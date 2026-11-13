@@ -45,9 +45,16 @@ export function RankExplorer() {
             type="text"
             inputMode="numeric"
             value={draft ?? formatRank(rank)}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              // Update live once the number is in range; mobile numeric keypads have no Enter key.
+              const n = Number(e.target.value.replace(/\D/g, ""));
+              if (n >= MIN && n <= MAX) setRank(n);
+            }}
+            enterKeyHint="done"
             onBlur={commit}
             onKeyDown={(e) => e.key === "Enter" && commit()}
+            aria-label="Your rank"
             className="numeric w-36 rounded-md border border-input bg-background px-2 py-1 font-pixel text-2xl focus:border-sky"
           />
         </label>

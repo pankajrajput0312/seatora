@@ -8,8 +8,11 @@ import { waitlistSchema, type WaitlistInput } from "./validations";
 export type WaitlistResult = { ok: true } | { ok: false; error: string };
 
 export async function joinWaitlist(input: WaitlistInput): Promise<WaitlistResult> {
-  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!allow(`waitlist:${ip}`)) return { ok: false, error: "Too many attempts. Please wait a minute and try again." };
+  // x-real-ip is set by Vercel and most proxies and can't be spoofed through them.
+  const h = await headers();
+  const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim();
+  // No IP: skip limiting rather than lock every visitor into one shared bucket.
+  if (ip && !allow(`waitlist:${ip}`)) return { ok: false, error: "Too many attempts. Please wait a minute and try again." };
 
   const parsed = waitlistSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };

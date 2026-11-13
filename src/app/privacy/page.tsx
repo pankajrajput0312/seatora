@@ -14,7 +14,7 @@ export default function PrivacyPage() {
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
           <section>
             <h2>What we collect</h2>
-            <p className="mt-2">When you join early access, we store your email address, the NEET PG year you chose and the time you signed up. Nothing else.</p>
+            <p className="mt-2">When you join early access, we store your email address, the NEET PG year you chose and the time you signed up. To stop abuse, your IP address is checked briefly in memory when you submit the form and is not stored with your sign-up; our hosting provider may keep standard server logs.</p>
           </section>
           <section>
             <h2>Why</h2>
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           <section>
             <h2>Your rights</h2>
             <p className="mt-2">
-              Under India&apos;s Digital Personal Data Protection Act, 2023, you can ask to see, correct or erase your data and withdraw consent at any time
+              Under India&apos;s Digital Personal Data Protection Act, 2023, you can ask to see, correct or erase your data, withdraw consent, or raise a complaint at any time
               {contact ? (
                 <> by writing to <a href={`mailto:${contact}`} className="text-sky underline">{contact}</a>.</>
               ) : (

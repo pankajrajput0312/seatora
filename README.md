@@ -29,7 +29,7 @@ The page renders without a database; only waitlist submissions need one (they sh
 
 ## Deploy (Vercel or any Node host)
 1. Provision PostgreSQL (Neon, Supabase, RDS…).
-2. Set `DATABASE_URL` and `NEXT_PUBLIC_SITE_URL` (e.g. `https://medpath.in`).
+2. Set `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL` (e.g. `https://medpath.in`) and `NEXT_PUBLIC_CONTACT_EMAIL` (privacy/deletion requests). Production builds fail if either public variable is missing.
 3. Run `npx prisma migrate deploy` against production once per schema change.
 4. Build with `npm run build`, start with `npm start`.
 

@@ -2,10 +2,13 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-if (!isDev && !process.env.NEXT_PUBLIC_SITE_URL && !process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-  const msg = "NEXT_PUBLIC_SITE_URL is not set: canonical, OG, sitemap and robots URLs will point to localhost.";
-  if (process.env.VERCEL_ENV === "production") throw new Error(msg);
-  console.warn(`⚠ ${msg}`);
+// Production builds must know their public URL and a privacy contact (see README).
+if (!isDev) {
+  const missing = [
+    !process.env.NEXT_PUBLIC_SITE_URL && !process.env.VERCEL_PROJECT_PRODUCTION_URL && "NEXT_PUBLIC_SITE_URL",
+    !process.env.NEXT_PUBLIC_CONTACT_EMAIL && "NEXT_PUBLIC_CONTACT_EMAIL",
+  ].filter(Boolean);
+  if (missing.length) throw new Error(`Missing required env for production build: ${missing.join(", ")}`);
 }
 
 // Static pages can't carry per-request nonces, so inline scripts/styles Next emits are allowed.
