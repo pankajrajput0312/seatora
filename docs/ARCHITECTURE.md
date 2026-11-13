@@ -65,7 +65,12 @@ Features may import from `components`, `lib`, `types` and `config`. A feature im
 - Pages and builds must not require a database until a feature actually reads from it.
 
 ## Authentication
-Deferred to Phase 7. The plan is Auth.js (NextAuth) with email magic link and Google, using the Prisma adapter and storing sessions in Postgres. Until then there are no accounts and no fake "Sign in" behaviour.
+Email and password, with no auth library (`src/features/auth`):
+- Passwords are hashed with Node `scrypt` and a per-user salt (`lib/password.ts`).
+- Sessions are database rows keyed by the SHA-256 of a random 32-byte token. The token lives only in an httpOnly, SameSite=Lax cookie (`medpath_session`, 30 days, Secure in production).
+- `getCurrentUser()` is used in server components. Protected pages call it and `redirect("/login")`. The landing page stays static, so the header always shows "Sign in", and `/login` and `/signup` redirect signed-in users to `/account`.
+- Sign-in and sign-up actions are Zod-validated and rate-limited per IP, and sign-in returns the same error for an unknown email and a wrong password.
+- Not built yet: password reset, email verification, OAuth. Add them before accounts hold anything valuable.
 
 ## Validation
 Zod is the single validation layer:

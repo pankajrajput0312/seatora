@@ -1,6 +1,6 @@
 # Database Schema (conceptual)
 
-Implemented so far in `prisma/schema.prisma`: **DataSource, College, Specialty, CollegeSpecialty, Cutoff, Announcement, WaitlistEntry** (landing-page early access). The other entities are documented here and added when real source data for them has been examined. Do not model data you have not seen.
+Implemented so far in `prisma/schema.prisma`: **DataSource, College, Specialty, CollegeSpecialty, Cutoff, Announcement, WaitlistEntry** (landing-page early access), **User, Session** (email/password auth). The other entities are documented here and added when real source data for them has been examined. Do not model data you have not seen.
 
 ## Provenance
 Every factual record references a `DataSource` and carries `lastVerifiedAt` and `verificationStatus`. Rules are in [DATA_INTEGRITY.md](DATA_INTEGRITY.md).

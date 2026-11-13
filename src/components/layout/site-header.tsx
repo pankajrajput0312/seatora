@@ -2,6 +2,7 @@ import Link from "next/link";
 import { siteConfig } from "@/config/site";
 import { Button } from "@/components/ui/button";
 import { Container } from "./container";
+import { AuthLink } from "./auth-link";
 import { LogoMark } from "./logo";
 import { MobileNav } from "./mobile-nav";
 
@@ -21,7 +22,10 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <div className="hidden md:block">
+          <div className="hidden items-center gap-2 md:flex">
+            <Button asChild size="sm" variant="ghost">
+              <AuthLink />
+            </Button>
             <Button asChild size="sm">
               <Link href="/#waitlist">Get early access</Link>
             </Button>

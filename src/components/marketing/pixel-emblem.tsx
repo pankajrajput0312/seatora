@@ -1,3 +1,5 @@
+import { cn } from "@/lib/cn";
+
 // Pixel-art emblem for the hero: dithered halo, ring, shaded disc and a green
 // medical cross (green, not red: the red cross is a protected emblem).
 
@@ -46,15 +48,17 @@ function buildPaths() {
 
 const paths = buildPaths();
 
-export function PixelEmblem({ className }: { className?: string }) {
+export function PixelEmblem({ className, animated = false }: { className?: string; animated?: boolean }) {
   return (
     <svg viewBox={`0 0 ${N} ${N}`} shapeRendering="crispEdges" className={className} aria-hidden>
-      <path d={paths.halo} className="fill-sky/40" />
+      <path d={paths.halo} className={cn("fill-sky/40", animated && "twinkle")} />
       <path d={paths.ring} className="fill-sky" />
       <path d={paths.disc} className="fill-accent" />
       <path d={paths.shine} className="fill-sky/30" />
-      <path d={paths.shadow} className="fill-background/70" />
-      <path d={paths.cross} className="fill-leaf" />
+      <g className={cn(animated && "heartbeat")}>
+        <path d={paths.shadow} className="fill-background/70" />
+        <path d={paths.cross} className="fill-leaf" />
+      </g>
     </svg>
   );
 }

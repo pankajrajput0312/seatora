@@ -41,3 +41,35 @@ test("waitlist sign-up succeeds", async ({ page }, info) => {
   await page.getByRole("button", { name: "Get early access" }).last().click();
   await expect(page.getByText("You're on the list")).toBeVisible();
 });
+
+test("sign up, sign out and sign back in", async ({ page }, info) => {
+  test.skip(!process.env.DATABASE_URL, "needs a database");
+  const email = `auth-${Date.now()}-${info.project.name}@example.com`;
+
+  await page.goto("/signup");
+  await page.getByLabel("Name").fill("Test Aspirant");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("short");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText("Use at least 8 characters")).toBeVisible();
+
+  await page.getByLabel("Password").fill("a-long-password");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Hi, Test Aspirant.");
+  await expect(page.locator('header a[href="/account"]')).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/login$/);
+
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("wrong-password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText("Incorrect email or password.")).toBeVisible();
+
+  await page.getByLabel("Password").fill("a-long-password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+});

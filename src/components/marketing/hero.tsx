@@ -31,7 +31,7 @@ export function Hero() {
           <p className="absolute top-0 left-0 z-10 rounded-full border border-input bg-secondary px-4 py-2 text-sm shadow-overlay">
             AIQ rank 12,450 · OBC · MD Medicine
           </p>
-          <PixelEmblem className="bob mx-auto w-4/5" />
+          <PixelEmblem className="bob mx-auto w-4/5" animated />
           <p className="absolute right-0 bottom-0 z-10 flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground shadow-overlay">
             <span className="size-1.5 animate-pulse rounded-full bg-sky" />
             comparing previous-year rounds

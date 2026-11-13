@@ -6,6 +6,7 @@ import { Dialog } from "radix-ui";
 import { Menu, X } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { Button } from "@/components/ui/button";
+import { AuthLink } from "./auth-link";
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
@@ -31,6 +32,7 @@ export function MobileNav() {
               </Link>
             ))}
           </nav>
+          <AuthLink onClick={() => setOpen(false)} className="block border-b border-border py-3.5 text-base" />
           <Button asChild size="lg" className="mt-5 w-full">
             <Link href="/#waitlist" onClick={() => setOpen(false)}>Get early access</Link>
           </Button>
