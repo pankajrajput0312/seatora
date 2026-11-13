@@ -31,8 +31,8 @@ export function MobileNav() {
                 {item.label}
               </Link>
             ))}
+            <AuthLink onClick={() => setOpen(false)} className="border-b border-border py-3.5 text-base" />
           </nav>
-          <AuthLink onClick={() => setOpen(false)} className="block border-b border-border py-3.5 text-base" />
           <Button asChild size="lg" className="mt-5 w-full">
             <Link href="/#waitlist" onClick={() => setOpen(false)}>Get early access</Link>
           </Button>

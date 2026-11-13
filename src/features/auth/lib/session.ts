@@ -23,7 +23,12 @@ export async function createSession(userId: string) {
     path: "/",
     maxAge: MAX_AGE_S,
   });
-  (await cookies()).set(SIGNED_IN_FLAG, "1", { sameSite: "lax", path: "/", maxAge: MAX_AGE_S });
+  (await cookies()).set(SIGNED_IN_FLAG, "1", {
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: MAX_AGE_S,
+  });
 }
 
 /** The signed-in user, or null. Expired sessions are treated as signed out. */
@@ -34,7 +39,12 @@ export async function getCurrentUser() {
     where: { id: hashToken(token) },
     include: { user: { select: { id: true, email: true, name: true } } },
   });
-  if (!session || session.expiresAt < new Date()) return null;
+  if (!session) return null;
+  if (session.expiresAt < new Date()) {
+    // Prune this user's expired sessions as they're found.
+    await db.session.deleteMany({ where: { userId: session.userId, expiresAt: { lt: new Date() } } });
+    return null;
+  }
   return session.user;
 }
 

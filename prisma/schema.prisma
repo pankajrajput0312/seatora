@@ -136,6 +136,9 @@ model User {
   email        String    @unique
   name         String
   passwordHash String
+  /// Consecutive failed sign-ins; the account is locked until lockedUntil after too many.
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime?
   createdAt    DateTime  @default(now())
   sessions     Session[]
 }

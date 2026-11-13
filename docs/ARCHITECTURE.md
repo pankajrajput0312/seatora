@@ -70,7 +70,8 @@ Email and password, with no auth library (`src/features/auth`):
 - Sessions are database rows keyed by the SHA-256 of a random 32-byte token. The token lives only in an httpOnly, SameSite=Lax cookie (`medpath_session`, 30 days, Secure in production).
 - `getCurrentUser()` is used in server components. Protected pages call it and `redirect("/login")`. The landing page stays static, so the header always shows "Sign in", and `/login` and `/signup` redirect signed-in users to `/account`.
 - Sign-in and sign-up actions are Zod-validated and rate-limited per IP, and sign-in returns the same error for an unknown email and a wrong password.
-- Not built yet: password reset, email verification, OAuth. Add them before accounts hold anything valuable.
+- Sign-in always runs scrypt (against a dummy hash for unknown emails), so timing reveals nothing. After 5 failures an account locks for 15 minutes (`failedLogins` and `lockedUntil` on User). The per-IP limit is a generous 30 per minute because hostels and colleges share IPs.
+- Not built yet: password reset, email verification (so sign-up still reveals an existing email), OAuth, and "sign out everywhere". These need an email provider; add them before accounts hold anything valuable.
 
 ## Validation
 Zod is the single validation layer:

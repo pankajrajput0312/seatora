@@ -16,7 +16,7 @@ export default function PrivacyPage() {
             <h2>What we collect</h2>
             <p className="mt-2">
               If you create an account, we store your name, email address and a one-way hash of your password (never the password
-              itself), plus two strictly necessary cookies that keep you signed in. We don&apos;t use tracking or advertising cookies.
+              itself), plus two strictly necessary cookies that keep you signed in, a record of each sign-in session (when it started and expires), and a count of recent failed sign-in attempts used to protect your account. We don&apos;t use tracking or advertising cookies.
             </p>
             <p className="mt-2">When you join early access, we store your email address, the NEET PG year you chose and the time you signed up. To stop abuse, your IP address is checked briefly in memory when you submit the form and is not stored with your sign-up; our hosting provider may keep standard server logs.</p>
           </section>

@@ -5,16 +5,20 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { allow } from "@/lib/rate-limit";
-import { hashPassword, verifyPassword } from "./lib/password";
+import { dummyHash, hashPassword, verifyPassword } from "./lib/password";
 import { createSession, deleteSession } from "./lib/session";
 import { signInSchema, signUpSchema, type SignInInput, type SignUpInput } from "./validations";
 
 export type AuthResult = { ok: false; error: string };
 
+const MAX_FAILED = 5;
+const LOCK_MS = 15 * 60 * 1000;
+
 async function rateLimited(kind: string) {
   const h = await headers();
   const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return ip ? !allow(`${kind}:${ip}`, 10) : false;
+  // Generous per IP (hostels and colleges share IPs); per-account lockout stops brute force.
+  return ip ? !allow(`${kind}:${ip}`, 30) : false;
 }
 
 export async function signUp(input: SignUpInput): Promise<AuthResult> {
@@ -44,9 +48,23 @@ export async function signIn(input: SignInInput): Promise<AuthResult> {
 
   try {
     const user = await db.user.findUnique({ where: { email: parsed.data.email } });
-    // Same message for unknown email and wrong password.
-    if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
-      return { ok: false, error: "Incorrect email or password." };
+    // Always run scrypt (against a dummy hash for unknown emails) so timing doesn't reveal accounts.
+    const valid = await verifyPassword(parsed.data.password, user?.passwordHash ?? (await dummyHash));
+    const locked = !!user?.lockedUntil && user.lockedUntil > new Date();
+
+    // Same message for unknown email, wrong password and locked account.
+    if (!user || !valid || locked) {
+      if (user && !locked) {
+        const failed = user.failedLogins + 1;
+        await db.user.update({
+          where: { id: user.id },
+          data: failed >= MAX_FAILED ? { failedLogins: 0, lockedUntil: new Date(Date.now() + LOCK_MS) } : { failedLogins: failed },
+        });
+      }
+      return { ok: false, error: "Incorrect email or password. After 5 failed attempts, sign-in is paused for 15 minutes." };
+    }
+    if (user.failedLogins || user.lockedUntil) {
+      await db.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null } });
     }
     await createSession(user.id);
   } catch (err) {

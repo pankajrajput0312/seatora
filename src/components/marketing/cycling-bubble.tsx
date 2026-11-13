@@ -9,14 +9,19 @@ export function CyclingBubble({ messages, className, interval = 2800 }: { messag
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let fade: ReturnType<typeof setTimeout>;
     const id = setInterval(() => {
       setVisible(false);
-      setTimeout(() => {
+      fade = setTimeout(() => {
         setI((n) => (n + 1) % messages.length);
         setVisible(true);
       }, 250);
     }, interval);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      clearTimeout(fade);
+    };
   }, [messages.length, interval]);
 
   return (

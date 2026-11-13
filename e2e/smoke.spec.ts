@@ -73,3 +73,29 @@ test("sign up, sign out and sign back in", async ({ page }, info) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/account$/);
 });
+
+test("account locks after 5 failed sign-ins", async ({ page }, info) => {
+  test.skip(!process.env.DATABASE_URL, "needs a database");
+  const email = `lock-${Date.now()}-${info.project.name}@example.com`;
+  await page.goto("/signup");
+  await page.getByLabel("Name").fill("Lock Test");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("a-long-password");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/$/);
+
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  for (let i = 0; i < 5; i++) {
+    await page.getByLabel("Password").fill(`wrong-${i}`);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.locator("form [role=alert]")).toContainText("Incorrect email or password");
+  }
+  // Correct password is refused while locked.
+  await page.getByLabel("Password").fill("a-long-password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.locator("form [role=alert]")).toContainText("Incorrect email or password");
+  await expect(page).toHaveURL(/\/login$/);
+});

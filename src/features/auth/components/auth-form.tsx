@@ -33,16 +33,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
   const field = (name: keyof SignUpInput, label: string, props: React.ComponentProps<"input">) => (
     <div>
-      <label htmlFor={name} className="text-sm font-medium">{label}</label>
+      <label htmlFor={`auth-${name}`} className="text-sm font-medium">{label}</label>
       <Input
-        id={name}
+        id={`auth-${name}`}
         className="mt-1.5 h-11"
         aria-invalid={!!errors[name]}
-        aria-describedby={errors[name] ? `${name}-error` : undefined}
+        aria-describedby={errors[name] ? `auth-${name}-error` : undefined}
         {...props}
         {...register(name)}
       />
-      {errors[name] && <p id={`${name}-error`} className="mt-1.5 text-xs text-ember">{errors[name]?.message}</p>}
+      {errors[name] && <p id={`auth-${name}-error`} className="mt-1.5 text-xs text-ember">{errors[name]?.message}</p>}
     </div>
   );
 
