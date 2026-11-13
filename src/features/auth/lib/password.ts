@@ -10,13 +10,15 @@ let running = 0;
 const queue: Array<() => void> = [];
 
 async function withSlot<T>(fn: () => Promise<T>): Promise<T> {
+  // A waiter inherits the finishing caller's slot, so `running` never overshoots.
   if (running >= MAX_CONCURRENT) await new Promise<void>((r) => queue.push(r));
-  running++;
+  else running++;
   try {
     return await fn();
   } finally {
-    running--;
-    queue.shift()?.();
+    const next = queue.shift();
+    if (next) next();
+    else running--;
   }
 }
 

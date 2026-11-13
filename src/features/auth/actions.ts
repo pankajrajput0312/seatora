@@ -83,7 +83,7 @@ export async function signIn(input: SignInInput): Promise<AuthResult> {
           }
         }
       }
-      return { ok: false, error: "Incorrect email or password. After 5 failed attempts, sign-in is paused for 15 minutes." };
+      return { ok: false, error: "Incorrect email or password. Too many failed attempts pause sign-in for a few minutes." };
     }
     reset(pairKey);
     if (user.failedLogins || user.lockedUntil) {
