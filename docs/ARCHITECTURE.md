@@ -70,7 +70,7 @@ Email and password, with no auth library (`src/features/auth`):
 - Sessions are database rows keyed by the SHA-256 of a random 32-byte token. The token lives only in an httpOnly, SameSite=Lax cookie (`medpath_session`, 30 days, Secure in production).
 - `getCurrentUser()` is used in server components. Protected pages call it and `redirect("/login")`. The landing page stays static, so the header always shows "Sign in", and `/login` and `/signup` redirect signed-in users to `/account`.
 - Sign-in and sign-up actions are Zod-validated and rate-limited per IP, and sign-in returns the same error for an unknown email and a wrong password.
-- Sign-in always runs scrypt (against a dummy hash for unknown emails), so timing reveals nothing. After 5 failures an account locks for 15 minutes (`failedLogins` and `lockedUntil` on User). The per-IP limit is a generous 30 per minute because hostels and colleges share IPs.
+- Sign-in always runs scrypt (against a dummy hash for unknown emails), so timing reveals nothing. Password guessing is limited at two levels: 5 failures per 15 minutes for each account and IP pair (in memory), which stops one attacker without locking the real user out elsewhere, and 20 failures on an account from any IP, which locks it for 15 minutes. That second counter is incremented atomically in the database, so parallel guesses can't race past it. At most 4 scrypt runs happen at once per instance (each uses about 128MB).
 - Not built yet: password reset, email verification (so sign-up still reveals an existing email), OAuth, and "sign out everywhere". These need an email provider; add them before accounts hold anything valuable.
 
 ## Validation

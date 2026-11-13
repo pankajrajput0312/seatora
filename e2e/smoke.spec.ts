@@ -99,3 +99,32 @@ test("account locks after 5 failed sign-ins", async ({ page }, info) => {
   await expect(page.locator("form [role=alert]")).toContainText("Incorrect email or password");
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test("parallel wrong guesses still trigger the lock", async ({ page, browser }, info) => {
+  test.skip(!process.env.DATABASE_URL, "needs a database");
+  const email = `race-${Date.now()}-${info.project.name}@example.com`;
+  await page.goto("/signup");
+  await page.getByLabel("Name").fill("Race Test");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("a-long-password");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+
+  // 8 tabs submit wrong passwords at the same moment.
+  const tabs = await Promise.all(Array.from({ length: 8 }, async () => {
+    const ctx = await browser.newContext();
+    const p = await ctx.newPage();
+    await p.goto("/login");
+    await p.getByLabel("Email").fill(email);
+    await p.getByLabel("Password").fill("wrong-password");
+    return p;
+  }));
+  await Promise.all(tabs.map((p) => p.getByRole("button", { name: "Sign in" }).click()));
+  await Promise.all(tabs.map((p) => expect(p.locator("form [role=alert]")).toBeVisible()));
+
+  const p = tabs[0];
+  await p.getByLabel("Password").fill("a-long-password");
+  await p.getByRole("button", { name: "Sign in" }).click();
+  await expect(p.locator("form [role=alert]")).toContainText("Incorrect email or password");
+  await expect(p).toHaveURL(/\/login$/);
+});

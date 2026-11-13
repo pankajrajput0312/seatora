@@ -4,15 +4,25 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { allow } from "@/lib/rate-limit";
+import { allow, isLimited, reset } from "@/lib/rate-limit";
 import { dummyHash, hashPassword, verifyPassword } from "./lib/password";
 import { createSession, deleteSession } from "./lib/session";
 import { signInSchema, signUpSchema, type SignInInput, type SignUpInput } from "./validations";
 
 export type AuthResult = { ok: false; error: string };
 
-const MAX_FAILED = 5;
+// Two layers against password guessing:
+// - per account + IP: 5 failures per 15 min. Targets one attacker without locking the real user out elsewhere.
+// - per account, any IP: 20 failures -> 15 min lock. Backstop against distributed guessing (atomic in the DB).
+const PAIR_LIMIT = 5;
+const PAIR_WINDOW_MS = 15 * 60 * 1000;
+const ACCOUNT_LIMIT = 20;
 const LOCK_MS = 15 * 60 * 1000;
+
+async function clientIp() {
+  const h = await headers();
+  return h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+}
 
 async function rateLimited(kind: string) {
   const h = await headers();
@@ -47,22 +57,35 @@ export async function signIn(input: SignInInput): Promise<AuthResult> {
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
   try {
+    const pairKey = `signin-fail:${parsed.data.email}:${await clientIp()}`;
     const user = await db.user.findUnique({ where: { email: parsed.data.email } });
     // Always run scrypt (against a dummy hash for unknown emails) so timing doesn't reveal accounts.
     const valid = await verifyPassword(parsed.data.password, user?.passwordHash ?? (await dummyHash));
-    const locked = !!user?.lockedUntil && user.lockedUntil > new Date();
+    const blocked =
+      isLimited(pairKey, PAIR_LIMIT) || (!!user?.lockedUntil && user.lockedUntil > new Date());
 
-    // Same message for unknown email, wrong password and locked account.
-    if (!user || !valid || locked) {
-      if (user && !locked) {
-        const failed = user.failedLogins + 1;
-        await db.user.update({
-          where: { id: user.id },
-          data: failed >= MAX_FAILED ? { failedLogins: 0, lockedUntil: new Date(Date.now() + LOCK_MS) } : { failedLogins: failed },
-        });
+    // Same message for unknown email, wrong password and blocked attempts.
+    if (!user || !valid || blocked) {
+      if (!valid) {
+        allow(pairKey, PAIR_LIMIT, PAIR_WINDOW_MS);
+        if (user) {
+          // Atomic increment, so parallel guesses can't overwrite each other's count.
+          const { failedLogins } = await db.user.update({
+            where: { id: user.id },
+            data: { failedLogins: { increment: 1 } },
+            select: { failedLogins: true },
+          });
+          if (failedLogins >= ACCOUNT_LIMIT) {
+            await db.user.updateMany({
+              where: { id: user.id, failedLogins: { gte: ACCOUNT_LIMIT } },
+              data: { failedLogins: 0, lockedUntil: new Date(Date.now() + LOCK_MS) },
+            });
+          }
+        }
       }
       return { ok: false, error: "Incorrect email or password. After 5 failed attempts, sign-in is paused for 15 minutes." };
     }
+    reset(pairKey);
     if (user.failedLogins || user.lockedUntil) {
       await db.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null } });
     }
