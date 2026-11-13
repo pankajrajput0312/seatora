@@ -1,5 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// Load .env so tests can tell whether a database is configured.
+try {
+  process.loadEnvFile();
+} catch {}
+
 export default defineConfig({
   testDir: "e2e",
   use: { baseURL: "http://localhost:3000" },

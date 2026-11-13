@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 // Questions aspirants ask during counselling. Prompts only, not data claims.
 const rows = [
   ["which colleges closed near my rank last year?", "is the bond worth the stipend?", "MD or MS with this rank?", "how heavy is the patient load?"],
-  ["AIQ or state quota first?", "what changed between round 1 and round 2?", "deemed fees vs government stipend", "who actually gets mop-up seats?"],
+  ["AIQ or state quota first?", "what changed between round 1 and round 2?", "deemed fees vs government stipend", "what opens up in round 3?"],
   ["hostel and duty hours?", "how is the faculty in radiology?", "seat matrix for my category", "when does choice filling close?"],
 ];
 

@@ -1,5 +1,6 @@
 import { Container } from "@/components/layout/container";
 import { WaitlistForm } from "@/features/waitlist/components/waitlist-form";
+import { examYearsFrom } from "@/features/waitlist/validations";
 
 export function Cta() {
   return (
@@ -10,11 +11,10 @@ export function Cta() {
             Make your next career decision with clarity.
           </h2>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground">
-            Join early access. We&apos;ll let you know when the planner opens for your counselling year. No spam; one
-            click to unsubscribe.
+            Join early access. We&apos;ll let you know when the planner opens for your counselling year.
           </p>
           <div className="mt-8 max-w-2xl">
-            <WaitlistForm />
+            <WaitlistForm examYears={examYearsFrom()} />
           </div>
         </div>
       </Container>

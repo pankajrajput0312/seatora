@@ -15,7 +15,7 @@ function Tile({ title, caption, className, children }: { title: string; caption:
   );
 }
 
-const rounds = ["R1", "R2", "R3", "Mop-up"];
+const rounds = ["R1", "R2", "R3", "Stray"];
 const series = [
   { name: "Government", values: [6800, 8200, 9100, 10400], stroke: "stroke-foreground", fill: "fill-foreground", dot: "bg-foreground" },
   { name: "Deemed", values: [14200, 18900, 22600, 27500], stroke: "stroke-sky", fill: "fill-sky", dot: "bg-sky" },
@@ -38,7 +38,7 @@ function RanksChart() {
           </g>
         ))}
       </svg>
-      <div className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+      <div className="mt-2 flex justify-between font-mono text-xs uppercase tracking-widest text-muted-foreground">
         {rounds.map((r) => <span key={r}>{r}</span>)}
       </div>
       <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
@@ -56,14 +56,14 @@ const seats = [[9, 3, 6, 4, 2], [8, 2, 5, 3, 1], [6, 2, 4, 2, 1], [4, 1, 3, 2, 1
 
 function SeatGrid() {
   return (
-    <div className="grid grid-cols-[auto_repeat(5,1fr)] gap-1 text-[10px]">
+    <div className="grid grid-cols-[auto_repeat(5,1fr)] gap-1 text-xs">
       <span />
       {categories.map((c) => <span key={c} className="text-center font-mono text-muted-foreground">{c}</span>)}
       {specialties.map((s, i) => (
         <div key={s} className="contents">
           <span className="pr-2 text-muted-foreground">{s}</span>
           {seats[i].map((n, j) => (
-            <span key={j} className={cn("numeric grid aspect-square place-items-center", n > 5 ? "text-background" : "text-foreground")}
+            <span key={j} className={cn("numeric grid aspect-square place-items-center", n >= 3 ? "text-background" : "text-foreground")}
               style={{ backgroundColor: `color-mix(in oklch, var(--color-sky) ${15 + (n / 9) * 85}%, transparent)` }}>
               {n}
             </span>
@@ -126,7 +126,7 @@ function CompareMini() {
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        <tr className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
           <th className="pb-2 text-left font-normal" />
           <th className="pb-2 text-right font-normal">College A</th>
           <th className="pb-2 text-right font-normal">College B</th>
@@ -149,16 +149,16 @@ function InstituteMini() {
   return (
     <div>
       <p className="text-sm font-medium">Example Government Medical College</p>
-      <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">City · State · Est. 1960</p>
+      <p className="mt-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">City · State · Est. 1960</p>
       <div className="mt-3 flex flex-wrap gap-1.5">
         <Badge>Government</Badge>
-        <Badge tone="success">Official source</Badge>
+        <Badge tone="warning">Demo</Badge>
       </div>
       <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
         {[["Beds", "1,800"], ["PG seats", "142"], ["Specialties", "21"]].map(([k, v]) => (
           <div key={k} className="rounded-md bg-muted py-2">
             <dd className="numeric font-pixel text-lg">{v}</dd>
-            <dt className="text-[10px] text-muted-foreground">{k}</dt>
+            <dt className="text-xs text-muted-foreground">{k}</dt>
           </div>
         ))}
       </dl>
@@ -189,7 +189,7 @@ const steps = [
   { label: "R1 result", state: "done" },
   { label: "Choice filling R2", state: "next" },
   { label: "R2 result", state: "todo" },
-  { label: "Mop-up", state: "todo" },
+  { label: "Round 3", state: "todo" },
   { label: "Stray vacancy", state: "todo" },
 ] as const;
 
@@ -199,7 +199,7 @@ function TrackerMini() {
       {steps.map((s) => (
         <li key={s.label} className="flex items-center gap-3 sm:flex-col sm:items-stretch sm:gap-2">
           <span className={cn("h-1.5 w-6 shrink-0 sm:w-auto", s.state === "done" ? "bg-foreground" : s.state === "next" ? "animate-pulse bg-sky" : "bg-muted")} />
-          <span className={cn("flex items-start gap-1 text-[11px] leading-tight", s.state === "todo" ? "text-muted-foreground" : s.state === "next" ? "text-sky" : "")}>
+          <span className={cn("flex items-start gap-1 text-xs leading-tight", s.state === "todo" ? "text-muted-foreground" : s.state === "next" ? "text-sky" : "")}>
             {s.state === "done" && <Check className="mt-px size-3 shrink-0" aria-hidden />}
             {s.label}
           </span>

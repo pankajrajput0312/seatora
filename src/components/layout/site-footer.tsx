@@ -14,6 +14,7 @@ export function SiteFooter() {
           {siteConfig.nav.map((item) => (
             <Link key={item.href} href={item.href} className="hover:text-foreground">{item.label}</Link>
           ))}
+          <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
           <span className="font-mono text-xs">© {new Date().getFullYear()}</span>
         </nav>
       </Container>

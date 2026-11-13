@@ -1,11 +1,16 @@
 "use server";
 
+import { headers } from "next/headers";
 import { db } from "@/lib/db";
+import { allow } from "@/lib/rate-limit";
 import { waitlistSchema, type WaitlistInput } from "./validations";
 
 export type WaitlistResult = { ok: true } | { ok: false; error: string };
 
 export async function joinWaitlist(input: WaitlistInput): Promise<WaitlistResult> {
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (!allow(`waitlist:${ip}`)) return { ok: false, error: "Too many attempts. Please wait a minute and try again." };
+
   const parsed = waitlistSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
@@ -14,12 +19,8 @@ export async function joinWaitlist(input: WaitlistInput): Promise<WaitlistResult
   if (website) return { ok: true };
 
   try {
-    // Re-joining with the same email just updates the year; no duplicate error for the user.
-    await db.waitlistEntry.upsert({
-      where: { email: parsed.data.email },
-      create: entry,
-      update: { examYear: entry.examYear },
-    });
+    // Existing emails are left untouched, so nobody can overwrite someone else's entry.
+    await db.waitlistEntry.upsert({ where: { email: entry.email }, create: entry, update: {} });
     return { ok: true };
   } catch (err) {
     console.error("joinWaitlist failed", err);

@@ -19,7 +19,7 @@ export const viewport: Viewport = { themeColor: "#0b0e12", colorScheme: "dark" }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en-IN" className={`scroll-smooth ${GeistSans.variable} ${GeistMono.variable} ${GeistPixelSquare.variable}`}>
+    <html lang="en-IN" className={`motion-safe:scroll-smooth ${GeistSans.variable} ${GeistMono.variable} ${GeistPixelSquare.variable}`}>
       <body className="flex min-h-screen flex-col">
         <SiteHeader />
         <main className="flex-1">{children}</main>

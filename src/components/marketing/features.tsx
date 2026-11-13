@@ -16,7 +16,7 @@ export function Features() {
         <Container className="grid gap-px overflow-hidden py-0 md:grid-cols-3">
           {problems.map((p) => (
             <div key={p.title} className="border-t border-border py-10 first:border-t-0 md:border-t-0 md:px-8 md:first:pl-0 md:[&:not(:first-child)]:border-l md:[&:not(:first-child)]:border-border">
-              <h3 className="text-base font-medium">{p.title}</h3>
+              <p className="text-base font-medium">{p.title}</p>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{p.body}</p>
             </div>
           ))}

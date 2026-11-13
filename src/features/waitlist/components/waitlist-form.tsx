@@ -7,9 +7,10 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { joinWaitlist } from "../actions";
-import { examYears, waitlistSchema, type WaitlistInput } from "../validations";
+import Link from "next/link";
+import { waitlistSchema, type WaitlistInput } from "../validations";
 
-export function WaitlistForm() {
+export function WaitlistForm({ examYears }: { examYears: number[] }) {
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<"idle" | "done" | string>("idle");
   const { register, handleSubmit, formState: { errors } } = useForm<WaitlistInput>({
@@ -53,7 +54,7 @@ export function WaitlistForm() {
         <label htmlFor="wl-year" className="sr-only">NEET PG year</label>
         <select
           id="wl-year"
-          className="h-12 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground focus:border-sky focus:outline-none"
+          className="h-12 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground focus:border-sky"
           {...register("examYear")}
         >
           {examYears.map((y) => <option key={y} value={y}>NEET PG {y}</option>)}
@@ -67,6 +68,10 @@ export function WaitlistForm() {
         Get early access
       </Button>
       {status !== "idle" && <p role="alert" className="text-sm text-ember sm:col-span-3">{status}</p>}
+      <p className="text-xs text-muted-foreground sm:col-span-3">
+        We&apos;ll only use your email to tell you when MEDPATH opens. See our{" "}
+        <Link href="/privacy" className="underline hover:text-foreground">privacy notice</Link>.
+      </p>
     </form>
   );
 }

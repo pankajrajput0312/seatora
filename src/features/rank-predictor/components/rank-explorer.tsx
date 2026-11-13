@@ -10,12 +10,12 @@ import { rankFit, rankFitLabel, type RankFit } from "../lib/rank-fit";
 const demoRows = [
   { college: "Example Government Medical College", type: "Government", r1: 6820, r2: 8240, fee: 52000 },
   { college: "Example State Institute of Medical Sciences", type: "Government", r1: 11410, r2: 12900, fee: 78000 },
-  { college: "Example Municipal Medical College", type: "Government", r1: 15300, r2: 17650, fee: 64000 },
-  { college: "Example Deemed University Hospital", type: "Deemed", r1: 21250, r2: 24800, fee: 2450000 },
+  { college: "Example Municipal Medical College", type: "Government", r1: 31300, r2: 38650, fee: 64000 },
+  { college: "Example Deemed University Hospital", type: "Deemed", r1: 74250, r2: 92800, fee: 2450000 },
 ];
 
 const MIN = 1000;
-const MAX = 30000;
+const MAX = 200000;
 
 const fitStyle: Record<RankFit, { row: string; tone: "success" | "warning" | "error" }> = {
   inside: { row: "border-l-leaf", tone: "success" },
@@ -25,7 +25,16 @@ const fitStyle: Record<RankFit, { row: string; tone: "success" | "warning" | "er
 
 export function RankExplorer() {
   const [rank, setRank] = useState(12450);
-  const clamp = (n: number) => Math.min(MAX, Math.max(MIN, Math.round(n) || MIN));
+  // Typed text is kept raw and only clamped on commit, so partial input like "5" isn't snapped.
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft == null) return;
+    const n = Number(draft.replace(/\D/g, ""));
+    if (n) setRank(Math.min(MAX, Math.max(MIN, n)));
+    setDraft(null);
+  };
+  const fits = demoRows.map((r) => rankFit(rank, r.r2)!);
+  const count = (f: RankFit) => fits.filter((x) => x === f).length;
 
   return (
     <figure className="overflow-hidden rounded-xl border border-border bg-card" aria-label="Interactive planner preview with demo data">
@@ -33,13 +42,13 @@ export function RankExplorer() {
         <label className="flex items-baseline gap-3">
           <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Your rank</span>
           <input
-            type="number"
+            type="text"
             inputMode="numeric"
-            min={MIN}
-            max={MAX}
-            value={rank}
-            onChange={(e) => setRank(clamp(e.target.valueAsNumber))}
-            className="numeric w-28 rounded-md border border-input bg-background px-2 py-1 font-pixel text-2xl focus:border-sky focus:outline-none"
+            value={draft ?? formatRank(rank)}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => e.key === "Enter" && commit()}
+            className="numeric w-36 rounded-md border border-input bg-background px-2 py-1 font-pixel text-2xl focus:border-sky"
           />
         </label>
         <div className="flex items-center gap-3">
@@ -48,9 +57,9 @@ export function RankExplorer() {
             type="range"
             min={MIN}
             max={MAX}
-            step={50}
+            step={100}
             value={rank}
-            onChange={(e) => setRank(Number(e.target.value))}
+            onChange={(e) => { setDraft(null); setRank(Number(e.target.value)); }}
             aria-label="Adjust your rank"
             className="h-2 w-full cursor-pointer accent-sky"
           />
@@ -76,9 +85,9 @@ export function RankExplorer() {
               <th className="px-5 py-3 text-right font-normal">Your rank vs R2</th>
             </tr>
           </thead>
-          <tbody aria-live="polite">
-            {demoRows.map((r) => {
-              const fit = rankFit(rank, r.r2)!;
+          <tbody>
+            {demoRows.map((r, i) => {
+              const fit = fits[i];
               return (
                 <tr key={r.college} className={cn("border-b border-l-2 border-b-border last:border-b-0 transition-colors", fitStyle[fit].row)}>
                   <td className="px-5 py-3">
@@ -97,8 +106,11 @@ export function RankExplorer() {
           </tbody>
         </table>
       </div>
+      <p className="sr-only" aria-live="polite">
+        {`Rank ${formatRank(rank)}: ${count("inside")} inside, ${count("near")} near, ${count("beyond")} beyond last year's closing rank.`}
+      </p>
       <figcaption className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
-        &ldquo;Near&rdquo; means within 10% of the previous-year closing rank. This compares against past rounds only and does not predict or guarantee a seat.
+        &ldquo;Near&rdquo; means within 10% of the previous-year closing rank. This compares against last year&apos;s Round 2 only and does not predict or guarantee a seat.
       </figcaption>
     </figure>
   );
