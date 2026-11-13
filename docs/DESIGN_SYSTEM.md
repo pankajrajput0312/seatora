@@ -82,6 +82,8 @@ Adapted from roook.space. Utilities are defined in `globals.css`. Use these on m
 - **Pixel emblem** (`PixelEmblem`): an SVG generated with Bayer-dithered pixels (sky ring, accent disc, leaf cross; never a red cross), floating with `bob`. It is flanked by a query chat bubble (`bg-secondary rounded-full`) and a status pill (`bg-primary` with a pulsing sky dot).
 - **Question marquee**: three rows of real aspirant questions. The middle row is large and sharp; the outer rows are small, 50% opacity and blurred 1.5px, with the bottom row reversed. Edges fade with `mask-x`. Rows are `aria-hidden`, with an `sr-only` list for screen readers.
 - **Tinted halftone cards**: four signal-colour cards (ember, sky, sun, leaf) with the `halftone` dot overlay and a pixel glyph, labelled in pixel type in the matching colour. A single `glow-strong` pixel headline overlays them on `md+` and sits above them on mobile.
+- **Rank explorer** (`features/rank-predictor/components/rank-explorer.tsx`): a rank slider and number input over demo rows. Each row gets a left border and a badge (leaf = inside, sun = within 10%, ember = beyond the previous closing rank), and the caption always states that the comparison is historical.
+- **Feature tiles** (`feature-tiles.tsx`): a grid of mini product previews instead of icon-and-text cards. These are SVG line charts, a seat heatmap, bars, pixel meters, a compare table, a profile card, a shortlist and a round tracker, built with plain SVG and divs (no chart library). The section carries one "demo data" badge.
 - **Text glow**: `glow` on pixel display headlines only.
 - **Footer wordmark**: a giant pixel "medpath" at 6% foreground, fading out at the bottom.
 - **Logo mark** (`LogoMark`, `app/icon.svg`): a 9×9 pixel ring with a cross.
