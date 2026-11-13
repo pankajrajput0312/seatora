@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/* MEDPATH tokens (dark, after roook.space). Source of truth: docs/DESIGN_SYSTEM.md */
+@theme {
+  --color-*: initial;
+  --color-background: oklch(14% 0.01 240);
+  --color-foreground: oklch(96% 0.006 240);
+  --color-card: oklch(18.5% 0.01 240);
+  --color-popover: oklch(19% 0.015 250);
+  --color-muted: oklch(22% 0.014 250);
+  --color-muted-foreground: oklch(70% 0.012 240);
+  --color-secondary: oklch(23% 0.016 250);
+  --color-accent: oklch(25% 0.018 250);
+  --color-primary: oklch(96% 0.006 240);
+  --color-primary-foreground: oklch(16% 0.016 250);
+  --color-border: oklch(100% 0 0 / 0.08);
+  --color-input: oklch(100% 0 0 / 0.11);
+  --color-ring: oklch(80% 0.12 222 / 0.6);
+
+  /* Signal colours: meaning only, never decoration */
+  --color-sky: oklch(80% 0.12 222);   /* info, links, focus */
+  --color-leaf: oklch(78% 0.19 145);  /* success, official */
+  --color-sun: oklch(87% 0.17 95);    /* warning, unverified */
+  --color-ember: oklch(65% 0.23 27);  /* error, destructive */
+  --color-white: #fff;
+  --color-black: #000;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-pixel: var(--font-geist-pixel-square), ui-monospace, monospace;
+
+  --radius-sm: 0.45rem;
+  --radius-md: 0.6rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --shadow-*: initial;
+  --shadow-overlay: 0 12px 32px oklch(0% 0 0 / 0.4);
+
+  --container-content: 72rem;
+  --container-prose: 42rem;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 {
+    color: var(--color-foreground);
+    letter-spacing: -0.025em;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+}
+
+/* Faint CRT scanlines over the whole page, after roook.space */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, oklch(100% 0 0 / 0.018) 2px 3px);
+}
+
+@keyframes marquee { to { transform: translateX(-50%); } }
+@keyframes bob { 50% { transform: translateY(-8px); } }
+
+@utility marquee { animation: marquee 60s linear infinite; }
+@utility marquee-slow { animation: marquee 90s linear infinite; }
+@utility bob { animation: bob 6s ease-in-out infinite; }
+@utility mask-x { mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent); }
+@utility glow { text-shadow: 0 0 24px oklch(100% 0 0 / 0.18); }
+@utility glow-strong { text-shadow: 0 2px 0 oklch(0% 0 0 / 0.6), 0 0 32px oklch(0% 0 0 / 0.8); }
+/* Halftone dots over a signal colour, standing in for roook's dithered photos */
+@utility halftone {
+  background-image: radial-gradient(circle, oklch(0% 0 0 / 0.55) 0.9px, transparent 1.4px),
+    linear-gradient(to bottom, transparent 40%, oklch(0% 0 0 / 0.55));
+  background-size: 4px 4px, 100% 100%;
+}
+
+@utility numeric {
+  font-variant-numeric: tabular-nums;
+}

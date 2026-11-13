@@ -1,0 +1,132 @@
+// Core entities only. Remaining entities in docs/DATABASE_SCHEMA.md are added
+// once their real data sources are understood.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SourceType {
+  OFFICIAL
+  VERIFIED_INSTITUTIONAL
+  THIRD_PARTY_RESEARCH
+  STUDENT_REPORTED
+  UNVERIFIED_COMMUNITY
+}
+
+enum VerificationStatus {
+  VERIFIED
+  PENDING
+  DISPUTED
+  OUTDATED
+}
+
+enum CollegeType {
+  GOVERNMENT
+  PRIVATE
+  DEEMED
+  CENTRAL
+}
+
+enum Quota {
+  AIQ
+  STATE
+  DEEMED
+  CENTRAL_INSTITUTE
+  MANAGEMENT
+  NRI
+}
+
+model DataSource {
+  id            String         @id @default(cuid())
+  name          String
+  url           String?
+  type          SourceType
+  publishedAt   DateTime?
+  createdAt     DateTime       @default(now())
+  cutoffs       Cutoff[]
+  announcements Announcement[]
+  colleges      College[]
+}
+
+model College {
+  id                 String             @id @default(cuid())
+  slug               String             @unique
+  name               String
+  city               String
+  state              String
+  type               CollegeType
+  sourceId           String
+  source             DataSource         @relation(fields: [sourceId], references: [id])
+  lastVerifiedAt     DateTime?
+  verificationStatus VerificationStatus @default(PENDING)
+  specialties        CollegeSpecialty[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([state])
+}
+
+model Specialty {
+  id       String             @id @default(cuid())
+  slug     String             @unique
+  name     String
+  degree   String // MD, MS, DNB, Diploma
+  colleges CollegeSpecialty[]
+}
+
+model CollegeSpecialty {
+  id          String    @id @default(cuid())
+  collegeId   String
+  specialtyId String
+  college     College   @relation(fields: [collegeId], references: [id])
+  specialty   Specialty @relation(fields: [specialtyId], references: [id])
+  cutoffs     Cutoff[]
+
+  @@unique([collegeId, specialtyId])
+}
+
+/// Historical rank data. Never a prediction.
+model Cutoff {
+  id                 String             @id @default(cuid())
+  collegeSpecialtyId String
+  collegeSpecialty   CollegeSpecialty   @relation(fields: [collegeSpecialtyId], references: [id])
+  counsellingYear    Int
+  round              String // e.g. "R1", "R2", "Mop-up", "Stray"
+  quota              Quota
+  category           String // e.g. "GEN", "OBC", "SC", "ST", "EWS", "PwD"
+  openingRank        Int?
+  closingRank        Int?
+  sourceId           String
+  source             DataSource         @relation(fields: [sourceId], references: [id])
+  lastVerifiedAt     DateTime?
+  verificationStatus VerificationStatus @default(PENDING)
+
+  @@unique([collegeSpecialtyId, counsellingYear, round, quota, category])
+}
+
+model Announcement {
+  id              String     @id @default(cuid())
+  title           String
+  authority       String // e.g. "MCC", "DME Maharashtra"
+  category        String // registration, choice-filling, seat-matrix, results...
+  counsellingYear Int
+  publishedAt     DateTime
+  officialUrl     String?
+  sourceId        String
+  source          DataSource @relation(fields: [sourceId], references: [id])
+
+  @@index([counsellingYear, authority])
+}
+
+/// Early-access sign-ups from the landing page.
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  examYear  Int
+  createdAt DateTime @default(now())
+}
