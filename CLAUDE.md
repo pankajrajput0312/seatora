@@ -1,9 +1,9 @@
-# MEDPATH — Project Instructions
+# Seatora — Project Instructions
 
 **Read this file before modifying the project, then read the linked doc for the area you are changing.** Keep it concise; detail lives in `docs/`.
 
 ## Product
-MEDPATH is a NEET PG counselling and college decision platform for India: college discovery, institute profiles, historical cutoffs, seat matrices, fees/stipends/bonds, resident experiences, comparisons, rank-based discovery and counselling announcements.
+Seatora is a NEET PG counselling and college decision platform for India: college discovery, institute profiles, historical cutoffs, seat matrices, fees/stipends/bonds, resident experiences, comparisons, rank-based discovery and counselling announcements.
 Audience: NEET PG aspirants, doctors preparing for PG admission, AIQ and state counselling participants, and medical students researching colleges.
 Details: [docs/PRODUCT.md](docs/PRODUCT.md) · phases: [docs/ROADMAP.md](docs/ROADMAP.md)
 

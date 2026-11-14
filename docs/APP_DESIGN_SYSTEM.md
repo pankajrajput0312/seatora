@@ -1,4 +1,4 @@
-# MEDPATH Inside App Design System: "Case sheet" (Decide)
+# Seatora Inside App Design System: "Case sheet" (Decide)
 
 The landing page, privacy and auth pages use the dark roook-style system in [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md). Everything under `/decide` uses this one, a light, data-first system built on **[Astryx](https://github.com/meta/astryx)**, Meta's open-source design system (`@astryxdesign/core`, `theme-neutral`). The two never share a page.
 
@@ -34,4 +34,4 @@ Fonts: `--font-app`, which is Atkinson Hyperlegible Next, used for body, heading
 - Big standalone numbers use proportional figures. Table columns use `numeric` (tabular).
 
 ## Adding inside-app UI
-Prefer Astryx components (`npx @astryxdesign/cli component <Name>` for docs). Where an existing MEDPATH component already fits, reuse it; the scoped tokens restyle it. Don't import Astryx CSS outside `src/app/decide/layout.tsx`.
+Prefer Astryx components (`npx @astryxdesign/cli component <Name>` for docs). Where an existing Seatora component already fits, reuse it; the scoped tokens restyle it. Don't import Astryx CSS outside `src/app/decide/layout.tsx`.

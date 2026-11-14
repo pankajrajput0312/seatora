@@ -20,7 +20,7 @@ export function SiteFooter() {
       </Container>
       <Container aria-hidden className="select-none">
         <p className="-mb-[0.18em] font-pixel text-[22vw] leading-none text-foreground/[0.06] [mask-image:linear-gradient(to_bottom,black_40%,transparent)] lg:text-[16rem]">
-          medpath
+          seatora
         </p>
       </Container>
     </footer>

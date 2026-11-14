@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { PixelEmblem } from "./pixel-emblem";
 
 // Scripted loop modelled on roook.space's hero: a question arrives, a dim "working" pill steps through
-// what MEDPATH is doing, then flips to a bright result while pixels burst from the emblem.
+// what Seatora is doing, then flips to a bright result while pixels burst from the emblem.
 // Illustrative only: no counts or claims about specific data.
 const scenes = [
   { ask: "AIQ rank 12,450 · MD Medicine", work: ["finding hospitals near your rank"], done: "residents you can message" },

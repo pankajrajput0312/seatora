@@ -11,7 +11,7 @@ export default function HomeV2() {
       <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur-md">
         <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-6 px-5 md:px-8">
           <Link href="/v2" className="flex items-center gap-2.5 text-lg font-bold tracking-tight">
-            <LogoMark className="size-7" /> MEDPATH
+            <LogoMark className="size-7" /> Seatora
           </Link>
           <nav aria-label="Primary" className="hidden items-center gap-8 text-[15px] text-muted-foreground md:flex">
             <Link href="/decide/options" className="hover:text-foreground">Planner</Link>
@@ -66,7 +66,7 @@ export default function HomeV2() {
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-8 text-sm text-muted-foreground md:px-8">
-          <span className="flex items-center gap-2 font-semibold text-foreground"><LogoMark className="size-5" /> MEDPATH</span>
+          <span className="flex items-center gap-2 font-semibold text-foreground"><LogoMark className="size-5" /> Seatora</span>
           <span>Independent. Not affiliated with MCC, NBEMS or NMC.</span>
           <nav aria-label="Footer" className="flex gap-5"><Link href="/privacy" className="hover:text-foreground">Privacy</Link><Link href="/" className="hover:text-foreground">Classic home</Link></nav>
         </div>

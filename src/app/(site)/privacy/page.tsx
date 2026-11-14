@@ -22,7 +22,7 @@ export default function PrivacyPage() {
           </section>
           <section>
             <h2>Why</h2>
-            <p className="mt-2">To run your account, and to tell you when the MEDPATH planner opens for your counselling year. We don&apos;t sell or share your email, and we don&apos;t send marketing from third parties.</p>
+            <p className="mt-2">To run your account, and to tell you when the Seatora planner opens for your counselling year. We don&apos;t sell or share your email, and we don&apos;t send marketing from third parties.</p>
           </section>
           <section>
             <h2>How long</h2>

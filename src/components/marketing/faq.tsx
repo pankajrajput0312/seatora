@@ -4,12 +4,12 @@ import { SectionHeading } from "./section-heading";
 
 const faqs = [
   {
-    q: "Which counselling does MEDPATH cover?",
+    q: "Which counselling does Seatora cover?",
     a: "All India Quota through MCC first, including central and deemed institutes, with state counselling added authority by authority. Each page shows which counselling the data comes from.",
   },
   {
     q: "Will it tell me which college I'll get?",
-    a: "No one can promise that honestly. MEDPATH shows where your rank sat against previous-year closing ranks by round, quota and category, so you can build a realistic, well-researched choice list.",
+    a: "No one can promise that honestly. Seatora shows where your rank sat against previous-year closing ranks by round, quota and category, so you can build a realistic, well-researched choice list.",
   },
   {
     q: "Where does the data come from?",

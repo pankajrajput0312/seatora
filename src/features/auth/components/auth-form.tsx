@@ -61,7 +61,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         {isSignUp ? "Create account" : "Sign in"}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
-        {isSignUp ? "Already have an account? " : "New to MEDPATH? "}
+        {isSignUp ? "Already have an account? " : "New to Seatora? "}
         <Link href={isSignUp ? "/login" : "/signup"} className="text-foreground underline hover:text-sky">
           {isSignUp ? "Sign in" : "Create an account"}
         </Link>

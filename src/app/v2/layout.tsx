@@ -5,7 +5,7 @@ import { Atkinson_Hyperlegible_Next } from "next/font/google";
 const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "MEDPATH · Your NEET PG rank, turned into a plan",
+  title: { absolute: "Seatora · Your NEET PG rank, turned into a plan" },
   robots: { index: false }, // alternative home page while both versions are compared
 };
 

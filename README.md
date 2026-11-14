@@ -1,4 +1,4 @@
-# MEDPATH
+# Seatora
 
 NEET PG counselling planner. Start with [CLAUDE.md](CLAUDE.md) and [docs/](docs).
 

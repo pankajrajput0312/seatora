@@ -40,7 +40,7 @@ export function Coverage() {
     <section id="coverage" className="scroll-mt-16 border-b border-border">
       <Container className="py-20 md:py-28">
         <SectionHeading eyebrow="Coverage" title="Every counselling route in one planner.">
-          MCC and state counselling run separately, with their own quotas, rules and dates. MEDPATH keeps them side by side,
+          MCC and state counselling run separately, with their own quotas, rules and dates. Seatora keeps them side by side,
           so you don&apos;t miss a route you&apos;re eligible for.
         </SectionHeading>
 
@@ -75,7 +75,7 @@ export function Coverage() {
             </li>
           ))}
         </ul>
-        <p className="mt-4 text-xs text-muted-foreground">For each route, MEDPATH tracks the above as the counselling authority publishes it.</p>
+        <p className="mt-4 text-xs text-muted-foreground">For each route, Seatora tracks the above as the counselling authority publishes it.</p>
       </Container>
     </section>
   );

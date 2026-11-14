@@ -26,7 +26,7 @@ export function Features() {
       <section id="features" className="scroll-mt-16 border-b border-border">
         <Container className="py-20 md:py-28">
           <SectionHeading eyebrow="Everything inside" title="Everything you need for counselling, in one place.">
-            Stop switching between forty tabs. MEDPATH puts the research behind every choice in one place.
+            Stop switching between forty tabs. Seatora puts the research behind every choice in one place.
           </SectionHeading>
           <Badge tone="warning" className="mt-6">Previews use demo data · illustrative only</Badge>
           <div className="mt-12">

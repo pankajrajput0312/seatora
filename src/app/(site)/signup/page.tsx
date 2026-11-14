@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Create account", robots: { index: fa
 export default async function SignupPage() {
   if (await getCurrentUser()) redirect("/account");
   return (
-    <AuthShell eyebrow="Join MEDPATH" title="Create your account.">
+    <AuthShell eyebrow="Join Seatora" title="Create your account.">
       <AuthForm mode="signup" />
     </AuthShell>
   );

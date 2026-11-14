@@ -24,7 +24,7 @@ export function Trust() {
       <Container className="grid gap-16 py-20 md:py-28 lg:grid-cols-2">
         <div>
           <SectionHeading eyebrow="Data you can trust" title="Your career decision deserves sourced data.">
-            Counselling choices are hard to undo. So MEDPATH is strict about where every figure comes from.
+            Counselling choices are hard to undo. So Seatora is strict about where every figure comes from.
           </SectionHeading>
           <dl className="mt-10 grid gap-6 sm:grid-cols-2">
             {principles.map((p) => (

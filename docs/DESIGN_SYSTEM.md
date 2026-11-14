@@ -1,4 +1,4 @@
-# MEDPATH Design System: Dark Instrument (after roook.space)
+# Seatora Design System: Dark Instrument (after roook.space)
 
 This is the single source of truth for visual design. Tokens are implemented in `src/app/globals.css` under `@theme`. Tailwind's default palette and shadows are **disabled**, so only the tokens below exist as classes.
 
@@ -33,7 +33,7 @@ Backdrop blur is allowed **only** on the sticky header (`bg-background/80 backdr
 
 **Signal colours**, used for meaning only:
 
-| Token | Value | Meaning in MEDPATH |
+| Token | Value | Meaning in Seatora |
 |---|---|---|
 | `sky` | oklch(80% .12 222) | Info, links, focus, verified institutional |
 | `leaf` | oklch(78% .19 145) | Success, **Official** source |
@@ -84,7 +84,7 @@ Adapted from roook.space. Utilities are defined in `globals.css`. Use these on m
 - **Resident portraits** (`features/residents/components/resident-card.tsx`): the main landing section, headed by a centred pixel headline, "who's already there?". Residents are grouped into rows, one per hospital, and each resident is a 3:4 portrait card built the same way as roook.space's portraits. From bottom to top: a dithered photo (`.dither`, a Bayer 4×4 matrix screened under `contrast()`) or a generated `PixelDoctor` avatar, then a signal-colour tint with `mix-blend-multiply` (ember, sky, sun and leaf in turn), then a `mist` tint that crossfades in on hover or focus (500ms) to reveal the grayscale image while it zooms 4% (700ms), then a `dots` overlay and a bottom gradient. The card shows the AIR in a pixel pill and the name, with the course in pixel type in the matching colour below, followed by the fit badge and contact chips. Cards rise in with `.rise-in` (a scroll-driven `view()` timeline, staggered with `--i`), and the avatars blink. When the list is empty, four illustrative avatar cards explain what each card will hold.
 - **Feature tiles** (`feature-tiles.tsx`): a grid of mini product previews instead of icon-and-text cards. These are SVG line charts, a seat heatmap, bars, pixel meters, a compare table, a profile card, a shortlist and a round tracker, built with plain SVG and divs (no chart library). The section carries one "demo data" badge.
 - **Text glow**: `glow` on pixel display headlines only.
-- **Footer wordmark**: a giant pixel "medpath" at 6% foreground, fading out at the bottom.
+- **Footer wordmark**: a giant pixel "seatora" at 6% foreground, fading out at the bottom.
 - **Logo mark** (`LogoMark`, `app/icon.svg`): a 9×9 pixel ring with a cross.
 
 ## Components (`src/components/ui`, built on Radix)

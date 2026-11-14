@@ -69,7 +69,7 @@ export function WaitlistForm({ examYears }: { examYears: number[] }) {
       </Button>
       {status !== "idle" && <p role="alert" className="text-sm text-ember sm:col-span-3">{status}</p>}
       <p className="text-xs text-muted-foreground sm:col-span-3">
-        We&apos;ll only use your email to tell you when MEDPATH opens. See our{" "}
+        We&apos;ll only use your email to tell you when Seatora opens. See our{" "}
         <Link href="/privacy" className="underline hover:text-foreground">privacy notice</Link>.
       </p>
     </form>

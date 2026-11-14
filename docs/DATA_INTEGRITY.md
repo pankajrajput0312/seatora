@@ -1,6 +1,6 @@
 # Data Integrity
 
-MEDPATH informs decisions that shape doctors' careers. Wrong data is worse than missing data.
+Seatora informs decisions that shape doctors' careers. Wrong data is worse than missing data.
 
 ## Absolute rules
 1. **Never fabricate** college data, cutoffs, seats, fees, stipends, bonds, rankings, reviews, testimonials, user identities or announcements.
@@ -27,7 +27,7 @@ Every important record must support (`src/types/provenance.ts`, `DataSource` in 
 | Tier | Example | UI treatment |
 |---|---|---|
 | **Official** | MCC, state DME/DMER, NBEMS, NMC notifications | "Official" (success badge) |
-| **Verified institutional** | College website or prospectus, confirmed by MEDPATH | "Verified institutional" (teal) |
+| **Verified institutional** | College website or prospectus, confirmed by Seatora | "Verified institutional" (teal) |
 | **Third-party research** | News, compiled datasets | "Third-party research" (neutral) |
 | **Student-reported** | Resident reviews with an identity check | "Student-reported" (neutral), clearly an opinion |
 | **Unverified community** | Forum or community submissions | "Unverified" (warning) |

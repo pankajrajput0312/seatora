@@ -3,7 +3,7 @@
 @layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
 @import "tailwindcss";
 
-/* MEDPATH tokens (dark, after roook.space). Source of truth: docs/DESIGN_SYSTEM.md */
+/* Seatora tokens (dark, after roook.space). Source of truth: docs/DESIGN_SYSTEM.md */
 @theme {
   --color-*: initial;
   --color-background: oklch(14% 0.01 240);
