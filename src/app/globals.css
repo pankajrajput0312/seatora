@@ -142,6 +142,12 @@ body::before {
   }
 }
 
+@media print {
+  header, footer, [data-print-hide], nav[aria-label="Decide"], nav[aria-label="Decide shortcuts"] { display: none !important; }
+  html, body { background: white !important; color: black !important; }
+  body::before { display: none; }
+}
+
 @utility numeric {
   font-variant-numeric: tabular-nums;
 }
