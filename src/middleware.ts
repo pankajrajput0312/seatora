@@ -15,13 +15,19 @@ export async function middleware(req: NextRequest) {
       if (gate.state === "off") console.warn("SITE_ACCESS_SECRET and SEATORA_ALLOWED_EMAILS are not set: /decide and /api/v1 are OPEN (development only).");
       else console.error("SITE_ACCESS_SECRET (32+ characters) and SEATORA_ALLOWED_EMAILS are both required: denying /decide and /api/v1.");
     }
-    if (gate.state === "off") return privateNext();
+    if (gate.state === "off") return pass(api, req.method);
     return api ? denied(503, "access_unconfigured", "Access is not configured.") : redirect(req, "/login?error=unavailable");
   }
 
-  if (await accessCookieUser(req.cookies.get(ACCESS_COOKIE)?.value, gate.key)) return privateNext();
+  if (await accessCookieUser(req.cookies.get(ACCESS_COOKIE)?.value, gate.key)) return pass(api, req.method);
   if (api) return denied(401, "unauthorized", "Sign in with an allowed account.");
   return redirect(req, `/login?${new URLSearchParams({ next: req.nextUrl.pathname + req.nextUrl.search })}`);
+}
+
+// The API is read-only: any other method gets the JSON error envelope (405), not Next's empty one. Pages pass (Server Actions POST).
+function pass(api: boolean, method: string) {
+  if (api && !["GET", "HEAD", "OPTIONS"].includes(method)) return denied(405, "method_not_allowed", "The Decide API is read-only: use GET.", { Allow: "GET, HEAD" });
+  return privateNext();
 }
 
 // Private responses are per user: no shared cache may keep them (this overrides the pages' and API's s-maxage).
@@ -31,8 +37,8 @@ function privateNext() {
   return res;
 }
 
-function denied(status: 401 | 503, code: string, message: string) {
-  return NextResponse.json({ ok: false, error: { code, message } }, { status, headers: { "Cache-Control": "private, no-store" } });
+function denied(status: 401 | 405 | 503, code: string, message: string, headers: Record<string, string> = {}) {
+  return NextResponse.json({ ok: false, error: { code, message } }, { status, headers: { "Cache-Control": "private, no-store", ...headers } });
 }
 
 // On the host the browser asked for (next start builds nextUrl from its own hostname).

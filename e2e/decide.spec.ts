@@ -68,15 +68,15 @@ const OPT_KOKILA_ANAES = "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8#400710~DNB~AN
 const OPT_KOKILA_FM = "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8#400710~DNB~FAMILYMEDICINE~DNB Quota";
 const OPT_GMC_NAGPUR = "GOVERNMENTMEDICALCOLLEGENAGPURGOVERNMENT#440003~MD~ANAESTHESIOLOGY~All India";
 
-test("options: her 1,360 options (707 shown, 25 at a time), Show more focuses the first new row, two ticked states both apply", async ({ page }) => {
+test("options: her 680 options in the open quotas (25 at a time), Show more focuses the first new row, two ticked states both apply", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto(`/decide/options?${PROFILE}`);
-  await expect(page.getByRole("link", { name: "All 1,360 options" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "All 680 options" })).toBeVisible();
   const count = page.locator("#options-count");
-  await expect(count).toContainText("Showing 1–25 of 707 options");
+  await expect(count).toContainText("Showing 1–25 of 680 options");
   await expect(page.locator("[data-item]").filter({ visible: true })).toHaveCount(25); // one page, never the whole list
   await page.getByRole("button", { name: "Show 25 more" }).click();
-  await expect(count).toContainText("Showing 1–50 of 707 options");
+  await expect(count).toContainText("Showing 1–50 of 680 options");
   await expect(page.locator('[data-item="26"]').filter({ visible: true })).toBeFocused();
 
   // Multi-select: both ticked states apply (repeated st params), and stay ticked.
@@ -87,7 +87,7 @@ test("options: her 1,360 options (707 shown, 25 at a time), Show more focuses th
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/st=Maharashtra/);
   await expect(page).toHaveURL(/st=Karnataka/);
-  await expect(count).toContainText("of 151 options");
+  await expect(count).toContainText("of 144 options");
   await expect(page.locator("summary", { hasText: "State" })).toContainText("2 selected");
 });
 

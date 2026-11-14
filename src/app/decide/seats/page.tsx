@@ -1,29 +1,28 @@
 import type { Metadata } from "next";
-import Form from "next/form";
 import Link from "next/link";
 import { Fragment } from "react";
 import { LayoutGrid } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { AppPage } from "@/features/decide/components/app-page";
-import { DataSource } from "@/features/decide/components/data-source";
+import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, PageHead } from "@/features/decide/components/bits";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
+import { FilterForm } from "@/features/decide/components/filter-form";
 import { courseName } from "@/features/decide/components/options-view";
 import { MccLink } from "@/features/decide/components/pages/mcc-link";
 import { findSeats, seatSorts } from "@/features/decide/components/seats/find-seats";
-import { listTitle, SeatListPicker, SeatListSource, SeatTable, seatKindNote } from "@/features/decide/components/seats/seat-lists";
+import { listTitle, SeatListPicker, SeatTable, seatKindNote } from "@/features/decide/components/seats/seat-lists";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
-import { control, EmptyState, Pager, rangeLabel, tbl } from "@/features/decide/components/ui";
+import { control, EmptyState, Pager, rangeLabel, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories } from "@/features/decide/lib/reach";
-import { keepProfileParams, profileFromParams, toURLSearchParams, type Profile } from "@/features/decide/profile";
-import { listNotices } from "@/features/decide/server/notices";
+import { keepProfileParams, profileFromParams, profileQuotas, toURLSearchParams, type Profile } from "@/features/decide/profile";
 import { seatLists } from "@/features/decide/server/seats";
 import { allotmentTrends, getCollege, getMeta, PAST_YEARS, YEARS } from "@/features/decide/service";
-import { baseCategories, seatKindLabel, type Category } from "@/features/decide/types";
+import { baseCategories, openQuotasNote, seatKindLabel, type Category } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Seats" };
 const PAGE_SIZE = 50;
@@ -31,7 +30,8 @@ const categories: Category[] = [...baseCategories, ...baseCategories.map((c) => 
 const lists = ["sp", "deg", "quota", "st"];
 /**
  * Page filters. Course, degree, quota and state are her profile params (sp, deg, quota, st), as on Options, so her
- * profile applies by default; `scat` (seat category: absent = the ones she can take, "all", or one) is not a profile key.
+ * profile applies by default (no quota ticked: the open quotas); `scat` (seat category: absent = the ones she can take,
+ * "all", or one) is not a profile key. `nohist=1`: only seats whose course and quota is not an option (no past allotments).
  */
 const schema = z.object({
   tab: z.enum(["matrix", "trends"]).default("matrix"),
@@ -45,6 +45,7 @@ const schema = z.object({
   inst: z.string().max(200).optional(),
   course: z.string().max(100).optional(),
   squota: z.string().max(100).optional(),
+  nohist: z.literal("1").optional(),
   q: z.string().max(100).optional(),
   sort: z.enum(seatSorts).default("college"),
   page: pageValue.default(1),
@@ -60,7 +61,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
   return (
     <AppPage className="grid grid-cols-1 gap-6">
       <PageHead title="Seats">
-        MCC&apos;s seat lists for a round, one list at a time, as each PDF printed them. Filtered to the courses, quotas and seat categories in your profile.
+        MCC&apos;s seat lists for a round, one list at a time, as each PDF printed them.{profile && " Filtered to the courses, quotas, states and seat categories in your profile."}
       </PageHead>
       <SubTabs label="Seats" current={f.tab} items={[{ key: "matrix", label: "Seat lists", href: L.to("/decide/seats", { tab: "matrix" }) }, { key: "trends", label: "Allotment trends", href: L.to("/decide/seats", { tab: "trends" }) }]} />
       {f.tab === "trends" ? <Trends profile={profile} page={f.page} L={L} /> : <SeatLists f={f} profile={profile} params={params} L={L} />}
@@ -82,26 +83,26 @@ async function SeatLists({ f, profile, params, L }: { f: Filters; profile: Profi
 
   const mine = profile ? eligibleCategories(profile.category, profile.pwd) : null;
   const cats = f.scat === "all" ? undefined : f.scat ? [f.scat] : (mine ?? undefined);
-  const [r, notices] = await Promise.all([
-    findSeats(
-      {
-        list: list.key,
-        college: inst?.key,
-        courses: course ? [course.slug] : undefined,
-        specialties: course ? [] : f.sp,
-        degrees: course ? [] : f.deg,
-        quotas: f.squota ? [f.squota] : f.quota,
-        states: inst ? [] : f.st,
-        categories: cats,
-        q: f.q?.trim() || undefined,
-        sort: f.sort,
-      },
-      { page: f.page, pageSize: PAGE_SIZE },
-    ),
-    listNotices({ kind: "seat_matrix", year: list.year, round: list.round }),
-  ]);
-  // MCC seat notices of this round from the list's date on, other than the seat list PDFs themselves.
-  const later = notices.filter((n) => n.url && !all.some((l) => l.url === n.url) && (!list.publishedAt || n.date >= list.publishedAt));
+  // As on Options: with a profile, no quota ticked means the open quotas, never the restricted ones.
+  const quotas = f.squota ? [f.squota] : profile ? profileQuotas(profile) : f.quota;
+  const r = await findSeats(
+    {
+      list: list.key,
+      college: inst?.key,
+      courses: course ? [course.slug] : undefined,
+      specialties: course ? [] : f.sp,
+      degrees: course ? [] : f.deg,
+      // A PDF that prints no quota (shown as "—") is not filtered on quota.
+      quotas: quotas.length ? [...quotas, null] : [],
+      states: inst ? [] : f.st,
+      categories: cats,
+      nohist: !!f.nohist,
+      q: f.q?.trim() || undefined,
+      sort: f.sort,
+    },
+    { page: f.page, pageSize: PAGE_SIZE },
+  );
+  const noState = r.noState[list.key] ?? 0;
   const here = (changes: Record<string, string | null>) => L.with("/decide/seats", { tab: null, page: null, ...changes });
   const keep = keepProfileParams(params);
   const matching = r.seats[list.key] ?? 0;
@@ -115,9 +116,10 @@ async function SeatLists({ f, profile, params, L }: { f: Filters; profile: Profi
       </p>
 
       {/* As on Options: the form and Apply stay mounted (focus stays on Apply); the fields remount to show what was applied. */}
-      <Form action="/decide/seats" scroll={false} role="search" aria-label="Filter seats" className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3">
+      <FilterForm action="/decide/seats" scroll={false} role="search" aria-label="Filter seats" className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3">
         {(["rank", "cat", "pwd", "fee", "bond"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         <input type="hidden" name="list" value={list.key} />
+        {f.nohist && <input type="hidden" name="nohist" value="1" />}
         <Fragment key={params.toString()}>
           <label className="min-w-56 flex-1">
             <span className="sr-only">Search institute or state</span>
@@ -125,7 +127,7 @@ async function SeatLists({ f, profile, params, L }: { f: Filters; profile: Profi
           </label>
           <FilterDropdown label="Course" name="sp" options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} selected={f.sp} />
           <FilterDropdown label="Degree" name="deg" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={f.deg} />
-          <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={f.quota} />
+          <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={f.quota} none={profile ? "Open quotas" : undefined} noneNote={profile ? openQuotasNote : undefined} />
           <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.st} />
           <label className="w-72 max-w-full">
             <span className="sr-only">Seat category</span>
@@ -145,13 +147,19 @@ async function SeatLists({ f, profile, params, L }: { f: Filters; profile: Profi
           </label>
         </Fragment>
         <Button type="submit">Apply</Button>
-      </Form>
+      </FilterForm>
 
       {one && (
         <p className="flex flex-wrap items-center gap-x-3 rounded-lg border border-border bg-card px-4 py-1 text-sm">
           Showing {course ? `${course.degree} ${course.name}` : "every course"}{f.squota && `, ${f.squota}`}
           {inst && <> at <Link href={L.institute(inst.slug)} className="inline-flex min-h-11 items-center font-semibold text-sky underline">{inst.name}</Link></>}
-          <Link href={here({ list: list.key, inst: null, course: null, squota: null })} className="inline-flex min-h-11 items-center text-muted-foreground underline hover:text-foreground">Show every seat in your profile</Link>
+          <Link href={here({ list: list.key, inst: null, course: null, squota: null, nohist: null })} className="inline-flex min-h-11 items-center text-muted-foreground underline hover:text-foreground">Show every seat in your profile</Link>
+        </p>
+      )}
+      {f.nohist && (
+        <p className="flex flex-wrap items-center gap-x-3 rounded-lg border border-border bg-card px-4 py-1 text-sm">
+          Only seats at courses and quotas with no past MCC allotments, so they are not on Options (no closing rank to compare).
+          <Link href={here({ list: list.key, nohist: null })} className={`${smallLink} text-muted-foreground`}>Show every seat</Link>
         </p>
       )}
       <div className="grid gap-2">
@@ -159,14 +167,20 @@ async function SeatLists({ f, profile, params, L }: { f: Filters; profile: Profi
           <span className="numeric text-base font-semibold text-foreground">{formatRank(matching)}</span> seats in the {title} list match these filters
           {" "}(<span className="numeric">{formatRank(list.seats)}</span> in the whole list).{r.total > 0 && <> Rows <span className="numeric">{rangeLabel(r)}</span>.</>}
         </p>
-        <SeatListSource list={list} changes={later} noticesHref={L.to("/decide/counselling")} />
+        {noState > 0 && (
+          <p className="text-sm text-muted-foreground">
+            <span className="numeric">{formatRank(noState)}</span> more seats match everything but the state: their institutes have no state in Decide&apos;s data, so the
+            state filter leaves them out. The state shown is the institute&apos;s, not the PDF&apos;s state column.
+          </p>
+        )}
+        <SeatSource list={list} L={L} />
       </div>
 
       {r.total === 0 ? (
         <EmptyState
           title="No seats match"
           description="Nothing in this list matches these filters. Pick another list, or widen the course, degree, quota, state or seat category filters."
-          href={here({ list: list.key, sp: null, deg: null, quota: null, st: null, q: null, scat: "all", sort: null })}
+          href={here({ list: list.key, inst: null, course: null, squota: null, sp: null, deg: null, quota: profile ? meta.quotas.join(",") : null, st: null, q: null, scat: "all", nohist: null, sort: null })}
           action="Show every seat in this list"
         />
       ) : (

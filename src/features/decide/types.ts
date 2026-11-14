@@ -80,6 +80,8 @@ export type DecideData = {
  * with no quota ticked means these three, and a restricted quota counts only once she ticks it.
  */
 export const openQuotas = ["All India", "DNB Quota", "Deemed/Paid Seats"];
+/** The Quota filter's note when her profile ticks none (Options, Seats). */
+export const openQuotasNote = `None ticked means ${openQuotas.join(", ")}: the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible.`;
 
 /** One choosable option: an institute's course under one quota. */
 export const optionId = (c: { college: string; degree: string; specialty: string; quota: string }) =>
@@ -120,8 +122,13 @@ export type RoundStepInfo = {
   url: string | null;
   title: string | null;
   note: string | null;
-  /** Dates printed in the schedule notice at `url` (YYYY-MM-DD or ISO date-time in IST); tentative = may change. */
+  /** Dates printed in MCC's schedule (YYYY-MM-DD or ISO date-time in IST); tentative = may change. */
   scheduled: { from: string | null; to: string | null; on: string | null; tentative: boolean } | null;
+  /**
+   * The schedule notice behind `scheduled`: `url` when that is a schedule notice, else the newest schedule notice of the
+   * round (else of the year). `url` can be a later notice (e.g. a suspension) that prints no dates. Null without dates.
+   */
+  scheduledBy: { url: string; title: string } | null;
   /** Every notice matched to this step, oldest first. */
   events: { date: string; status: StepStatus; title: string; url: string }[];
 };

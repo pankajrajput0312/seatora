@@ -12,6 +12,7 @@ import { Closing, Dash, HISTORY_CAPTION, PageHead, Provisional, ReachBadge, Term
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
 import { courseName, RoundGrid, SeatsCell, SeatsHead, toChoiceItem } from "@/features/decide/components/options-view";
+import { UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
@@ -85,7 +86,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const f = parseSearchParams(schema, sp);
   const [inst, meta] = await Promise.all([getInstitute(slug, profile), getMeta()]);
   if (!inst) notFound();
-  const { college, options, yours, allotmentsByYear, terms, seatList } = inst;
+  const { college, options, yours, allotmentsByYear, terms, seatList, unlisted } = inst;
   const offers = (program: "MD" | "DNB") => options.some((o) => programOf(o.course.degree) === program);
   const tab = f.tab;
   const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
@@ -105,6 +106,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
   const residentGroups = residents ? groupResidents(residents.rows, profile) : [];
   const residentYears = [...new Set(residents?.rows.map((r) => r.year))].sort((a, b) => b - a);
+  // Seats here with no past allotments: not options, so not in the lists below; Seats shows them.
+  const unlistedNote = unlisted && unlisted.seats > 0 && <UnlistedSeats u={unlisted} profile={!!profile} here href={L.to("/decide/seats", { list: unlisted.list.key, inst: slug, nohist: "1" })} />;
   const termSources = [...kinds.map((k) => termOf(terms.md, k)?.source), ...kinds.map((k) => termOf(terms.dnb, k)?.source)];
 
   return (
@@ -141,8 +144,12 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               <h2 id="yours" className="text-lg font-semibold">{profile ? "Your options here" : "Courses and quotas here"}</h2>
               <Link href={L.institute(slug, "courses")} className={`${smallLink} text-sm text-sky`}>All course details</Link>
             </div>
+            {unlistedNote && <div className="mt-2">{unlistedNote}</div>}
             {listed.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">None of the courses and quotas here match your profile. <Link href={L.institute(slug, "courses")} className={`${smallLink} text-sky`}>See every course here</Link></p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {profile ? "None of the courses and quotas with past allotments here match your profile." : "No courses with past allotments here."}{" "}
+                {options.length > 0 && <Link href={L.institute(slug, "courses")} className={`${smallLink} text-sky`}>See every course here</Link>}
+              </p>
             ) : (
               <ul className="mt-3 divide-y divide-border">
                 {listed.map((o) => (
@@ -188,58 +195,63 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       {tab === "courses" && (
         <section aria-labelledby="courses-h" className="grid grid-cols-1 gap-3">
           <h2 id="courses-h" className="sr-only">Courses</h2>
-          <div role="region" aria-label="Courses offered" tabIndex={0} className={tbl.wrap}>
-            <table className={tbl.table}>
-              <caption className="sr-only">Courses at {college.name}, with past closing ranks</caption>
-              <thead>
-                <tr className={tbl.headRow}>
-                  <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Add to choices</span></th>
-                  <th scope="col" className={tbl.th}>Course and quota</th>
-                  <th scope="col" className={tbl.th}>{profile ? "Your reach" : "Reach"}</th>
-                  {seatList && <th scope="col" className={`${tbl.th} text-right`}><SeatsHead list={seatList} /></th>}
-                  <th scope="col" className={`${tbl.th} text-right`}>{LATEST_YEAR} R1</th>
-                  <th scope="col" className={`${tbl.th} text-right`}>{PAST_YEARS[1]} deepest</th>
-                  <th scope="col" className={tbl.th}>Related</th>
-                  <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Compare</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {options.flatMap((r) => [
-                  <tr key={r.id} className={`expand-host ${tbl.row}`}>
-                    {/* Without a rank the reach is unknown, so nothing would be saved with the choice: star only with a profile. */}
-                    <td className="px-2 py-2">{profile && <ChoiceStar item={toChoiceItem(r)} />}</td>
-                    <th scope="row" className={`${tbl.td} text-left font-medium`}>{courseName(r)}<span className="block text-xs font-normal text-muted-foreground">{r.quota}</span></th>
-                    <td className={tbl.td}>{profile ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} /> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
-                    {seatList && <td className={`${tbl.td} text-right`}><SeatsCell r={r} list={seatList} L={L} /></td>}
-                    <td className={tbl.num}>
-                      <Closing d={r.latest} />
-                      {/* ReachBadge already carries the marker for "Reached in R1". */}
-                      <Provisional when={r.latest?.provisional && !(profile && r.reachProvisional)} />
-                    </td>
-                    <td className={tbl.num}><Closing d={r.byYear[PAST_YEARS[1]]} /></td>
-                    <td className={`${tbl.td} whitespace-nowrap`}>
-                      <details><summary className="cursor-pointer py-3 text-sky">Rounds by year</summary></details>
-                      <span className="flex gap-x-3">
-                        <Link href={L.lastRanks(r.course.slug, { inst: slug })} className={`${smallLink} text-sky`}>Last ranks</Link>
-                        <Link href={L.institute(slug, "allotments", { course: r.course.slug })} className={`${smallLink} text-sky`}>Allotments</Link>
-                      </span>
-                    </td>
-                    <td className="px-2 py-2"><CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}, ${r.quota}`} /></td>
-                  </tr>,
-                  <tr key={`${r.id}-rounds`} className="expand-row bg-muted/30">
-                    <td />
-                    <td colSpan={seatList ? 7 : 6} className="px-4 pb-4"><RoundGrid row={r} caption={`${courseName(r)}, ${r.quota}: closing ranks by year and round`} /></td>
-                  </tr>,
-                ])}
-              </tbody>
-            </table>
-          </div>
+          {unlistedNote}
+          {options.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No courses with past MCC allotments here, so there are no closing ranks to show.</p>
+          ) : (
+            <div role="region" aria-label="Courses offered" tabIndex={0} className={tbl.wrap}>
+              <table className={tbl.table}>
+                <caption className="sr-only">Courses at {college.name}, with past closing ranks</caption>
+                <thead>
+                  <tr className={tbl.headRow}>
+                    <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Add to choices</span></th>
+                    <th scope="col" className={tbl.th}>Course and quota</th>
+                    <th scope="col" className={tbl.th}>{profile ? "Your reach" : "Reach"}</th>
+                    {seatList && <th scope="col" className={`${tbl.th} text-right`}><SeatsHead list={seatList} /></th>}
+                    <th scope="col" className={`${tbl.th} text-right`}>{LATEST_YEAR} R1</th>
+                    <th scope="col" className={`${tbl.th} text-right`}>{PAST_YEARS[1]} deepest</th>
+                    <th scope="col" className={tbl.th}>Related</th>
+                    <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Compare</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {options.flatMap((r) => [
+                    <tr key={r.id} className={`expand-host ${tbl.row}`}>
+                      {/* Without a rank the reach is unknown, so nothing would be saved with the choice: star only with a profile. */}
+                      <td className="px-2 py-2">{profile && <ChoiceStar item={toChoiceItem(r)} />}</td>
+                      <th scope="row" className={`${tbl.td} text-left font-medium`}>{courseName(r)}<span className="block text-xs font-normal text-muted-foreground">{r.quota}</span></th>
+                      <td className={tbl.td}>{profile ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} /> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
+                      {seatList && <td className={`${tbl.td} text-right`}><SeatsCell r={r} list={seatList} L={L} /></td>}
+                      <td className={tbl.num}>
+                        <Closing d={r.latest} />
+                        {/* ReachBadge already carries the marker for "Reached in R1". */}
+                        <Provisional when={r.latest?.provisional && !(profile && r.reachProvisional)} />
+                      </td>
+                      <td className={tbl.num}><Closing d={r.byYear[PAST_YEARS[1]]} /></td>
+                      <td className={`${tbl.td} whitespace-nowrap`}>
+                        <details><summary className="cursor-pointer py-3 text-sky">Rounds by year</summary></details>
+                        <span className="flex gap-x-3">
+                          <Link href={L.lastRanks(r.course.slug, { inst: slug })} className={`${smallLink} text-sky`}>Last ranks</Link>
+                          <Link href={L.institute(slug, "allotments", { course: r.course.slug })} className={`${smallLink} text-sky`}>Allotments</Link>
+                        </span>
+                      </td>
+                      <td className="px-2 py-2"><CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}, ${r.quota}`} /></td>
+                    </tr>,
+                    <tr key={`${r.id}-rounds`} className="expand-row bg-muted/30">
+                      <td />
+                      <td colSpan={seatList ? 7 : 6} className="px-4 pb-4"><RoundGrid row={r} caption={`${courseName(r)}, ${r.quota}: closing ranks by year and round`} /></td>
+                    </tr>,
+                  ])}
+                </tbody>
+              </table>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
             {HISTORY_CAPTION}{profile ? " Closing ranks are on the seat categories you can take." : " Closing ranks shown across all seat categories."}
             {seatList && ` ${roundLabel[seatList.round]} seats: in the ${seatList.year} ${roundLabel[seatList.round]} clear vacancy list, that quota and ${profile ? "your seat categories" : "every seat category"}; "—" when the list has none.`}
           </p>
           <DataSource />
-          <SeatSource list={seatList} noticesHref={L.to("/decide/counselling")} />
+          <SeatSource list={seatList} L={L} />
         </section>
       )}
 

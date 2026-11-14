@@ -105,6 +105,7 @@ function Step({ s }: { s: StepNow }) {
           <p>
             <span className="text-muted-foreground">Scheduled: </span>
             {dates ? <span className="numeric">{dates}{sc?.tentative && " (tentative)"}</span> : <Dash />}
+            {dates && s.scheduledBy && s.scheduledBy.url !== s.url && <> <NoticeLink s={s.scheduledBy}>MCC schedule</NoticeLink></>}
           </p>
         )}
         {why && <p className="text-xs text-sun">{why}</p>}
@@ -194,7 +195,7 @@ async function MeritLists() {
         <h2 id="merit-h" className="text-lg font-semibold">NEET PG results</h2>
         <p className="text-sm text-muted-foreground">The NBEMS result PDFs behind Decide&apos;s score and rank history. History only: each year has its own maximum marks, so compare ranks across years, not scores.</p>
       </div>
-      <div role="region" aria-label="NEET PG results" tabIndex={0} className={tbl.wrap}>
+      <div role="region" aria-label="NEET PG result PDFs" tabIndex={0} className={tbl.wrap}>
         <table className={tbl.table}>
           <caption className="sr-only">NEET PG result PDFs by year, with what each covers</caption>
           <thead>

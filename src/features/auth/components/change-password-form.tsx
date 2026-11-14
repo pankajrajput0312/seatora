@@ -13,24 +13,27 @@ import { changePasswordSchema, type ChangePasswordInput } from "../validations";
 export function ChangePasswordForm({ email }: { email: string }) {
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const { register, handleSubmit, reset, setFocus, formState: { errors } } = useForm<ChangePasswordInput>({
+  const { register, handleSubmit, reset, setError, setFocus, formState: { errors } } = useForm<ChangePasswordInput>({
     resolver: zodResolver(changePasswordSchema),
     defaultValues: { current: "", password: "", confirm: "" },
   });
 
-  const onSubmit = handleSubmit((values) =>
+  const onSubmit = handleSubmit((values) => {
+    if (pending) return; // the button is aria-disabled, not disabled, so it keeps focus while saving
     startTransition(async () => {
       setResult(null);
       const res = await changePassword(values);
       if (res.ok) {
         reset();
         setResult({ ok: true, message: "Password changed. Every other device has been signed out; this one stays signed in." });
+      } else if (res.field) {
+        setError(res.field, { message: res.error }, { shouldFocus: true }); // marked on the field: aria-invalid + its error text
       } else {
         setResult({ ok: false, message: res.error });
         setFocus("current");
       }
-    }),
-  );
+    });
+  });
 
   const field = (name: keyof ChangePasswordInput, label: string, autoComplete: string) => (
     <div>
@@ -68,7 +71,7 @@ export function ChangePasswordForm({ email }: { email: string }) {
           </p>
         )}
       </div>
-      <Button type="submit" disabled={pending} className="justify-self-start">
+      <Button type="submit" aria-disabled={pending || undefined} className="justify-self-start aria-disabled:cursor-not-allowed aria-disabled:opacity-50">
         {pending && <Loader2 className="size-4 animate-spin" />}
         Change password
       </Button>

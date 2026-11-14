@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Form from "next/form";
 import Link from "next/link";
 import { Fragment } from "react";
 import { z } from "zod";
@@ -9,14 +8,16 @@ import { AppPage } from "@/features/decide/components/app-page";
 import { HISTORY_CAPTION, PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
+import { FilterForm } from "@/features/decide/components/filter-form";
 import { OptionsResults } from "@/features/decide/components/option-actions";
+import { UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { control, EmptyState, smallLink } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories, reachLabel, reachOrder, reachWindow } from "@/features/decide/lib/reach";
 import { BOND_YEAR_CHOICES, feeChoices, keepProfileParams, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
-import { getMeta, LATEST_YEAR, listOptions, PAST_YEARS } from "@/features/decide/service";
-import { openQuotas, roundLabel } from "@/features/decide/types";
+import { getMeta, LATEST_YEAR, listOptions, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
+import { openQuotas, openQuotasNote, roundLabel } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
@@ -27,7 +28,7 @@ const filtersSchema = z.object({
   reach: z.enum(reachOrder).optional(),
   closed: z.literal("1").optional(),
   prov: z.literal("0").optional(),
-  /** Only options with seats in the newest clear vacancy list. */
+  /** Only options with seats in the newest clear vacancy list (never added to the virtual vacancy list's). */
   seats: z.literal("1").optional(),
   page: pageValue.default(1),
 });
@@ -39,7 +40,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
 
   const f = parseSearchParams(filtersSchema, params);
   const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: !!f.closed, hasSeats: !!f.seats };
-  const [meta, r] = await Promise.all([getMeta(), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE })]);
+  const [meta, r, unlisted] = await Promise.all([getMeta(), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }), unlistedSeats(profile)]);
   const L = decideLinks(params);
   const here = (changes: Record<string, string | null>) => L.with("/decide/options", { page: null, ...changes });
   // The All chip counts what it lists: closed-before options only while they are shown.
@@ -65,7 +66,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       </PageHead>
 
       {/* The profile filters are URL params, so this visit can differ from the saved profile. The form and Apply stay mounted (focus stays on Apply); only the fields remount to show what was applied. */}
-      <Form action="/decide/options" scroll={false} role="search" aria-label="Filter options" className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3">
+      <FilterForm action="/decide/options" scroll={false} role="search" aria-label="Filter options" className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3">
         {(["rank", "cat", "pwd"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         {f.reach && <input type="hidden" name="reach" value={f.reach} />}
         {f.closed && <input type="hidden" name="closed" value="1" />}
@@ -76,7 +77,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           </label>
           <FilterDropdown label="Course" name="sp" options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} selected={profile.specialties} />
           <FilterDropdown label="Degree" name="deg" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={profile.degrees} />
-          <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" noneNote={`None ticked means ${openQuotas.join(", ")}: the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible.`} />
+          <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" noneNote={openQuotasNote} />
           <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} />
           <label className="w-44">
             <span className="sr-only">Maximum fee per year</span>
@@ -95,7 +96,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           {seatList && (
             <label className="inline-flex min-h-11 items-center gap-2 px-1 text-sm">
               <input type="checkbox" name="seats" value="1" defaultChecked={!!f.seats} className="size-4 accent-sky" />
-              Has {roundLabel[seatList.round]} seats ({seatList.year} clear vacancy)
+              Has {roundLabel[seatList.round]} clear vacancy seats ({seatList.year})
             </label>
           )}
           {latestProvisional && (
@@ -106,7 +107,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           )}
         </Fragment>
         <Button type="submit">Apply</Button>
-      </Form>
+      </FilterForm>
 
       <nav aria-label="Filter by reach" className="flex flex-wrap gap-2">
         <Link href={here({ reach: null })} aria-current={!f.reach ? "true" : undefined} className={chip(!f.reach)}>
@@ -132,6 +133,18 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           )}
         </p>
       )}
+
+      {r.virtualOnly && r.virtualOnly.options > 0 && (
+        <p className="text-sm text-muted-foreground">
+          <span className="numeric">{formatRank(r.virtualOnly.options)}</span> more {r.virtualOnly.options === 1 ? "option has" : "options have"} seats only in the{" "}
+          {r.virtualOnly.list.year} {roundLabel[r.virtualOnly.list.round]} virtual vacancy list (seats that open if their holder upgrades or leaves), so this filter hides{" "}
+          {r.virtualOnly.options === 1 ? "it" : "them"}.{" "}
+          <Link href={L.seats({ list: r.virtualOnly.list.key })} className={`${smallLink} text-sky`}>See the virtual vacancy list</Link>
+        </p>
+      )}
+      {unlisted && <UnlistedSeats u={unlisted} profile href={L.to("/decide/seats", { list: unlisted.list.key, nohist: "1" })} />}
+      {/* Stays mounted across filter changes (OptionsResults remounts), so the new count is announced. */}
+      <p role="status" className="sr-only">{formatRank(r.total)} {r.total === 1 ? "option matches" : "options match"}</p>
 
       {r.total ? (
         <OptionsResults
@@ -172,7 +185,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           later) but before your rank. Options with no fee or bond listed stay in when you set a fee or bond limit.
         </p>
         <DataSource terms={r.rows.flatMap((x) => [x.terms.fee?.source, x.terms.bond?.source])} />
-        <SeatSource list={seatList} noticesHref={L.to("/decide/counselling")} />
+        <SeatSource list={seatList} L={L} />
       </div>
     </AppPage>
   );

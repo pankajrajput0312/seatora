@@ -1,5 +1,4 @@
 import { Fragment } from "react";
-import Form from "next/form";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { EmptyState as AstryxEmptyState } from "@astryxdesign/core/EmptyState";
@@ -7,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { keepProfileParams } from "../profile";
+import { FilterForm } from "./filter-form";
 import { FocusOnChange } from "./focus-item";
 
 // Shared building blocks so every Decide screen reads the same way (docs/APP_DESIGN_SYSTEM.md, "Inside-app primitives").
@@ -24,16 +24,17 @@ export const tbl = {
 
 /**
  * GET filter form that keeps the profile params (every repeated value, comma-joined). The form and its Apply button
- * stay mounted across navigations so focus stays on Apply; only the fields remount to show the applied values.
+ * stay mounted across navigations so focus stays on Apply (Enter in a field moves it there); only the fields remount
+ * to show the applied values.
  * Submitting drops `page`, so results start at page 1.
  */
 export function FilterBar({ action, params, children, cols = "md:grid-cols-4" }: { action: string; params: URLSearchParams; children: React.ReactNode; cols?: string }) {
   return (
-    <Form action={action} scroll={false} role="search" className={cn("grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2", cols, "md:items-end")}>
+    <FilterForm action={action} scroll={false} role="search" className={cn("grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2", cols, "md:items-end")}>
       {[...keepProfileParams(params)].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       <Fragment key={params.toString()}>{children}</Fragment>
       <Button type="submit">Apply</Button>
-    </Form>
+    </FilterForm>
   );
 }
 

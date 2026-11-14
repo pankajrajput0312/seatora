@@ -29,12 +29,30 @@ export type RoundStatus = {
 /** Round steps of a counselling year, R1 → stray, each seat matrix → final result. Null when none are imported. */
 export async function roundStatus(year: number): Promise<RoundStatus | null> {
   await getCatalog();
-  const rows = await db.roundStep.findMany({ where: { year } });
+  const [rows, schedules] = await Promise.all([
+    db.roundStep.findMany({ where: { year } }),
+    db.announcement.findMany({ where: { category: "schedule", counsellingYear: year, officialUrl: { not: null } }, select: { title: true, officialUrl: true, round: true }, orderBy: { publishedAt: "desc" } }),
+  ]);
   if (!rows.length) return null;
+  // Where a step's dates are printed: its own notice when that is a schedule, else the newest schedule of its round, else of the year.
+  const scheduleOf = (round: string, url: string | null) => {
+    const s = schedules.find((n) => n.officialUrl === url) ?? schedules.find((n) => n.round === round) ?? schedules.find((n) => n.round == null);
+    return s ? { url: s.officialUrl!, title: s.title } : null;
+  };
   const out = new Map<Round, RoundStepInfo[]>();
   for (const r of rows) {
     const scheduled = r.scheduledFrom || r.scheduledTo || r.scheduledOn ? { from: r.scheduledFrom, to: r.scheduledTo, on: r.scheduledOn, tentative: r.tentative } : null;
-    const step: RoundStepInfo = { step: r.step as RoundStepName, status: r.status as StepStatus, date: r.date, url: r.url, title: r.title, note: r.note, scheduled, events: r.events as RoundStepInfo["events"] };
+    const step: RoundStepInfo = {
+      step: r.step as RoundStepName,
+      status: r.status as StepStatus,
+      date: r.date,
+      url: r.url,
+      title: r.title,
+      note: r.note,
+      scheduled,
+      scheduledBy: scheduled && scheduleOf(r.round, r.url),
+      events: r.events as RoundStepInfo["events"],
+    };
     (out.get(r.round as Round) ?? out.set(r.round as Round, []).get(r.round as Round)!).push(step);
   }
   return {

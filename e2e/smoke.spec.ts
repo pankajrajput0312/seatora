@@ -147,8 +147,11 @@ test("change password: checks the current one, keeps this session, signs out the
     await change(invited.password, next, `${next}x`);
     await expect(form.getByText("The new passwords don't match")).toBeVisible();
     await change("wrong-password", next);
-    await expect(form.getByRole("alert")).toContainText("Current password is incorrect.");
-    await expect(form.getByLabel("Current password", { exact: true })).toBeFocused();
+    // Marked on the field (aria-invalid + its error text as the description), and focus moves there.
+    const current = form.getByLabel("Current password", { exact: true });
+    await expect(current).toHaveAttribute("aria-invalid", "true");
+    await expect(current).toHaveAccessibleDescription(/Current password is incorrect\./);
+    await expect(current).toBeFocused();
 
     await change(invited.password, next);
     await expect(form.getByRole("status")).toContainText("Password changed. Every other device has been signed out");

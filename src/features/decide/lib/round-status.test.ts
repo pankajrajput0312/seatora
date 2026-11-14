@@ -38,7 +38,7 @@ it("formats in IST whatever the server's time zone", () => {
 });
 
 it("banner: open steps now, then the earliest upcoming date", () => {
-  const step = (step: RoundStepInfo["step"], s: Pick<RoundStepInfo, "status" | "scheduled">): RoundStepInfo => ({ step, date: null, url: null, title: null, note: null, events: [], ...s });
+  const step = (step: RoundStepInfo["step"], s: Pick<RoundStepInfo, "status" | "scheduled">): RoundStepInfo => ({ step, date: null, url: null, title: null, note: null, scheduledBy: null, events: [], ...s });
   const rs = { rounds: [
     { round: "R2" as const, steps: [step("choice_filling", choice), step("provisional_result", result)] },
     { round: "R3" as const, steps: [step("choice_filling", r3)] },

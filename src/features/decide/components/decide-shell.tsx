@@ -27,6 +27,8 @@ const sections = [
       { href: "/decide/compare", label: "Compare", icon: GitCompareArrows },
     ],
   },
+  // Above Research: the round schedule must show without scrolling the sidebar on a 1280x800 laptop.
+  { title: "Counselling", items: [{ href: "/decide/counselling", label: "Schedule & notices", icon: CalendarDays }] },
   {
     title: "Research",
     items: [
@@ -39,7 +41,6 @@ const sections = [
       { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
     ],
   },
-  { title: "Counselling", items: [{ href: "/decide/counselling", label: "Schedule & notices", icon: CalendarDays }] },
 ];
 const bottom = [
   { href: "/decide/options", label: "Options", icon: SlidersHorizontal },

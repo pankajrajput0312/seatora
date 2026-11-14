@@ -40,6 +40,12 @@ describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "notices.json
         expect(st.scheduled).toEqual(want.scheduled ? { from: null, to: null, on: null, tentative: false, ...want.scheduled } : null);
       }
     expect(s.rounds.find((r) => r.round === "R2")!.steps.map((x) => x.step)).toEqual(["seat_matrix", "choice_filling", "provisional_result", "final_result"]);
+    // The 15 Nov 23:55 end is printed in the Round-2 schedule, not in the suspension notice the status cites.
+    const choice = s.rounds.find((r) => r.round === "R2")!.steps.find((x) => x.step === "choice_filling")!;
+    const schedule = notices.find((n) => n.kind === "schedule" && n.year === 2026 && n.round === "R2")!;
+    expect(choice.scheduledBy).toEqual({ url: schedule.url, title: schedule.title });
+    expect(choice.url).not.toBe(schedule.url);
+    for (const r of s.rounds) for (const st of r.steps) if (st.scheduled && st.url && notices.some((n) => n.kind === "schedule" && n.url === st.url)) expect(st.scheduledBy?.url).toBe(st.url);
     expect(await roundStatus(1999)).toBeNull();
   });
 });

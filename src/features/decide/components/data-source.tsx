@@ -1,18 +1,19 @@
 import { Badge } from "@/components/ui/badge";
 import { sourceTypeLabels } from "@/components/ui/source-label";
 import { listNotices } from "../server/notices";
-import { seatLists } from "../server/seats";
+import { seatChanges, seatLists } from "../server/seats";
 import { getMeta } from "../service";
+import type { DecideLinks } from "../lib/links";
 import { rounds, roundLabel, type SeatList, type Term } from "../types";
 import { Provisional } from "./bits";
 import { SeatListSource } from "./seats/seat-lists";
 
-/** The seat list behind a seats column: its PDF and date, and the later MCC seat notices it does not apply (as on Seats). */
-export async function SeatSource({ list, noticesHref }: { list: SeatList | null; noticesHref: string }) {
+/** The seat list behind a seats column or the Seats page: its PDF and date, and the MCC seat notices it may not apply. */
+export async function SeatSource({ list, L }: { list: SeatList | null; L: DecideLinks }) {
   if (!list) return null;
   const [all, notices] = await Promise.all([seatLists(), listNotices({ kind: "seat_matrix", year: list.year, round: list.round })]);
-  const later = notices.filter((n) => n.url && !all.some((l) => l.url === n.url) && (!list.publishedAt || n.date >= list.publishedAt));
-  return <SeatListSource list={list} changes={later} noticesHref={noticesHref} />;
+  const noticesHref = L.to("/decide/counselling", { tab: "announcements", kind: "seat_matrix", year: list.year, round: list.round });
+  return <SeatListSource list={list} {...seatChanges(list, all, notices)} noticesHref={noticesHref} />;
 }
 
 type Used = { year: number; round?: string };

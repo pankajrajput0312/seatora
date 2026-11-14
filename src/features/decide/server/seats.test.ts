@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SeatList } from "../types";
 import { DataUnavailableError } from "./catalog";
-import { listSeats, pickLists, seatCountsFor, seatLists, sumSeats } from "./seats";
+import { listSeats, pickLists, seatChanges, seatCountsFor, seatLists, sumSeats } from "./seats";
 
 const list = (key: string, year: number, round: SeatList["round"], kind: SeatList["kind"]): SeatList => ({ key, name: key, url: null, year, round, kind, publishedAt: null, seats: 1 });
 // seatLists() order: newest year, round, then kind
@@ -32,6 +32,17 @@ it("sumSeats adds one list's cells in a quota and categories; null when the list
   expect(sumSeats(cells, { categories: ["OBC"] })).toBe(5);
   expect(sumSeats(cells, { quota: "All India", categories: ["SC"] })).toBeNull();
   expect(sumSeats(undefined)).toBeNull();
+});
+
+it("seatChanges: notices after the list are not applied, same-day ones may be in it; the list PDFs themselves are left out", () => {
+  const l = { ...list("26c", 2026, "R2", "clear"), url: "u/clear.pdf", publishedAt: "2026-11-13" };
+  const n = (date: string, url: string | null) => ({ title: url ?? "", date, url, authority: "MCC", kind: "seat_matrix" as const, year: 2026, round: "R2" as const });
+  const notices = [n("2026-11-14", "u/later.pdf"), n("2026-11-13", "u/addremove.pdf"), n("2026-11-13", "u/clear.pdf"), n("2026-11-12", "u/old.pdf"), n("2026-11-14", null)];
+  const urls = (xs: { url: string | null }[]) => xs.map((x) => x.url);
+  const r = seatChanges(l, [l], notices);
+  expect([urls(r.later), urls(r.sameDay)]).toEqual([["u/later.pdf"], ["u/addremove.pdf"]]);
+  // No date: every notice of the round counts as later.
+  expect(urls(seatChanges({ ...l, publishedAt: null }, [l], notices).later)).toEqual(["u/later.pdf", "u/addremove.pdf", "u/old.pdf"]);
 });
 
 describe("without a database", () => {

@@ -6,8 +6,11 @@ import { currentSteps, fmtIST, nextDate, roundName, stepName, stepsNow, type Ste
 import { roundStatus } from "../server/notices";
 import { smallLink } from "./ui";
 
-/** A step's MCC notice (for an upcoming step, the schedule notice), opening in a new tab; without `children` its title. */
-export function NoticeLink({ s, children }: { s: StepNow; children?: React.ReactNode }) {
+/**
+ * A step's MCC notice (for an upcoming step, the schedule notice), or the schedule behind its dates (`s.scheduledBy`),
+ * opening in a new tab; without `children` its title.
+ */
+export function NoticeLink({ s, children }: { s: Pick<StepNow, "url" | "title">; children?: React.ReactNode }) {
   if (!s.url) return null;
   return (
     <a href={s.url} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>
@@ -32,6 +35,8 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
             </strong>
           </span>
           {s.clock === "started" && <span className="text-muted-foreground">as scheduled, not yet confirmed by an MCC notice</span>}
+          {/* The end date's own source when the status cites a later notice (e.g. a suspension) that doesn't print it. */}
+          {s.now !== "suspended" && s.scheduled?.to && s.scheduledBy && s.scheduledBy.url !== s.url && <NoticeLink s={s.scheduledBy}>MCC schedule</NoticeLink>}
           <NoticeLink s={s}>MCC notice</NoticeLink>
         </p>
       ))}
@@ -42,7 +47,7 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
             Next: {roundName[next.round]} {stepName[next.step].toLowerCase()} {next.scheduled?.from ? "from" : "on"} <span className="numeric">{fmtIST(nextDate(next)!)}</span>
             {next.scheduled?.tentative && " (tentative)"}
           </span>
-          <NoticeLink s={next}>MCC schedule</NoticeLink>
+          <NoticeLink s={next.scheduledBy ?? next}>MCC schedule</NoticeLink>
         </p>
       )}
       <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">

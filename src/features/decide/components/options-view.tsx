@@ -31,7 +31,7 @@ export function SeatsHead({ list }: { list: SeatList }) {
 export function SeatsCell({ r, list, L }: { r: OptionRow; list: SeatList; L: DecideLinks }) {
   if (r.seats == null) return <Dash />;
   return (
-    <Link href={L.seats({ list: list.key, inst: r.college.slug, course: r.course.slug, quota: r.quota })} className={`${smallLink} numeric justify-end font-semibold text-sky`}>
+    <Link href={L.seats({ list: list.key, inst: r.college.slug, course: r.course.slug, quota: r.quota })} className={`${smallLink} numeric min-w-11 justify-end font-semibold text-sky`}>
       {formatRank(r.seats)}<span className="sr-only"> seats in the {list.year} {roundLabel[list.round]} {seatKindLabel[list.kind].toLowerCase()} list: {r.college.name}, {courseName(r)}, {r.quota}</span>
     </Link>
   );

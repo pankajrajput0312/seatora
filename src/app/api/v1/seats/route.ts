@@ -41,6 +41,7 @@ export async function GET(req: Request) {
       { ...f, college: inst?.key, specialties: specialty, courses: course, degrees: degree, quotas: quota, categories: category, states: state },
       { page, pageSize },
     );
+    if (!r.lists.length) return notFound("No MCC seat list for this kind, year and round");
     return ok(
       { lists: r.lists, seats: r.seats, rows: r.rows },
       { page: pageOf(r), sources: r.lists.map((l) => ({ key: l.key, name: l.name, url: l.url, year: l.year, round: l.round })) },

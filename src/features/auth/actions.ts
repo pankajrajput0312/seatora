@@ -115,7 +115,8 @@ export async function signIn(input: SignInInput, next?: string): Promise<AuthRes
   redirect(safeNext(next));
 }
 
-export type ChangePasswordResult = { ok: true } | AuthResult;
+/** `field`: the error is about that field (the form marks it). */
+export type ChangePasswordResult = { ok: true } | (AuthResult & { field?: "current" });
 
 /**
  * For the signed-in user: checks the current password with the same limits as sign-in (the guesses share sign-in's
@@ -136,7 +137,7 @@ export async function changePassword(input: ChangePasswordInput): Promise<Change
     const blocked = isLimited(pairKey, PAIR_LIMIT) || (!!user.lockedUntil && user.lockedUntil > new Date());
     if (!valid || blocked) {
       if (!valid) await recordFailure(pairKey, user.id);
-      return { ok: false, error: "Current password is incorrect. Too many failed attempts pause this for a few minutes." };
+      return { ok: false, error: "Current password is incorrect. Too many failed attempts pause this for a few minutes.", field: "current" };
     }
     reset(pairKey);
     const passwordHash = await hashPassword(parsed.data.password);

@@ -2,8 +2,8 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { PageQuery, Paged } from "../service";
-import { rounds, seatKinds, type College, type Course, type Round, type SeatKind, type SeatList } from "../types";
-import { getCatalog } from "./catalog";
+import { optionId, rounds, seatKinds, type College, type Course, type MccNotice, type Round, type SeatKind, type SeatList } from "../types";
+import { getCatalog, type Catalog } from "./catalog";
 
 // MCC seat lists (SeatSource + SeatCount, prisma/import-mcc.ts). Each list is one kind of one round as its PDF printed
 // it; kinds overlap, so everything here works on one kind at a time and never adds kinds together.
@@ -34,6 +34,17 @@ export function pickLists(all: SeatList[], f: { list?: string; kind?: SeatKind; 
   const kind = f.kind ?? "clear";
   const match = all.filter((l) => l.kind === kind && (f.year == null || l.year === f.year) && (f.round == null || l.round === f.round));
   return match.filter((l) => l.year === match[0]?.year && l.round === match[0]?.round);
+}
+
+/**
+ * MCC seat notices of a list's round that may change it (`notices`: that round's seat_matrix notices), other than the
+ * seat list PDFs (`lists`) themselves: `later` (dated after the list: not applied) and `sameDay` (dated the same day:
+ * it may already include them). Every one is `later` when the list has no date.
+ */
+export function seatChanges(list: SeatList, lists: SeatList[], notices: MccNotice[]) {
+  const xs = notices.filter((n) => n.url && !lists.some((l) => l.url === n.url));
+  const day = list.publishedAt;
+  return { later: xs.filter((n) => !day || n.date > day), sameDay: day ? xs.filter((n) => n.date === day) : [] };
 }
 
 export type SeatFilters = {
@@ -119,6 +130,10 @@ export async function listSeats(f: SeatFilters = {}, pg?: PageQuery): Promise<Pa
   });
   return { rows, total, page, pageSize, lists, seats: Object.fromEntries(lists.map((l) => [l.key, per.find((p) => p.key === l.key)?.seats ?? 0])) };
 }
+
+/** The seat row's course and quota is an Options row (it has past allotments). A row with no quota printed never is. */
+export const hasOption = (cat: Catalog, r: Pick<SeatRow, "college" | "degree" | "specialty" | "quota">) =>
+  r.quota != null && cat.optionById.has(optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota }));
 
 /** Seats of one list in one quota × category of a course at a college (PDF lines printed twice are summed). */
 export type SeatCell = { quota: string | null; category: string; seats: number };
