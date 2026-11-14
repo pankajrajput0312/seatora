@@ -48,7 +48,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
   const exportJson = () => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(draft, null, 2)], { type: "application/json" }));
-    a.download = "medpath-profile.json";
+    a.download = "seatora-profile.json";
     a.click();
   };
   const importJson = async (file: File) => {
@@ -56,10 +56,10 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
     try {
       data = JSON.parse(await file.text());
     } catch {
-      return setImportError("That file isn't JSON. Choose a file exported from MEDPATH.");
+      return setImportError("That file isn't JSON. Choose a file exported from Seatora.");
     }
     const r = profileSchema.safeParse(data);
-    if (!r.success) return setImportError("That file isn't a MEDPATH profile.");
+    if (!r.success) return setImportError("That file isn't a Seatora profile.");
     setImportError(null);
     setDraft(r.data);
     setRankText(String(r.data.rank));

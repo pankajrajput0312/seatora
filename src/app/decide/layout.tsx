@@ -18,7 +18,7 @@ const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-a
 // before the data, and a blocking render lets notFound() answer 404 instead of a streamed 200.
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: { default: "Decide", template: "%s · Decide · MEDPATH" } };
+export const metadata: Metadata = { title: { default: "Decide", template: "%s · Decide · Seatora" } };
 export const viewport: Viewport = { themeColor: "#f3f6f9" }; // chart paper (--color-background inside .app)
 
 export default async function DecideLayout({ children }: { children: React.ReactNode }) {

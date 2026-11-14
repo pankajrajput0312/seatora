@@ -85,7 +85,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
         topNav={
           <TopNav
             label="App"
-            heading={<TopNavHeading logo={<LogoMark className="size-6" />} heading="MEDPATH Decide" headingHref={L.to("/decide")} />}
+            heading={<TopNavHeading logo={<LogoMark className="size-6" />} heading="Seatora Decide" headingHref={L.to("/decide")} />}
             endContent={
               <span className="flex items-center gap-1">
                 {/* Compare tray: in the sticky header (phones: the bottom bar), never floating over the page and the focused control. */}
