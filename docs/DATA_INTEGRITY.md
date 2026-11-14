@@ -44,6 +44,12 @@ Official information and reported experiences are never mixed in the same block.
 - Entries show "Resident-reported" unless `verified: true`, which may only be set after checking the allotment letter.
 - A resident's rank is shown as where one person got in, not as a closing rank or a prediction.
 
+## Admitted-list residents (Decide institute "Residents" tab)
+- Names come only from MCC's official admitted-candidates lists (`Resident`, imported from a private bundle that never enters git), with the list PDF as source. Name, course, year, list and the 2025 AIR where known: no roll numbers, and no contact details are held or shown.
+- Shown per institute only, for choosing a college, with the caption "contact people respectfully; ask to be hidden and we will". There is no endpoint across institutes, responses are `Cache-Control: private, no-store`, and the tab is `noindex`.
+- "Hide" records the person in `HiddenResident` (name + college PIN code) and sets `hidden`; hidden rows are never rendered or returned, and both imports keep them hidden, even under a new college key or course.
+- The rank is where one person got in, not a closing rank or a prediction.
+
 ## Announcements
 - Only show announcements traceable to an issuing authority, with a publication date and an official link where one exists.
 - With no live feed connected, show an honest empty state or labelled demo content.

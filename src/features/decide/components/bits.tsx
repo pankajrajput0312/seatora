@@ -20,8 +20,11 @@ export function PageHead({ title, children }: { title: string; children?: React.
   );
 }
 
-/** The one marker for numbers from a provisional MCC result (Source.provisional); renders nothing otherwise. */
-export function Provisional({ when = true }: { when?: boolean | null }) {
+/**
+ * The one marker for numbers from a provisional MCC result (Source.provisional); renders nothing otherwise. `when` is
+ * required: a missing closing passes undefined, which must mean "no badge", never a default of true.
+ */
+export function Provisional({ when }: { when: boolean | null | undefined }) {
   return when ? <Badge tone="warning">Provisional</Badge> : null;
 }
 

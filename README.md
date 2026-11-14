@@ -61,10 +61,19 @@ The landing page's main section shows residents grouped by the hospital or colle
 - A bad entry fails `npm run build` with a message naming the field. Rebuild after editing.
 
 ## Deploy (Vercel or any Node host)
-1. Provision PostgreSQL (Neon, Supabase, RDS…).
-2. Set `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL` (e.g. `https://medpath.in`) and `NEXT_PUBLIC_CONTACT_EMAIL` (privacy/deletion requests). Production builds fail if either public variable is missing.
-3. Run `npx prisma migrate deploy` against production once per schema change.
+Public: the landing and policy pages, `/login` and `/signup`. Private: `/decide` and `/api/v1`, for one invited account only (docs/ARCHITECTURE.md "Access gate"). Sign-up is closed to everyone else.
+
+1. Provision PostgreSQL (Supabase, Neon, RDS…).
+2. Set the environment:
+   - `DATABASE_URL`: the app's connection. On Supabase (serverless), the transaction pooler (port 6543) with `?pgbouncer=true&connection_limit=1` appended.
+   - `DIRECT_URL`: the direct connection (port 5432), for migrations and imports. The schema reads only `DATABASE_URL`, so run those with `DATABASE_URL="$DIRECT_URL"`.
+   - `SITE_ACCESS_SECRET`: signs the access cookie. Generate with `openssl rand -hex 32` (32+ characters; nobody types it).
+   - `SEATORA_ALLOWED_EMAILS`: the email(s) allowed to sign up and sign in, comma-separated. Changing it or the secret signs everyone out of Decide. Without both, production denies `/decide` and `/api/v1`.
+   - `SEATORA_INVITE_CODE`: sign-up also needs this code, since nothing verifies the email (anyone who knows an allowlisted address could otherwise claim it). Generate with `openssl rand -hex 8` (16+ characters) and give it to the invitee yourself. Unset or short: sign-up is closed.
+   - `NEXT_PUBLIC_SITE_URL` (the public origin, e.g. `https://your-domain.in`) and `NEXT_PUBLIC_CONTACT_EMAIL` (privacy/deletion requests). Production builds fail if either is missing.
+3. Once per schema change, with `DATABASE_URL="$DIRECT_URL"`: `npx prisma migrate deploy`. On Supabase, after **every** `migrate deploy` also run `psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -f tools/sql/supabase_lockdown.sql` from the neetpg-planner repo (RLS on and no Data API access for new tables). Then `npm run db:import` (MCC data, public bundle) and `npm run db:import-residents` (names, private bundle).
 4. Build with `npm run build`, start with `npm start`.
+5. Before the domain is public: check that no `User` row already has the allowlisted email (`psql "$DIRECT_URL" -c "SELECT id, \"createdAt\" FROM \"User\" WHERE lower(email) = '<email>'"`). If one does and the invitee didn't create it, delete it (its sessions cascade): whoever knows its password would otherwise get in. Then the invited person opens `/signup` and creates the account with the allowlisted email and the invite code. Afterwards, remove `SEATORA_INVITE_CODE` and redeploy, so sign-up is closed for good.
 
 Security headers are set in `next.config.ts`.
 

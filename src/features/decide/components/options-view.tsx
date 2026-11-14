@@ -24,7 +24,7 @@ export function ClosingCell({ d }: { d: Deepest | null | undefined }) {
   return (
     <>
       <Closing d={d} />
-      {d?.provisional && <span className="mt-1 block"><Provisional /></span>}
+      {d?.provisional && <span className="mt-1 block"><Provisional when /></span>}
     </>
   );
 }
@@ -62,7 +62,7 @@ export function RoundGrid({ row, caption }: { row: OptionRow; caption: string })
                         <span className="font-semibold">{formatRank(c.closing)}</span>{" "}
                         <span className="text-muted-foreground">({formatRank(c.n)}<span className="sr-only"> allotted, all categories</span>)</span>
                         <span className="block text-muted-foreground">{c.category} seat</span>
-                        {c.provisional && <Provisional />}
+                        {c.provisional && <Provisional when />}
                       </>
                     ) : (
                       <span>—<span className="sr-only">not available</span></span>

@@ -10,7 +10,8 @@ export function PlannerPreview() {
           <p className="font-mono text-xs uppercase tracking-widest text-sky">Residents</p>
           <h2 className="glow-strong mt-4 font-pixel text-5xl leading-none md:text-7xl">who&apos;s already there?</h2>
           <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground">
-            Find the residents at every hospital, with their rank and specialty, and message them to ask what it&apos;s really like.
+            See the residents at every hospital, with their course, year and 2025 All India Rank, from MCC&apos;s official admitted-candidates
+            lists. Names are shown only to signed-in accounts with access.
           </p>
         </div>
         <div className="mt-12">

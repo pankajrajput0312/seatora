@@ -1,4 +1,5 @@
 import "server-only";
+import { cache as perRequest } from "react";
 import { db } from "@/lib/db";
 import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Source, type Term } from "../types";
 
@@ -151,11 +152,17 @@ async function loadCatalog(): Promise<Catalog> {
   });
 }
 
-// ponytail: one catalog per process, re-validated at most once a minute against the data version (latest source,
-// last college update: every import touches both). Multi-instance deploys each hold their own copy, which is fine.
-let cache: { version: string; checkedAt: number; catalog: Promise<Catalog> } | null = null;
+// ponytail: one catalog per process, re-validated on every request against the data version: the marker row
+// prisma/import-mcc.ts writes last in its transaction, so it changes only once an import has committed (never mid-import).
+// Checked per request, not per minute: a catalog older than the cutoffs would drop rows whose source or course it
+// doesn't know (e.g. right after the provisional-to-final swap). One primary-key read, once per render (React cache).
+// Multi-instance deploys each hold their own copy, which is fine.
+let cache: { version: string; catalog: Promise<Catalog> } | null = null;
 let testCatalog: Catalog | null = null;
-const TTL_MS = 60_000;
+const dataVersion = perRequest(async () => {
+  const marker = await db.dataSource.findUnique({ where: { key: "import/mcc" }, select: { createdAt: true } });
+  return marker?.createdAt.toISOString() ?? "";
+});
 
 /** No database configured or reachable: Decide shows "Data unavailable", never stand-in data. */
 export class DataUnavailableError extends Error {
@@ -173,13 +180,12 @@ export function setTestCatalog(d: DecideData | null) {
 export async function getCatalog(): Promise<Catalog> {
   if (testCatalog) return testCatalog;
   if (!process.env.DATABASE_URL) throw new DataUnavailableError("DATABASE_URL is not set");
-  if (cache && Date.now() - cache.checkedAt < TTL_MS) return cache.catalog;
-  const [{ version }] = await db.$queryRaw<{ version: string }[]>`
-    SELECT concat_ws('|', (SELECT max("createdAt") FROM "DataSource"), (SELECT count(*) FROM "DataSource"), (SELECT max("updatedAt") FROM "College")) AS version`;
+  // Read before loading: an import committing during the load leaves the old version cached, so the next check reloads.
+  const version = await dataVersion();
   if (cache?.version !== version) {
     const catalog = loadCatalog();
     catalog.catch(() => (cache = null)); // don't keep a failed load
-    cache = { version, checkedAt: Date.now(), catalog };
-  } else cache.checkedAt = Date.now();
+    cache = { version, catalog };
+  }
   return cache.catalog;
 }

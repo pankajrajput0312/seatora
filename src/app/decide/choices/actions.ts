@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { canUseDecide } from "@/features/auth/lib/session";
 import { profileFromParams } from "@/features/decide/profile";
 import { getOptionsByIds } from "@/features/decide/service";
 
@@ -8,7 +9,8 @@ const inputSchema = z.object({ ids: z.array(z.string().min(1).max(300)).max(1000
 
 /**
  * Reach labels for saved choices, from the current data and the profile params in the page URL, so a label never
- * goes stale after she edits her rank or category. Null when there is no rank, the input is invalid or there's no data.
+ * goes stale after she edits her rank or category. Null when there is no rank, the input is invalid, there's no data or
+ * no access (Server Actions can be POSTed to any route, past the middleware).
  * (A server action: a list can hold hundreds of ids, more than /api/v1/options/compare takes.)
  */
 export async function liveReach(ids: string[], profile: string) {
@@ -16,6 +18,7 @@ export async function liveReach(ids: string[], profile: string) {
   const p = input.success ? profileFromParams(new URLSearchParams(input.data.profile)) : null;
   if (!input.success || !p) return null;
   try {
+    if (!(await canUseDecide())) return null;
     const rows = await getOptionsByIds([...new Set(input.data.ids)], p);
     return Object.fromEntries(rows.map((o) => [o.id, { reach: o.reach, provisional: !!o.latest?.provisional }]));
   } catch (e) {

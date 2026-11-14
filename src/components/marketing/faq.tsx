@@ -16,8 +16,8 @@ const faqs = [
     a: "Official allotment lists, seat matrices and notices from counselling authorities, plus documents from the institutes themselves. Each figure links to its source and shows when it was last verified.",
   },
   {
-    q: "Are resident reviews real?",
-    a: "Reviews come from residents and alumni and are labelled by how they were verified. We don't write reviews ourselves or publish testimonials from people who don't exist.",
+    q: "Where do residents' names come from?",
+    a: "From MCC's official admitted-candidates lists, with the 2025 All India Rank from the NBEMS merit list where it is published. Seatora shows a name, course and year only. It holds no contact details, and hides a name if that person asks.",
   },
   {
     q: "When can I start using it?",

@@ -20,17 +20,17 @@ const collegeKey = async (prefix: string) => (await svc.getDecideData()).college
 
 // (importing ./service loads Prisma, which reads .env, so the guard sees DATABASE_URL from .env too)
 describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout: 120_000 }, () => {
-  it("loads the catalog with the MCC result PDFs (2026 R1 provisional)", async () => {
+  it("loads the catalog with the MCC result PDFs (2026 R1 final)", async () => {
     const meta = await timed("catalog (cold)", () => svc.getMeta());
-    expect(meta.years[0]).toMatchObject({ year: 2026, rounds: ["R1"], provisional: true, label: "2026 (R1, provisional)" });
+    expect(meta.years[0]).toMatchObject({ year: 2026, rounds: ["R1"], provisional: false, label: "2026 (R1)" });
     expect(meta.years.find((y) => y.year === 2025)?.label).toBe("2025");
   });
 
-  it("Kokilaben Navi Mumbai DNB Anaesthesiology, DNB Quota, Open seat: 2025 R1–stray and 2026 R1 (provisional)", async () => {
+  it("Kokilaben Navi Mumbai DNB Anaesthesiology, DNB Quota, Open seat: 2025 R1–stray and 2026 R1", async () => {
     const rows = await timed("lastRanks DNB anaesthesiology Open", () => svc.lastRanks({ specialty: "ANAESTHESIOLOGY", degree: "DNB", quota: "DNB Quota", category: "Open" }));
     const g = rows.rows.find((r) => r.college.key.startsWith(KOKILA_NM))!.grid;
     expect([g[2025].R1?.closing, g[2025].R2?.closing, g[2025].R3?.closing, g[2025].stray?.closing]).toEqual([21699, 25059, 29892, 33685]);
-    expect(g[2026].R1).toMatchObject({ closing: 20132, provisional: true });
+    expect(g[2026].R1).toMatchObject({ closing: 20132, provisional: false });
     expect(g[2025].R1?.provisional).toBe(false);
   });
 
@@ -38,18 +38,18 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     const c = await collegeKey(GMC_NAGPUR);
     const a = await svc.listAllotments({ year: 2026, round: "R1", course: "md-anaesthesiology" }, 50, c.key);
     expect(a.total).toBe(12);
-    expect(a.rows.every((r) => r.provisional && r.remark === "Fresh")).toBe(true);
+    expect(a.rows.every((r) => !r.provisional && r.remark === "Fresh")).toBe(true);
     // her grid (Open + OBC seats): closing from her categories, bracketed count = allotments in every category
     const inst = (await svc.getInstitute(c.slug, her))!;
     const md = inst.options.find((o) => o.course.slug === "md-anaesthesiology" && o.quota === "All India")!;
-    expect(md.grid[2026].R1).toMatchObject({ closing: 17213, category: "OBC", n: 12, provisional: true });
+    expect(md.grid[2026].R1).toMatchObject({ closing: 17213, category: "OBC", n: 12, provisional: false });
   });
 
   it("Seth GS MD Anaesthesiology 2026 R1: OBC 11,842, Open 8,502, 20 allotments", async () => {
     const c = await collegeKey(SETH_GS);
     const inst = (await timed("getInstitute Seth GS", () => svc.getInstitute(c.slug, { ...her, rank: 1 })))!;
     const md = inst.options.find((o) => o.course.slug === "md-anaesthesiology" && o.quota === "All India")!;
-    expect(md.grid[2026].R1).toMatchObject({ closing: 11842, category: "OBC", n: 20, provisional: true });
+    expect(md.grid[2026].R1).toMatchObject({ closing: 11842, category: "OBC", n: 20, provisional: false });
     const open = await svc.lastRanks({ specialty: "ANAESTHESIOLOGY", degree: "MD", quota: "All India", category: "Open" });
     // closing on Open seats; the bracketed count is every allotment that round (all categories)
     expect(open.rows.find((r) => r.college.key === c.key)!.grid[2026].R1).toMatchObject({ closing: 8502, n: 20 });
@@ -61,9 +61,9 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     const all = await timed("listOptions her (showClosed)", () => svc.listOptions(her, { showClosed: true }));
     const shown = await timed("listOptions her (default)", () => svc.listOptions(her));
     console.log("her options", all.rows.length, all.counts, "shown", shown.rows.length, "hidden closed", shown.hiddenClosed);
-    expect(all.total).toBe(1364); // every option in both specialties; 1,341 of them have an Open or OBC allotment
-    expect(all.counts).toMatchObject({ "reached-latest": 293, "reached-both": 56, "reached-one": 168, "within-10": 102, "closed-before": 654, "no-data": 91 });
-    expect(shown.total + shown.hiddenClosed).toBe(1364);
+    expect(all.total).toBe(1360); // every option in both specialties; 1,338 of them have an Open or OBC allotment
+    expect(all.counts).toMatchObject({ "reached-latest": 294, "reached-both": 57, "reached-one": 165, "within-10": 102, "closed-before": 653, "no-data": 89 });
+    expect(shown.total + shown.hiddenClosed).toBe(1360);
     const page2 = await svc.listOptions(her, {}, { page: 2, pageSize: 50 });
     expect(page2.rows.map((r) => r.id)).toEqual(shown.rows.slice(50, 100).map((r) => r.id));
     const t = performance.now();
@@ -78,7 +78,7 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     expect(trends.total).toBeGreaterThan(10000);
     expect(trends.rows).toHaveLength(50);
     const inst = await timed("listInstitutes her", () => svc.listInstitutes(her, {}));
-    expect(inst.total).toBe(2146);
+    expect(inst.total).toBe(2141); // colleges.ndjson count in the bundle manifest
     const firstPage = await timed("listInstitutes her, page 1", () => svc.listInstitutes(her, {}, { page: 1, pageSize: 48 }));
     expect(firstPage.rows).toHaveLength(48);
     // best reach (per-year maxima in SQL) agrees with the institute page, over the options in her profile only

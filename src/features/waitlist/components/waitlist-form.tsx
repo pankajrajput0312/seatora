@@ -35,7 +35,7 @@ export function WaitlistForm({ examYears }: { examYears: number[] }) {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="relative grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-start">
+    <form method="post" onSubmit={onSubmit} noValidate className="relative grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-start">
       <div>
         <label htmlFor="wl-email" className="sr-only">Email</label>
         <Input

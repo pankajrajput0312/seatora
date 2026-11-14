@@ -11,6 +11,7 @@ export const signUpSchema = z.object({
   name: z.string().trim().min(1, "Enter your name").max(80),
   email,
   password: z.string().min(8, "Use at least 8 characters").max(128, "Use at most 128 characters"),
+  invite: z.string().trim().min(1, "Enter your invite code").max(128),
 });
 
 export type SignInInput = z.input<typeof signInSchema>;

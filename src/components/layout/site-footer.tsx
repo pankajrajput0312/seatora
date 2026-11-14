@@ -1,6 +1,18 @@
 import Link from "next/link";
+import { business } from "@/config/business";
 import { siteConfig } from "@/config/site";
 import { Container } from "./container";
+
+/** About, pricing and policy pages, also linked from /v2's footer. */
+export const legalLinks = [
+  { label: "About", href: "/about" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Terms", href: "/terms" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Refund policy", href: "/refund-policy" },
+  { label: "Shipping policy", href: "/shipping-policy" },
+  { label: "Contact", href: "/contact" },
+];
 
 export function SiteFooter() {
   return (
@@ -10,12 +22,11 @@ export function SiteFooter() {
           An independent NEET PG planner. Not affiliated with MCC, NBEMS, NMC or any state counselling authority.
           Previous-year data does not guarantee admission.
         </p>
-        <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          {siteConfig.nav.map((item) => (
-            <Link key={item.href} href={item.href} className="hover:text-foreground">{item.label}</Link>
+        <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-6">
+          {[...siteConfig.nav, ...legalLinks].map((item) => (
+            <Link key={item.href} href={item.href} className="inline-flex min-h-11 items-center hover:text-foreground">{item.label}</Link>
           ))}
-          <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
-          <span className="font-mono text-xs">© {new Date().getFullYear()}</span>
+          <span className="font-mono text-xs">© {new Date().getFullYear()}{business.sellerName && ` ${business.sellerName}`}</span>
         </nav>
       </Container>
       <Container aria-hidden className="select-none">

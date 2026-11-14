@@ -66,7 +66,7 @@ export function ResidentFinder({ residents }: { residents: Resident[] }) {
         <div className="mt-2">
           <PortraitPreview />
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Residents are being added. Each card will show their rank, hospital and specialty, and a way to say hello.
+            Residents are being added. Each card will show their rank, hospital, specialty and year.
           </p>
         </div>
       ) : groups.length === 0 ? (
@@ -104,7 +104,6 @@ export function ResidentFinder({ residents }: { residents: Resident[] }) {
       )}
 
       <p className="mt-4 text-xs text-muted-foreground">
-        Residents are listed, with their contact details, only with their agreement. Please be respectful when you reach out.
         Their ranks show where people got in before; they don&apos;t predict or guarantee your seat.
       </p>
     </div>

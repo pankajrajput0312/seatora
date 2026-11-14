@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { allow, isLimited, reset } from "@/lib/rate-limit";
+import { inviteMatches, isAllowed, safeNext } from "@/lib/site-access";
 import { dummyHash, hashPassword, verifyPassword } from "./lib/password";
 import { createSession, deleteSession } from "./lib/session";
 import { signInSchema, signUpSchema, type SignInInput, type SignUpInput } from "./validations";
@@ -31,16 +32,22 @@ async function rateLimited(kind: string) {
   return ip ? !allow(`${kind}:${ip}`, 30) : false;
 }
 
-export async function signUp(input: SignUpInput): Promise<AuthResult> {
+// Invite-only: one allowlisted account (SEATORA_ALLOWED_EMAILS) may sign up and sign in. Sign-up also needs
+// SEATORA_INVITE_CODE, since nothing verifies the email. `next` is ?next= from the page.
+export async function signUp(input: SignUpInput, next?: string): Promise<AuthResult> {
   if (await rateLimited("signup")) return { ok: false, error: "Too many attempts. Please wait a minute." };
   const parsed = signUpSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  // One message for both, so it doesn't reveal which emails are allowlisted.
+  if (!isAllowed(parsed.data.email) || !(await inviteMatches(parsed.data.invite))) {
+    return { ok: false, error: "That email and invite code don't match an invite. Seatora is invite-only for now." };
+  }
 
   try {
     const user = await db.user.create({
       data: { name: parsed.data.name, email: parsed.data.email, passwordHash: await hashPassword(parsed.data.password) },
     });
-    await createSession(user.id);
+    await createSession(user);
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return { ok: false, error: "An account with this email already exists. Try signing in." };
@@ -48,10 +55,10 @@ export async function signUp(input: SignUpInput): Promise<AuthResult> {
     console.error("signUp failed", err);
     return { ok: false, error: "We couldn't create your account. Please try again." };
   }
-  redirect("/account");
+  redirect(safeNext(next));
 }
 
-export async function signIn(input: SignInInput): Promise<AuthResult> {
+export async function signIn(input: SignInInput, next?: string): Promise<AuthResult> {
   if (await rateLimited("signin")) return { ok: false, error: "Too many attempts. Please wait a minute." };
   const parsed = signInSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -89,12 +96,14 @@ export async function signIn(input: SignInInput): Promise<AuthResult> {
     if (user.failedLogins || user.lockedUntil) {
       await db.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null } });
     }
-    await createSession(user.id);
+    // Only after the password checks out, so this reveals nothing to a guesser.
+    if (!isAllowed(user.email)) return { ok: false, error: "This account doesn't have access." };
+    await createSession(user);
   } catch (err) {
     console.error("signIn failed", err);
     return { ok: false, error: "We couldn't sign you in. Please try again." };
   }
-  redirect("/account");
+  redirect(safeNext(next));
 }
 
 export async function signOut() {

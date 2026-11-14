@@ -14,7 +14,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:import": "node --experimental-strip-types prisma/import-mcc.ts"
+    "db:import": "node --experimental-strip-types prisma/import-mcc.ts",
+    "db:import-residents": "node --experimental-strip-types prisma/import-residents.ts"
   },
   "dependencies": {
     "@astryxdesign/core": "^0.7.16",

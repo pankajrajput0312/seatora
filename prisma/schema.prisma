@@ -78,6 +78,7 @@ model College {
   verificationStatus VerificationStatus @default(PENDING)
   specialties        CollegeSpecialty[]
   terms              CollegeTerm[]
+  residents          Resident[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -85,13 +86,14 @@ model College {
 }
 
 model Specialty {
-  id       String             @id @default(cuid())
-  slug     String             @unique
-  name     String
-  degree   String // MD, MS, DNB, Diploma
+  id        String             @id @default(cuid())
+  slug      String             @unique
+  name      String
+  degree    String // MD, MS, DNB, Diploma
   /// Canonical specialty code shared across degrees, e.g. "ANAESTHESIOLOGY" (MD and DNB Anaesthesiology). Set by the importer.
-  code     String?
-  colleges CollegeSpecialty[]
+  code      String?
+  colleges  CollegeSpecialty[]
+  residents Resident[]
 }
 
 model CollegeSpecialty {
@@ -148,6 +150,43 @@ model Allotment {
   @@index([counsellingYear, rank])
   @@index([collegeSpecialtyId, counsellingYear, round])
   @@index([sourceId])
+}
+
+/// One name on an MCC admitted-candidates list (PRIVATE bundle, `npm run db:import-residents`, replaced whole on import).
+/// Name, course, year and list only: the source has no roll numbers or contact details, and none are stored.
+model Resident {
+  id          String    @id @default(cuid())
+  /// Cascade: a college the MCC import removes takes its residents with it.
+  collegeId   String
+  college     College   @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  specialtyId String
+  specialty   Specialty @relation(fields: [specialtyId], references: [id])
+  /// Counselling year of the list.
+  year        Int
+  name        String
+  /// NEET PG 2025 All India Rank from the NBEMS merit list; null when not known (always for 2023 and 2024).
+  rank        Int?
+  /// The list as MCC labels it, e.g. "up to Round 3" or "final list (26 Mar 2025)".
+  list        String
+  /// The admitted-list PDF, e.g. "mcc/2025/admitted_upto_R3.pdf" (= DataSource.key).
+  sourceKey   String
+  /// Asked not to be shown: never rendered or returned by the API. Set from HiddenResident on every import.
+  hidden      Boolean   @default(false)
+
+  @@index([collegeId, year])
+  @@index([specialtyId])
+}
+
+/// A person who asked not to be shown (the Residents tab "Hide"). Apart from Resident, which the imports replace or
+/// cascade away, and with no foreign key, so a hide survives a new college key or course. By name and the college's PIN
+/// code: a same-named person at another college with that PIN is hidden too (never the other way round).
+model HiddenResident {
+  name      String
+  /// College.pincode, or College.key for a college without one.
+  place     String
+  createdAt DateTime @default(now())
+
+  @@id([name, place])
 }
 
 /// Fee, stipend, bond or penalty text exactly as published, per college and program (MD or DNB).

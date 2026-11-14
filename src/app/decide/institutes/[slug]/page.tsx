@@ -3,11 +3,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { Badge } from "@/components/ui/badge";
+import { SourceLabel } from "@/components/ui/source-label";
 import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Closing, Dash, HISTORY_CAPTION, PageHead, Provisional, ReachBadge, TermText } from "@/features/decide/components/bits";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
+import { HideableRow } from "@/features/decide/components/residents/hideable-row";
 import { courseName, RoundGrid, toChoiceItem } from "@/features/decide/components/options-view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl } from "@/features/decide/components/ui";
@@ -15,7 +18,9 @@ import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, PAST_YEARS, type OptionTerms } from "@/features/decide/service";
+import { canSeeResidents, groupResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
 import { roundLabel, termLabel } from "@/features/decide/types";
+import { hideResidentAction } from "./actions";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 const tabs = [
@@ -24,10 +29,11 @@ const tabs = [
   { key: "allotments", label: "Allotments" },
   { key: "fees", label: "Fees & bond" },
   { key: "clinical", label: "Clinical data" },
+  { key: "residents", label: "Residents" },
 ] as const;
 const PAGE_SIZE = 50;
 const schema = z.object({
-  tab: z.enum(["overview", "courses", "allotments", "fees", "clinical"]).default("overview"),
+  tab: z.enum(["overview", "courses", "allotments", "fees", "clinical", "residents"]).default("overview"),
   year: z.coerce.number().int().optional(),
   course: z.string().max(100).optional(),
   page: pageValue.default(1),
@@ -35,9 +41,11 @@ const schema = z.object({
 const kinds = ["FEE", "STIPEND", "BOND", "PENALTY"] as const;
 const termOf = (t: OptionTerms, k: (typeof kinds)[number]) => ({ FEE: t.fee, STIPEND: t.stipend, BOND: t.bond, PENALTY: t.penalty })[k];
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const college = await getCollege((await params).slug).catch(() => null);
-  return { title: college?.name ?? "Institute" };
+  // People's names: never indexed.
+  const robots = parseSearchParams(schema, toURLSearchParams(await searchParams)).tab === "residents" ? { index: false, follow: false } : undefined;
+  return { title: college?.name ?? "Institute", robots };
 }
 
 /** Fee, stipend, bond and seat-leaving penalty for one programme, each as published with its own source link. */
@@ -90,6 +98,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
     allotPage = Math.min(f.page, Math.max(1, Math.ceil(allot.total / PAGE_SIZE)));
     if (allotPage < f.page) allot = await listAllotments(allotQ, PAGE_SIZE, college.key, (allotPage - 1) * PAGE_SIZE);
   }
+  // ponytail: every row on one page (largest institute ~930 rows, ~1.6 MB HTML); add a course filter if that grows.
+  const residentsAccess = tab !== "residents" ? null : !(await canSeeResidents()) ? "locked" : !(await residentsBudget("read")) ? "limited" : "ok";
+  const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
+  const residentGroups = residents ? groupResidents(residents.rows, profile) : [];
+  const residentYears = [...new Set(residents?.rows.map((r) => r.year))].sort((a, b) => b - a);
   const termSources = [...kinds.map((k) => termOf(terms.md, k)?.source), ...kinds.map((k) => termOf(terms.dnb, k)?.source)];
 
   return (
@@ -105,7 +118,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         </p>
       </div>
 
-      <SubTabs label="Institute sections" current={tab} items={tabs.map((t) => ({ key: t.key, label: t.label, href: L.institute(slug, t.key) }))} />
+      <SubTabs label="Institute sections" current={tab} items={tabs.map((t) => ({ key: t.key, label: t.label, href: L.to(`/decide/institutes/${slug}`, { tab: t.key }) }))} />
 
       {tab === "overview" && (
         <>
@@ -282,6 +295,84 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           href={L.institute(slug, "courses")}
           action="See the courses here"
         />
+      )}
+      {residentsAccess === "locked" && (
+        <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.institute(slug, "courses")} action="See the courses here" />
+      )}
+      {residentsAccess === "limited" && (
+        <EmptyState title="Too many requests" description="Residents were opened too many times from this network. Try again in an hour." href={L.institute(slug, "courses")} action="See the courses here" />
+      )}
+      {tab === "residents" && residents && (
+        <section aria-labelledby="res-h" className="grid grid-cols-1 gap-4">
+          <h2 id="res-h" className="sr-only">Residents</h2>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            From MCC&apos;s official admitted-candidates lists. Shown for choosing a college — contact people respectfully; ask to be hidden and we will.
+          </p>
+          {residents.total === 0 ? (
+            <EmptyState title="No residents listed here" description="MCC's admitted-candidates lists have no names at this institute, or they were hidden." href={L.institute(slug, "courses")} action="See the courses here" />
+          ) : (
+            <>
+              <div role="region" aria-label="Residents by course and year" tabIndex={0} className={tbl.wrap}>
+                <table className={tbl.table}>
+                  <caption className="sr-only">Residents at {college.name} by course and year</caption>
+                  <thead><tr className={tbl.headRow}>
+                    <th scope="col" className={tbl.th}>Course</th>
+                    {residentYears.map((y) => <th key={y} scope="col" className={`${tbl.th} text-right`}>{y}</th>)}
+                    <th scope="col" className={`${tbl.th} text-right`}>Total</th>
+                  </tr></thead>
+                  <tbody>
+                    {residentGroups.map((g) => (
+                      <tr key={g.course.slug} className={tbl.row}>
+                        <th scope="row" className={`${tbl.td} text-left font-medium`}><a href={`#res-${g.course.slug}`} className="hover:text-sky hover:underline">{g.course.degree} {g.course.name}</a></th>
+                        {residentYears.map((y) => {
+                          const n = g.years.find((x) => x.year === y)?.rows.length;
+                          return <td key={y} className={tbl.num}>{n ? formatRank(n) : <Dash />}</td>;
+                        })}
+                        <td className={tbl.num}>{formatRank(g.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {residentGroups.map((g) => (
+                <section key={g.course.slug} aria-labelledby={`res-${g.course.slug}`} className="grid gap-2">
+                  <h3 id={`res-${g.course.slug}`} tabIndex={-1} className="flex flex-wrap items-center gap-2 text-base font-semibold">
+                    {g.course.degree} {g.course.name} <span className="numeric text-sm font-normal text-muted-foreground">{formatRank(g.total)}</span>
+                    {profile && g.mine && <Badge tone="info">In your profile</Badge>}
+                  </h3>
+                  <div role="region" aria-label={`Residents, ${g.course.degree} ${g.course.name}`} tabIndex={0} className={tbl.wrap}>
+                    <table className={tbl.table}>
+                      <caption className="sr-only">Residents in {g.course.degree} {g.course.name} at {college.name}, newest year first</caption>
+                      <thead><tr className={tbl.headRow}>
+                        <th scope="col" className={tbl.th}>Name</th><th scope="col" className={tbl.th}>Year</th><th scope="col" className={tbl.th}>MCC list</th>
+                        <th scope="col" className={`${tbl.th} text-right`}>2025 AIR</th><th scope="col" className={tbl.th}><span className="sr-only">Hide</span></th>
+                      </tr></thead>
+                      {g.years.map((y) => (
+                        <tbody key={y.year}>
+                          <tr className="border-b border-border bg-muted/40"><th scope="rowgroup" colSpan={5} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground"><span className="numeric">{y.year}</span> · {formatRank(y.rows.length)}</th></tr>
+                          {y.rows.map((r) => (
+                            <HideableRow key={r.id} id={r.id} name={r.name} hide={hideResidentAction} colSpan={5} className={tbl.row}>
+                              <th scope="row" className={`${tbl.td} text-left font-medium`}>{r.name}</th>
+                              <td className={`${tbl.td} numeric`}>{r.year}</td>
+                              <td className={tbl.td}>{r.list}</td>
+                              <td className={tbl.num}>{r.rank != null ? formatRank(r.rank) : <Dash />}</td>
+                            </HideableRow>
+                          ))}
+                        </tbody>
+                      ))}
+                    </table>
+                  </div>
+                </section>
+              ))}
+              <p className="text-xs text-muted-foreground">2025 AIR: the All India Rank in NBEMS&apos;s NEET PG 2025 merit list, where known. It is where one person got in, not a closing rank or a prediction. No contact details are held.</p>
+            </>
+          )}
+          <div className="grid gap-1">
+            {residents.sources.map((s) => (
+              <SourceLabel key={s.key} provenance={{ sourceName: s.name, sourceUrl: s.url, sourceType: "OFFICIAL", academicYear: `PG counselling ${s.year ?? "—"}` }} />
+            ))}
+          </div>
+        </section>
       )}
     </AppPage>
   );
