@@ -22,6 +22,8 @@
   --color-leaf: oklch(78% 0.19 145);  /* success, official */
   --color-sun: oklch(87% 0.17 95);    /* warning, unverified */
   --color-ember: oklch(65% 0.23 27);  /* error, destructive */
+  /* Pale cool tint a portrait fades to on hover, revealing the grayscale image (roook.space portraits) */
+  --color-mist: oklch(86% 0.025 225);
   --color-white: #fff;
   --color-black: #000;
   --color-transparent: transparent;
@@ -78,12 +80,17 @@ body::before {
 @keyframes bob { 50% { transform: translateY(-8px); } }
 @keyframes heartbeat { 0%, 40%, 100% { transform: scale(1); } 10% { transform: scale(1.1); } 25% { transform: scale(1.05); } }
 @keyframes twinkle { 50% { opacity: 0.45; } }
+@keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
+@keyframes rise { from { opacity: 0; transform: translateY(28px); filter: blur(6px); } }
 
 @utility marquee { animation: marquee 60s linear infinite; }
 @utility marquee-slow { animation: marquee 90s linear infinite; }
 @utility bob { animation: bob 6s ease-in-out infinite; }
 @utility heartbeat { transform-box: fill-box; transform-origin: center; animation: heartbeat 1.6s ease-out infinite; }
 @utility twinkle { animation: twinkle 3s ease-in-out infinite; }
+@utility blink { transform-box: fill-box; transform-origin: center; animation: blink 5s ease-in-out infinite; }
+/* Dot texture laid over portraits with mix-blend-overlay */
+@utility dots { background-image: radial-gradient(circle, oklch(0% 0 0 / 0.5) 0.8px, transparent 1.2px); background-size: 3px 3px; }
 @utility mask-x { mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent); }
 @utility glow { text-shadow: 0 0 24px oklch(100% 0 0 / 0.18); }
 @utility glow-strong { text-shadow: 0 2px 0 oklch(0% 0 0 / 0.6), 0 0 32px oklch(0% 0 0 / 0.8); }
@@ -92,6 +99,39 @@ body::before {
   background-image: radial-gradient(circle, oklch(0% 0 0 / 0.55) 0.9px, transparent 1.4px),
     linear-gradient(to bottom, transparent 40%, oklch(0% 0 0 / 0.55));
   background-size: 4px 4px, 100% 100%;
+}
+
+/* Scroll-driven entrance: rises and un-blurs as it enters the viewport. Browsers without
+   scroll timelines simply show the content. Stagger with style={{ "--i": n }}. */
+@supports (animation-timeline: view()) {
+  .rise-in {
+    animation: rise linear both;
+    animation-timeline: view();
+    animation-range: entry calc(var(--i, 0) * 6%) entry calc(55% + var(--i, 0) * 6%);
+  }
+}
+
+/* True ordered dither for photos, as on roook.space: a tiled 4×4 Bayer matrix is screened over the
+   grayscale image, then high contrast snaps each pixel to black or white. */
+@layer components {
+  .dither {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: black;
+    filter: grayscale(1) brightness(1.05) contrast(1.6);
+  }
+  .dither::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='1' height='1' fill='%23000'/%3E%3Crect x='1' width='1' height='1' fill='%23888'/%3E%3Crect x='2' width='1' height='1' fill='%23222'/%3E%3Crect x='3' width='1' height='1' fill='%23aaa'/%3E%3Crect y='1' width='1' height='1' fill='%23ccc'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23444'/%3E%3Crect x='2' y='1' width='1' height='1' fill='%23eee'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%23666'/%3E%3Crect y='2' width='1' height='1' fill='%23333'/%3E%3Crect x='1' y='2' width='1' height='1' fill='%23bbb'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23111'/%3E%3Crect x='3' y='2' width='1' height='1' fill='%23999'/%3E%3Crect y='3' width='1' height='1' fill='%23fff'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%23777'/%3E%3Crect x='2' y='3' width='1' height='1' fill='%23ddd'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23555'/%3E%3C/svg%3E");
+    background-size: 8px 8px;
+    image-rendering: pixelated;
+    mix-blend-mode: screen;
+    opacity: 0.3;
+  }
 }
 
 @utility numeric {

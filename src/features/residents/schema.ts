@@ -34,6 +34,8 @@ export const residentSchema = z
     /** e.g. "MD General Medicine". */
     course: z.string().trim().min(1),
     contact: contactSchema.default({}),
+    /** Optional photo they shared, saved under public/residents/. Shown dithered and tinted. */
+    photo: z.string().regex(/^\/residents\/[\w.-]+\.(jpe?g|png|webp)$/, "Path like /residents/name.jpg in public/residents").optional(),
     /** Set true only after checking their allotment letter. */
     verified: z.boolean().default(false),
     /** Name and contact details are public, so every entry needs the resident's agreement to both. */

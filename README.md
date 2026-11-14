@@ -55,6 +55,7 @@ The landing page's main section shows residents grouped by the hospital or colle
 ```
 - `category`: Open, EWS, OBC, SC, ST, or any of those with " PwD". `quota`: AIQ, State, Deemed, Central institute, Management, NRI. `round` (optional): R1, R2, R3, Stray, Special stray, State round. `state` is optional.
 - `contact` is optional, and every field inside it is optional: `whatsapp`, `phone` (digits with country code, e.g. `+919812345678`), `email`, `instagram` (handle without @) and `linkedin` (full URL). Each one becomes a button.
+- `photo` is optional: save the image in `public/residents/` and set e.g. `"photo": "/residents/priya.jpg"`. It's shown dithered and colour-tinted like the rest of the site. Without a photo, the card shows a pixel-art doctor generated from their name.
 - `consent` must be `true`. Only list people who agreed to be shown publicly with their name **and** the contact details you add. Anything on the page can be copied by anyone.
 - Set `verified` to `true` only after checking their allotment letter.
 - A bad entry fails `npm run build` with a message naming the field. Rebuild after editing.

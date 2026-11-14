@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("landing page renders key sections", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Plan your PG seat");
-  await expect(page.getByRole("heading", { name: "Find residents at every hospital, and reach them directly." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "who's already there?" })).toBeVisible();
   // Every in-page link must point at a section that exists.
   const hashes = await page.locator('a[href^="/#"], a[href^="#"]').evaluateAll((as) => as.map((a) => a.getAttribute("href")!.split("#")[1]));
   for (const id of new Set(hashes)) await expect(page.locator(`#${id}`), `#${id}`).toBeAttached();
@@ -22,7 +22,7 @@ test("resident finder takes a rank and shows hospitals or an honest empty state"
   await input.pressSequentially("5000");
   await input.blur();
   await expect(input).toHaveValue("5,000");
-  await expect(finder.getByText("No residents added yet.").or(finder.getByRole("heading", { level: 3 }).first())).toBeVisible();
+  await expect(finder.getByText("Residents are being added.").or(finder.getByRole("heading", { level: 3 }).first())).toBeVisible();
 });
 
 test("waitlist sign-up succeeds", async ({ page }, info) => {
