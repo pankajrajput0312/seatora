@@ -7,15 +7,16 @@ import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { HISTORY_CAPTION, PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
-import { DataSource } from "@/features/decide/components/data-source";
+import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { OptionsResults } from "@/features/decide/components/option-actions";
 import { control, EmptyState, smallLink } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { eligibleCategories, reachLabel, reachOrder } from "@/features/decide/lib/reach";
+import { eligibleCategories, reachLabel, reachOrder, reachWindow } from "@/features/decide/lib/reach";
 import { BOND_YEAR_CHOICES, feeChoices, keepProfileParams, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, LATEST_YEAR, listOptions, PAST_YEARS } from "@/features/decide/service";
+import { openQuotas, roundLabel } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
@@ -26,6 +27,8 @@ const filtersSchema = z.object({
   reach: z.enum(reachOrder).optional(),
   closed: z.literal("1").optional(),
   prov: z.literal("0").optional(),
+  /** Only options with seats in the newest clear vacancy list. */
+  seats: z.literal("1").optional(),
   page: pageValue.default(1),
 });
 
@@ -35,18 +38,21 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   if (!profile) return <AppPage><PageHead title="Options" /><SetRankPrompt path="/decide/options" /></AppPage>;
 
   const f = parseSearchParams(filtersSchema, params);
-  const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: !!f.closed };
+  const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: !!f.closed, hasSeats: !!f.seats };
   const [meta, r] = await Promise.all([getMeta(), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE })]);
   const L = decideLinks(params);
   const here = (changes: Record<string, string | null>) => L.with("/decide/options", { page: null, ...changes });
-  const all = reachOrder.reduce((s, x) => s + r.counts[x], 0);
+  // The All chip counts what it lists: closed-before options only while they are shown.
+  const all = reachOrder.reduce((s, x) => s + r.counts[x], 0) - (f.closed ? 0 : r.counts["closed-before"]);
+  const counted = reachWindow(LATEST_YEAR, PAST_YEARS, !f.prov);
+  const seatList = r.seatList;
   const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
   // The latest year's R1 is the only round that can be provisional (MCC's provisional result); the toggle exists only then.
   const latestProvisional = !!meta.sources.find((s) => s.year === LATEST_YEAR && s.round === "R1")?.provisional;
   const keep = keepProfileParams(params);
   // Same profile and filters for /api/v1/options, where "Show more" reads the next pages.
   const api = profileToParams(profile);
-  for (const [k, v] of [["q", f.q], ["reach", f.reach], ["showClosed", f.closed], ["prov", f.prov]] as const) if (v) api.set(k, v);
+  for (const [k, v] of [["q", f.q], ["reach", f.reach], ["showClosed", f.closed], ["prov", f.prov], ["hasSeats", f.seats]] as const) if (v) api.set(k, v);
   const caption = `Options for AIR ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats`;
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
@@ -54,7 +60,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   return (
     <AppPage className="grid grid-cols-1 gap-5">
       <PageHead title="Options">
-        Every institute and course in your profile, labelled by how your rank compares with past closing ranks on {seats} seats, the seat categories you can take.
+        Every institute and course in your profile, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats, the seat
+        categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${openQuotas.join(", ")})`}.
       </PageHead>
 
       {/* The profile filters are URL params, so this visit can differ from the saved profile. The form and Apply stay mounted (focus stays on Apply); only the fields remount to show what was applied. */}
@@ -69,7 +76,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           </label>
           <FilterDropdown label="Course" name="sp" options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} selected={profile.specialties} />
           <FilterDropdown label="Degree" name="deg" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={profile.degrees} />
-          <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} />
+          <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" noneNote={`None ticked means ${openQuotas.join(", ")}: the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible.`} />
           <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} />
           <label className="w-44">
             <span className="sr-only">Maximum fee per year</span>
@@ -85,6 +92,12 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
               {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? "No bond" : `Bond up to ${y} ${y === 1 ? "yr" : "yrs"}`}</option>)}
             </select>
           </label>
+          {seatList && (
+            <label className="inline-flex min-h-11 items-center gap-2 px-1 text-sm">
+              <input type="checkbox" name="seats" value="1" defaultChecked={!!f.seats} className="size-4 accent-sky" />
+              Has {roundLabel[seatList.round]} seats ({seatList.year} clear vacancy)
+            </label>
+          )}
           {latestProvisional && (
             <label className="inline-flex min-h-11 items-center gap-2 px-1 text-sm">
               <input type="checkbox" name="prov" value="0" defaultChecked={!!f.prov} className="size-4 accent-sky" />
@@ -101,7 +114,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         </Link>
         {reachOrder.filter((x) => r.counts[x] > 0).map((x) => (
           <Link key={x} href={here({ reach: x, closed: x === "closed-before" ? "1" : null })} aria-current={f.reach === x ? "true" : undefined} className={chip(f.reach === x)}>
-            {reachLabel(x, LATEST_YEAR, PAST_YEARS)} <span className="numeric font-semibold">{formatRank(r.counts[x])}</span><span className="sr-only"> options</span>
+            {reachLabel(x, LATEST_YEAR, PAST_YEARS, !f.prov)} <span className="numeric font-semibold">{formatRank(r.counts[x])}</span><span className="sr-only"> options</span>
             {x === "reached-latest" && <Provisional when={latestProvisional && !f.prov} />}
           </Link>
         ))}
@@ -110,7 +123,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         <p className="text-sm text-muted-foreground">
           {r.hiddenClosed > 0 ? (
             <>
-              <span className="numeric">{formatRank(r.hiddenClosed)}</span> that closed before your rank in every past round are hidden.{" "}
+              <span className="numeric">{formatRank(r.hiddenClosed)}</span> that closed before your rank in every round of {counted} are hidden
+              {r.hiddenProvisional > 0 && <> (<span className="numeric">{formatRank(r.hiddenProvisional)}</span> of them only in the provisional {LATEST_YEAR} R1)</>}.{" "}
               <Link href={here({ closed: "1" })} className={`${smallLink} text-sky`}>Show them</Link>
             </>
           ) : (
@@ -131,13 +145,15 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           firstPageHref={r.page > 1 ? here({}) : undefined}
           latestYear={LATEST_YEAR}
           pastYears={PAST_YEARS}
+          includeLatest={!f.prov}
+          seatList={seatList}
         />
       ) : (
         <EmptyState
           title="No options match"
           description="Nothing in your profile matches this search and label. Clear them, or widen the course, quota, state, fee or bond filters above."
-          href={here({ q: null, reach: null, closed: "1" })}
-          action="Clear search and labels"
+          href={here({ q: null, reach: null, closed: "1", seats: null })}
+          action="Clear search, seats and labels"
         />
       )}
 
@@ -148,10 +164,15 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           that round alone. Bracketed numbers are allotments made that round in every category, not the seat matrix.
         </p>
         <p>
+          Labels count every round of {PAST_YEARS[0]} and {PAST_YEARS[1]}{!f.prov && `, and ${LATEST_YEAR} R1`}; older years show under Rounds by year but are not counted.
+          {seatList && <> {roundLabel[seatList.round]} seats: in the {seatList.year} {roundLabel[seatList.round]} clear vacancy list, this option&apos;s quota and your seat categories ({seats}); &quot;—&quot; when the list has none. Select a number to see those seats.</>}
+        </p>
+        <p>
           Within 10%: in a past round the closing rank was at least 90% of yours (AIR <span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or
           later) but before your rank. Options with no fee or bond listed stay in when you set a fee or bond limit.
         </p>
         <DataSource terms={r.rows.flatMap((x) => [x.terms.fee?.source, x.terms.bond?.source])} />
+        <SeatSource list={seatList} noticesHref={L.to("/decide/counselling")} />
       </div>
     </AppPage>
   );

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, IndianRupee, LayoutDashboard, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
+import { Calculator } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -13,7 +14,7 @@ import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { MAX_COMPARE } from "../lib/choices";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
-import { profileFromParams, profileToParams, type Profile } from "../profile";
+import { profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
 import { ProfileDialog, type ProfileMeta } from "./profile-dialog";
 
 const sections = [
@@ -33,6 +34,7 @@ const sections = [
       { href: "/decide/last-ranks", label: "Last ranks", icon: TrendingUp },
       { href: "/decide/allotments", label: "Allotments", icon: Table2 },
       { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch },
+      { href: "/decide/rank-tools", label: "Score & rank", icon: Calculator },
       { href: "/decide/fees", label: "Fees & bond", icon: IndianRupee },
       { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
     ],
@@ -56,7 +58,8 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
   const [compare] = useCompare(); // Zod-validated tray: a malformed value is an empty tray, never a crash
   const [editing, setEditing] = useState(false);
 
-  // URL params override; otherwise bring the saved profile into the URL.
+  // URL params override; otherwise bring the saved profile into the URL. A URL profile that doesn't parse (a hand-edited
+  // rank=abc or cat=GEN) counts as none, so the page and this sidebar both show the saved one, never a silent fallback.
   useEffect(() => {
     if (!hydrated) return;
     const next = new URLSearchParams(sp.toString());
@@ -64,7 +67,8 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
     const wantsEdit = next.get("editProfile") === "1";
     next.delete("editProfile");
     if (wantsEdit) setEditing(true);
-    if (profile && !next.get("rank")) router.replace(`${pathname}?${profileToParams(profile, next)}`, { scroll: false });
+    const saved = profile && profileToParams(profile, next);
+    if (saved && !profileSchema.safeParse(profileInput(next)).success && `${saved}` !== `${next}`) router.replace(`${pathname}?${saved}`, { scroll: false });
     else if (wantsEdit) router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
   }, [hydrated, profile, sp, pathname, router]);
 
@@ -92,8 +96,9 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
                 {compare.length > 0 && (
                   <span className="hidden md:block" data-print-hide>
                     <Button asChild variant="secondary">
-                      <Link href={L.compare(compare)} aria-label={`Compare ${compare.length} of ${MAX_COMPARE} selected options`}>
-                        <GitCompareArrows className="size-4" aria-hidden /> <span className="numeric">{compare.length}/{MAX_COMPARE}</span>
+                      {/* Name from the content, so it contains the visible "2/4" (WCAG 2.5.3). */}
+                      <Link href={L.compare(compare)}>
+                        <GitCompareArrows className="size-4" aria-hidden /> <span className="sr-only">Compare </span><span className="numeric">{compare.length}/{MAX_COMPARE}</span><span className="sr-only"> selected</span>
                       </Link>
                     </Button>
                   </span>
@@ -113,7 +118,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
                   <>
                     <p className="mt-0.5 text-2xl font-bold tracking-tight">{formatRank(shown.rank)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {shown.category}{shown.pwd ? " PwD" : ""}, {shown.specialties.length ? `${shown.specialties.length} ${shown.specialties.length === 1 ? "course" : "courses"}` : "all courses"}
+                      {shown.category}{shown.pwd ? " PwD" : ""}, {shown.specialties.length ? `${shown.specialties.length} ${shown.specialties.length === 1 ? "specialty" : "specialties"}` : "all specialties"}
                     </p>
                   </>
                 ) : (
@@ -144,7 +149,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
 
       <nav aria-label="Decide shortcuts" className={cn("fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-background md:hidden", compare.length ? "grid-cols-4" : "grid-cols-3")}>
         {[...bottom, ...(compare.length ? [{ href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows }] : [])].map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 text-xs", isCurrent(href) ? "text-foreground" : "text-muted-foreground")}>
+          <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 border-t-2 text-xs", isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <Icon className="size-5" strokeWidth={1.75} aria-hidden />
             <span className="numeric">{label}</span>
           </Link>

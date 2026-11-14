@@ -18,6 +18,13 @@ const sqlRounds = [...rounds] as string[];
 
 const byYearRound = (a: Cutoff, b: Cutoff) => a.year - b.year || roundPos(a.round) - roundPos(b.round);
 
+/**
+ * "collegeSpecialtyId" IN ($1, …, $n), not = ANY($1): Postgres moves a prepared statement to a generic plan after five
+ * runs, and for ANY($1) that plan assumes a short array, so her ~1,300-id read went from 30 to 120 ms once pages had
+ * run it with 25 ids. A bound list tells even the generic plan how long it is.
+ */
+const csIn = (cs: string[]) => Prisma.sql`"collegeSpecialtyId" IN (${Prisma.join(cs)})`;
+
 /** Cutoffs ordered by year, then round, so ties keep the earliest round. Sorted here, not in SQL (cheaper). */
 export async function findCutoffs(cat: Catalog, q: CutoffQuery): Promise<Cutoff[]> {
   if (q.cs?.length === 0) return [];
@@ -32,7 +39,7 @@ export async function findCutoffs(cat: Catalog, q: CutoffQuery): Promise<Cutoff[
     );
   }
   const where = [
-    q.cs && Prisma.sql`"collegeSpecialtyId" = ANY(${q.cs})`,
+    q.cs && csIn(q.cs),
     q.quotas && Prisma.sql`quota = ANY(${q.quotas})`,
     q.categories && Prisma.sql`category = ANY(${q.categories})`,
     q.years && Prisma.sql`"counsellingYear" = ANY(${q.years})`,
@@ -51,28 +58,34 @@ export async function findCutoffs(cat: Catalog, q: CutoffQuery): Promise<Cutoff[
 }
 
 /**
- * Reach-label inputs per option id: in her seat categories, the deepest closing of each past year and of the latest
- * year's R1. One row per option from SQL instead of every cutoff (Institutes needs a label for every college).
+ * Reach-label inputs per option id: in her seat categories (all when omitted), the deepest closing of each past year
+ * (the later one with its round and seat category) and of the latest year's R1. One row per option from SQL instead
+ * of every cutoff (Options, Overview and Institutes label every option in her profile; only a page is built in full).
  */
 export async function findReachInputs(
   cat: Catalog,
-  q: { cs?: string[]; categories: string[]; pastYears: [number, number]; latestYear: number },
+  q: { cs?: string[]; categories?: string[]; pastYears: [number, number]; latestYear: number },
 ): Promise<Map<string, ReachInput[]>> {
   const [y1, y2] = q.pastYears;
   if (cat.mem) {
     const rows = await findCutoffs(cat, { cs: q.cs, categories: q.categories, years: [y1, y2, q.latestYear] });
     const out = new Map<string, ReachInput[]>();
-    for (const c of rows) (out.get(optionId(c)) ?? out.set(optionId(c), []).get(optionId(c))!).push(c);
+    for (const c of rows.sort(byYearRound)) (out.get(optionId(c)) ?? out.set(optionId(c), []).get(optionId(c))!).push(c);
     return out;
   }
   if (q.cs?.length === 0) return new Map();
-  const rows = await db.$queryRaw<{ cs: string; q: string; a: number | null; b: number | null; c: number | null }[]>`
+  // bx: the later year's deepest row as "closing|9-round position|round|category", so a plain MAX picks it (ties: the
+  // earliest round, as deepestByYear does) without a sort (array_agg ORDER BY spilled to disk: 300 ms vs 50 ms).
+  const rows = await db.$queryRaw<{ cs: string; q: string; a: number | null; b: number | null; bx: string | null; c: number | null }[]>`
     SELECT "collegeSpecialtyId" AS cs, quota AS q,
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y1}) AS a,
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y2}) AS b,
+      MAX(lpad("closingRank"::text, 7, '0') || '|' || (9 - array_position(${sqlRounds}::text[], round)) || '|' || round || '|' || category) FILTER (WHERE "counsellingYear" = ${y2}) AS bx,
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${q.latestYear} AND round = 'R1') AS c
     FROM "Cutoff"
-    WHERE category = ANY(${q.categories}) AND "counsellingYear" = ANY(${[y1, y2, q.latestYear]}) ${q.cs ? Prisma.sql`AND "collegeSpecialtyId" = ANY(${q.cs})` : Prisma.empty}
+    WHERE "counsellingYear" = ANY(${[y1, y2, q.latestYear]})
+      ${q.categories ? Prisma.sql`AND category = ANY(${q.categories})` : Prisma.empty}
+      ${q.cs ? Prisma.sql`AND ${csIn(q.cs)}` : Prisma.empty}
     GROUP BY 1, 2`;
   const out = new Map<string, ReachInput[]>();
   for (const r of rows) {
@@ -80,7 +93,8 @@ export async function findReachInputs(
     if (!pair) continue;
     const list: ReachInput[] = [];
     if (r.a != null) list.push({ year: y1, closing: r.a });
-    if (r.b != null) list.push({ year: y2, closing: r.b });
+    const [, , round, category] = r.bx?.split("|") ?? [];
+    if (r.b != null) list.push({ year: y2, closing: r.b, round: round as Round, category: category as Category });
     if (r.c != null) list.push({ year: q.latestYear, round: "R1", closing: r.c });
     out.set(optionId({ ...pair, quota: r.q }), list);
   }
@@ -108,7 +122,7 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
     return { total: all.length, rows: all.slice(offset, opts.limit == null ? undefined : offset + opts.limit) };
   }
   const where = [
-    q.cs && Prisma.sql`"collegeSpecialtyId" = ANY(${q.cs})`,
+    q.cs && csIn(q.cs),
     q.year && Prisma.sql`"counsellingYear" = ${q.year}`,
     q.round && Prisma.sql`round = ${q.round}`,
     q.quota && Prisma.sql`quota = ${q.quota}`,

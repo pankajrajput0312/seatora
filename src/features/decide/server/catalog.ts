@@ -1,5 +1,6 @@
 import "server-only";
 import { cache as perRequest } from "react";
+import { requireDecideAccess } from "@/features/auth/lib/session";
 import { db } from "@/lib/db";
 import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Source, type Term } from "../types";
 
@@ -159,6 +160,7 @@ async function loadCatalog(): Promise<Catalog> {
 // Multi-instance deploys each hold their own copy, which is fine.
 let cache: { version: string; catalog: Promise<Catalog> } | null = null;
 let testCatalog: Catalog | null = null;
+const access = perRequest(() => requireDecideAccess());
 const dataVersion = perRequest(async () => {
   const marker = await db.dataSource.findUnique({ where: { key: "import/mcc" }, select: { createdAt: true } });
   return marker?.createdAt.toISOString() ?? "";
@@ -180,6 +182,10 @@ export function setTestCatalog(d: DecideData | null) {
 export async function getCatalog(): Promise<Catalog> {
   if (testCatalog) return testCatalog;
   if (!process.env.DATABASE_URL) throw new DataUnavailableError("DATABASE_URL is not set");
+  // Every Decide page, API route and Server Action reads through here. src/middleware.ts checks only the access cookie's
+  // signature, so a copied cookie with no live session is sent to sign-in (pages; the API answers 401 first in handle()).
+  // Open while the gate is off (development, unit tests).
+  await access();
   // Read before loading: an import committing during the load leaves the old version cached, so the next check reloads.
   const version = await dataVersion();
   if (cache?.version !== version) {

@@ -19,14 +19,15 @@ import { termLabel } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Compare" };
 
-/** ids: repeated or comma-joined option ids; duplicates and anything past the 4th are dropped. */
+/** ids: repeated or comma-joined option ids; duplicates and unknown ids are dropped, then anything past the 4th. */
 const paramsSchema = z.object({ ids: z.array(z.string().min(1).max(300)).default([]) });
 
 export default async function ComparePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
-  const ids = [...new Set(parseSearchParams(paramsSchema, params, ["ids"]).ids)].slice(0, MAX_COMPARE);
-  const [options, meta] = await Promise.all([getOptionsByIds(ids, profile), getMeta()]);
+  const ids = [...new Set(parseSearchParams(paramsSchema, params, ["ids"]).ids)].slice(0, 5 * MAX_COMPARE);
+  const [known, meta] = await Promise.all([getOptionsByIds(ids, profile), getMeta()]);
+  const options = known.slice(0, MAX_COMPARE);
   const L = decideLinks(params);
   const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
   const [older, last] = PAST_YEARS;
@@ -39,7 +40,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       label: "Your reach",
       cell: (r) =>
         profile ? (
-          <ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} />
+          <ReachBadge reach={r.reach} provisional={r.reachProvisional} />
         ) : (
           <Link href={L.with("/decide/compare", { editProfile: "1" })} className={`${smallLink} text-sky`}>Set your rank to see</Link>
         ),
@@ -68,7 +69,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
 
   return (
     <AppPage className="py-6">
-      <CompareFromDevice validIds={options.map((o) => o.id)} requested={ids} />
+      <CompareFromDevice validIds={known.map((o) => o.id)} requested={ids} />
       <PageHead title="Compare">Up to {MAX_COMPARE} options side by side. Add them with the compare button on Options, Choices or an institute page.</PageHead>
 
       {options.length === 0 ? (

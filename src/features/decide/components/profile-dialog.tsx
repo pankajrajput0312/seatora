@@ -5,7 +5,7 @@ import { Dialog } from "radix-ui";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { baseCategories } from "../types";
+import { baseCategories, openQuotas } from "../types";
 import { BOND_YEAR_CHOICES, feeChoices, profileSchema, type Profile } from "../profile";
 import { control } from "./ui";
 
@@ -13,11 +13,11 @@ export type ProfileMeta = { specialties: { code: string; name: string }[]; degre
 
 const empty: Profile = { rank: 0, category: "Open", pwd: false, specialties: [], degrees: [], quotas: [], states: [], maxFeeLakh: null, maxBondYears: null };
 
-function Checks({ legend, options, value, onChange }: { legend: string; options: { value: string; label: string }[]; value: string[]; onChange: (v: string[]) => void }) {
+function Checks({ legend, options, value, onChange, note = "None ticked = all." }: { legend: string; options: { value: string; label: string }[]; value: string[]; onChange: (v: string[]) => void; note?: string }) {
   return (
     <fieldset>
       <legend className="text-sm font-medium">{legend}</legend>
-      <p className="text-xs text-muted-foreground">None ticked = all.</p>
+      <p className="text-xs text-muted-foreground">{note}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {options.map((o) => (
           <label key={o.value} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-input bg-secondary px-3 text-sm has-checked:border-sky">
@@ -101,7 +101,13 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
 
           <Checks legend="Specialties" options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} value={draft.specialties} onChange={(v) => set("specialties", v)} />
           <Checks legend="Degrees" options={meta.degrees.map((d) => ({ value: d, label: d }))} value={draft.degrees} onChange={(v) => set("degrees", v)} />
-          <Checks legend="Quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} value={draft.quotas} onChange={(v) => set("quotas", v)} />
+          <Checks
+            legend="Quotas"
+            note={`None ticked = ${openQuotas.join(", ")}, the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible.`}
+            options={meta.quotas.map((q) => ({ value: q, label: q }))}
+            value={draft.quotas}
+            onChange={(v) => set("quotas", v)}
+          />
           <Checks legend="States" options={meta.states.map((st) => ({ value: st, label: st }))} value={draft.states} onChange={(v) => set("states", v)} />
 
           <div className="grid gap-4 sm:grid-cols-2">

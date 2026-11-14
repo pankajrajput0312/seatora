@@ -1,8 +1,10 @@
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { canUseDecide } from "@/features/auth/lib/session";
 import { rankValue, readParams } from "./lib/params";
 import { reachOrder } from "./lib/reach";
 import { profileInput, profileSchema } from "./profile";
-import { baseCategories, rounds, type Source } from "./types";
+import { baseCategories, rounds, type SeatList, type Source } from "./types";
 
 // Query schemas and response helpers for the /api/v1 route handlers (thin wrappers over service.ts).
 // Lists accept repeated or comma-separated params: ?sp=A&sp=B or ?sp=A,B. Profile params use the URL keys of
@@ -20,8 +22,13 @@ export const optionsQuerySchema = pageSchema.extend({
   showClosed: bool.default(false),
   /** "0" leaves the provisional 2026 R1 out of the reach labels. */
   prov: bool.default(true),
+  /** Only options with seats in the newest clear vacancy list. */
+  hasSeats: bool.default(false),
 });
-export const compareQuerySchema = z.object({ ids: z.array(z.string().min(1).max(200)).min(1).max(4) });
+/** Repeated ids count once (deduped before the limit of 4). */
+export const compareQuerySchema = z.object({
+  ids: z.array(z.string().min(1).max(200)).transform((ids) => [...new Set(ids)]).pipe(z.array(z.string()).min(1).max(4)),
+});
 export const collegesQuerySchema = pageSchema.extend({
   q: z.string().trim().max(100).optional(),
   state: z.string().optional(),
@@ -49,7 +56,7 @@ export const allotmentsQuerySchema = pageSchema
   })
   .refine((q) => !q.from || !q.to || q.from <= q.to, { message: "from must be ≤ to", path: ["from"] });
 export const rankScanQuerySchema = z.object({
-  rank: int.min(1).max(300000),
+  rank: rankValue,
   year: int.min(2000).max(2100).default(2025),
   window: int.min(1).max(1000).default(500),
 });
@@ -60,7 +67,6 @@ export const feesQuerySchema = pageSchema.extend({
   sort: z.enum(["fee", "stipend", "name"]).default("fee"),
 });
 export const trendsQuerySchema = pageSchema.extend({ specialty: z.string().optional(), degree: z.string().optional() });
-export const noticesQuerySchema = z.object({ kind: z.enum(["schedule", "announcement", "merit"]).optional() });
 
 type Issue = { path: string; message: string };
 export type ApiResult<T> =
@@ -96,17 +102,34 @@ export function invalid(...errors: (z.ZodError | undefined)[]) {
 
 export const notFound = (message: string) => Response.json({ ok: false, error: { code: "not_found", message } } satisfies ApiResult<never>, { status: 404 });
 
-/** Runs a handler; errors are logged on the server and answered without details (503 when there is no database). */
+const noStore = { "Cache-Control": "private, no-store" };
+
+/** No database configured, or Postgres unreachable, timed out or out of connections: data unavailable, not a bug. */
+export const isDataUnavailable = (e: unknown) =>
+  e instanceof Prisma.PrismaClientInitializationError ||
+  (e instanceof Prisma.PrismaClientKnownRequestError && ["P1001", "P1002", "P1008", "P1017", "P2024"].includes(e.code)) ||
+  (e instanceof Error && e.name === "DataUnavailableError");
+
+/**
+ * Runs a handler for a signed-in, allowlisted user with a live session (src/middleware.ts checks only the access
+ * cookie, so a copied cookie after sign-out gets a 401 here); errors are logged and answered without details: 503
+ * data_unavailable when the database is missing or down, else 500.
+ */
 export async function handle(fn: () => Promise<Response>) {
   try {
+    if (!(await canUseDecide()))
+      return Response.json({ ok: false, error: { code: "unauthorized", message: "Sign in with an allowed account." } } satisfies ApiResult<never>, { status: 401, headers: noStore });
     return await fn();
   } catch (e) {
     console.error("[api/v1]", e);
-    if (e instanceof Error && e.name === "DataUnavailableError")
-      return Response.json({ ok: false, error: { code: "data_unavailable", message: "The MCC data is not available right now" } } satisfies ApiResult<never>, { status: 503 });
-    return Response.json({ ok: false, error: { code: "internal_error", message: "Something went wrong" } } satisfies ApiResult<never>, { status: 500 });
+    if (isDataUnavailable(e))
+      return Response.json({ ok: false, error: { code: "data_unavailable", message: "The MCC data is not available right now" } } satisfies ApiResult<never>, { status: 503, headers: { ...noStore, "Retry-After": "60" } });
+    return Response.json({ ok: false, error: { code: "internal_error", message: "Something went wrong" } } satisfies ApiResult<never>, { status: 500, headers: noStore });
   }
 }
+
+/** The seat list behind an R2 seats column, as a source. */
+export const seatListSource = (l: SeatList | null): Provenance[] => (l ? [{ key: l.key, name: l.name, url: l.url, year: l.year, round: l.round }] : []);
 
 /** The result PDFs behind the given year/round pairs (all when `used` is omitted). */
 export function sourcesFor(sources: Source[], used?: Iterable<{ year: number; round: string }>): Provenance[] {

@@ -46,8 +46,8 @@ export function buildGrid(all: Cutoff[], eligible: Set<string> | null, provision
   return grid;
 }
 
-/** What a reach label reads from a cutoff (a raw cutoff, or a per-year deepest closing whose round is unknown). */
-export type ReachInput = Pick<Cutoff, "year" | "closing"> & { round?: Round };
+/** What a reach label reads from a cutoff (a raw cutoff, or a per-year deepest closing whose round may be unknown). */
+export type ReachInput = Pick<Cutoff, "year" | "closing"> & { round?: Round; category?: Category };
 
 export const reachOrder = ["reached-latest", "reached-both", "reached-one", "within-10", "closed-before", "no-data"] as const;
 export type Reach = (typeof reachOrder)[number];
@@ -74,14 +74,19 @@ export function classifyReach(
   return "closed-before";
 }
 
-export function reachLabel(reach: Reach, latestYear: number, pastYears: [number, number]): string {
+/** The rounds the labels count, e.g. "2024, 2025 and 2026 R1" (older years show in the grids but are not counted). */
+export const reachWindow = (latestYear: number, [a, b]: [number, number], includeLatest = true, or = false) =>
+  includeLatest ? `${a}, ${b} ${or ? "or" : "and"} ${latestYear} R1` : `${a} ${or ? "or" : "and"} ${b}`;
+
+/** `includeLatest` false: the labels were made without the latest year's R1 (Options' "leave out provisional"). */
+export function reachLabel(reach: Reach, latestYear: number, pastYears: [number, number], includeLatest = true): string {
   return {
     "reached-latest": `Reached in ${latestYear} R1`,
     "reached-both": `Reached in ${pastYears[0]} and ${pastYears[1]}`,
-    "reached-one": "Reached in one year",
+    "reached-one": `Reached in ${pastYears[0]} or ${pastYears[1]}`,
     "within-10": "Within 10% in a past round",
     "closed-before": "Closed before your rank",
-    "no-data": "No past allotment in your categories",
+    "no-data": `No allotment in your categories in ${reachWindow(latestYear, pastYears, includeLatest, true)}`,
   }[reach];
 }
 

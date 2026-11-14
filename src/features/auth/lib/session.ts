@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { ACCESS_COOKIE, ACCESS_MAX_AGE_S, accessCookie, accessCookieUser, isAllowed, siteGate } from "@/lib/site-access";
 
@@ -65,6 +66,12 @@ export async function getCurrentUser() {
   return isAllowed(session.user.email) ? session.user : null;
 }
 
+/** This browser's session id (the token's hash), so a password change can keep it and delete the others. */
+export async function currentSessionId() {
+  const token = (await cookies()).get(COOKIE)?.value;
+  return token ? hashToken(token) : null;
+}
+
 export async function deleteSession() {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
@@ -86,7 +93,23 @@ export async function hasSiteAccess() {
   return (await getCurrentUser())?.id === userId;
 }
 
-/** For Decide Server Actions, which can be POSTed to any route: what the middleware lets in (open only with the gate off). */
+/**
+ * For Decide Server Actions (they can be POSTed to any route) and /api/v1 handlers: what the middleware lets in, plus a
+ * live session for the cookie's user (open only with the gate off).
+ */
 export async function canUseDecide() {
   return siteGate().state === "off" || hasSiteAccess();
+}
+
+/**
+ * Decide pages (server components). src/middleware.ts checks only the access cookie's HMAC, so a copied seatora_access
+ * cookie keeps opening Decide for its 30 days after sign-out or a password change; this also checks the session row.
+ * Redirects to /login?next=<next> when access is gone. The layout can't see its path, so it uses the default "/decide".
+ *
+ * Not for route handlers: redirect() throws, and handle() in features/decide/api.ts would answer that as a 500. There:
+ *   if (!(await canUseDecide())) return Response.json({ ok: false, error: { code: "unauthorized", message: "Sign in with an allowed account." } },
+ *     { status: 401, headers: { "Cache-Control": "private, no-store" } });
+ */
+export async function requireDecideAccess(next = "/decide") {
+  if (!(await canUseDecide())) redirect(`/login?${new URLSearchParams({ next })}`);
 }

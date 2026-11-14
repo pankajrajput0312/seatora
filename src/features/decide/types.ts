@@ -74,6 +74,54 @@ export type DecideData = {
   allotments: Allotment[];
 };
 
+/**
+ * MCC PG quotas any candidate can take. The others are for one group only (Armed Forces Medical: in-service candidates;
+ * Non-Resident Indian; Muslim/Jain Minority; Delhi/IP/BHU/AMU University: that university's graduates), so a profile
+ * with no quota ticked means these three, and a restricted quota counts only once she ticks it.
+ */
+export const openQuotas = ["All India", "DNB Quota", "Deemed/Paid Seats"];
+
 /** One choosable option: an institute's course under one quota. */
 export const optionId = (c: { college: string; degree: string; specialty: string; quota: string }) =>
   [c.college, c.degree, c.specialty, c.quota].join("~");
+
+/**
+ * MCC seat lists of a round (SeatSource), each a snapshot of its PDF as published: later MCC addition/removal notices
+ * are not applied. clear = clear vacancy (seats nobody holds after the previous round), virtual = virtual vacancy (seats
+ * held after the previous round that fall vacant only if their holder upgrades or leaves in this round), new = newly
+ * added seats (added to the round after its seat matrix). The kinds OVERLAP (a newly added seat is also in that round's
+ * clear vacancy list): never add them together; show one kind at a time.
+ */
+export const seatKinds = ["clear", "virtual", "new"] as const;
+export type SeatKind = (typeof seatKinds)[number];
+export const seatKindLabel: Record<SeatKind, string> = { clear: "Clear vacancy", virtual: "Virtual vacancy", new: "Newly added seats" };
+/**
+ * One seat list PDF. `publishedAt` = date (YYYY-MM-DD) of the MCC notice that links the PDF, null when no imported notice
+ * does (never guessed). `seats` = Σ seats the list prints (one kind, one PDF).
+ */
+export type SeatList = { key: string; name: string; url: string | null; year: number; round: Round; kind: SeatKind; publishedAt: string | null; seats: number };
+
+/** MCC notices (Announcement), kind as notices.json gives it. */
+export const noticeKinds = ["notice", "seat_matrix", "result", "schedule", "bulletin"] as const;
+export type NoticeKind = (typeof noticeKinds)[number];
+export type MccNotice = { title: string; date: string; url: string | null; authority: string; kind: NoticeKind; year: number; round: Round | null };
+
+/** Steps of an MCC round (RoundStep), derived only from MCC notices. */
+export const roundSteps = ["seat_matrix", "choice_filling", "provisional_result", "final_result"] as const;
+export type RoundStepName = (typeof roundSteps)[number];
+export const stepStatuses = ["done", "open", "suspended", "upcoming", "unknown"] as const;
+export type StepStatus = (typeof stepStatuses)[number];
+export type RoundStepInfo = {
+  step: RoundStepName;
+  status: StepStatus;
+  /** Date of the notice behind the status; null when implied or upcoming. */
+  date: string | null;
+  /** The notice that justifies the status (for an upcoming step: the schedule notice). */
+  url: string | null;
+  title: string | null;
+  note: string | null;
+  /** Dates printed in the schedule notice at `url` (YYYY-MM-DD or ISO date-time in IST); tentative = may change. */
+  scheduled: { from: string | null; to: string | null; on: string | null; tentative: boolean } | null;
+  /** Every notice matched to this step, oldest first. */
+  events: { date: string; status: StepStatus; title: string; url: string }[];
+};

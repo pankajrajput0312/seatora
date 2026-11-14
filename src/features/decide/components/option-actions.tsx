@@ -10,9 +10,10 @@ import { MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
 import type { DecideLinks } from "../lib/links";
 import { useChoices, useCompare, useDecideLinks } from "../lib/use-decide-store";
 import type { OptionRow } from "../service";
+import type { SeatList } from "../types";
 import { ReachBadge, TermText } from "./bits";
 import { FocusItem } from "./focus-item";
-import { ClosingCell, courseName, FeeText, RoundGrid, toChoiceItem } from "./options-view";
+import { ClosingCell, courseName, FeeText, RoundGrid, SeatsCell, SeatsHead, toChoiceItem } from "./options-view";
 import { smallLink } from "./ui";
 
 export function ChoiceStar({ item }: { item: ChoiceItem }) {
@@ -54,7 +55,8 @@ export function CompareToggle({ id, label }: { id: string; label: string }) {
 
 // ---------- Options list ----------
 
-type Years = { latestYear: number; pastYears: [number, number] };
+/** `includeLatest` false: labels made without the latest R1. `seatList`: the list behind each row's `seats` (none: no column). */
+type Years = { latestYear: number; pastYears: [number, number]; includeLatest: boolean; seatList: SeatList | null };
 
 function FeeBond({ r }: { r: OptionRow }) {
   return (
@@ -83,7 +85,7 @@ const summary = "inline-flex min-h-11 cursor-pointer items-center text-sky";
  * Options as a table (md and up) and as cards (phones). A row's "Rounds by year" grid is rendered only once she opens
  * it (it is most of a row's markup). `start` = rows before these, for data-item numbering (focus after Show more).
  */
-function OptionsTable({ rows, caption, start, L, latestYear, pastYears }: { rows: OptionRow[]; caption: string; start: number; L: DecideLinks } & Years) {
+function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeLatest, seatList }: { rows: OptionRow[]; caption: string; start: number; L: DecideLinks } & Years) {
   const [older, last] = pastYears;
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string, on: boolean) =>
@@ -106,6 +108,7 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears }: { rows
               <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Add to choices</span></th>
               <th scope="col" className="px-3 py-3">Institute and course</th>
               <th scope="col" className="px-3 py-3">Reach</th>
+              {seatList && <th scope="col" className="px-3 py-3 text-right"><SeatsHead list={seatList} /></th>}
               <th scope="col" className="px-3 py-3 text-right">{latestYear} R1 closing</th>
               <th scope="col" className="px-3 py-3 text-right">{last} deepest</th>
               <th scope="col" className="hidden px-3 py-3 text-right xl:table-cell">{older} deepest</th>
@@ -123,7 +126,8 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears }: { rows
                   <Link href={L.institute(r.college.slug)} className="font-semibold hover:text-sky hover:underline">{r.college.name}</Link>
                   <span className="block">{courseName(r)}<span className="text-muted-foreground">, {r.quota}, {r.college.state ?? "state not listed"}</span></span>
                 </th>
-                <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} /></td>
+                <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /></td>
+                {seatList && <td className="px-3 py-1 text-right"><SeatsCell r={r} list={seatList} L={L} /></td>}
                 <td className="px-3 py-3 text-right"><ClosingCell d={r.latest} /></td>
                 <td className="px-3 py-3 text-right"><ClosingCell d={r.byYear[last]} /></td>
                 <td className="hidden px-3 py-3 text-right xl:table-cell"><ClosingCell d={r.byYear[older]} /></td>
@@ -142,7 +146,7 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears }: { rows
               open.has(r.id) && (
                 <tr key={`${r.id}-rounds`} className="bg-muted/30">
                   <td />
-                  <td colSpan={8} className="px-3 pb-4"><RoundGrid row={r} caption={gridCaption(r)} /></td>
+                  <td colSpan={seatList ? 9 : 8} className="px-3 pb-4"><RoundGrid row={r} caption={gridCaption(r)} /></td>
                 </tr>
               ),
             ])}
@@ -164,7 +168,13 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears }: { rows
                   <CompareToggle id={r.id} label={label(r)} />
                 </div>
               </div>
-              <div className="mt-2"><ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} /></div>
+              <div className="mt-2"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /></div>
+              {seatList && (
+                <p className="mt-1 flex items-center gap-2 text-sm">
+                  <span className="text-xs text-muted-foreground"><SeatsHead list={seatList} /></span>
+                  <SeatsCell r={r} list={seatList} L={L} />
+                </p>
+              )}
               <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
                 <div><dt className="text-xs text-muted-foreground">{latestYear} R1 closing</dt><dd><ClosingCell d={r.latest} /></dd></div>
                 <div><dt className="text-xs text-muted-foreground">{last} deepest</dt><dd><ClosingCell d={r.byYear[last]} /></dd></div>
@@ -188,7 +198,7 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears }: { rows
  * One server-rendered page of options; "Show more" appends the next page from /api/v1/options (`query` = the same
  * profile and filters) and moves focus to the first new row. The page never holds more rows than she asked to see.
  */
-export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, latestYear, pastYears }: {
+export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, latestYear, pastYears, includeLatest, seatList }: {
   initial: OptionRow[];
   page: number;
   pageSize: number;
@@ -227,7 +237,7 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
         Showing <span className="numeric font-semibold text-foreground">{formatRank(start + 1)}–{formatRank(shown)}</span> of <span className="numeric">{formatRank(total)}</span> options
         {firstPageHref && <> · <Link href={firstPageHref} className={`${smallLink} text-sky`}>Back to the first</Link></>}
       </p>
-      <OptionsTable rows={rows} caption={caption} start={start} L={L} latestYear={latestYear} pastYears={pastYears} />
+      <OptionsTable rows={rows} caption={caption} start={start} L={L} latestYear={latestYear} pastYears={pastYears} includeLatest={includeLatest} seatList={seatList} />
       {shown < total && (
         <div className="grid justify-items-center gap-2">
           {/* aria-disabled, not disabled: the button keeps focus while the next page loads. */}

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { duplicateList, markTypedUpTo, move, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
-import type { Reach } from "../lib/reach";
+import { LATEST_YEAR, PAST_YEARS, reachWindow, type Reach } from "../lib/reach";
 import { useChoices, useDecideLinks } from "../lib/use-decide-store";
 import { keepProfileParams } from "../profile";
 import { ReachBadge } from "./bits";
@@ -66,7 +66,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
     requestAnimationFrame(() => {
       const el = id ? document.getElementById(`${which}-${id}`) : null;
       const handle = id ? document.getElementById(`handle-${id}`) : null;
-      const target = el && !(el as HTMLButtonElement).disabled ? el : handle ?? listRef.current ?? document.getElementById("choices-h");
+      const target = el && !(el as HTMLButtonElement).disabled ? el : handle ?? listRef.current ?? document.getElementById("choices-undo") ?? document.getElementById("choices-h");
       target?.focus();
       target?.scrollIntoView({ block: "nearest" });
     });
@@ -111,7 +111,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
     const item = items[index];
     setRemoved({ listId: list.id, listName: list.name, item, index });
     setItems(items.filter((_, i) => i !== index));
-    // Focus the item that took its place, else the one before, else the list.
+    // Focus the item that took its place, else the one before, else Undo (the list is gone).
     focusItem((items[index + 1] ?? items[index - 1])?.id);
     setAnnounce(`Removed ${name(item)} from ${list.name}. Undo is available.`);
   };
@@ -159,7 +159,15 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
             {l.name} <span className="opacity-70">({l.items.length})</span>
           </Button>
         ))}
-        <Button variant="ghost" onClick={() => setState((s) => duplicateList(s, list.id))}>Duplicate for next round</Button>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setState((s) => duplicateList(s, list.id));
+            setAnnounce(`Duplicated ${list.name} as ${duplicateList(state, list.id).lists.at(-1)!.name}; now showing it.`);
+          }}
+        >
+          Duplicate for next round
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2" data-print-hide>
@@ -190,7 +198,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
       {removed && (
         <p className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm" data-print-hide>
           Removed {name(removed.item)} from {removed.listName}.
-          <Button variant="ghost" onClick={undo}>Undo</Button>
+          <Button id="choices-undo" variant="ghost" onClick={undo}>Undo</Button>
         </p>
       )}
 
@@ -208,7 +216,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
               const closed = lr ? lr.reach === "closed-before" : item.closedEveryRound;
               const flags = [
                 (counts.get(dupKey(item)) ?? 0) > 1 && "Same institute and course listed more than once",
-                closed && `Closed before your rank in every past round${lr ? "" : " (when added)"}`,
+                closed && `Closed before your rank in every round of ${reachWindow(LATEST_YEAR, PAST_YEARS)}${lr ? "" : " (when added)"}`,
                 fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
                 typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
               ].filter(Boolean) as string[];

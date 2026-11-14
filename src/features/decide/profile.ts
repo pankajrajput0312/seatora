@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { baseCategories } from "./types";
+import { baseCategories, openQuotas } from "./types";
 
 /** Her profile: user-entered, saved in localStorage, and mirrored into the URL so server pages can read it. */
 export const profileSchema = z.object({
@@ -10,7 +10,7 @@ export const profileSchema = z.object({
   specialties: z.array(z.string()),
   /** e.g. MD, DNB, NBEMS Diploma. Empty = all. */
   degrees: z.array(z.string()),
-  /** MCC quota labels. Empty = all. */
+  /** MCC quota labels. Empty = the open quotas (types.ts openQuotas), never the restricted ones. */
   quotas: z.array(z.string()),
   states: z.array(z.string()),
   maxFeeLakh: z.number().positive().nullable(),
@@ -30,15 +30,24 @@ export const BOND_YEAR_CHOICES = [0, 1, 2, 3];
 export const feeChoices = (current: number | null | undefined) =>
   current != null && !FEE_LAKH_CHOICES.includes(current) ? [...FEE_LAKH_CHOICES, current].sort((a, b) => a - b) : FEE_LAKH_CHOICES;
 
+/** The quotas her profile covers: the ones she ticked, else the open quotas. */
+export const profileQuotas = (p: Pick<Profile, "quotas">) => (p.quotas.length ? p.quotas : openQuotas);
+
 const list = (p: URLSearchParams, k: string) => p.getAll(k).flatMap((v) => v.split(",")).map((v) => v.trim()).filter(Boolean);
 const num = (v: string | null | undefined) => (v != null && v.trim() !== "" ? Number(v) : null);
+/** 1/true/yes or 0/false/no (any case); absent is false; anything else stays a string, so strict parsing rejects it. */
+const flag = (v: string | null) => {
+  const s = v?.trim().toLowerCase() ?? "";
+  return s === "" || ["0", "false", "no"].includes(s) ? false : ["1", "true", "yes"].includes(s) ? true : s;
+};
 
 /** Profile params as typed values with no fallbacks (NaN for a malformed number), for strict validation (HTTP API). */
 export function profileInput(p: URLSearchParams) {
+  const cat = p.get("cat")?.trim() ?? "Open";
   return {
     rank: num(p.get("rank")?.replace(/[,\s]/g, "")),
-    category: p.get("cat") ?? "Open",
-    pwd: p.get("pwd") === "1",
+    category: baseCategories.find((c) => c.toLowerCase() === cat.toLowerCase()) ?? cat, // "obc" is OBC
+    pwd: flag(p.get("pwd")),
     specialties: list(p, "sp"),
     degrees: list(p, "deg"),
     quotas: list(p, "quota"),
@@ -63,7 +72,7 @@ export function profileFromParams(p: URLSearchParams): Profile | null {
   return {
     rank: rank.data,
     category: field("category", "Open"),
-    pwd: raw.pwd,
+    pwd: field("pwd", false),
     specialties: field("specialties", []),
     degrees: field("degrees", []),
     quotas: field("quotas", []),

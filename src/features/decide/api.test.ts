@@ -1,12 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { allotmentsQuerySchema, compareQuerySchema, cutoffsQuerySchema, optionsQuerySchema, parseOptionalProfile, parseProfile, parseQuery, sourcesFor } from "./api";
+import { Prisma } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import { allotmentsQuerySchema, compareQuerySchema, cutoffsQuerySchema, handle, optionsQuerySchema, parseOptionalProfile, parseProfile, parseQuery, rankScanQuerySchema, sourcesFor } from "./api";
+
+const access = vi.hoisted(() => ({ ok: true }));
+vi.mock("@/features/auth/lib/session", () => ({ canUseDecide: async () => access.ok }));
 
 const qs = (s: string) => new URLSearchParams(s);
 
 describe("query schemas", () => {
   it("applies defaults and reads lists repeated or comma-separated", () => {
     const r = parseQuery(optionsQuerySchema, qs("reach=within-10,reached-one&reach=no-data&showClosed=1"), ["reach"]);
-    expect(r.success && r.data).toEqual({ page: 1, pageSize: 50, reach: ["within-10", "reached-one", "no-data"], showClosed: true, prov: true });
+    expect(r.success && r.data).toEqual({ page: 1, pageSize: 50, reach: ["within-10", "reached-one", "no-data"], showClosed: true, prov: true, hasSeats: false });
   });
   it("treats empty values as absent", () => {
     const r = parseQuery(allotmentsQuerySchema, qs("year=&round=&from=30,000&to=50000"));
@@ -25,6 +29,34 @@ describe("query schemas", () => {
     expect(bad(cutoffsQuerySchema, "specialty=anaesthesia")).toEqual(["specialty"]);
     expect(bad(compareQuerySchema, "ids=a,b,c,d,e", ["ids"])).toEqual(["ids"]);
   });
+  it("compare counts a repeated id once before the limit of 4; rank-scan takes 42,284", () => {
+    const r = parseQuery(compareQuerySchema, qs("ids=a&ids=a&ids=a&ids=a&ids=a,b"), ["ids"]);
+    expect(r.success && r.data.ids).toEqual(["a", "b"]);
+    const s = parseQuery(rankScanQuerySchema, qs("rank=42,284"));
+    expect(s.success && s.data).toEqual({ rank: 42284, year: 2025, window: 500 });
+  });
+});
+
+describe("handle", () => {
+  const code = async (r: Response) => [r.status, ((await r.json()) as { error?: { code: string } }).error?.code];
+  it("answers 503 data_unavailable when Postgres can't be reached, 500 for anything else", async () => {
+    const down = new Prisma.PrismaClientInitializationError("Can't reach database server at localhost:5432", "6.0.0");
+    const timeout = new Prisma.PrismaClientKnownRequestError("Timed out fetching a new connection", { code: "P2024", clientVersion: "6.0.0" });
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await handle(async () => { throw down; });
+    expect(await code(r)).toEqual([503, "data_unavailable"]);
+    expect(r.headers.get("Retry-After")).toBe("60");
+    expect(await code(await handle(async () => { throw timeout; }))).toEqual([503, "data_unavailable"]);
+    expect(await code(await handle(async () => { throw new Error("bug"); }))).toEqual([500, "internal_error"]);
+    quiet.mockRestore();
+  });
+  it("answers 401 without a live session, before the handler runs", async () => {
+    access.ok = false;
+    const fn = vi.fn(async () => Response.json({}));
+    expect(await code(await handle(fn))).toEqual([401, "unauthorized"]);
+    expect(fn).not.toHaveBeenCalled();
+    access.ok = true;
+  });
 });
 
 describe("profile params", () => {
@@ -36,6 +68,12 @@ describe("profile params", () => {
     expect(parseProfile(qs("rank=42284&fee=abc")).success).toBe(false);
     expect(parseProfile(qs("cat=OBC")).success).toBe(false);
     expect(parseProfile(qs("rank=42284&cat=GEN")).success).toBe(false);
+  });
+  it("reads pwd as 1/true/yes or 0/false/no, rejects anything else; cat in any case", () => {
+    for (const v of ["1", "true", "yes", "TRUE"]) expect(parseProfile(qs(`rank=1&pwd=${v}`)).data?.pwd).toBe(true);
+    for (const v of ["0", "false", "no", ""]) expect(parseProfile(qs(`rank=1&pwd=${v}`)).data?.pwd).toBe(false);
+    expect(parseProfile(qs("rank=1&pwd=maybe")).success).toBe(false);
+    expect(parseProfile(qs("rank=1&cat=obc")).data?.category).toBe("OBC");
   });
   it("optional profile: no rank → null", () => {
     expect(parseOptionalProfile(qs("cat=OBC"))).toMatchObject({ success: true, data: null });

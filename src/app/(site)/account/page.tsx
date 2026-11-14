@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
-import { PixelEmblem } from "@/components/marketing/pixel-emblem";
 import { signOut } from "@/features/auth/actions";
+import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
 import { getCurrentUser } from "@/features/auth/lib/session";
 
 export const metadata: Metadata = { title: "Your account", robots: { index: false } };
@@ -24,10 +24,11 @@ export default async function AccountPage() {
         </form>
       </div>
 
-      <div className="grid place-items-center py-24 text-center">
-        <PixelEmblem className="bob w-28 opacity-60" />
-        <h2 className="mt-8 text-lg font-medium">Nothing here yet.</h2>
-      </div>
+      <section aria-labelledby="password-h" className="max-w-sm py-12">
+        <h2 id="password-h" className="text-lg font-medium">Change password</h2>
+        <p className="mt-1 mb-6 text-sm text-muted-foreground">This signs you out on every other device.</p>
+        <ChangePasswordForm email={user.email} />
+      </section>
     </Container>
   );
 }

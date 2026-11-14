@@ -67,7 +67,7 @@
     --color-primary: #102231;
     --color-primary-foreground: #ffffff;
     --color-border: #d9e1e9;         /* ruled hairline */
-    --color-input: #c3cfdb;
+    --color-input: #7d8fa3;          /* control borders: 3.3:1 on the sheet (WCAG 1.4.11) */
     --color-ring: #2a78d6;
     --color-sky: #1c5cab;            /* chart-ink blue (text-safe step) */
     --color-mark: #2a78d6;           /* chart-ink blue for marks */
@@ -272,3 +272,6 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
 
 /* Astryx's phone menu button is 32px; the house touch target is 44px (its own rules carry high specificity). */
 .app [data-testid="mobile-nav-toggle"] { min-width: 2.75rem !important; min-height: 2.75rem !important; }
+/* Same for its nav rows, the brand link and the drawer's close button (all 32px); unlayered, so these beat Astryx's layer. */
+.app .astryx-side-nav-item, .app .astryx-top-nav-heading { min-height: 2.75rem; }
+.app .astryx-mobile-nav .astryx-button { min-width: 2.75rem; min-height: 2.75rem; }

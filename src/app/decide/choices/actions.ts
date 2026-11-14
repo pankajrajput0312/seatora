@@ -20,7 +20,7 @@ export async function liveReach(ids: string[], profile: string) {
   try {
     if (!(await canUseDecide())) return null;
     const rows = await getOptionsByIds([...new Set(input.data.ids)], p);
-    return Object.fromEntries(rows.map((o) => [o.id, { reach: o.reach, provisional: !!o.latest?.provisional }]));
+    return Object.fromEntries(rows.map((o) => [o.id, { reach: o.reach, provisional: o.reachProvisional }]));
   } catch (e) {
     console.error("[choices] live reach", e);
     return null;

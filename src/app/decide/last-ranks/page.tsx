@@ -52,7 +52,10 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
   const meta = await getMeta();
-  const course = meta.courses.find((c) => c.slug === f.course) ?? meta.courses.find((c) => profile?.specialties.includes(c.specialty)) ?? meta.courses[0];
+  // Default: one of her courses (her degrees, if set), MD/MS first, then DNB, then the rest (meta sorts Diploma first).
+  const order = (d: string) => (["MD", "MS", "DNB"].includes(d) ? ["MD", "MS", "DNB"].indexOf(d) : 3);
+  const mine = meta.courses.filter((c) => profile?.specialties.includes(c.specialty) && (!profile.degrees.length || profile.degrees.includes(c.degree)));
+  const course = meta.courses.find((c) => c.slug === f.course) ?? mine.sort((a, b) => order(a.degree) - order(b.degree))[0] ?? meta.courses[0];
   const category = f.lcat ?? profile?.category ?? "Open";
   const quota = f.lquota && meta.quotas.includes(f.lquota) ? f.lquota : undefined;
   const [sortYear, sortRound] = f.sort?.split("-") ?? [];

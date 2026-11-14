@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { feeChoices, keepProfileParams, profileFromParams, profileToParams, toURLSearchParams, type Profile } from "./profile";
+import { feeChoices, keepProfileParams, profileFromParams, profileQuotas, profileToParams, toURLSearchParams, type Profile } from "./profile";
 
 const her: Profile = {
   rank: 42284, category: "OBC", pwd: false, specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: [],
@@ -29,6 +29,13 @@ it("keeps every value of a repeated key from Next's searchParams (GET form with 
   const kept = keepProfileParams(p);
   expect(kept.toString()).toBe("rank=42284&cat=OBC&sp=ANAESTHESIOLOGY%2CFAMILYMEDICINE&st=Bihar%2CKerala");
   expect(profileFromParams(kept)).toEqual(profileFromParams(p));
+});
+
+it("no quota ticked means the open quotas only; pages read a bad pwd as not PwD", () => {
+  expect(profileQuotas({ quotas: [] })).toEqual(["All India", "DNB Quota", "Deemed/Paid Seats"]);
+  expect(profileQuotas({ quotas: ["Non-Resident Indian"] })).toEqual(["Non-Resident Indian"]);
+  expect(profileFromParams(new URLSearchParams("rank=1&pwd=true"))?.pwd).toBe(true);
+  expect(profileFromParams(new URLSearchParams("rank=1&pwd=maybe"))?.pwd).toBe(false);
 });
 
 it("offers her fee cap even when it isn't a standard choice", () => {

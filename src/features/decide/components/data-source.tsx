@@ -1,8 +1,19 @@
 import { Badge } from "@/components/ui/badge";
 import { sourceTypeLabels } from "@/components/ui/source-label";
+import { listNotices } from "../server/notices";
+import { seatLists } from "../server/seats";
 import { getMeta } from "../service";
-import { rounds, roundLabel, type Term } from "../types";
+import { rounds, roundLabel, type SeatList, type Term } from "../types";
 import { Provisional } from "./bits";
+import { SeatListSource } from "./seats/seat-lists";
+
+/** The seat list behind a seats column: its PDF and date, and the later MCC seat notices it does not apply (as on Seats). */
+export async function SeatSource({ list, noticesHref }: { list: SeatList | null; noticesHref: string }) {
+  if (!list) return null;
+  const [all, notices] = await Promise.all([seatLists(), listNotices({ kind: "seat_matrix", year: list.year, round: list.round })]);
+  const later = notices.filter((n) => n.url && !all.some((l) => l.url === n.url) && (!list.publishedAt || n.date >= list.publishedAt));
+  return <SeatListSource list={list} changes={later} noticesHref={noticesHref} />;
+}
 
 type Used = { year: number; round?: string };
 
@@ -29,7 +40,7 @@ export async function DataSource({ used, terms, results = true }: { used?: Used[
       {pdfs.length > 0 && (
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <Badge tone={sourceTypeLabels.OFFICIAL.tone}>{sourceTypeLabels.OFFICIAL.text}</Badge>
-          <span>Allotment results</span>
+          <span>MCC allotment results</span>
           {years.map((y) => (
             <span key={y} className="inline-flex flex-wrap items-center gap-x-2">
               <span className="numeric">{y}:</span>
@@ -39,11 +50,11 @@ export async function DataSource({ used, terms, results = true }: { used?: Used[
                 .map((s) => (
                   <span key={s.key} className="inline-flex items-center gap-1">
                     {s.url ? (
-                      <a href={s.url} target="_blank" rel="noopener noreferrer" title={s.name} className="inline-flex min-h-6 items-center underline hover:text-sky">
+                      <a href={s.url} target="_blank" rel="noopener noreferrer" title={s.name} className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-sky">
                         <span className="sr-only">{s.name}: </span>{roundLabel[s.round]}<span className="sr-only">, PDF (opens in a new tab)</span>
                       </a>
                     ) : (
-                      <span title={s.name}>{roundLabel[s.round]}</span>
+                      <span title={s.name} className="inline-flex min-w-11 justify-center">{roundLabel[s.round]}</span>
                     )}
                     <Provisional when={s.provisional} />
                   </span>
@@ -59,7 +70,7 @@ export async function DataSource({ used, terms, results = true }: { used?: Used[
           <p key={name} className="flex flex-wrap items-center gap-x-2">
             <Badge tone={tier.tone}>{tier.text}</Badge>
             {d.urls.size === 1 ? (
-              <a href={only} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-6 items-center underline hover:text-sky">{name}<span className="sr-only"> (opens in a new tab)</span></a>
+              <a href={only} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline hover:text-sky">{name}<span className="sr-only"> (opens in a new tab)</span></a>
             ) : (
               <span>{name}{d.urls.size > 1 && `: ${d.urls.size} documents, each value links its own`}</span>
             )}

@@ -28,14 +28,15 @@ export function Provisional({ when }: { when: boolean | null | undefined }) {
   return when ? <Badge tone="warning">Provisional</Badge> : null;
 }
 
-export function ReachBadge({ reach, provisional }: { reach: Reach; provisional?: boolean }) {
+/** `provisional`: the label rests on the provisional latest-year R1 (OptionRow.reachProvisional), whatever the label. */
+export function ReachBadge({ reach, provisional, includeLatest = true }: { reach: Reach; provisional?: boolean; includeLatest?: boolean }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       <Badge tone={reachTone[reach]} className={reach === "closed-before" ? "text-muted-foreground" : undefined}>
         {reach === "reached-both" && <History className="mr-1 size-3" aria-hidden />}
-        {reachLabel(reach, LATEST_YEAR, PAST_YEARS)}
+        {reachLabel(reach, LATEST_YEAR, PAST_YEARS, includeLatest)}
       </Badge>
-      <Provisional when={reach === "reached-latest" && provisional} />
+      <Provisional when={provisional} />
     </span>
   );
 }

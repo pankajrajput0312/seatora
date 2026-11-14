@@ -1,11 +1,12 @@
 import "server-only";
 import { cache } from "react";
 import { bondYears, firstRupees } from "./lib/format";
-import { buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachOrder, YEARS, type Deepest, type GridCell, type Reach } from "./lib/reach";
-import type { Profile } from "./profile";
+import { buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachOrder, YEARS, type Deepest, type GridCell, type Reach, type ReachInput } from "./lib/reach";
+import { profileQuotas, type Profile } from "./profile";
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
-import { optionId, rounds, type College, type Course, type Cutoff, type Notice, type Round, type Term } from "./types";
+import { pickLists, seatCountsFor, seatLists, sumSeats } from "./server/seats";
+import { optionId, rounds, type Category, type College, type Course, type Cutoff, type Notice, type Round, type SeatList, type Term } from "./types";
 
 // Data comes from Postgres (MCC import, prisma/import-mcc.ts) through ./server; the small, slow-changing part (colleges,
 // courses, sources, terms, option list) is a per-process catalog, cutoffs and allotments are filtered in SQL per call.
@@ -44,6 +45,8 @@ export type OptionRow = {
   course: Course;
   quota: string;
   reach: Reach;
+  /** The label rests on the provisional latest-year R1: without that round it would be another label. */
+  reachProvisional: boolean;
   latest: Deepest | null; // latest year's R1 (provisional while its source is)
   byYear: Record<number, Deepest | null>;
   /** year → round → deepest closing among eligible categories (with its seat category); n = allotments, all categories */
@@ -58,9 +61,15 @@ export type OptionRow = {
   bondText: string | null;
   bondYears: number | null;
   penaltyText: string | null;
+  /**
+   * Options and institute rows only: seats for this option (its quota, her seat categories; all without a profile) in
+   * the newest clear vacancy list (`seatList` beside the rows), null when that list prints none. One list, never kinds added.
+   */
+  seats?: number | null;
 };
 
-export type OptionFilters = { search?: string; reach?: Reach[]; includeProvisional?: boolean; showClosed?: boolean };
+/** `hasSeats`: only options with seats in the newest clear vacancy list. */
+export type OptionFilters = { search?: string; reach?: Reach[]; includeProvisional?: boolean; showClosed?: boolean; hasSeats?: boolean };
 
 /** Fee/stipend/bond terms are published per program: DNB, DrNB and NBEMS Diploma seats vs medical-college seats (MD, MS, Diploma, MCh…). */
 export const programOf = (degree: string): Term["program"] => (/^(DNB|DrNB|NBEMS)/.test(degree) ? "DNB" : "MD");
@@ -76,6 +85,16 @@ const amountOf = (t: Term | null | undefined) => (t ? (t.amountInr ?? firstRupee
 
 const provisionalKeys = (cat: Catalog) => new Set(cat.sources.filter((s) => s.provisional).map((s) => s.key));
 const latestR1Provisional = (cat: Catalog) => cat.sources.some((s) => s.year === LATEST_YEAR && s.round === "R1" && s.provisional);
+
+/**
+ * Her label, and whether it rests on the provisional latest-year R1 (`prov`: that round is in and provisional): the
+ * label it would be without that round differs.
+ */
+function labelOf(rank: number, list: ReachInput[], includeLatest: boolean, prov: boolean): { reach: Reach; provisional: boolean } {
+  const opt = { latestYear: LATEST_YEAR, pastYears: PAST_YEARS };
+  const reach = classifyReach(rank, list, { ...opt, includeLatest });
+  return { reach, provisional: includeLatest && prov && classifyReach(rank, list, { ...opt, includeLatest: false }) !== reach };
+}
 
 function sumByYear(list: Cutoff[]) {
   return Object.fromEntries(YEARS.map((y) => {
@@ -93,12 +112,14 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], profile: Profile | null,
   const provisional = provisionalKeys(cat);
   const deepest = deepestByYear(mine, provisional);
   const t = termsFor(cat, college.key, course.degree);
+  const label = profile ? labelOf(profile.rank, mine, includeProvisional, latestR1Provisional(cat)) : { reach: "no-data" as const, provisional: false };
   return {
     id: o.id,
     college: { key: college.key, slug: college.slug, name: college.name, state: college.state, type: college.type },
     course,
     quota: o.quota,
-    reach: profile ? classifyReach(profile.rank, mine, { latestYear: LATEST_YEAR, pastYears: PAST_YEARS, includeLatest: includeProvisional }) : "no-data",
+    reach: label.reach,
+    reachProvisional: label.provisional,
     latest: deepestByYear(mine.filter((c) => c.year === LATEST_YEAR && c.round === "R1"), provisional).get(LATEST_YEAR) ?? null,
     byYear: Object.fromEntries(YEARS.map((y) => [y, deepest.get(y) ?? null])),
     grid: buildGrid(list, eligible, provisional),
@@ -134,13 +155,16 @@ async function rowsFor(cat: Catalog, opts: Opt[], profile: Profile | null, inclu
   return opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], profile, includeProvisional));
 }
 
-/** Her profile filters on one option: course, degree, quota, state, fee cap and bond cap (unknown fee or bond passes). */
+/**
+ * Her profile filters on one option: course, degree, quota (none ticked: the open quotas only), state, fee cap and
+ * bond cap (unknown fee or bond passes).
+ */
 function optMatches(cat: Catalog, o: Opt, p: Profile | null) {
   if (!p) return true;
   const state = cat.collegeByKey.get(o.college)?.state ?? null;
   if (p.specialties.length && !p.specialties.includes(o.specialty)) return false;
   if (p.degrees.length && !p.degrees.includes(o.degree)) return false;
-  if (p.quotas.length && !p.quotas.includes(o.quota)) return false;
+  if (!profileQuotas(p).includes(o.quota)) return false;
   if (p.states.length && (state == null || !p.states.includes(state))) return false;
   if (p.maxFeeLakh == null && p.maxBondYears == null) return true;
   const t = termsFor(cat, o.college, o.degree);
@@ -149,9 +173,52 @@ function optMatches(cat: Catalog, o: Opt, p: Profile | null) {
   return (p.maxFeeLakh == null || fee == null || fee <= p.maxFeeLakh * 100000) && (p.maxBondYears == null || bond == null || bond <= p.maxBondYears);
 }
 
+type Ranked = { o: Opt; reach: Reach; provisional: boolean; deepest: ReachInput | undefined };
+
+/**
+ * Every option given, labelled, deepest closing of the later past year first within a label (`deepest`, with its round
+ * and seat category). From one SQL row per option (findReachInputs), never every cutoff: a profile with no course
+ * ticked covers ~11,800 options, and only a page of them is built in full.
+ */
+async function rankOptions(cat: Catalog, opts: Opt[], profile: Profile | null, includeProvisional: boolean): Promise<Ranked[]> {
+  const inputs = await findReachInputs(cat, {
+    cs: opts.length < cat.options.length / 2 ? [...new Set(opts.map((o) => o.cs))] : undefined,
+    categories: profile ? eligibleCategories(profile.category, profile.pwd) : undefined,
+    pastYears: PAST_YEARS,
+    latestYear: LATEST_YEAR,
+  });
+  const prov = latestR1Provisional(cat);
+  const ranked = opts.map((o) => {
+    const list = inputs.get(o.id) ?? [];
+    const label = profile ? labelOf(profile.rank, list, includeProvisional, prov) : { reach: "no-data" as const, provisional: false };
+    const deepest = list.filter((c) => c.year === PAST_YEARS[1]).reduce<ReachInput | undefined>((a, c) => (!a || c.closing > a.closing ? c : a), undefined);
+    return { o, ...label, deepest };
+  });
+  return ranked.sort((a, b) => reachOrder.indexOf(a.reach) - reachOrder.indexOf(b.reach) || (b.deepest?.closing ?? 0) - (a.deepest?.closing ?? 0));
+}
+
+const countsOf = (xs: { reach: Reach }[]) => Object.fromEntries(reachOrder.map((r) => [r, xs.filter((x) => x.reach === r).length])) as Record<Reach, number>;
+
+/** The newest clear vacancy list (the R2 seats column), or null: none imported, or the unit-test fixture (no seat lists). */
+async function seatListNow(cat: Catalog): Promise<SeatList | null> {
+  return cat.mem ? null : (pickLists(await seatLists(), { kind: "clear" })[0] ?? null);
+}
+
+/** Seats per option id in that ONE list, in the option's quota and her seat categories (all without a profile); absent = none printed. */
+async function seatsOf(list: SeatList | null, opts: Opt[], profile: Profile | null): Promise<Map<string, number>> {
+  if (!list || !opts.length) return new Map();
+  const { seats } = await seatCountsFor([...new Set(opts.map((o) => o.cs))], list.key);
+  const categories = profile ? eligibleCategories(profile.category, profile.pwd) : undefined;
+  return new Map(opts.flatMap((o): [string, number][] => {
+    const n = sumSeats(seats[o.cs], { quota: o.quota, categories });
+    return n == null ? [] : [[o.id, n]];
+  }));
+}
+
 /**
  * Options in her profile, labelled by reach, deepest-closing first within a label. `counts` are per label before the
  * reach filter, closed included (what the reach chips show). Pass `pg` to get one page; `total` counts every row.
+ * `seatList` is the clear vacancy list behind each row's `seats` (null: no list).
  */
 export async function listOptions(profile: Profile | null, f: OptionFilters = {}, pg?: PageQuery) {
   const cat = await getCatalog();
@@ -164,15 +231,29 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     const course = cat.courseOf.get(`${o.degree}|${o.specialty}`)!;
     return `${college.name} ${college.state ?? ""} ${course.name} ${course.degree}`.toLowerCase().includes(q);
   });
-  const narrow = opts.length < cat.options.length / 2;
-  const every = (await rowsFor(cat, opts, profile, includeProvisional, narrow)).sort(
-    (a, b) => reachOrder.indexOf(a.reach) - reachOrder.indexOf(b.reach) || (b.byYear[2025]?.closing ?? 0) - (a.byYear[2025]?.closing ?? 0),
-  );
-  const counts = Object.fromEntries(reachOrder.map((r) => [r, every.filter((x) => x.reach === r).length])) as Record<Reach, number>;
+  const [ranked, seatList] = await Promise.all([rankOptions(cat, opts, profile, includeProvisional), seatListNow(cat)]);
+  // Seats of every option only to filter on them; otherwise just this page's.
+  const seatsAll = f.hasSeats ? await seatsOf(seatList, opts, profile) : null;
+  const every = seatsAll ? ranked.filter((x) => (seatsAll.get(x.o.id) ?? 0) > 0) : ranked;
   const all = every.filter((r) => !f.reach?.length || f.reach.includes(r.reach));
   const showClosed = f.showClosed || f.reach?.includes("closed-before");
-  const rows = showClosed ? all : all.filter((r) => r.reach !== "closed-before");
-  return { ...paged(rows, pg), hiddenClosed: showClosed ? 0 : all.length - rows.length, counts };
+  const shown = showClosed ? all : all.filter((r) => r.reach !== "closed-before");
+  const page = paged(shown, pg);
+  const pageOpts = page.rows.map((x) => x.o);
+  const [built, seats] = await Promise.all([
+    rowsFor(cat, pageOpts, profile, includeProvisional, pageOpts.length < cat.options.length / 2),
+    seatsAll ?? seatsOf(seatList, pageOpts, profile),
+  ]);
+  const hidden = all.filter((r) => !showClosed && r.reach === "closed-before");
+  return {
+    ...page,
+    rows: built.map((r) => ({ ...r, seats: seats.get(r.id) ?? null })),
+    hiddenClosed: hidden.length,
+    /** Of the hidden ones, those whose label rests on the provisional latest-year R1 alone. */
+    hiddenProvisional: hidden.filter((r) => r.provisional).length,
+    counts: countsOf(every),
+    seatList,
+  };
 }
 
 export async function getOptionsByIds(ids: string[], profile: Profile | null) {
@@ -183,17 +264,22 @@ export async function getOptionsByIds(ids: string[], profile: Profile | null) {
 
 const sumYear = (opts: Opt[], year: number) => (opts.some((o) => o.byYear[year] != null) ? opts.reduce((s, o) => s + (o.byYear[year] ?? 0), 0) : null);
 
-/** One institute: every option here (`options`), the ones in her profile (`yours`), allotments per year, terms per program. */
+/**
+ * One institute: every option here (`options`, with `seats` in `seatList`), the ones in her profile (`yours`),
+ * allotments per year, terms per program.
+ */
 export async function getInstitute(slug: string, profile: Profile | null) {
   const cat = await getCatalog();
   const college = cat.collegeBySlug.get(slug);
   if (!college) return null;
   const opts = cat.options.filter((o) => o.college === college.key);
-  const options = await rowsFor(cat, opts, profile, true);
+  const [built, seatList] = await Promise.all([rowsFor(cat, opts, profile, true), seatListNow(cat)]);
+  const seats = await seatsOf(seatList, opts, profile);
+  const options = built.map((r) => ({ ...r, seats: seats.get(r.id) ?? null }));
   const mine = new Set(opts.filter((o) => optMatches(cat, o, profile)).map((o) => o.id));
   const allotmentsByYear = YEARS.map((year) => ({ year, n: sumYear(opts, year) }));
   const terms = { md: termsFor(cat, college.key, "MD"), dnb: termsFor(cat, college.key, "DNB") };
-  return { college, options, yours: options.filter((o) => mine.has(o.id)), allotmentsByYear, terms };
+  return { college, options, yours: options.filter((o) => mine.has(o.id)), allotmentsByYear, terms, seatList };
 }
 
 export async function rankScan(rank: number, year: number, window = 500) {
@@ -206,17 +292,18 @@ export async function rankScan(rank: number, year: number, window = 500) {
   return rounds.map((round) => ({ round, rows: out.filter((r) => r.round === round) })).filter((g) => g.rows.length);
 }
 
-export type LastRanksFilters = { degree?: string; specialty: string; category?: string; quota?: string; sort?: { year: number; round: Round; dir: "asc" | "desc" } };
+export type LastRanksFilters = { degree?: string; specialty: string; category?: string; quota?: string; years?: number[]; sort?: { year: number; round: Round; dir: "asc" | "desc" } };
 
 /**
  * Every institute's closing rank by year and round for one course, on one seat category (all when omitted); bracketed
- * n counts allotments in every category. `rows` holds options with a closing on that category (sorted by name, or by
- * one year/round column); `empty` counts the rest; `columns` lists the years and rounds that have data.
+ * n counts allotments in every category. `years` keeps only those years (in SQL, so totals and every field agree).
+ * `rows` holds options with a closing on that category (sorted by name, or by one year/round column); `empty` counts
+ * the rest; `columns` lists the years and rounds that have data.
  */
 export async function lastRanks(f: LastRanksFilters, pg?: PageQuery) {
   const cat = await getCatalog();
   const opts = cat.options.filter((o) => o.specialty === f.specialty && (!f.degree || o.degree === f.degree) && (!f.quota || o.quota === f.quota));
-  const groups = groupByOption(await findCutoffs(cat, { cs: [...new Set(opts.map((o) => o.cs))], quotas: f.quota ? [f.quota] : undefined }));
+  const groups = groupByOption(await findCutoffs(cat, { cs: [...new Set(opts.map((o) => o.cs))], quotas: f.quota ? [f.quota] : undefined, years: f.years?.length ? f.years : undefined }));
   const eligible = f.category ? new Set([f.category]) : undefined;
   const built = opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], null, true, eligible));
   let rows = built.filter((r) => Object.keys(r.grid).length > 0);
@@ -269,33 +356,58 @@ const median = (xs: number[]) => {
   return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
 };
 
+/** One option's deepest closing of the later past year, as the Overview draws and tabulates it. */
+export type StripPoint = { name: string; quota: string; closing: number; round: Round; category: Category };
+
+// ponytail: the strip and trend show the courses with the most options, up to 8 courses and about 1,500 dots (an
+// all-courses profile would draw ~9,400 dots, a 2.8 MB page); the summary table lists every course. Aggregate per
+// course (bins) if a bigger chart is ever wanted.
+const STRIP_COURSES = 8;
+const STRIP_DOTS = 1500;
+
 /**
- * Everything the overview dashboard draws, from the same rows and counts Options uses so the numbers always agree.
- * The strip is slim on purpose (one point per option with a 2025 closing, no ids or links); `summary` is its table view.
+ * Everything the overview dashboard draws, from the same labels and counts Options uses so the numbers always agree.
+ * `summary` covers every course in her profile (most options first), with the option behind the deepest and the
+ * shallowest closing; `strip` (one point per option with a closing in the later past year) and `trend` cover the
+ * first courses of it (see STRIP_COURSES).
  */
 export async function dashboard(profile: Profile) {
-  const { rows, counts, total } = await listOptions(profile, { showClosed: true });
-  const courses = [...new Map(rows.map((r) => [r.course.slug, r.course])).values()];
-  const strip = courses.map((course) => ({
-    course,
-    points: rows
-      .filter((r) => r.course.slug === course.slug && r.byYear[2025])
-      .map((r) => ({ name: r.college.name, quota: r.quota, closing: r.byYear[2025]!.closing, round: r.byYear[2025]!.round, category: r.byYear[2025]!.category })),
-  }));
-  const summary = strip.map(({ course, points }) => {
-    const xs = points.map((p) => p.closing);
-    const reached = xs.filter((c) => c >= profile.rank).length;
-    return { course, options: xs.length, reached, closedBefore: xs.length - reached, deepest: xs.length ? Math.max(...xs) : null, median: median(xs), shallowest: xs.length ? Math.min(...xs) : null };
+  const cat = await getCatalog();
+  const ranked = await rankOptions(cat, cat.options.filter((o) => optMatches(cat, o, profile)), profile, true);
+  const [, last] = PAST_YEARS;
+  const byCourse = new Map<string, { course: Course; points: StripPoint[]; opts: Opt[] }>();
+  for (const { o, deepest: d } of ranked) {
+    const course = cat.courseOf.get(`${o.degree}|${o.specialty}`)!;
+    const g = byCourse.get(course.slug) ?? byCourse.set(course.slug, { course, points: [], opts: [] }).get(course.slug)!;
+    if (!d) continue;
+    g.points.push({ name: cat.collegeByKey.get(o.college)!.name, quota: o.quota, closing: d.closing, round: d.round!, category: d.category! });
+    g.opts.push(o);
+  }
+  const courses = [...byCourse.values()].sort((a, b) => b.points.length - a.points.length || a.course.name.localeCompare(b.course.name));
+  const summary = courses.map(({ course, points }) => {
+    const xs = [...points].sort((a, b) => b.closing - a.closing);
+    const reached = xs.filter((p) => p.closing >= profile.rank).length;
+    return { course, options: xs.length, reached, closedBefore: xs.length - reached, deepest: xs[0] ?? null, median: median(xs.map((p) => p.closing)), shallowest: xs.at(-1) ?? null };
   });
+  const shown: typeof courses = [];
+  let dots = 0;
+  for (const c of courses) {
+    if (shown.length === STRIP_COURSES || (shown.length && dots + c.points.length > STRIP_DOTS)) break;
+    shown.push(c);
+    dots += c.points.length;
+  }
+  const strip = shown.map(({ course, points }) => ({ course, points }));
+  // The round trend needs each option's closing per round of that year: full rows, for the shown courses only.
+  const rows = await rowsFor(cat, shown.flatMap((c) => c.opts), profile, true);
   const trendRounds: Round[] = ["R1", "R2", "R3", "stray"];
-  const trend = courses.map((course) => ({
+  const trend = shown.map(({ course }) => ({
     course,
     points: trendRounds.map((round) => {
-      const vals = rows.filter((r) => r.course.slug === course.slug).flatMap((r) => (r.grid[2025]?.[round] ? [r.grid[2025]![round]!.closing] : []));
+      const vals = rows.filter((r) => r.course.slug === course.slug).flatMap((r) => (r.grid[last]?.[round] ? [r.grid[last]![round]!.closing] : []));
       return { round, median: median(vals), n: vals.length };
     }),
   }));
-  return { total, counts, strip, summary, trend };
+  return { total: ranked.length, counts: countsOf(ranked), strip, summary, trend };
 }
 
 // ---------- Institutes, allotments, fees ----------
@@ -327,7 +439,7 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
   const page = paged(colleges, pg);
   // Reach only for this page's options that match her profile, so only those cutoffs are read.
   const mineOf = new Map(page.rows.map(({ college }) => [college.key, (byCollege.get(college.key) ?? []).filter((o) => optMatches(cat, o, profile))]));
-  let reachOf = new Map<string, Reach>();
+  let reachOf = new Map<string, { reach: Reach; provisional: boolean }>();
   if (profile) {
     const opts = [...mineOf.values()].flat();
     const inputs = await findReachInputs(cat, {
@@ -336,15 +448,14 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
       pastYears: PAST_YEARS,
       latestYear: LATEST_YEAR,
     });
-    const opt = { latestYear: LATEST_YEAR, pastYears: PAST_YEARS, includeLatest: true };
-    reachOf = new Map([...inputs].map(([id, list]) => [id, classifyReach(profile.rank, list, opt)]));
+    const prov = latestR1Provisional(cat);
+    reachOf = new Map([...inputs].map(([id, list]) => [id, labelOf(profile.rank, list, true, prov)]));
   }
-  const prov = latestR1Provisional(cat);
   const rows = page.rows.map(({ college, allotments2025 }) => {
     const opts = byCollege.get(college.key) ?? [];
     const best = (mineOf.get(college.key) ?? [])
-      .map((o) => ({ o, reach: reachOf.get(o.id) ?? ("no-data" as Reach) }))
-      .reduce<{ o: Opt; reach: Reach } | null>((a, b) => (!a || reachOrder.indexOf(b.reach) < reachOrder.indexOf(a.reach) ? b : a), null);
+      .map((o) => ({ o, ...(reachOf.get(o.id) ?? { reach: "no-data" as Reach, provisional: false }) }))
+      .reduce<{ o: Opt; reach: Reach; provisional: boolean } | null>((a, b) => (!a || reachOrder.indexOf(b.reach) < reachOrder.indexOf(a.reach) ? b : a), null);
     return {
       college,
       courses: [...new Map(opts.map((o) => cat.courseOf.get(`${o.degree}|${o.specialty}`)!).map((c) => [c.slug, c])).values()],
@@ -352,7 +463,7 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
       allotments2025,
       bestReach: (profile && best ? best.reach : "no-data") as Reach,
       /** The option the best label comes from; provisional when that label rests on a provisional latest-year R1. */
-      best: profile && best && best.reach !== "no-data" ? { course: cat.courseOf.get(`${best.o.degree}|${best.o.specialty}`)!, quota: best.o.quota, provisional: best.reach === "reached-latest" && prov } : null,
+      best: profile && best && best.reach !== "no-data" ? { course: cat.courseOf.get(`${best.o.degree}|${best.o.specialty}`)!, quota: best.o.quota, provisional: best.provisional } : null,
     };
   });
   return { ...page, rows };
@@ -360,8 +471,11 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
 
 export type AllotmentFilters = { year?: number; round?: Round; course?: string; quota?: string; category?: string; state?: string; from?: number; to?: number };
 
-/** Allotments (ranks only, never names), newest year, then round, then rank. Page with limit = pageSize, offset = (page − 1) × pageSize. */
-export async function listAllotments(f: AllotmentFilters, limit: number, collegeKey?: string, offset = 0) {
+/**
+ * Allotments (ranks only, never names), newest year, then round, then rank, one page. A page past the end returns the
+ * last page (as every list here does: `page` says which).
+ */
+export async function listAllotments(f: AllotmentFilters, pg: PageQuery, collegeKey?: string) {
   const cat = await getCatalog();
   const course = f.course ? cat.courses.find((c) => c.slug === f.course) : undefined;
   // College, course and state become a list of CollegeSpecialty ids for the SQL WHERE.
@@ -371,10 +485,21 @@ export async function listAllotments(f: AllotmentFilters, limit: number, college
         .filter((p) => (!collegeKey || p.college === collegeKey) && (!f.course || (course && p.degree === course.degree && p.specialty === course.specialty)) && (!f.state || cat.collegeByKey.get(p.college)?.state === f.state))
         .map((p) => p.cs)
     : undefined;
-  const { total, rows } = await findAllotments(cat, { cs, year: f.year, round: f.round, quota: f.quota, category: f.category, from: f.from, to: f.to }, { limit, offset, count: true });
+  const q = { cs, year: f.year, round: f.round, quota: f.quota, category: f.category, from: f.from, to: f.to };
+  const at = (page: number) => findAllotments(cat, q, { limit: pg.pageSize, offset: (page - 1) * pg.pageSize, count: true });
+  let page = Math.max(1, pg.page);
+  let res = await at(page);
+  const last = Math.max(1, Math.ceil(res.total / pg.pageSize));
+  if (page > last) {
+    page = last;
+    res = await at(page);
+  }
+  const { total, rows } = res;
   const provisional = new Set(cat.sources.filter((s) => s.provisional).map((s) => `${s.year}|${s.round}`));
   return {
     total,
+    page,
+    pageSize: pg.pageSize,
     rows: rows.map((a) => {
       const t = termsFor(cat, a.college, a.degree);
       const c = cat.courseOf.get(`${a.degree}|${a.specialty}`);

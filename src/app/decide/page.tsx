@@ -7,15 +7,28 @@ import { ChartCard, LabelBars, RankStrip, RoundTrend } from "@/features/decide/c
 import { ChoicesStat, TopChoices } from "@/features/decide/components/dashboard-parts";
 import { DataSource } from "@/features/decide/components/data-source";
 import { MCC_PG } from "@/features/decide/components/pages/mcc-link";
+import { RoundStatusBanner } from "@/features/decide/components/round-status";
 import { smallLink, StatStrip } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
-import { eligibleCategories, reachLabel, reachOrder } from "@/features/decide/lib/reach";
+import { eligibleCategories, reachLabel, reachOrder, reachWindow } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { dashboard, getMeta, getNotices, LATEST_YEAR, PAST_YEARS } from "@/features/decide/service";
+import { dashboard, getMeta, getNotices, LATEST_YEAR, PAST_YEARS, type StripPoint } from "@/features/decide/service";
+import { roundLabel } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Overview" };
 const label = (r: (typeof reachOrder)[number]) => reachLabel(r, LATEST_YEAR, PAST_YEARS);
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+
+/** A summary closing with the option it comes from: a closing is never shown without its seat category. */
+function At({ p }: { p: StripPoint | null }) {
+  if (!p) return <>{formatRank(null)}</>;
+  return (
+    <>
+      {formatRank(p.closing)}
+      <span className="block text-xs text-muted-foreground">{p.category}, {roundLabel[p.round]}, {p.quota}</span>
+    </>
+  );
+}
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
@@ -46,17 +59,18 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
           </p>
         )}
       </div>
+      <RoundStatusBanner params={params} />
 
       <section aria-label="Your options in numbers" className="grid gap-2">
         <StatStrip
           items={[
-            { label: "Options in your profile", value: formatRank(d.total), note: `${formatRank(d.strip.length)} ${d.strip.length === 1 ? "course" : "courses"}, ${formatRank(d.counts["closed-before"])} closed before your rank` },
+            { label: "Options in your profile", value: formatRank(d.total), note: `${formatRank(d.summary.length)} ${d.summary.length === 1 ? "course" : "courses"} (degree and specialty), ${formatRank(d.counts["closed-before"])} closed before your rank` },
             {
               label: "Reached your rank in a past round",
               value: formatRank(reached),
               note: (
                 <span className="inline-flex flex-wrap items-center gap-x-1.5">
-                  <Link href={L.options()} className={smallLink}>{formatRank(d.counts["reached-latest"])} of them in {LATEST_YEAR} R1</Link>
+                  <Link href={L.options({ reach: "reached-latest" })} className={smallLink}>{formatRank(d.counts["reached-latest"])} of them in {LATEST_YEAR} R1</Link>
                   <Provisional when={latestR1?.provisional} />
                 </span>
               ),
@@ -73,7 +87,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         source={<DataSource used={[{ year: 2025 }]} />}
         className="chart-paper"
         title="Where your rank sits"
-        subtitle={`Each dot is one option's deepest closing rank in 2025, on ${seats} seats. Dots at or right of your line closed at or after your rank.`}
+        subtitle={`Each dot is one option's deepest closing rank in 2025, on ${seats} seats. Dots at or right of your line closed at or after your rank.${d.strip.length < d.summary.length ? ` The ${d.strip.length} courses with the most options are drawn; the table lists all ${d.summary.length}.` : ""}`}
         legend={
           <>
             <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-mark" />Closed at or after your rank in 2025</span>
@@ -102,9 +116,9 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                   <td className="numeric text-right">{formatRank(s.options)}</td>
                   <td className="numeric text-right">{formatRank(s.reached)}</td>
                   <td className="numeric text-right">{formatRank(s.closedBefore)}</td>
-                  <td className="numeric text-right">{formatRank(s.deepest)}</td>
+                  <td className="numeric text-right"><At p={s.deepest} /></td>
                   <td className="numeric text-right">{formatRank(s.median)}</td>
-                  <td className="numeric text-right">{formatRank(s.shallowest)}</td>
+                  <td className="numeric text-right"><At p={s.shallowest} /></td>
                 </tr>
               ))}
             </tbody>
@@ -112,14 +126,17 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         }
       >
         <RankStrip rank={profile.rank} rows={d.strip.map((r) => ({ course: `${r.course.degree} ${r.course.name}`, points: r.points }))} />
-        <p className="mt-2 text-xs text-muted-foreground">Every option, with its round and seat category, is on <Link href={L.options({ closed: true })} className={`${smallLink} text-sky`}>Options</Link>.</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {d.strip.length < d.summary.length && "Tick courses in your profile to choose which are drawn. "}
+          Every option, with its round and seat category, is on <Link href={L.options({ closed: true })} className={`${smallLink} text-sky`}>Options</Link>.
+        </p>
       </ChartCard>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.4fr]">
         <ChartCard
           source={<DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR, round: "R1" }]} />}
           title="Options by label"
-          subtitle="From past closing ranks only. Select a label to see those options."
+          subtitle={`From closing ranks in ${reachWindow(LATEST_YEAR, PAST_YEARS)} only; older years are not counted. Select a label to see those options.`}
           table={
             <table className="w-full text-sm">
               <caption className="sr-only">Options by label</caption>
@@ -133,7 +150,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         <ChartCard
           source={<DataSource used={[{ year: 2025 }]} />}
           title="How closing ranks moved through 2025"
-          subtitle={`Median closing rank per round across your options, on ${seats} seats, in 2025.`}
+          subtitle={`Median closing rank per round across your options, on ${seats} seats, in 2025.${d.trend.length < d.summary.length ? ` The ${d.trend.length} courses with the most options.` : ""}`}
           table={
             <table className="w-full text-sm">
               <caption className="sr-only">Median 2025 closing rank by round, on {seats} seats</caption>
@@ -168,7 +185,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
             </ol>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">
-              No MCC schedule is loaded here yet, so no dates are shown. Check them on the{" "}
+              Every round&apos;s dates and status, each from its MCC notice, are on <Link href={L.to("/decide/counselling")} className={`${smallLink} text-sky`}>Schedule &amp; notices</Link>. MCC may change them: check the{" "}
               <a href={MCC_PG} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>MCC PG counselling site<span className="sr-only"> (opens in a new tab)</span></a>.
             </p>
           )}

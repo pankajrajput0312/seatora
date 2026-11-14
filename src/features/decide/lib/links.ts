@@ -44,6 +44,8 @@ export function decideLinks(params: URLSearchParams | string = "") {
       to("/decide/allotments", { course: o.course, inst: o.inst, year: o.year, round: o.round, aq: o.quota, acat: o.category, state: o.state, from: o.from, to: o.to }),
     rankScan: (rank: number, year?: number) => to("/decide/rank-scan", { scan: rank, year }),
     options: (o: { q?: string; reach?: string; closed?: boolean } = {}) => to("/decide/options", { q: o.q, reach: o.reach, closed: o.closed ? "1" : undefined }),
+    /** One seat list; with inst + course (+ quota: `squota`) only that option's seats. */
+    seats: (o: { list?: string; inst?: string; course?: string; quota?: string } = {}) => to("/decide/seats", { list: o.list, inst: o.inst, course: o.course, squota: o.quota }),
     fees: (o: { program?: string; state?: string } = {}) => to("/decide/fees", o),
     compare: (ids: string[]) => to("/decide/compare", { ids: ids.join(",") }),
     institutes: (o: { course?: string; state?: string } = {}) => to("/decide/institutes", o),

@@ -36,7 +36,7 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
 
   it("GMC Nagpur 2026 R1 MD Anaesthesiology: 12 allotments, OBC closing 17,213", async () => {
     const c = await collegeKey(GMC_NAGPUR);
-    const a = await svc.listAllotments({ year: 2026, round: "R1", course: "md-anaesthesiology" }, 50, c.key);
+    const a = await svc.listAllotments({ year: 2026, round: "R1", course: "md-anaesthesiology" }, { page: 1, pageSize: 50 }, c.key);
     expect(a.total).toBe(12);
     expect(a.rows.every((r) => !r.provisional && r.remark === "Fresh")).toBe(true);
     // her grid (Open + OBC seats): closing from her categories, bracketed count = allotments in every category
@@ -53,7 +53,7 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     const open = await svc.lastRanks({ specialty: "ANAESTHESIOLOGY", degree: "MD", quota: "All India", category: "Open" });
     // closing on Open seats; the bracketed count is every allotment that round (all categories)
     expect(open.rows.find((r) => r.college.key === c.key)!.grid[2026].R1).toMatchObject({ closing: 8502, n: 20 });
-    expect((await svc.listAllotments({ year: 2026, round: "R1", course: "md-anaesthesiology" }, 50, c.key)).total).toBe(20);
+    expect((await svc.listAllotments({ year: 2026, round: "R1", course: "md-anaesthesiology" }, { page: 1, pageSize: 50 }, c.key)).total).toBe(20);
   });
 
   it("her options (AIR 42,284 OBC, Anaesthesiology + Family Medicine) in under a second", async () => {
@@ -61,9 +61,14 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     const all = await timed("listOptions her (showClosed)", () => svc.listOptions(her, { showClosed: true }));
     const shown = await timed("listOptions her (default)", () => svc.listOptions(her));
     console.log("her options", all.rows.length, all.counts, "shown", shown.rows.length, "hidden closed", shown.hiddenClosed);
-    expect(all.total).toBe(1360); // every option in both specialties; 1,338 of them have an Open or OBC allotment
-    expect(all.counts).toMatchObject({ "reached-latest": 294, "reached-both": 57, "reached-one": 165, "within-10": 102, "closed-before": 653, "no-data": 89 });
-    expect(shown.total + shown.hiddenClosed).toBe(1360);
+    // Every quota ticked: every option in both specialties; 1,338 of them have an Open or OBC allotment.
+    const every = await svc.listOptions({ ...her, quotas: (await svc.getMeta()).quotas }, { showClosed: true });
+    expect(every.total).toBe(1360);
+    expect(every.counts).toMatchObject({ "reached-latest": 294, "reached-both": 57, "reached-one": 165, "within-10": 102, "closed-before": 653, "no-data": 89 });
+    // None ticked: the open quotas only (31 options in restricted quotas left out).
+    expect(all.total).toBe(1329);
+    expect(all.rows.every((r) => ["All India", "DNB Quota", "Deemed/Paid Seats"].includes(r.quota))).toBe(true);
+    expect(shown.total + shown.hiddenClosed).toBe(1329);
     const page2 = await svc.listOptions(her, {}, { page: 2, pageSize: 50 });
     expect(page2.rows.map((r) => r.id)).toEqual(shown.rows.slice(50, 100).map((r) => r.id));
     const t = performance.now();
@@ -78,7 +83,7 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     expect(trends.total).toBeGreaterThan(10000);
     expect(trends.rows).toHaveLength(50);
     const inst = await timed("listInstitutes her", () => svc.listInstitutes(her, {}));
-    expect(inst.total).toBe(2141); // colleges.ndjson count in the bundle manifest
+    expect(inst.total).toBe(2194); // colleges.ndjson (2,141) + seat_colleges.ndjson (53) in the bundle manifest
     const firstPage = await timed("listInstitutes her, page 1", () => svc.listInstitutes(her, {}, { page: 1, pageSize: 48 }));
     expect(firstPage.rows).toHaveLength(48);
     // best reach (per-year maxima in SQL) agrees with the institute page, over the options in her profile only

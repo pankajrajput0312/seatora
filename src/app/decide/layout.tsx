@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Atkinson_Hyperlegible_Next } from "next/font/google";
+import { unstable_rethrow } from "next/navigation";
 import { DatabaseZap } from "lucide-react";
 import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
@@ -28,6 +29,7 @@ export default async function DecideLayout({ children }: { children: React.React
     const m = await getMeta();
     meta = { specialties: m.specialties, degrees: m.degrees, quotas: m.quotas, states: m.states };
   } catch (e) {
+    unstable_rethrow(e); // the sign-in redirect when access is gone
     console.error("[decide] data unavailable", e);
   }
   return (

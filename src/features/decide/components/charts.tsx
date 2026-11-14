@@ -1,20 +1,27 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { roundLabel, type Round } from "../types";
 
 // Charts follow the dataviz skill: emphasis form (one accent + gray context), thin marks, hairline solid grid,
-// hover AND focus tooltips, legend for 2+ series, and a table view for every chart. Text never wears the data colour.
+// hover tooltips, legend for 2+ series, and a table view for every chart. Text never wears the data colour.
 
 type Tip = { x: number; y: number; value: string; label: string; sub?: string } | null;
 
-function Tooltip({ tip }: { tip: Tip }) {
+/** Hover tooltip (WCAG 1.4.13): stays while the pointer is on it, Escape closes it. Not a live region: the values are in the chart's label and table. */
+function Tooltip({ tip, setTip }: { tip: Tip; setTip: (t: Tip) => void }) {
+  useEffect(() => {
+    if (!tip) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setTip(null);
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [tip, setTip]);
   if (!tip) return null;
   return (
-    <div role="status" className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-overlay" style={{ left: tip.x, top: tip.y - 10 }}>
+    <div className="absolute z-20 -translate-x-1/2 -translate-y-full rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-overlay" style={{ left: tip.x, top: tip.y - 10 }}>
       <p className="numeric text-sm font-semibold text-foreground">{tip.value}</p>
       <p className="text-muted-foreground">{tip.label}</p>
       {tip.sub && <p className="text-muted-foreground">{tip.sub}</p>}
@@ -29,15 +36,18 @@ export function ChartCard({ title, subtitle, legend, table, children, className,
     <figure aria-labelledby={id} className={cn("m-0 rounded-xl border border-border bg-card p-5", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <figcaption id={id} className="text-base font-medium">{title}</figcaption>
+          <h2 id={id} className="text-base font-medium">{title}</h2>
           {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
         </div>
-        <button type="button" aria-pressed={asTable} onClick={() => setAsTable((v) => !v)} className="min-h-11 rounded-md px-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+        {/* The label says what it does, so no aria-pressed (a pressed "Show chart" contradicts itself). */}
+        <button type="button" onClick={() => setAsTable((v) => !v)} className="min-h-11 rounded-md px-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
           {asTable ? "Show chart" : "Show as table"}
         </button>
       </div>
       {legend && !asTable && <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">{legend}</div>}
-      <div className="mt-4">{asTable ? <div className="relative max-h-96 overflow-auto">{table}</div> : children}</div>
+      <div className="mt-4">
+        {asTable ? <div role="region" aria-label={`${title} (table)`} tabIndex={0} className="relative max-h-96 overflow-auto">{table}</div> : children}
+      </div>
       {source && <div className="mt-4">{source}</div>}
     </figure>
   );
@@ -99,7 +109,7 @@ export function RankStrip({ rank, rows }: { rank: number; rows: { course: string
         <line x1={x(rank)} x2={x(rank)} y1={top - 20} y2={H - 24} className="stroke-foreground" strokeWidth={2} />
         <text x={x(rank) + 6} y={top - 10} className="numeric fill-foreground text-[13px] font-bold">You, {formatRank(rank)}</text>
       </svg>
-      <Tooltip tip={tip} />
+      <Tooltip tip={tip} setTip={setTip} />
     </div>
   );
 }
@@ -112,7 +122,7 @@ export function LabelBars({ rows }: { rows: { label: string; count: number; href
       {rows.map((r) => (
         <li key={r.label}>
           <Link href={r.href} className="group grid min-h-11 grid-cols-[minmax(0,11rem)_1fr] items-center gap-3 rounded-md hover:bg-muted/50">
-            <span className="truncate text-sm text-muted-foreground group-hover:text-foreground">{r.label}</span>
+            <span className="py-1 text-sm text-pretty text-muted-foreground group-hover:text-foreground">{r.label}</span>
             <span className="flex items-center gap-2">
               <span className={cn("h-3 rounded-r-[4px]", r.accent ? "bg-mark" : "bg-muted-foreground/50")} style={{ width: `${(r.count / max) * 85}%` }} aria-hidden />
               <span className="numeric text-sm font-semibold text-foreground">{formatRank(r.count)}<span className="sr-only"> options</span></span>
@@ -136,7 +146,7 @@ export function RoundTrend({ title, href, rank, points }: { title: string; href?
   const last = [...points].reverse().find((p) => p.median);
   return (
     <div className="relative rounded-lg border border-border p-3" onPointerLeave={() => setTip(null)}>
-      <p className="text-sm font-medium">{href ? <Link href={href} className="inline-flex min-h-11 items-center text-sky underline">{title}</Link> : title}</p>
+      <h3 className="text-sm font-medium">{href ? <Link href={href} className="inline-flex min-h-11 items-center text-sky underline">{title}</Link> : title}</h3>
       <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" role="img" aria-label={`${title}: median closing rank by round in 2025. ${points.map((p) => `${roundLabel[p.round]} ${p.median ? formatRank(p.median) : "none"}`).join(", ")}. Your rank ${formatRank(rank)}.`}>
         <line x1={L} x2={W - R} y1={y(rank)} y2={y(rank)} className="stroke-foreground/70" strokeWidth={1} />
         <text x={L} y={y(rank) - 4} className="numeric fill-muted-foreground text-[10px]">You, {formatRank(rank)}</text>
@@ -154,7 +164,7 @@ export function RoundTrend({ title, href, rank, points }: { title: string; href?
         {points.map((p, i) => <text key={p.round} x={x(i)} y={H - 6} textAnchor="middle" className="fill-muted-foreground text-[10px]">{roundLabel[p.round]}</text>)}
         {last?.median && <text x={x(points.indexOf(last))} y={y(last.median) - 8} textAnchor="end" className="numeric fill-foreground text-[11px] font-semibold">{formatRank(last.median)}</text>}
       </svg>
-      <Tooltip tip={tip} />
+      <Tooltip tip={tip} setTip={setTip} />
     </div>
   );
 }

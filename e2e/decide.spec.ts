@@ -1,7 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./auth";
 
-// Runs on the real MCC import (spot values: neetpg-planner docs/HANDOFF_CONTEXT.md §7). Without a database Decide only
-// shows "Data unavailable", so the whole file is skipped.
+// Runs on the real MCC import (spot values: neetpg-planner docs/HANDOFF_CONTEXT.md §7), signed in to the invited account
+// (e2e/auth.ts). Without a database Decide only shows "Data unavailable", so the whole file is skipped.
 test.skip(!process.env.DATABASE_URL, "needs the MCC data in Postgres (DATABASE_URL)");
 
 const PROFILE = "rank=42284&cat=OBC&sp=ANAESTHESIOLOGY,FAMILYMEDICINE";
@@ -68,21 +68,22 @@ const OPT_KOKILA_ANAES = "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8#400710~DNB~AN
 const OPT_KOKILA_FM = "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8#400710~DNB~FAMILYMEDICINE~DNB Quota";
 const OPT_GMC_NAGPUR = "GOVERNMENTMEDICALCOLLEGENAGPURGOVERNMENT#440003~MD~ANAESTHESIOLOGY~All India";
 
-test("options: her 1,364 options (710 shown, 25 at a time), Show more focuses the first new row, two ticked states both apply", async ({ page }) => {
+test("options: her 1,360 options (707 shown, 25 at a time), Show more focuses the first new row, two ticked states both apply", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto(`/decide/options?${PROFILE}`);
-  await expect(page.getByRole("link", { name: "All 1,364 options" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "All 1,360 options" })).toBeVisible();
   const count = page.locator("#options-count");
-  await expect(count).toContainText("Showing 1–25 of 710 options");
+  await expect(count).toContainText("Showing 1–25 of 707 options");
   await expect(page.locator("[data-item]").filter({ visible: true })).toHaveCount(25); // one page, never the whole list
   await page.getByRole("button", { name: "Show 25 more" }).click();
-  await expect(count).toContainText("Showing 1–50 of 710 options");
+  await expect(count).toContainText("Showing 1–50 of 707 options");
   await expect(page.locator('[data-item="26"]').filter({ visible: true })).toBeFocused();
 
   // Multi-select: both ticked states apply (repeated st params), and stay ticked.
   await page.locator("summary", { hasText: "State" }).click();
   await page.getByRole("checkbox", { name: "Maharashtra" }).check();
   await page.getByRole("checkbox", { name: "Karnataka" }).check();
+  await page.locator("summary", { hasText: "State" }).click(); // close it: on a phone the open list covers Apply
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/st=Maharashtra/);
   await expect(page).toHaveURL(/st=Karnataka/);
@@ -90,17 +91,19 @@ test("options: her 1,364 options (710 shown, 25 at a time), Show more focuses th
   await expect(page.locator("summary", { hasText: "State" })).toContainText("2 selected");
 });
 
-test("options and compare: official closings with their seat category and Provisional", async ({ page }) => {
-  // Kokilaben Navi Mumbai DNB Anaesthesiology, DNB Quota: 2026 R1 20,132 (Open seat, provisional); 2025 deepest 33,685 (stray).
+test("options and compare: official closings with their seat category, 2026 R1 final", async ({ page }) => {
+  // Kokilaben Navi Mumbai DNB Anaesthesiology, DNB Quota: 2026 R1 20,132 (Open seat, final); 2025 deepest 33,685 (stray).
   await page.goto(`/decide/options?${PROFILE}&q=Kokilaben&closed=1`);
   const row = page.locator("[data-item]").filter({ visible: true }).filter({ hasText: "DNB Anaesthesiology" })
     .filter({ has: page.getByRole("link", { name: "Kokilaben Dhirubhai Ambani Hospital", exact: true }) });
-  for (const v of ["20,132", "R1, Open seat", "Provisional", "33,685", "Stray, Open seat"]) await expect(row).toContainText(v);
+  for (const v of ["20,132", "R1, Open seat", "33,685", "Stray, Open seat"]) await expect(row).toContainText(v);
+  await expect(row).not.toContainText("Provisional");
 
   // GMC Nagpur 2026 R1 MD Anaesthesiology: OBC closing 17,213 and 12 allotments (all categories).
   await page.goto(`/decide/compare?${new URLSearchParams({ ids: [OPT_KOKILA_ANAES, OPT_GMC_NAGPUR].join(",") })}&${PROFILE}`);
   const table = page.getByRole("table", { name: "Comparison of 2 options" });
-  for (const v of ["20,132", "17,213", "R1, OBC seat", "2026 (R1, provisional)", "Seat-leaving penalty (MCC)"]) await expect(table).toContainText(v);
+  for (const v of ["20,132", "17,213", "R1, OBC seat", "2026 R1 closing", "Seat-leaving penalty (MCC)"]) await expect(table).toContainText(v);
+  await expect(table).not.toContainText(/provisional/i);
   await expect(table.getByRole("row", { name: /^Allotments made/ })).toContainText("12");
 
   // Removing a column focuses the next one; removing the last focuses the page heading (never <body>).
@@ -171,13 +174,14 @@ test("research and counselling routes render real data, never demo data", async 
 });
 
 test("last ranks show the official closings: closing on one seat category, allotments in every category", async ({ page }) => {
-  // Kokilaben Navi Mumbai, DNB Anaesthesiology, DNB Quota, Open seats: 2025 R1 → stray, then 2026 R1 (provisional).
+  // Kokilaben Navi Mumbai, DNB Anaesthesiology, DNB Quota, Open seats: 2025 R1 → stray, then 2026 R1 (final).
   // The institute link opens the page that holds its row.
   await page.goto(`/decide/last-ranks?${PROFILE}&course=dnb-anaesthesiology&lcat=Open&lquota=DNB+Quota&inst=${KOKILA_NM}`);
   const kokila = page.locator(`#inst-${KOKILA_NM}`);
   await expect(kokila).toBeVisible();
   for (const v of ["21,699", "25,059", "29,892", "33,685", "20,132"]) await expect(kokila).toContainText(v);
-  await expect(page.getByRole("columnheader", { name: "2026 Provisional" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "2026", exact: true })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: /Provisional/ })).toHaveCount(0);
 
   // Seth GS MD Anaesthesiology, All India, 2026 R1: OBC 11,842 and Open 8,502, both with 20 allotments (all categories).
   await page.goto(`/decide/last-ranks?${PROFILE}&course=md-anaesthesiology&lcat=OBC&lquota=All+India&inst=${SETH_GS}`);
@@ -193,7 +197,7 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
   await page.goto(`/decide/allotments?${PROFILE}&inst=${GMC_NAGPUR}&course=md-anaesthesiology&year=2026&round=R1`);
   await expect(page.locator("#results")).toContainText("1–12 of 12");
   const table = page.getByRole("region", { name: "Allotments", exact: true });
-  await expect(table.getByText("Provisional").first()).toBeVisible();
+  await expect(table.getByText("Provisional")).toHaveCount(0); // 2026 R1 is final
   await page.getByLabel("Seat category").selectOption("OBC");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/acat=OBC/);
@@ -226,19 +230,14 @@ test("institute page: MCC address, terms with their sources, paginated allotment
   await expect(results).toBeFocused();
 });
 
-test("seats, rank scan and counselling say what is missing instead of inventing it", async ({ page }) => {
-  await page.goto(`/decide/seats?${PROFILE}`);
-  await expect(page.getByRole("heading", { name: "Seat matrix not imported yet" })).toBeVisible();
+// The Seats matrix (seat lists) and Counselling notices are being rebuilt on the imported 2026 R2 data: assert them there.
+test("seat trends and rank scan on the final 2026 R1", async ({ page }) => {
   await page.goto(`/decide/seats?${PROFILE}&tab=trends`);
-  await expect(page.locator("#results")).toContainText("of 1,364");
+  await expect(page.locator("#results")).toContainText("of 1,360");
 
   await page.goto(`/decide/rank-scan?${PROFILE}&scan=42,284&year=2026`);
-  await expect(page.getByRole("heading", { name: /2026 R1/ })).toContainText("Provisional");
+  await expect(page.getByRole("heading", { name: /2026 R1/ })).not.toContainText("Provisional");
   await expect(page.getByLabel("Year")).toHaveValue("2026");
-
-  await page.goto(`/decide/counselling?${PROFILE}&tab=announcements`);
-  await expect(page.getByRole("heading", { name: "No announcements loaded" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Official MCC PG counselling site/ })).toHaveAttribute("href", /mcc\.nic\.in/);
 });
 
 test("related data is linked: institute → course last ranks → allotments → rank scan", async ({ page }) => {

@@ -1,23 +1,23 @@
 import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { SourceLabel } from "@/components/ui/source-label";
 import { AppPage } from "@/features/decide/components/app-page";
-import { DataSource } from "@/features/decide/components/data-source";
+import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Closing, Dash, HISTORY_CAPTION, PageHead, Provisional, ReachBadge, TermText } from "@/features/decide/components/bits";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
-import { courseName, RoundGrid, toChoiceItem } from "@/features/decide/components/options-view";
+import { courseName, RoundGrid, SeatsCell, SeatsHead, toChoiceItem } from "@/features/decide/components/options-view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, PAST_YEARS, type OptionTerms } from "@/features/decide/service";
+import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, PAST_YEARS, programOf, type OptionTerms } from "@/features/decide/service";
 import { canSeeResidents, groupResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
 import { roundLabel, termLabel } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
@@ -42,19 +42,27 @@ const kinds = ["FEE", "STIPEND", "BOND", "PENALTY"] as const;
 const termOf = (t: OptionTerms, k: (typeof kinds)[number]) => ({ FEE: t.fee, STIPEND: t.stipend, BOND: t.bond, PENALTY: t.penalty })[k];
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
-  const college = await getCollege((await params).slug).catch(() => null);
+  const college = await getCollege((await params).slug).catch((e) => {
+    unstable_rethrow(e);
+    return null;
+  });
+  const { tab } = parseSearchParams(schema, toURLSearchParams(await searchParams));
   // People's names: never indexed.
-  const robots = parseSearchParams(schema, toURLSearchParams(await searchParams)).tab === "residents" ? { index: false, follow: false } : undefined;
-  return { title: college?.name ?? "Institute", robots };
+  const robots = tab === "residents" ? { index: false, follow: false } : undefined;
+  // The tab is in the title, so switching tabs is announced (Next's route announcer reads the title).
+  return { title: `${tabs.find((t) => t.key === tab)!.label} · ${college?.name ?? "Institute"}`, robots };
 }
 
-/** Fee, stipend, bond and seat-leaving penalty for one programme, each as published with its own source link. */
-function Terms({ title, t }: { title: string; t: OptionTerms }) {
+/**
+ * Fee, stipend, bond and seat-leaving penalty for one programme, each as published with its own source link. `offered`:
+ * the MCC results have courses of this programme here.
+ */
+function Terms({ title, t, offered }: { title: string; t: OptionTerms; offered: boolean }) {
   return (
     <div className="rounded-xl border border-border bg-card p-5">
       <h3 className="text-base font-semibold">{title}</h3>
       {!kinds.some((k) => termOf(t, k)) ? (
-        <p className="mt-2 text-sm text-muted-foreground">Not offered here, or not listed.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{offered ? "Offered here, but no fee, stipend or bond is listed for it." : "No courses of this kind here in the MCC results."}</p>
       ) : (
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
           {kinds.map((k) => (
@@ -77,7 +85,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const f = parseSearchParams(schema, sp);
   const [inst, meta] = await Promise.all([getInstitute(slug, profile), getMeta()]);
   if (!inst) notFound();
-  const { college, options, yours, allotmentsByYear, terms } = inst;
+  const { college, options, yours, allotmentsByYear, terms, seatList } = inst;
+  const offers = (program: "MD" | "DNB") => options.some((o) => programOf(o.course.degree) === program);
   const tab = f.tab;
   const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
   const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n ?? 0));
@@ -90,14 +99,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const nLatest = allotmentsByYear.find((a) => a.year === LATEST_YEAR)?.n ?? null;
 
   // Allotments tab: one page from SQL; a page past the end shows the last page.
-  const allotQ = { year: allotYear, course: allotCourse };
-  let allot = null;
-  let allotPage = 1;
-  if (tab === "allotments") {
-    allot = await listAllotments(allotQ, PAGE_SIZE, college.key, (f.page - 1) * PAGE_SIZE);
-    allotPage = Math.min(f.page, Math.max(1, Math.ceil(allot.total / PAGE_SIZE)));
-    if (allotPage < f.page) allot = await listAllotments(allotQ, PAGE_SIZE, college.key, (allotPage - 1) * PAGE_SIZE);
-  }
+  const allot = tab === "allotments" ? await listAllotments({ year: allotYear, course: allotCourse }, { page: f.page, pageSize: PAGE_SIZE }, college.key) : null;
   // ponytail: every row on one page (largest institute ~930 rows, ~1.6 MB HTML); add a course filter if that grows.
   const residentsAccess = tab !== "residents" ? null : !(await canSeeResidents()) ? "locked" : !(await residentsBudget("read")) ? "limited" : "ok";
   const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
@@ -153,7 +155,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       </span>
                     </span>
                     <span className="flex items-center gap-4">
-                      {profile && <ReachBadge reach={o.reach} provisional={!!o.latest?.provisional} />}
+                      {profile && <ReachBadge reach={o.reach} provisional={o.reachProvisional} />}
                       <span className="text-right"><span className="block text-xs text-muted-foreground">{PAST_YEARS[1]} deepest</span><Closing d={o.byYear[PAST_YEARS[1]]} /></span>
                     </span>
                   </li>
@@ -194,6 +196,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Add to choices</span></th>
                   <th scope="col" className={tbl.th}>Course and quota</th>
                   <th scope="col" className={tbl.th}>{profile ? "Your reach" : "Reach"}</th>
+                  {seatList && <th scope="col" className={`${tbl.th} text-right`}><SeatsHead list={seatList} /></th>}
                   <th scope="col" className={`${tbl.th} text-right`}>{LATEST_YEAR} R1</th>
                   <th scope="col" className={`${tbl.th} text-right`}>{PAST_YEARS[1]} deepest</th>
                   <th scope="col" className={tbl.th}>Related</th>
@@ -206,11 +209,12 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     {/* Without a rank the reach is unknown, so nothing would be saved with the choice: star only with a profile. */}
                     <td className="px-2 py-2">{profile && <ChoiceStar item={toChoiceItem(r)} />}</td>
                     <th scope="row" className={`${tbl.td} text-left font-medium`}>{courseName(r)}<span className="block text-xs font-normal text-muted-foreground">{r.quota}</span></th>
-                    <td className={tbl.td}>{profile ? <ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} /> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
+                    <td className={tbl.td}>{profile ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} /> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
+                    {seatList && <td className={`${tbl.td} text-right`}><SeatsCell r={r} list={seatList} L={L} /></td>}
                     <td className={tbl.num}>
                       <Closing d={r.latest} />
                       {/* ReachBadge already carries the marker for "Reached in R1". */}
-                      <Provisional when={r.latest?.provisional && !(profile && r.reach === "reached-latest")} />
+                      <Provisional when={r.latest?.provisional && !(profile && r.reachProvisional)} />
                     </td>
                     <td className={tbl.num}><Closing d={r.byYear[PAST_YEARS[1]]} /></td>
                     <td className={`${tbl.td} whitespace-nowrap`}>
@@ -224,14 +228,18 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   </tr>,
                   <tr key={`${r.id}-rounds`} className="expand-row bg-muted/30">
                     <td />
-                    <td colSpan={6} className="px-4 pb-4"><RoundGrid row={r} caption={`${courseName(r)}, ${r.quota}: closing ranks by year and round`} /></td>
+                    <td colSpan={seatList ? 7 : 6} className="px-4 pb-4"><RoundGrid row={r} caption={`${courseName(r)}, ${r.quota}: closing ranks by year and round`} /></td>
                   </tr>,
                 ])}
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-muted-foreground">{HISTORY_CAPTION}{profile ? " Closing ranks are on the seat categories you can take." : " Closing ranks shown across all seat categories."}</p>
+          <p className="text-xs text-muted-foreground">
+            {HISTORY_CAPTION}{profile ? " Closing ranks are on the seat categories you can take." : " Closing ranks shown across all seat categories."}
+            {seatList && ` ${roundLabel[seatList.round]} seats: in the ${seatList.year} ${roundLabel[seatList.round]} clear vacancy list, that quota and ${profile ? "your seat categories" : "every seat category"}; "—" when the list has none.`}
+          </p>
           <DataSource />
+          <SeatSource list={seatList} noticesHref={L.to("/decide/counselling")} />
         </section>
       )}
 
@@ -244,7 +252,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <Field label="Course"><Select name="course" value={allotCourse} all="All courses" options={courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
           </FilterBar>
           <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
-            <span className="numeric font-semibold text-foreground">{rangeLabel({ ...allot, page: allotPage, pageSize: PAGE_SIZE })}</span> allotments at this institute, newest first. Ranks only, never names.{" "}
+            <span className="numeric font-semibold text-foreground">{rangeLabel(allot)}</span> allotments at this institute, newest first. Ranks only, never names.{" "}
             <Link href={L.allotments({ inst: slug, course: allotCourse, year: allotYear })} className={`${smallLink} text-sky`}>Open in Allotments, with fees and more filters</Link>
           </p>
           {allot.total === 0 ? (
@@ -271,7 +279,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               </table>
             </div>
           )}
-          <Pager page={allotPage} pageSize={PAGE_SIZE} total={allot.total} href={(n) => L.page(`/decide/institutes/${slug}`, n)} focusId="results" label="Allotments" />
+          <Pager page={allot.page} pageSize={PAGE_SIZE} total={allot.total} href={(n) => L.page(`/decide/institutes/${slug}`, n)} focusId="results" label="Allotments" />
           <p className="text-xs text-muted-foreground">Select a rank to scan the allotments around it that year.</p>
           <DataSource used={[...new Map(allot.rows.map((a) => [`${a.year}|${a.round}`, { year: a.year, round: a.round }])).values()]} />
         </section>
@@ -280,8 +288,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       {tab === "fees" && (
         <section aria-labelledby="fees-h" className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <h2 id="fees-h" className="sr-only">Fees, stipend, bond and seat-leaving penalty</h2>
-          <Terms title="Medical college seats (MD, MS, Diploma)" t={terms.md} />
-          <Terms title="DNB and NBEMS Diploma seats" t={terms.dnb} />
+          <Terms title="Medical college seats (MD, MS, Diploma)" t={terms.md} offered={offers("MD")} />
+          <Terms title="DNB and NBEMS Diploma seats" t={terms.dnb} offered={offers("DNB")} />
           <p className="text-xs text-muted-foreground md:col-span-2">Each value is quoted as published, with a link to its document. Missing values show as a dash.</p>
           {college.state && <p className="text-sm md:col-span-2"><Link href={L.fees({ state: college.state })} className={`${smallLink} text-sky`}>Compare fees with other institutes in {college.state}</Link></p>}
           <div className="md:col-span-2"><DataSource terms={termSources} results={false} /></div>

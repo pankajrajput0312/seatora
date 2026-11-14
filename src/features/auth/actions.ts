@@ -7,8 +7,15 @@ import { db } from "@/lib/db";
 import { allow, isLimited, reset } from "@/lib/rate-limit";
 import { inviteMatches, isAllowed, safeNext } from "@/lib/site-access";
 import { dummyHash, hashPassword, verifyPassword } from "./lib/password";
-import { createSession, deleteSession } from "./lib/session";
-import { signInSchema, signUpSchema, type SignInInput, type SignUpInput } from "./validations";
+import { createSession, currentSessionId, deleteSession, getCurrentUser } from "./lib/session";
+import {
+  changePasswordSchema,
+  signInSchema,
+  signUpSchema,
+  type ChangePasswordInput,
+  type SignInInput,
+  type SignUpInput,
+} from "./validations";
 
 export type AuthResult = { ok: false; error: string };
 
@@ -30,6 +37,24 @@ async function rateLimited(kind: string) {
   const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim();
   // Generous per IP (hostels and colleges share IPs); per-account lockout stops brute force.
   return ip ? !allow(`${kind}:${ip}`, 30) : false;
+}
+
+/** A wrong password: counts for the account + IP pair (in memory) and the account (atomic in the DB, can lock it). */
+async function recordFailure(pairKey: string, userId?: string) {
+  allow(pairKey, PAIR_LIMIT, PAIR_WINDOW_MS);
+  if (!userId) return;
+  // Atomic increment, so parallel guesses can't overwrite each other's count.
+  const { failedLogins } = await db.user.update({
+    where: { id: userId },
+    data: { failedLogins: { increment: 1 } },
+    select: { failedLogins: true },
+  });
+  if (failedLogins >= ACCOUNT_LIMIT) {
+    await db.user.updateMany({
+      where: { id: userId, failedLogins: { gte: ACCOUNT_LIMIT } },
+      data: { failedLogins: 0, lockedUntil: new Date(Date.now() + LOCK_MS) },
+    });
+  }
 }
 
 // Invite-only: one allowlisted account (SEATORA_ALLOWED_EMAILS) may sign up and sign in. Sign-up also needs
@@ -73,23 +98,7 @@ export async function signIn(input: SignInInput, next?: string): Promise<AuthRes
 
     // Same message for unknown email, wrong password and blocked attempts.
     if (!user || !valid || blocked) {
-      if (!valid) {
-        allow(pairKey, PAIR_LIMIT, PAIR_WINDOW_MS);
-        if (user) {
-          // Atomic increment, so parallel guesses can't overwrite each other's count.
-          const { failedLogins } = await db.user.update({
-            where: { id: user.id },
-            data: { failedLogins: { increment: 1 } },
-            select: { failedLogins: true },
-          });
-          if (failedLogins >= ACCOUNT_LIMIT) {
-            await db.user.updateMany({
-              where: { id: user.id, failedLogins: { gte: ACCOUNT_LIMIT } },
-              data: { failedLogins: 0, lockedUntil: new Date(Date.now() + LOCK_MS) },
-            });
-          }
-        }
-      }
+      if (!valid) await recordFailure(pairKey, user?.id);
       return { ok: false, error: "Incorrect email or password. Too many failed attempts pause sign-in for a few minutes." };
     }
     reset(pairKey);
@@ -104,6 +113,43 @@ export async function signIn(input: SignInInput, next?: string): Promise<AuthRes
     return { ok: false, error: "We couldn't sign you in. Please try again." };
   }
   redirect(safeNext(next));
+}
+
+export type ChangePasswordResult = { ok: true } | AuthResult;
+
+/**
+ * For the signed-in user: checks the current password with the same limits as sign-in (the guesses share sign-in's
+ * counters, so neither path gets extra tries), then saves the new hash and deletes every other session in one
+ * transaction. This browser stays signed in.
+ */
+export async function changePassword(input: ChangePasswordInput): Promise<ChangePasswordResult> {
+  if (await rateLimited("password")) return { ok: false, error: "Too many attempts. Please wait a minute." };
+  const parsed = changePasswordSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  try {
+    const me = await getCurrentUser();
+    const user = me && (await db.user.findUnique({ where: { id: me.id } }));
+    if (!user) return { ok: false, error: "You're signed out. Sign in again to change your password." };
+    const pairKey = `signin-fail:${user.email}:${await clientIp()}`;
+    const valid = await verifyPassword(parsed.data.current, user.passwordHash);
+    const blocked = isLimited(pairKey, PAIR_LIMIT) || (!!user.lockedUntil && user.lockedUntil > new Date());
+    if (!valid || blocked) {
+      if (!valid) await recordFailure(pairKey, user.id);
+      return { ok: false, error: "Current password is incorrect. Too many failed attempts pause this for a few minutes." };
+    }
+    reset(pairKey);
+    const passwordHash = await hashPassword(parsed.data.password);
+    const keep = (await currentSessionId()) ?? "";
+    await db.$transaction([
+      db.user.update({ where: { id: user.id }, data: { passwordHash, failedLogins: 0, lockedUntil: null } }),
+      db.session.deleteMany({ where: { userId: user.id, id: { not: keep } } }),
+    ]);
+    return { ok: true };
+  } catch (err) {
+    console.error("changePassword failed", err);
+    return { ok: false, error: "We couldn't change your password. Please try again." };
+  }
 }
 
 export async function signOut() {

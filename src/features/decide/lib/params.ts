@@ -12,8 +12,11 @@ export function readParams(p: URLSearchParams, lists: readonly string[] = []): R
   return raw;
 }
 
-/** A rank as people type it: "30,000", "30 000" or "30000", 1 to 3,00,000. */
-export const rankValue = z.preprocess((v) => (typeof v === "string" ? v.replace(/[,\s]/g, "") : v), z.coerce.number().int().min(1).max(300000));
+/** A rank as people type it: "30,000", "30 000" or "30000", 1 to 3,00,000 (one message for missing, malformed or out of range). */
+export const rankValue = z.preprocess(
+  (v) => (typeof v === "string" ? v.replace(/[,\s]/g, "") : v),
+  z.coerce.number({ error: "Enter a rank from 1 to 3,00,000, e.g. 42,284" }).int().min(1).max(300000),
+);
 
 /** 1-based page number for server-side pagination. */
 export const pageValue = z.coerce.number().int().min(1).max(100000);

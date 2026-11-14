@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cutoff, Round } from "../types";
-import { buildGrid, classifyReach, deepestByYear, eligibleCategories } from "./reach";
+import { buildGrid, classifyReach, deepestByYear, eligibleCategories, reachLabel } from "./reach";
 
 const c = (year: number, round: Round, closing: number, category: Cutoff["category"] = "Open"): Cutoff => ({
   college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY", year, round, quota: "All India", category,
@@ -50,4 +50,10 @@ describe("review fixes", () => {
     const g = buildGrid(all, new Set(["Open", "OBC"]), new Set(["2026-R1"]));
     expect(g[2026].R1).toEqual({ closing: 17213, category: "OBC", n: 12, provisional: true });
   });
+});
+
+it("labels name the years they count (2023 is shown in the grids, never counted)", () => {
+  expect(reachLabel("no-data", 2026, [2024, 2025])).toBe("No allotment in your categories in 2024, 2025 or 2026 R1");
+  expect(reachLabel("no-data", 2026, [2024, 2025], false)).toBe("No allotment in your categories in 2024 or 2025");
+  expect(reachLabel("reached-one", 2026, [2024, 2025])).toBe("Reached in 2024 or 2025");
 });

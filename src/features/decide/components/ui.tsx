@@ -12,7 +12,8 @@ import { FocusOnChange } from "./focus-item";
 // Shared building blocks so every Decide screen reads the same way (docs/APP_DESIGN_SYSTEM.md, "Inside-app primitives").
 
 export const tbl = {
-  wrap: "relative overflow-x-auto rounded-xl border border-border bg-card",
+  // scroll-px: Tab scrolls a half-hidden link fully into the box, focus ring included.
+  wrap: "relative scroll-px-12 overflow-x-auto rounded-xl border border-border bg-card",
   table: "w-full text-sm",
   headRow: "border-b border-border text-left",
   th: "px-4 py-3 text-xs font-semibold text-muted-foreground",

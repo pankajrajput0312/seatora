@@ -53,6 +53,25 @@ describe("service on the test fixture", () => {
     expect((await svc.listOptions(her, {}, { page: 999, pageSize: 5 })).page).toBe(Math.ceil(shown.total / 5)); // clamped
   });
 
+  it("labels from per-year deepest closings agree with labels from every cutoff; deepest 2025 first within a label", async () => {
+    const all = await svc.listOptions({ ...her, pwd: true }, { showClosed: true });
+    for (const x of reachOrder) expect(all.rows.filter((r) => r.reach === x)).toHaveLength(all.counts[x]);
+    const key = (r: (typeof all.rows)[number]) => [reachOrder.indexOf(r.reach), -(r.byYear[2025]?.closing ?? 0)];
+    const keys = all.rows.map(key);
+    expect(keys).toEqual([...keys].sort((a, b) => a[0] - b[0] || a[1] - b[1]));
+    expect(all.seatList).toBeNull(); // the fixture has no seat lists: no seats column
+  });
+
+  it("overview: every course in the summary with the option behind its deepest closing; the same counts as Options", async () => {
+    const d = await svc.dashboard(her);
+    const o = await svc.listOptions(her, { showClosed: true });
+    expect([d.total, d.counts]).toEqual([o.total, o.counts]);
+    expect(d.summary.map((s) => s.course.slug).sort()).toEqual([...new Set(o.rows.map((r) => r.course.slug))].sort());
+    for (const s of d.summary) if (s.deepest) expect(s.deepest).toMatchObject({ closing: expect.any(Number), round: expect.any(String), category: expect.any(String), quota: expect.any(String) });
+    expect(d.strip.length).toBeLessThanOrEqual(8);
+    expect(d.trend.map((t) => t.course.slug)).toEqual(d.strip.map((s) => s.course.slug));
+  });
+
   it("narrows by profile before reading cutoffs", async () => {
     const { rows } = await svc.listOptions({ ...her, specialties: ["FAMILYMEDICINE"], quotas: ["DNB Quota"] }, { showClosed: true });
     expect(rows.length).toBeGreaterThan(0);
@@ -91,14 +110,18 @@ describe("service on the test fixture", () => {
     }
   });
 
-  it("allotments: filters, total, order (newest year, round, rank) and offset", async () => {
+  it("allotments: filters, total, order (newest year, round, rank) and pages (past the end: the last page)", async () => {
     const all = fx.allotments.filter((a) => a.year === 2025 && a.quota === "DNB Quota");
-    const page1 = await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, 10);
+    const page1 = await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, { page: 1, pageSize: 10 });
     expect(page1.total).toBe(all.length);
     expect(page1.rows[0].round).toBe("R1");
     expect(page1.rows.map((r) => r.rank)).toEqual([...page1.rows.map((r) => r.rank)].sort((a, b) => a - b));
-    const page2 = await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, 10, undefined, 10);
-    expect(page2.rows[0]).toEqual((await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, 11)).rows[10]);
+    const page2 = await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, { page: 2, pageSize: 10 });
+    expect(page2.rows[0]).toEqual((await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, { page: 1, pageSize: 11 })).rows[10]);
+    const last = Math.ceil(all.length / 3);
+    const past = await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, { page: last + 5, pageSize: 3 });
+    expect(past.page).toBe(last);
+    expect(past.rows).toEqual((await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, { page: last, pageSize: 3 })).rows);
   });
 
   it("last ranks: closing on the chosen seat category, n over every category, sorted and paged", async () => {

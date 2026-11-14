@@ -13,7 +13,7 @@ it("relabels saved choices from the current data, and validates what the browser
   const ids = [...new Set(fx.cutoffs.map(optionId))].slice(0, 3);
   const live = await liveReach([...ids, "no~such~option"], "rank=42284&cat=OBC");
   const rows = await getOptionsByIds(ids, { rank: 42284, category: "OBC", pwd: false, specialties: [], degrees: [], quotas: [], states: [], maxFeeLakh: null, maxBondYears: null });
-  expect(live).toEqual(Object.fromEntries(rows.map((r) => [r.id, { reach: r.reach, provisional: !!r.latest?.provisional }])));
+  expect(live).toEqual(Object.fromEntries(rows.map((r) => [r.id, { reach: r.reach, provisional: r.reachProvisional }])));
   expect(live).not.toHaveProperty("no~such~option"); // unknown ids are left out, so the list can flag them
   expect(await liveReach(ids, "cat=OBC")).toBeNull(); // no rank, no labels
   expect(await liveReach(["x".repeat(301)], "rank=1")).toBeNull();

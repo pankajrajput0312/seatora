@@ -46,9 +46,12 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       : reversed
         ? "“Rank from” is above “Rank to”. That range was not applied."
         : null;
+  // With no filter at all the page opens on the latest year's latest round (not all 2,09,571 rows); "All years" is year=all.
+  const pristine = !["inst", "course", "year", "round", "aq", "acat", "state", "from", "to"].some((k) => params.get(k)?.trim());
+  const latest = pristine ? meta.years[0] : undefined;
   const filters = {
-    year: meta.years.some((y) => y.year === f.year) ? f.year : undefined,
-    round: f.round,
+    year: meta.years.some((y) => y.year === f.year) ? f.year : latest?.year,
+    round: f.round ?? latest?.rounds.at(-1),
     course: f.course,
     quota: f.aq,
     category: f.acat,
@@ -56,10 +59,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
     from: rankError ? undefined : f.from,
     to: rankError ? undefined : f.to,
   };
-  let res = await listAllotments(filters, PAGE_SIZE, inst?.key, (f.page - 1) * PAGE_SIZE);
-  const page = Math.min(f.page, Math.max(1, Math.ceil(res.total / PAGE_SIZE)));
-  if (page < f.page) res = await listAllotments(filters, PAGE_SIZE, inst?.key, (page - 1) * PAGE_SIZE);
-  const { rows, total } = res;
+  const { rows, total, page } = await listAllotments(filters, { page: f.page, pageSize: PAGE_SIZE }, inst?.key);
   const narrowed = inst || Object.values(filters).some((v) => v != null);
   const rankInput = (name: "from" | "to") => ({
     name,
@@ -83,8 +83,8 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
 
       <FilterBar action="/decide/allotments" params={params} cols="md:grid-cols-4 xl:grid-cols-[1fr_1fr_2fr_1fr_1fr_1fr_1fr_auto]">
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
-        <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : undefined} all="All years" options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
-        <Field label="Round"><Select name="round" value={f.round} all="All rounds" options={rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
+        <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
+        <Field label="Round"><Select name="round" value={filters.round} all="All rounds" options={rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
         <Field label="Course"><Select name="course" value={f.course} all="All courses" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
         <Field label="Quota"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
         <Field label="Seat category"><Select name="acat" value={f.acat} all="All" options={categories.map((c) => ({ value: c, label: c }))} /></Field>
@@ -94,7 +94,8 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       {rankError && <p id="rank-error" role="alert" className="text-sm text-ember">{rankError}</p>}
 
       <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
-        <span className="numeric font-semibold text-foreground">{rangeLabel({ ...res, page, pageSize: PAGE_SIZE })}</span> allotments, newest year first, then round and rank.
+        <span className="numeric font-semibold text-foreground">{rangeLabel({ rows, total, page, pageSize: PAGE_SIZE })}</span> allotments, newest year first, then round and rank.
+        {latest && ` The latest round, ${latest.year} ${roundLabel[latest.rounds.at(-1)!]}: pick All years for every round.`}
         {!narrowed && " This is every year and course: pick an institute, course, year or rank range to narrow it."}
       </p>
 
