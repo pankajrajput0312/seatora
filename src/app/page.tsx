@@ -1,3 +1,4 @@
+import { Coverage } from "@/components/marketing/coverage";
 import { Cta } from "@/components/marketing/cta";
 import { Faq } from "@/components/marketing/faq";
 import { Features } from "@/components/marketing/features";
@@ -14,6 +15,7 @@ export default function HomePage() {
       <Hero />
       <QuestionMarquee />
       <PlannerPreview />
+      <Coverage />
       <Features />
       <SeatFactors />
       <HowItWorks />
