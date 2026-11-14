@@ -553,6 +553,21 @@ async function main() {
         const want = { total: listTotal.get(s.key), rows: seats.filter((x) => x.src === s.key).length };
         if (!got || got.total !== want.total || got.sum !== want.total || got.n !== want.rows) bad.push(`seat list ${s.key}: file Σ ${want.total} in ${want.rows} rows, DB ${JSON.stringify(got)}`);
       }
+      // A virtual vacancy of the newest round is a seat someone holds from an earlier round of that year, so it has an
+      // allotment there on its own college, course, quota and seat category; one institute under two keys breaks this.
+      const order = (s: (typeof seatSources)[number]) => s.year * 10 + mccRounds.indexOf(s.round);
+      const newest = seatSources.filter((s) => s.kind === "virtual").sort((a, b) => order(b) - order(a))[0];
+      if (newest) {
+        const earlier = mccRounds.slice(0, mccRounds.indexOf(newest.round));
+        const [{ n, seats: held }] = await tx.$queryRaw<{ n: number; seats: number | null }[]>`
+          SELECT COUNT(*)::int AS n, SUM(x.seats)::int AS seats
+          FROM "SeatCount" x JOIN "DataSource" d ON d.id = x."seatSourceId"
+          WHERE d.key = ${newest.key} AND NOT EXISTS (
+            SELECT 1 FROM "Cutoff" u JOIN "CollegeSpecialty" p ON p.id = u."collegeSpecialtyId"
+            WHERE p."collegeId" = x."collegeId" AND p."specialtyId" = x."specialtyId" AND u.quota = x.quota AND u.category = x.category
+              AND u."counsellingYear" = ${newest.year} AND u.round = ANY(${earlier}))`;
+        if (n) bad.push(`${newest.key}: ${n} virtual vacancy rows (${held} seats) have no ${newest.year} ${earlier.join("/")} allotment on their college, course, quota and seat category (one institute under two keys?)`);
+      }
       const wantLinked = seats.filter((x) => pairKeys.has(`${x.ikey}|${courseSlug.get(`${x.degree}|${x.specialty}`)}`)).length;
       const linked = await tx.seatCount.count({ where: { collegeSpecialtyId: { not: null } } });
       if (linked !== wantLinked) bad.push(`seat rows linked to a course at a college: ${linked}, expected ${wantLinked}`);
@@ -610,7 +625,7 @@ async function main() {
   console.log(result);
   if (unknownCourses.size) console.log(`Seat rows with a course not in courses.json (kept, no Specialty link): ${[...unknownCourses].join(", ")}`);
   if (result.removed.residents) console.warn(`${result.removed.residents} resident row(s) went with their college or course: run npm run db:import-residents.`);
-  console.log("Committed. Spot checks passed (Kokilaben DNB Anaesthesiology 2025 R1–stray + 2026 R1 and its stray allotment; GMC Nagpur 2026 R1 closing and 12 allotments; no provisional 2026 R1; every seat list adds up to its file; NBEMS top scores).");
+  console.log("Committed. Spot checks passed (Kokilaben DNB Anaesthesiology 2025 R1–stray + 2026 R1 and its stray allotment; GMC Nagpur 2026 R1 closing and 12 allotments; no provisional 2026 R1; every seat list adds up to its file; every newest virtual vacancy has an earlier allotment; NBEMS top scores).");
 }
 
 main()

@@ -448,7 +448,8 @@ const sumYear = (opts: Opt[], year: number) => (opts.some((o) => o.byYear[year] 
 
 /**
  * One institute: every option here (`options`, with `seats` in `seatList` and `seatsBy` per list of its round), the ones
- * in her profile (`yours`), the seats here in her profile that are no option (`unlisted`), allotments per year, terms per program.
+ * in her profile (`yours`), the seats here in her profile that are no option (`unlisted`: in `seatList`; `unlistedBy`:
+ * in each list of its round, never added), allotments per year, terms per program.
  */
 export async function getInstitute(slug: string, profile: Profile | null) {
   const cat = await getCatalog();
@@ -457,12 +458,12 @@ export async function getInstitute(slug: string, profile: Profile | null) {
   const opts = cat.options.filter((o) => o.college === college.key);
   const [built, lists] = await Promise.all([rowsFor(cat, opts, profile, true), roundLists(cat)]);
   const seatList = lists[0] ?? null;
-  const [seats, unlisted] = await Promise.all([seatsOfOpts(lists, opts), unlistedOf(cat, seatList, profile, college.key)]);
+  const [seats, unlistedBy] = await Promise.all([seatsOfOpts(lists, opts), Promise.all(lists.map((l) => unlistedOf(cat, l, profile, college.key)))]);
   const options = withSeats(built, lists, seats, profile);
   const mine = new Set(opts.filter((o) => optMatches(cat, o, profile)).map((o) => o.id));
   const allotmentsByYear = YEARS.map((year) => ({ year, n: sumYear(opts, year) }));
   const terms = { md: termsFor(cat, college.key, "MD"), dnb: termsFor(cat, college.key, "DNB") };
-  return { college, options, yours: options.filter((o) => mine.has(o.id)), allotmentsByYear, terms, seatList, unlisted };
+  return { college, options, yours: options.filter((o) => mine.has(o.id)), allotmentsByYear, terms, seatList, unlisted: unlistedBy[0] ?? null, unlistedBy: unlistedBy.filter((u) => !!u) };
 }
 
 export async function rankScan(rank: number, year: number, window = 500) {

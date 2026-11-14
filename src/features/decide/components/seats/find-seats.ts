@@ -1,16 +1,17 @@
 import "server-only";
 import { z } from "zod";
+import { bondFigures, firstRupees, listDay, stipendYear1 } from "../../lib/format";
 import { pageValue, parseSearchParams } from "../../lib/params";
 import { classifyReach, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachLabel, reachOrder, type Reach } from "../../lib/reach";
 import { pairSchema, profileCourseFilter, profileQuotas, type Profile } from "../../profile";
 import { getCatalog, type Catalog } from "../../server/catalog";
 import { listNotices } from "../../server/notices";
 import { findCutoffs } from "../../server/queries";
-import { hasOption, listSeats, seatChanges, seatLists, type SeatFilters, type SeatRow } from "../../server/seats";
+import { allottedRows, hasOption, listSeats, seatChanges, seatLists, type SeatFilters, type SeatRow } from "../../server/seats";
 import { getCollege, getMeta, programOf, type OptionTerms, type PageQuery } from "../../service";
-import { baseCategories, openQuotas, optionId, roundLabel, seatKindLabel, termLabel, type Category, type Cutoff, type Round, type SeatList, type Term } from "../../types";
+import { baseCategories, openQuotas, optionId, roundLabel, rounds, seatKindLabel, seatKinds, termLabel, type Category, type Cutoff, type Round, type SeatKind, type SeatList, type Term } from "../../types";
 
-export const seatSorts = ["reach", "closing", "seats", "college", "state"] as const;
+export const seatSorts = ["reach", "closing", "seats", "college", "state", "fee", "bond"] as const;
 export type SeatSort = (typeof seatSorts)[number];
 export const seatCategories: Category[] = [...baseCategories, ...baseCategories.map((c) => `${c} PwD` as const)];
 
@@ -20,14 +21,22 @@ export const PAST_ROUNDS: { year: number; round: Round }[] = [
   { year: LATEST_YEAR, round: "R1" },
 ];
 
-export type PastClosing = { year: number; round: Round; closing: number; provisional: boolean };
+/** `n`: allotments MCC made in that round on the row's quota and seat category (not seats). */
+export type PastClosing = { year: number; round: Round; closing: number; n: number; provisional: boolean };
 export type SeatHistory = {
   /** Closing ranks on the row's quota and seat category in every round the reach label counts (both past years, the latest R1), oldest first. */
   rounds: PastClosing[];
+  /** Every closing on the row's quota and seat category in every result in the data (all years and rounds), oldest first. */
+  closings: PastClosing[];
   /** The deepest of `rounds` in PAST_ROUNDS; null when none of them has one. */
   deepest: PastClosing | null;
-  /** Options' label (lib/reach.ts) on this row's seat category alone; null without a rank, or on a seat category she can't take. */
+  /**
+   * Options' label (lib/reach.ts) on this row's seat category alone; "new" (as Options) when the course and quota has no
+   * past allotment at all; null without a rank, or with a `noLabel` reason.
+   */
   reach: Reach | null;
+  /** With a rank, why the row has no label: a seat category she can't take, no quota printed, or a data gap (`NO_LABEL`). */
+  noLabel: string | null;
   /** The label rests on a provisional latest-year R1 (as OptionRow.reachProvisional). */
   reachProvisional: boolean;
   /** Fee, stipend, bond and seat-leaving penalty as published for the row's institute and program, each with its source. */
@@ -43,14 +52,17 @@ export type SeatLine = SeatRow & SeatHistory & { byList: Record<string, number> 
  * listSeats filters with several quotas and states (her profile can hold more than one) and a sort. A null in `quotas`
  * keeps the rows of a PDF that prints no quota. `nohist`: only rows whose course and quota is not an Options row (no
  * past allotments). `compare`: every list of the picked list's round side by side, one row per institute, course,
- * quota and seat category. `reachFor`: her rank and the seat categories she can take, for the reach labels.
+ * quota and seat category; "all": every list of every round, plus the rows MCC allotted in some result that no list
+ * prints (the Seats matrix's "All rounds"). `has`: only rows with seats in a list of these kinds in the picked list's
+ * round (any of them). `reachFor`: her rank and the seat categories she can take, for the reach labels.
  */
 export type SeatQuery = Omit<SeatFilters, "quota" | "state"> & {
   quotas?: (string | null)[];
   states?: string[];
   sort?: SeatSort;
   nohist?: boolean;
-  compare?: boolean;
+  compare?: boolean | "all";
+  has?: SeatKind[];
   reachFor?: { rank: number; categories: string[] } | null;
 };
 
@@ -58,9 +70,11 @@ const lastIfNull = (s: string | null) => s ?? "￿";
 
 /**
  * Quota/state filters and the sort on rows in listSeats order (college name…); the sort is stable, so ties keep it.
- * `reach` (beyond her rank first, as Options) and `closing` (deepest past closing first) read the rows' history; missing last.
+ * `reach` (beyond her rank first, as Options) and `closing` (deepest past closing first) read the rows' history, `fee`
+ * (lowest first: the published amount, else the first ₹ figure) and `bond` (fewest years first; a bond text giving
+ * several, by its largest) their terms; missing last.
  */
-export function refineSeats<T extends SeatRow & Partial<Pick<SeatHistory, "reach" | "deepest">>>(rows: T[], { quotas, states, sort = "college" }: Pick<SeatQuery, "quotas" | "states" | "sort">): T[] {
+export function refineSeats<T extends SeatRow & Partial<Pick<SeatHistory, "reach" | "deepest" | "terms">>>(rows: T[], { quotas, states, sort = "college" }: Pick<SeatQuery, "quotas" | "states" | "sort">): T[] {
   const out = rows.filter(
     (r) => (!quotas?.length || quotas.includes(r.quota)) && (!states?.length || (r.college.state != null && states.includes(r.college.state))),
   );
@@ -70,6 +84,17 @@ export function refineSeats<T extends SeatRow & Partial<Pick<SeatHistory, "reach
   if (sort === "seats") out.sort((a, b) => b.seats - a.seats);
   if (sort === "closing") out.sort((a, b) => deep(b) - deep(a));
   if (sort === "reach") out.sort((a, b) => reach(a) - reach(b) || deep(b) - deep(a));
+  // Lowest first, missing (Infinity) last; equal keys keep their order (Infinity - Infinity would be NaN).
+  const asc = (key: (r: T) => number | null | undefined) => (a: T, b: T) => {
+    const [x, y] = [key(a) ?? Infinity, key(b) ?? Infinity];
+    return x === y ? 0 : x - y;
+  };
+  if (sort === "fee") out.sort(asc((r) => r.terms?.fee && (r.terms.fee.amountInr ?? firstRupees(r.terms.fee.text))));
+  const bondMax = (r: T) => {
+    const ys = bondFigures(r.terms?.bond?.text).years;
+    return ys.length ? Math.max(...ys) : null;
+  };
+  if (sort === "bond") out.sort(asc(bondMax));
   return out;
 }
 
@@ -86,10 +111,14 @@ const byInstitute = (a: SeatRow, b: SeatRow) =>
   (a.quota ?? "").localeCompare(b.quota ?? "") ||
   catPos(a.category) - catPos(b.category);
 
-/** One row per institute, course, quota and seat category, with its seats in each list (a line a PDF prints twice is summed, as seatCountsFor does). */
+/**
+ * One row per institute, course, quota and seat category, with its seats in each list (a line a PDF prints twice is
+ * summed, as seatCountsFor does). A line printing 0 seats is left out: it adds no seat (the one-list view shows it).
+ */
 function mergeLists(rows: SeatRow[], current: string) {
   const out = new Map<string, SeatRow & { byList: Record<string, number> }>();
   for (const x of rows) {
+    if (x.seats === 0) continue;
     const k = [x.college.key, x.degree, x.specialty, x.quota, x.category].join("|");
     const m = out.get(k) ?? out.set(k, { ...x, list: current, seats: 0, byList: {} }).get(k)!;
     m.byList[x.list] = (m.byList[x.list] ?? 0) + x.seats;
@@ -104,10 +133,20 @@ const termsOf = (cat: Catalog, college: string, degree: string): OptionTerms => 
   return { fee: get("FEE"), stipend: get("STIPEND"), bond: get("BOND"), penalty: get("PENALTY") };
 };
 
-/** Past closings, reach label and terms per row: one cutoff read for the rows' courses, quotas and seat categories. */
-async function withHistory<T extends SeatRow>(cat: Catalog, rows: T[], reachFor: SeatQuery["reachFor"]): Promise<(T & SeatHistory)[]> {
+/** Why a row with her rank has no label (SeatHistory.noLabel). */
+export const NO_LABEL = {
+  category: "Not a seat category you can take",
+  quota: "Quota not printed in this PDF: no label",
+  unlinked: "No label: its virtual vacancy seats mean MCC allotted it before, but the data links no past allotment to it here",
+} as const;
+
+/**
+ * Past closings and reach label per row: one cutoff read for the rows' courses, quotas and seat categories, every year
+ * in the data. `virtual`: the virtual vacancy list keys among the rows' lists.
+ */
+async function withHistory<T extends SeatRow & { terms: OptionTerms; byList: Record<string, number> }>(cat: Catalog, rows: T[], reachFor: SeatQuery["reachFor"], virtual: Set<string>): Promise<(T & SeatHistory)[]> {
   const opts = rows.filter((r) => r.cs && r.quota != null);
-  const years = [...PAST_YEARS, LATEST_YEAR];
+  const years = cat.meta.years.map((y) => y.year);
   const cutoffs = await findCutoffs(cat, { cs: uniq(opts.map((r) => r.cs!)), quotas: uniq(opts.map((r) => r.quota!)), categories: uniq(opts.map((r) => r.category)), years });
   const provisional = new Set(cat.sources.filter((s) => s.provisional).map((s) => s.key));
   const latestProvisional = cat.sources.some((s) => s.year === LATEST_YEAR && s.round === "R1" && s.provisional);
@@ -118,66 +157,97 @@ async function withHistory<T extends SeatRow>(cat: Catalog, rows: T[], reachFor:
   }
   const opt = { latestYear: LATEST_YEAR, pastYears: PAST_YEARS };
   const shown = (c: { year: number; round: Round }) => PAST_ROUNDS.some((p) => p.year === c.year && p.round === c.round);
+  const counted = (c: { year: number; round: Round }) => PAST_YEARS.includes(c.year) || (c.year === LATEST_YEAR && c.round === "R1");
   return rows.map((r) => {
     const all = (r.quota != null && by.get(`${optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota })}|${r.category}`)) || [];
+    const closings = all.map((c) => ({ year: c.year, round: c.round, closing: c.closing, n: c.n, provisional: provisional.has(c.src) }));
     // The rounds the label counts (as classifyReach): both past years, every round, and the latest year's R1.
-    const used = all.filter((c) => PAST_YEARS.includes(c.year) || (c.year === LATEST_YEAR && c.round === "R1"));
-    const rounds = used.map((c) => ({ year: c.year, round: c.round, closing: c.closing, provisional: provisional.has(c.src) }));
+    const used = all.filter(counted);
+    const rounds = closings.filter(counted);
     const deepest = rounds.filter(shown).reduce<PastClosing | null>((a, c) => (!a || c.closing > a.closing ? c : a), null);
-    const reach = reachFor?.categories.includes(r.category) ? classifyReach(reachFor.rank, used, { ...opt, includeLatest: true }) : null;
-    const reachProvisional = !!reach && latestProvisional && classifyReach(reachFor!.rank, used, { ...opt, includeLatest: false }) !== reach;
-    return { ...r, rounds, deepest, reach, reachProvisional, terms: termsOf(cat, r.college.key, r.degree) };
+    // As Options: a course and quota MCC never allotted in any result is "new". A row with no quota printed is no option,
+    // so no label. A virtual vacancy is a seat someone holds from an earlier round: with no allotment it is a data gap
+    // (one institute under two keys), never "new".
+    const fresh = !hasOption(cat, r);
+    const noLabel = !reachFor
+      ? null
+      : !reachFor.categories.includes(r.category)
+        ? NO_LABEL.category
+        : r.quota == null
+          ? NO_LABEL.quota
+          : fresh && Object.entries(r.byList).some(([k, n]) => virtual.has(k) && n > 0)
+            ? NO_LABEL.unlinked
+            : null;
+    const reach = !reachFor || noLabel ? null : fresh ? "new" : classifyReach(reachFor.rank, used, { ...opt, includeLatest: true });
+    const reachProvisional = !!reach && !fresh && latestProvisional && classifyReach(reachFor!.rank, used, { ...opt, includeLatest: false }) !== reach;
+    return { ...r, closings, rounds, deepest, reach, noLabel, reachProvisional };
   });
 }
+
+const rowKey = (x: SeatRow) => [x.college.key, x.degree, x.specialty, x.quota, x.category].join("|");
 
 /**
  * Seat rows for the Seats page, its CSV and /api/v1/seats, each with its past closings, reach label and terms.
  * `seats[list key]` = Σ seats of every matching row of that one list (lists are never added together). Empty filter
  * arrays mean "all". `noState[list key]`: with a state filter, Σ seats of rows that match everything else but are at an
  * institute with no state in the data (the filter drops them). `pg` returns one page, without it every row.
- * ponytail: reads every matching row of the picked list(s) (≤ ~18k each, ~150 ms) and sorts/pages here; history is read
- * for the page only unless the sort needs it (reach, closing). Move sort and paging into SQL if lists grow.
+ * ponytail: reads every matching row of the picked list(s) (≤ ~18k each, ~150 ms; "all": every list and every allotted
+ * row) and sorts/pages here; history is read for the page only unless the sort needs it (reach, closing). Move sort and
+ * paging into SQL if lists grow.
  */
 export async function findSeats(f: SeatQuery, pg?: PageQuery) {
-  const { quotas, states, sort, nohist, compare, reachFor, courses, specialties, degrees, pairs, categories, ...rest } = f;
+  const { quotas, states, sort, nohist, compare, has, reachFor, courses, specialties, degrees, pairs, categories, ...rest } = f;
   const filters = { ...rest, courses: some(courses), specialties: some(specialties), degrees: some(degrees), pairs: some(pairs), categories: some(categories), quota: quotas?.length === 1 ? (quotas[0] ?? undefined) : undefined };
   // State is filtered here, not in SQL, so the rows a state filter drops for having no state can be counted.
   const [r, cat] = await Promise.all([listSeats(filters), getCatalog()]);
+  const cur = r.lists[0];
   let lists = r.lists;
   let lines = r.rows.map((x) => ({ ...x, byList: { [x.list]: x.seats } }));
-  if (compare && r.lists.length) {
-    const cur = r.lists[0];
-    lists = (await seatLists()).filter((l) => l.year === cur.year && l.round === cur.round);
-    const more = await Promise.all(lists.filter((l) => !r.lists.some((x) => x.key === l.key)).map((l) => listSeats({ ...filters, list: l.key })));
-    lines = mergeLists([...r.rows, ...more.flatMap((m) => m.rows)], cur.key).sort(byInstitute);
+  if (compare && cur) {
+    lists = (await seatLists()).filter((l) => compare === "all" || (l.year === cur.year && l.round === cur.round));
+    const [more, allotted] = await Promise.all([
+      Promise.all(lists.filter((l) => !r.lists.some((x) => x.key === l.key)).map((l) => listSeats({ ...filters, list: l.key }))),
+      compare === "all" ? allottedRows(filters) : [],
+    ]);
+    const merged = mergeLists([...r.rows, ...more.flatMap((m) => m.rows)], cur.key);
+    const listed = new Set(merged.map(rowKey));
+    lines = [...merged, ...allotted.filter((x) => !listed.has(rowKey(x))).map((x) => ({ ...x, list: cur.key, byList: {} }))].sort(byInstitute);
   }
-  const kept = nohist ? lines.filter((x) => !hasOption(cat, x)) : lines;
+  const round = cur ? lists.filter((l) => l.year === cur.year && l.round === cur.round) : [];
+  const hasKind = (x: (typeof lines)[number]) => !has?.length || round.some((l) => has.includes(l.kind) && (x.byList[l.key] ?? 0) > 0);
+  const kept = lines.filter((x) => (!nohist || !hasOption(cat, x)) && hasKind(x)).map((x) => ({ ...x, terms: termsOf(cat, x.college.key, x.degree) }));
   const matching = refineSeats(kept, { quotas, states });
   const noState = states?.length ? refineSeats(kept, { quotas }).filter((x) => x.college.state == null) : [];
-  const perList = (xs: typeof lines) => Object.fromEntries(lists.map((l) => [l.key, xs.reduce((a, x) => a + (x.byList[l.key] ?? 0), 0)]));
+  const perList = (xs: typeof kept) => Object.fromEntries(lists.map((l) => [l.key, xs.reduce((a, x) => a + (x.byList[l.key] ?? 0), 0)]));
+  const virtual = new Set(lists.filter((l) => l.kind === "virtual").map((l) => l.key));
   const total = matching.length;
   const pageSize = pg?.pageSize ?? Math.max(1, total);
   const page = pg ? Math.min(Math.max(1, pg.page), Math.max(1, Math.ceil(total / pg.pageSize))) : 1;
   const cut = <T>(xs: T[]) => xs.slice((page - 1) * pageSize, page * pageSize);
   const rows: SeatLine[] =
     sort === "reach" || sort === "closing"
-      ? cut(refineSeats(await withHistory(cat, matching, reachFor), { sort }))
-      : await withHistory(cat, cut(refineSeats(matching, { sort })), reachFor);
+      ? cut(refineSeats(await withHistory(cat, matching, reachFor, virtual), { sort }))
+      : await withHistory(cat, cut(refineSeats(matching, { sort })), reachFor, virtual);
   return { rows, total, page, pageSize, lists, seats: perList(matching), noState: perList(noState) };
 }
 
 // ---------- The Seats page's params, shared with its CSV (/api/v1/seats/export) ----------
 
-const listParams = ["sp", "deg", "c", "quota", "st"];
+const listParams = ["sp", "deg", "c", "quota", "st", "has"];
 /**
  * Seats page filters. Course, degree, exact course, quota and state are her profile params (sp, deg, c, quota, st), as
  * on Options, so her profile applies by default (no quota ticked: the open quotas); `scat` (seat category: absent = the
  * ones she can take, "all", or one) is not a profile key. `nohist=1`: only seats whose course and quota is not an option
- * (no past allotments). `view=compare`: every list of the round side by side. `sort` absent: reach with a rank, else institute.
+ * (no past allotments). `view`: `matrix` (default: one row per institute, course, quota and seat category with seats in the
+ * round's lists, every closing rank; `rounds=all` adds every earlier list and the rows MCC allotted that no list prints),
+ * `list` (one list) or `compare` (every list of the round side by side). `has`: rows with seats in the round's clear,
+ * virtual or newly added list (any ticked). `sort` absent: reach with a rank, else institute.
  */
 export const seatsParamsSchema = z.object({
   tab: z.enum(["matrix", "trends"]).default("matrix"),
-  view: z.enum(["list", "compare"]).default("list"),
+  view: z.enum(["matrix", "list", "compare"]).default("matrix"),
+  rounds: z.literal("all").optional(),
+  has: z.array(z.enum(seatKinds)).default([]),
   list: z.string().max(200).optional(),
   sp: z.array(z.string().max(100)).default([]),
   deg: z.array(z.string().max(100)).default([]),
@@ -227,7 +297,8 @@ export async function seatsView(f: SeatsParams, profile: Profile | null, pageSiz
       nohist: !!f.nohist,
       q: f.q?.trim() || undefined,
       sort,
-      compare: f.view === "compare",
+      compare: f.view === "list" ? false : f.view === "matrix" && f.rounds ? "all" : true,
+      has: f.view === "matrix" ? f.has : undefined,
       reachFor: profile && mine && { rank: profile.rank, categories: mine },
     },
     pageSize ? { page: f.page, pageSize } : undefined,
@@ -247,7 +318,7 @@ const field = (v: string | number | null | undefined) => {
 export const csvLine = (xs: (string | number | null | undefined)[]) => xs.map(field).join(",");
 
 const listName = (l: SeatList, lists: SeatList[]) => {
-  const day = lists.some((x) => x !== l && x.kind === l.kind) ? l.key.match(/\d{4}-\d{2}-\d{2}/)?.[0] : undefined;
+  const day = lists.some((x) => x !== l && x.kind === l.kind && x.year === l.year && x.round === l.round) ? listDay(l) : undefined;
   return `${l.year} ${roundLabel[l.round]} ${seatKindLabel[l.kind].toLowerCase()}${day ? ` (${day} PDF)` : ""}`;
 };
 /** "2026 R2 clear vacancy seats", "2026 R2 newly added seats". */
@@ -256,14 +327,20 @@ const docOf = (s: { name: string; url: string | null } | null | undefined) => s 
 
 /**
  * The view as CSV (UTF-8, no BOM: the route adds it), in the page's order and filters, every matching row: seats per
- * list (never added), past closings, the reach label (with a rank), and terms each with its own document. After a blank
+ * list (never added), past closings (matrix: every round of every year, each with its allotments), the reach label (with
+ * a rank), and terms each with its own document (matrix: also the figures its columns show). After a blank
  * row: `notes` and the sources every column comes from (seat list PDFs with their date, the later MCC seat notices they
  * don't apply and the same-day ones they may already include; the MCC result PDF of each round). "—" = not available.
  */
 export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }, notes: string[] = []) {
   const { r, profile, meta } = v;
-  const round = r.lists[0];
-  const notices = round ? await listNotices({ kind: "seat_matrix", year: round.year, round: round.round }) : [];
+  const matrix = v.f.view === "matrix";
+  // The matrix's closing columns: every year with results, newest first (the latest year's rounds with a result, every round of the others).
+  const closingCols = matrix ? meta.years.flatMap((y, i) => (i === 0 ? y.rounds : rounds).map((round) => ({ year: y.year, round }))) : [];
+  // MCC seat notices of each round the lists are from (one round, but every round with "All rounds").
+  const roundOf = (l: SeatList) => `${l.year}|${l.round}`;
+  const firsts = [...new Map(r.lists.map((l) => [roundOf(l), l])).values()];
+  const notices = new Map(await Promise.all(firsts.map(async (l) => [roundOf(l), await listNotices({ kind: "seat_matrix", year: l.year, round: l.round })] as const)));
   const at = (x: SeatLine, p: { year: number; round: Round }) => x.rounds.find((c) => c.year === p.year && c.round === p.round);
   const label = (c: { year: number; round: Round }) => `${c.year} ${roundLabel[c.round]}`;
   const prov = (c: PastClosing) => `${label(c)}${c.provisional ? " (provisional)" : ""}`;
@@ -272,24 +349,36 @@ export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }
   const head = [
     "Institute", "State", "Degree", "Course", "Quota", "Restricted quota", "Seat category",
     ...r.lists.map((l) => seatsCol(l, r.lists)),
-    ...PAST_ROUNDS.map((p) => `${label(p)} closing rank`),
-    "Deepest of these", "Deepest round", "Other closing ranks the reach label counts",
-    ...(profile ? [`Reach at AIR ${profile.rank} (history, not a prediction)`] : []),
+    ...(matrix
+      ? [...closingCols.flatMap((p) => [`${label(p)} closing rank`, `${label(p)} allotted`]), "Course fee/yr", "Stipend year 1", "Bond years", "Bond ₹", "Beds"]
+      : [...PAST_ROUNDS.map((p) => `${label(p)} closing rank`), "Deepest of these", "Deepest round", "Other closing ranks the reach label counts"]),
+    ...(profile ? [`${matrix ? "Your chances" : "Reach"} at AIR ${profile.rank} (history, not a prediction)`] : []),
     ...kinds.flatMap((k) => [termLabel[kindOf[k]], `${termLabel[kindOf[k]]} source`]),
   ];
+  const all = (x: SeatLine, p: { year: number; round: Round }) => x.closings.find((c) => c.year === p.year && c.round === p.round);
+  const fee = (t: Term | undefined) => t && (t.amountInr ?? firstRupees(t.text));
+  /** The bond's one figure (bondFigures); "Varies: see text" when its text gives several. */
+  const one = (xs: number[]) => (xs.length > 1 ? "Varies: see text" : xs[0]);
   const body = r.rows.map((x) => [
     x.college.name, x.college.state, x.degree, x.course?.name ?? x.specialty, x.quota, x.quota == null ? null : openQuotas.includes(x.quota) ? "No" : "Yes", x.category,
     ...r.lists.map((l) => x.byList[l.key]),
-    ...PAST_ROUNDS.map((p) => at(x, p)?.closing),
-    x.deepest?.closing, x.deepest && prov(x.deepest),
-    x.rounds.filter((c) => !PAST_ROUNDS.some((p) => p.year === c.year && p.round === c.round)).map((c) => `${prov(c)}: ${c.closing}`).join("; "),
-    ...(profile ? [x.reach ? `${reachLabel(x.reach, LATEST_YEAR, PAST_YEARS, true, x.category)}${x.reachProvisional ? " (provisional)" : ""}` : "Not a seat category you can take"] : []),
+    ...(matrix
+      ? [
+          ...closingCols.flatMap((p) => [all(x, p)?.closing, all(x, p)?.n]),
+          fee(x.terms.fee), stipendYear1(x.terms.stipend?.text), one(bondFigures(x.terms.bond?.text).years), one(bondFigures(x.terms.bond?.text).inr), x.college.beds,
+        ]
+      : [
+          ...PAST_ROUNDS.map((p) => at(x, p)?.closing),
+          x.deepest?.closing, x.deepest && prov(x.deepest),
+          x.rounds.filter((c) => !PAST_ROUNDS.some((p) => p.year === c.year && p.round === c.round)).map((c) => `${prov(c)}: ${c.closing}`).join("; "),
+        ]),
+    ...(profile ? [x.reach ? `${reachLabel(x.reach, LATEST_YEAR, PAST_YEARS, true, x.category)}${x.reachProvisional ? " (provisional)" : ""}` : x.noLabel] : []),
     ...kinds.flatMap((k) => [x.terms[k]?.text, docOf(x.terms[k]?.source)]),
   ]);
-  const used = new Set(r.rows.flatMap((x) => x.rounds.map(label)));
+  const used = new Set(r.rows.flatMap((x) => (matrix ? x.closings : x.rounds).map(label)));
   const sources = [
     ...r.lists.flatMap((l) => {
-      const c = seatChanges(l, v.all, notices);
+      const c = seatChanges(l, v.all, notices.get(roundOf(l)) ?? []);
       return [
         [l.name, l.url, `${seatsCol(l, r.lists)}: MCC notice dated ${l.publishedAt ?? "—"}; the list as that PDF printed it`],
         ...c.later.map((n) => [n.title, n.url, `MCC seat notice dated ${n.date}, after the ${listName(l, r.lists)} list: not applied here`]),
@@ -301,6 +390,7 @@ export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }
   const foot = [
     ...notes.map((n) => [n]),
     ["Closing rank = the highest All India Rank MCC allotted in that round on a seat of the row's quota and seat category. Seat columns are separate MCC lists of one round: they overlap, so never add them."],
+    ...(matrix ? [["Allotted = allotments MCC made in that round on the row's quota and seat category (not seats). Provisional results are marked in the sources below. Fee, stipend and bond figures are taken from the published texts in the term columns (a bond text giving several years or ₹ amounts: \"Varies: see text\"); Beds are not imported yet."]] : []),
     [],
     ["Source", "Link", "Note"],
     ...sources,

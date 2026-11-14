@@ -41,6 +41,7 @@ Fonts: `--font-app`, which is Atkinson Hyperlegible Next, used for body, heading
 - `EmptyState` (ui.tsx, Astryx EmptyState on a dashed sheet): the one empty, no-results, not-found and unavailable state, with a heading and an action. `SetRankPrompt` uses it.
 - `DataSource`: provenance under every data block, from the data (MCC result PDFs per year and round, term documents). `TermText`: a fee, stipend, bond or seat-leaving penalty exactly as published, with its source link. `termLabel` (types.ts) names them; PENALTY is MCC's seat-leaving forfeit, never "bond penalty".
 - `Provisional` (bits.tsx): the one warning marker, shown only when the data's source is provisional (`Source.provisional`, `GridCell.provisional`, `Deepest.provisional`); never tied to a year. `ReachBadge`, `Closing` (closing rank with its round and seat category), `Dash` ("—" with sr-only "not available").
+- `SeatMatrix` (seats/seat-matrix.tsx): the wide Seats table: sticky institute column, grouped headers (round → clear/virtual, year → rounds), a Display column chooser (CSS on `data-col`, saved on the device) and a details drawer (Radix Dialog, no portal) per row. Its term cells are `SeatTermsCells`, one component on purpose.
 - `SubTabs`: link sub-navigation. `smallLink`: a 44px-tall link for notes and cross-links. Counts and ranks go through `formatRank` (Indian grouping).
 
 ## Adding inside-app UI

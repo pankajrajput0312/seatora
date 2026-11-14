@@ -221,7 +221,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           <Link href={here({ seats: "virtual" })} className={`${smallLink} text-sky`}>Show options with virtual vacancy seats</Link>
         </p>
       )}
-      {unlisted && <UnlistedSeats u={unlisted} profile href={L.to("/decide/seats", { list: unlisted.list.key, nohist: "1" })} />}
+      {unlisted && <UnlistedSeats u={unlisted} profile href={L.to("/decide/seats", { view: "list", list: unlisted.list.key, nohist: "1" })} />}
       {r.noState > 0 && (
         <p className="text-sm text-muted-foreground">
           <span className="numeric">{formatRank(r.noState)}</span> more {r.noState === 1 ? "option" : "options"} with {round} seats in your courses, quotas and seat categories{" "}

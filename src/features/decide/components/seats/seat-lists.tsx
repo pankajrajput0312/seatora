@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { sourceTypeLabels } from "@/components/ui/source-label";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
+import { fmtDay, listDay } from "../../lib/format";
 import type { DecideLinks } from "../../lib/links";
 import { roundName } from "../../lib/round-status";
 import type { SeatRow } from "../../server/seats";
@@ -22,13 +23,10 @@ export const seatKindNote: Record<SeatKind, string> = {
   new: "seats added to the round after its seat matrix; most are also in the clear vacancy list.",
 };
 
-/** "13 Nov 2026" from YYYY-MM-DD. */
-export const fmtDay = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+export { fmtDay } from "../../lib/format";
 export const listTitle = (l: SeatList) => `${l.year} ${roundLabel[l.round]} ${seatKindLabel[l.kind].toLowerCase()}`;
 
 const groupOf = (l: SeatList) => `${l.year} ${roundLabel[l.round]}`;
-/** Two PDFs of one kind in a round (2025 R2 newly added seats) share a name: the date in the key tells them apart. */
-const keyDay = (l: SeatList) => l.key.match(/\d{4}-\d{2}-\d{2}/)?.[0];
 
 /** Link chips, one per list PDF, grouped by year and round (seatLists() order); earlier rounds fold away unless picked. */
 export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; current: string; href: (key: string) => string }) {
@@ -47,7 +45,7 @@ export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; cu
           )}
         >
           <span className="sr-only">{g} </span>{seatKindLabel[l.kind]} <span className="numeric font-semibold">{formatRank(l.seats)}</span><span className="sr-only"> seats</span>
-          {xs.some((x) => x !== l && x.kind === l.kind) && keyDay(l) && <span className="numeric text-xs"><span className="sr-only">, </span>{fmtDay(keyDay(l)!)} PDF</span>}
+          {xs.some((x) => x !== l && x.kind === l.kind) && listDay(l) && <span className="numeric text-xs"><span className="sr-only">, </span>{fmtDay(listDay(l)!)} PDF</span>}
         </Link>
       ))}
     </div>
@@ -203,7 +201,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
             <th scope="col" className={th}>Seat category</th>
             {lists.map((l) => (
               <th key={l.key} scope="col" className={cn(th, "text-right")} aria-sort={sort === "seats" && l.key === current ? "descending" : undefined}>
-                {several ? <>{seatKindLabel[l.kind]}{lists.some((x) => x !== l && x.kind === l.kind) && keyDay(l) && <span className="numeric block font-normal">{fmtDay(keyDay(l)!)} PDF</span>}</> : "Seats"}
+                {several ? <>{seatKindLabel[l.kind]}{lists.some((x) => x !== l && x.kind === l.kind) && listDay(l) && <span className="numeric block font-normal">{fmtDay(listDay(l)!)} PDF</span>}</> : "Seats"}
               </th>
             ))}
             <th scope="col" className={cn(th, "text-right")} aria-sort={sort === "closing" ? "descending" : undefined}>
@@ -232,7 +230,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
                 <td className={td}><PastClosings r={r} name={name} /></td>
                 {ranked && (
                   <td className={td}>
-                    {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : <span className="text-xs text-muted-foreground">Not a seat category you can take</span>}
+                    {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : <span className="text-xs text-muted-foreground">{r.noLabel}</span>}
                   </td>
                 )}
                 <td className={cn(td, "text-xs")}><Terms t={r.terms} /></td>

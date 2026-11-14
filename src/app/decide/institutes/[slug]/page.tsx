@@ -94,7 +94,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const f = parseSearchParams(schema, sp);
   const [inst, meta] = await Promise.all([getInstitute(slug, profile), getMeta()]);
   if (!inst) notFound();
-  const { college, options, yours, allotmentsByYear, terms, unlisted } = inst;
+  const { college, options, yours, allotmentsByYear, terms, unlistedBy } = inst;
   const offers = (program: "MD" | "DNB") => options.some((o) => programOf(o.course.degree) === program);
   const tab = f.tab;
   const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
@@ -117,7 +117,13 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // Seats here with no past allotments: not in the lists below; Seats shows them, and while Options opens in the round
   // view, Options lists those in her profile as new options (search: this institute's name, within its 100 characters).
   const newOnOptions = profile && optionsView(undefined, inst.seatList ? [inst.seatList] : [], meta.sources) === "round" ? L.options({ reach: "new", q: college.name.slice(0, 100) }) : undefined;
-  const unlistedNote = unlisted && unlisted.seats > 0 && <UnlistedSeats u={unlisted} profile={!!profile} here href={L.to("/decide/seats", { list: unlisted.list.key, inst: slug, nohist: "1" })} options={newOnOptions} />;
+  // One note per list of the round with such seats (clear, virtual, newly added: they overlap, so never added).
+  const unlisted = unlistedBy.filter((u) => u.seats > 0);
+  const unlistedNote = unlisted.length > 0 && (
+    <div className="grid gap-1">
+      {unlisted.map((u) => <UnlistedSeats key={u.list.key} u={u} profile={!!profile} here href={L.to("/decide/seats", { view: "list", list: u.list.key, inst: slug, nohist: "1" })} options={newOnOptions} />)}
+    </div>
+  );
   const termSources = [...kinds.map((k) => termOf(terms.md, k)?.source), ...kinds.map((k) => termOf(terms.dnb, k)?.source)];
   const programs = [
     { title: "Medical college seats (MD, MS, Diploma)", t: terms.md, offered: offers("MD") },
@@ -277,7 +283,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                         <td key={list.key} className={`${tbl.td} text-right`}>
                           <SeatNumber
                             n={optionSeats(rows, { ...r.course, quota: r.quota }, seatCats)}
-                            href={L.to("/decide/seats", { list: list.key, inst: slug, course: r.course.slug, squota: r.quota, scat: mine && !seatCats ? "all" : undefined })}
+                            href={L.to("/decide/seats", { view: "list", list: list.key, inst: slug, course: r.course.slug, squota: r.quota, scat: mine && !seatCats ? "all" : undefined })}
                             label={`seats in the ${listTitle(list)} list, ${seatCats ? "your seat categories" : "every seat category"}: ${college.name}, ${courseName(r)}, ${r.quota}`}
                           />
                         </td>

@@ -24,7 +24,7 @@ export async function GET(req: Request) {
       ...asked.filter((c) => !f.c.includes(c)).map((c) => `Course "${c}" was not recognised (degree~SPECIALTY, e.g. DNB~FAMILYMEDICINE) and is left out of the course filter.`),
       ...(f.list && f.list !== v.list.key ? [`Seat list "${f.list}" was not found, so this is the ${v.list.year} ${v.list.round} ${v.list.kind} list.`] : []),
     ];
-    const name = `seatora-seats-${v.list.year}-${v.list.round}-${v.f.view === "compare" ? "all-lists" : v.list.kind}.csv`;
+    const name = `seatora-seats-${v.list.year}-${v.list.round}-${v.f.view === "matrix" ? `matrix${v.f.rounds ? "-all-rounds" : ""}` : v.f.view === "compare" ? "all-lists" : v.list.kind}.csv`;
     return new Response(`\uFEFF${await seatsCsv({ ...v, r: v.r }, notes)}`, {
       headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "private, no-store" },
     });

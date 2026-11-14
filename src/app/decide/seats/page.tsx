@@ -14,19 +14,35 @@ import { courseName } from "@/features/decide/components/options-view";
 import { MccLink } from "@/features/decide/components/pages/mcc-link";
 import { PAST_ROUNDS, parseSeatsParams, seatCategories, seatSorts, seatsView, type SeatSort, type SeatsParams } from "@/features/decide/components/seats/find-seats";
 import { listTitle, SeatListPicker, SeatTable, seatKindNote } from "@/features/decide/components/seats/seat-lists";
+import { SeatMatrix, type ClosingYear, type SeatGroup } from "@/features/decide/components/seats/seat-matrix";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { control, EmptyState, Pager, rangeLabel, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { reachWindow } from "@/features/decide/lib/reach";
 import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, type Profile } from "@/features/decide/profile";
 import { allotmentTrends, getMeta, LATEST_YEAR, PAST_YEARS, YEARS } from "@/features/decide/service";
-import { openQuotas, openQuotasNote, roundLabel, seatKindLabel, type SeatList } from "@/features/decide/types";
+import { fmtDay, listDay } from "@/features/decide/lib/format";
+import { openQuotas, openQuotasNote, roundLabel, rounds, seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Seats" };
 const PAGE_SIZE = 50;
 /** "clear vacancy seats", "newly added seats". */
 const kindSeats = (l: SeatList) => `${seatKindLabel[l.kind].toLowerCase()}${l.kind === "new" ? "" : " seats"}`;
-const sortLabels: Record<SeatSort, string> = { reach: "Reach: beyond your rank first", closing: "Deepest past closing first", seats: "Most seats first", college: "By institute", state: "By state" };
+const sortLabels: Record<SeatSort, string> = {
+  reach: "Reach: beyond your rank first", closing: "Deepest past closing first", seats: "Most seats first", college: "By institute", state: "By state", fee: "Lowest fee first", bond: "Shortest bond first",
+};
+/** The matrix count line: "1,234 clear seats", "567 virtual", "89 newly added" (a round's two newly added PDFs: each dated, as the picker does). */
+const kindCount = (l: SeatList, n: number, round: SeatList[]) => {
+  const day = round.some((x) => x !== l && x.kind === l.kind) ? listDay(l) : undefined;
+  return `${formatRank(n)} ${{ clear: "clear seats", virtual: "virtual", new: "newly added" }[l.kind]}${day ? ` (${fmtDay(day)} PDF)` : ""}`;
+};
+/** Seat columns of the matrix: one group per round of `lists` (seatLists order, newest first). */
+const seatGroups = (lists: SeatList[]): SeatGroup[] =>
+  [...new Set(lists.map((l) => `${l.year}-${l.round}`))].map((g) => {
+    const ls = lists.filter((l) => `${l.year}-${l.round}` === g);
+    // ponytail: a round with two clear (or virtual) PDFs shows the newest; none has so far (only newly added lists come in twos).
+    return { key: `seats-${g}`, label: `${ls[0].year} ${roundLabel[ls[0].round]}`, clear: ls.find((l) => l.kind === "clear") ?? null, virtual: ls.find((l) => l.kind === "virtual") ?? null, added: ls.filter((l) => l.kind === "new") };
+  });
 
 export default async function SeatsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
@@ -37,8 +53,8 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
   return (
     <AppPage className="grid grid-cols-1 gap-6">
       <PageHead title="Seats">
-        MCC&apos;s seat lists for a round, as each PDF printed them: one list, or every list of the round side by side, with past closing ranks and
-        terms per seat.{profile && " Filtered to the courses, quotas, states and seat categories in your profile."}
+        MCC&apos;s seat lists for a round, as each PDF printed them: the seat matrix (every list of the round with every closing rank, fee and bond per
+        row), one list, or the round&apos;s lists side by side.{profile && " Filtered to the courses, quotas, states and seat categories in your profile."}
       </PageHead>
       <SubTabs label="Seats" current={f.tab} items={[{ key: "matrix", label: "Seat lists", href: L.to("/decide/seats", { tab: "matrix" }) }, { key: "trends", label: "Allotment trends", href: L.to("/decide/seats", { tab: "trends" }) }]} />
       {f.tab === "trends" ? <Trends profile={profile} page={f.page} L={L} /> : <SeatLists f={f} profile={profile} params={params} L={L} />}
@@ -57,6 +73,11 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
     );
 
   const compare = f.view === "compare";
+  const matrix = f.view === "matrix";
+  const several = f.view !== "list";
+  const allRounds = matrix && !!f.rounds;
+  /** The picked list's round: the lists the count line, `has` and the seats sort are about. */
+  const roundLists = r.lists.filter((l) => l.year === list.year && l.round === list.round);
   const noState = r.noState[list.key] ?? 0;
   const here = (changes: Record<string, string | null>) => L.with("/decide/seats", { tab: null, page: null, ...changes });
   const keep = keepProfileParams(params);
@@ -65,16 +86,35 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
   const round = `${list.year} ${roundLabel[list.round]}`;
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
-  const caption = `${compare ? `Seats in every ${round} list side by side` : `Seats in the ${title} list`} (MCC PDF${compare ? "s" : ""}), ${sortLabels[sort].toLowerCase()}, page ${r.page}`;
+  const caption = matrix
+    ? `Seat matrix, ${round}${allRounds ? " and every other round" : ""}: seats per list, terms${profile ? ", your chances" : ""} and closing ranks by year and round, ${sortLabels[sort].toLowerCase()}, page ${r.page}`
+    : `${compare ? `Seats in every ${round} list side by side` : `Seats in the ${title} list`} (MCC PDF${compare ? "s" : ""}), ${sortLabels[sort].toLowerCase()}, page ${r.page}`;
+  const years: ClosingYear[] = meta.years.map((y, i) => ({ year: y.year, rounds: i === 0 ? y.rounds : [...rounds] }));
 
   return (
     <>
       <SeatListPicker lists={all} current={list.key} href={(key) => here({ list: key })} />
       <nav aria-label="Seats view" className="flex flex-wrap gap-2">
-        <Link href={here({ view: null })} aria-current={!compare ? "true" : undefined} className={chip(!compare)}>One list</Link>
-        <Link href={here({ view: "compare" })} aria-current={compare ? "true" : undefined} className={chip(compare)}>Compare the {round} lists</Link>
+        <Link href={here({ view: null })} aria-current={matrix ? "true" : undefined} className={chip(matrix)}>Seat matrix</Link>
+        <Link href={here({ view: "list", rounds: null, has: null })} aria-current={f.view === "list" ? "true" : undefined} className={chip(f.view === "list")}>One list</Link>
+        <Link href={here({ view: "compare", rounds: null, has: null })} aria-current={compare ? "true" : undefined} className={chip(compare)}>Compare the {round} lists</Link>
       </nav>
-      {compare ? (
+      {matrix && (
+        <>
+          <nav aria-label="Seat matrix rounds" className="flex flex-wrap gap-2">
+            <Link href={here({ rounds: null })} aria-current={!allRounds ? "true" : undefined} className={chip(!allRounds)}>This round only ({round})</Link>
+            <Link href={here({ rounds: "all" })} aria-current={allRounds ? "true" : undefined} className={chip(allRounds)}>All rounds</Link>
+          </nav>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            One row per institute, course, quota and seat category {allRounds ? "with seats in any MCC seat list in the data, or allotted in any MCC result" : `with seats in the ${round} lists`}:
+            {" "}its <span className="font-semibold text-foreground">clear</span> and <span className="font-semibold text-foreground">virtual</span> vacancy seats per round, a
+            {" "}<span className="font-semibold text-foreground">+N new</span> badge when the newly added list prints seats for it (most are also in the clear vacancy list, so they are not extra seats),
+            the published terms{profile && ", your chances on that seat category"} and its closing rank in every round, with the allotments MCC made there in brackets.
+            {" "}The lists overlap, so their seats are never added together. The list picked above sets the round and the list &quot;Most seats first&quot; sorts by.
+          </p>
+        </>
+      )}
+      {matrix ? null : compare ? (
         <p className="max-w-3xl text-sm text-muted-foreground">
           One row per institute, course, quota and seat category, with its seats in each {round} list.{" "}
           {r.lists.map((l) => <Fragment key={l.key}><span className="font-semibold text-foreground">{seatKindLabel[l.kind]}</span>: {seatKindNote[l.kind]}{" "}</Fragment>)}
@@ -91,7 +131,8 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
       <FilterForm action="/decide/seats" scroll={false} role="search" aria-label="Filter seats" className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3">
         {(["rank", "cat", "pwd", "fee", "bond"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         <input type="hidden" name="list" value={list.key} />
-        {compare && <input type="hidden" name="view" value="compare" />}
+        {!matrix && <input type="hidden" name="view" value={f.view} />}
+        {allRounds && <input type="hidden" name="rounds" value="all" />}
         {f.nohist && <input type="hidden" name="nohist" value="1" />}
         {(["inst", "course", "squota"] as const).map((k) => f[k] && <input key={k} type="hidden" name={k} value={f[k]} />)}
         <Fragment key={params.toString()}>
@@ -116,6 +157,16 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             noneNote={profile ? openQuotasNote : undefined}
           />
           <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.st} />
+          {matrix && (
+            <FilterDropdown
+              label={`Seats in ${round}`}
+              name="has"
+              options={seatKinds.filter((k) => roundLists.some((l) => l.kind === k)).map((k) => ({ value: k, label: { clear: "Has clear vacancy", virtual: "Has virtual vacancy", new: "Has newly added" }[k] }))}
+              selected={f.has}
+              none="Any"
+              noneNote={`None ticked means every row. Ticked: rows with seats in any ticked ${round} list.`}
+            />
+          )}
           <label className="w-72 max-w-full">
             <span className="sr-only">Seat category</span>
             <select name="scat" defaultValue={f.scat ?? ""} className={control}>
@@ -127,7 +178,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
           <label className="w-72 max-w-full">
             <span className="sr-only">Sort</span>
             <select name="sort" defaultValue={sort} className={control}>
-              {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && compare ? `Most ${kindSeats(list)} first` : sortLabels[s]}</option>)}
+              {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && several ? `Most ${kindSeats(list)} first` : s === "reach" && matrix ? "Your chances: beyond your rank first" : sortLabels[s]}</option>)}
             </select>
           </label>
         </Fragment>
@@ -150,7 +201,12 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
       <div className="grid gap-2">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
-            {compare ? (
+            {matrix ? (
+              <>
+                <span className="numeric text-base font-semibold text-foreground">{formatRank(r.total)}</span> rows in {round}{allRounds && " and every other round"}
+                {roundLists.map((l) => <Fragment key={l.key}> · <span className="numeric">{kindCount(l, r.seats[l.key] ?? 0, roundLists)}</span></Fragment>)} (never added together).
+              </>
+            ) : compare ? (
               <>
                 <span className="numeric text-base font-semibold text-foreground">{formatRank(r.total)}</span> institute, course, quota and seat category rows match these filters,
                 with{" "}
@@ -178,7 +234,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             r.total > 0 && (
               <Button asChild variant="secondary">
                 <a href={L.with("/api/v1/seats/export", { tab: null, page: null })} download>
-                  <Download className="size-4" aria-hidden />Download CSV<span className="sr-only"> of {compare ? `every ${round} list` : `the ${title} list`}, these filters, every row</span>
+                  <Download className="size-4" aria-hidden />Download CSV<span className="sr-only"> of {matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row</span>
                 </a>
               </Button>
             )
@@ -186,20 +242,37 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         </div>
         {noState > 0 && (
           <p className="text-sm text-muted-foreground">
-            <span className="numeric">{formatRank(noState)}</span> more seats{compare && ` in the ${seatKindLabel[list.kind].toLowerCase()} list`} match everything but the state: their institutes have no state in Decide&apos;s data, so the
+            <span className="numeric">{formatRank(noState)}</span> more seats{several && ` in the ${seatKindLabel[list.kind].toLowerCase()} list`} match everything but the state: their institutes have no state in Decide&apos;s data, so the
             state filter leaves them out. The state shown is the institute&apos;s, not the PDF&apos;s state column.
           </p>
         )}
-        {compare ? r.lists.map((l) => <SeatSource key={l.key} list={l} L={L} />) : <SeatSource list={list} L={L} />}
+        {several ? roundLists.map((l) => <SeatSource key={l.key} list={l} L={L} />) : <SeatSource list={list} L={L} />}
+        {allRounds && r.lists.length > roundLists.length && (
+          <details className="text-xs text-muted-foreground">
+            <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky underline">Sources of the other rounds&apos; lists</summary>
+            <div className="grid gap-3">{r.lists.filter((l) => !roundLists.includes(l)).map((l) => <SeatSource key={l.key} list={l} L={L} />)}</div>
+          </details>
+        )}
       </div>
 
       {r.total === 0 ? (
         <EmptyState
           title="No seats match"
-          description={`Nothing in ${compare ? `the ${round} lists` : "this list"} matches these filters. Pick another list, or widen the course, degree, quota, state or seat category filters.`}
-          href={here({ list: list.key, inst: null, course: null, squota: null, sp: null, deg: null, c: null, quota: profile ? meta.quotas.join(",") : null, st: null, q: null, scat: "all", nohist: null, sort: null })}
-          action={compare ? "Show every seat in these lists" : "Show every seat in this list"}
+          description={`Nothing in ${several ? `the ${round} lists` : "this list"} matches these filters. Pick another list, or widen the course, degree, quota, state, seat category${matrix ? " or seats" : ""} filters.`}
+          href={here({ list: list.key, inst: null, course: null, squota: null, sp: null, deg: null, c: null, quota: profile ? meta.quotas.join(",") : null, st: null, q: null, scat: "all", nohist: null, has: null, sort: null })}
+          action={several ? "Show every seat in these lists" : "Show every seat in this list"}
         />
+      ) : matrix ? (
+        <>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category, as rank (allotments made in that round, not seats); &quot;—&quot; means no
+            allotment there in that round, or no MCC result for it in the data.
+            {profile && <> Your chances is Options&apos; label on that one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round); &quot;New&quot; when MCC never allotted the course and quota; no label on a row whose PDF prints no quota.</>}{" "}
+            {HISTORY_CAPTION}
+          </p>
+          <SeatMatrix rows={r.rows} groups={seatGroups(r.lists)} years={years} results={meta.sources} ranked={!!profile} sort={sort} caption={caption} />
+          <DataSource terms={r.rows.flatMap((x) => [x.terms.fee?.source, x.terms.stipend?.source, x.terms.bond?.source, x.terms.penalty?.source])} />
+        </>
       ) : (
         <>
           <p className="max-w-3xl text-sm text-muted-foreground">
