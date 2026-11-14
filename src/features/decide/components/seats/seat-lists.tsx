@@ -7,10 +7,9 @@ import { cn } from "@/lib/cn";
 import type { DecideLinks } from "../../lib/links";
 import { roundName } from "../../lib/round-status";
 import type { SeatRow } from "../../server/seats";
-import type { OptionTerms } from "../../service";
-import { openQuotas, roundLabel, rounds, seatKindLabel, termLabel, type MccNotice, type Round, type SeatKind, type SeatList } from "../../types";
-import { Dash, Provisional, ReachBadge, TermText } from "../bits";
-import { FeeText } from "../options-view";
+import { openQuotas, roundLabel, rounds, seatKindLabel, type MccNotice, type Round, type SeatKind, type SeatList } from "../../types";
+import { Dash, Provisional, ReachBadge } from "../bits";
+import { TermsSummary } from "../fees";
 import { smallLink, tbl } from "../ui";
 import { PAST_ROUNDS, type SeatLine, type SeatSort } from "./find-seats";
 
@@ -134,7 +133,6 @@ export function UnlistedSeats({ u, profile, here, href, options }: { u: { list: 
 }
 
 const courseOf = (r: SeatRow) => `${r.degree} ${r.course?.name ?? r.specialty}`;
-const kindOf = { fee: "FEE", stipend: "STIPEND", bond: "BOND", penalty: "PENALTY" } as const;
 
 /** The deepest closing of the shown past rounds (PAST_ROUNDS), and behind a disclosure every round the reach label counts. */
 function PastClosings({ r, name }: { r: SeatLine; name: string }) {
@@ -169,20 +167,6 @@ function PastClosings({ r, name }: { r: SeatLine; name: string }) {
   );
 }
 
-/** Fee, stipend, bond and seat-leaving penalty as published, each with its source; "—" when not listed. */
-function Terms({ t }: { t: OptionTerms }) {
-  return (
-    <dl className="grid gap-1">
-      {(["fee", "stipend", "bond", "penalty"] as const).map((k) => (
-        <div key={k}>
-          <dt className="inline text-muted-foreground">{termLabel[kindOf[k]]}: </dt>
-          <dd className="inline">{k === "fee" ? <FeeText t={t.fee} /> : <TermText term={t[k]} />}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 /**
  * Seat rows: institute (with course, quota and state; sticky, so a phone scrolls the rest beside it), seat category,
  * seats in each of `lists` (one list, or every list of a round side by side: never added; `current` orders the seats sort), the deepest past closing on
@@ -210,7 +194,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
               Deepest past closing<span className="block font-normal">{PAST_ROUNDS.map((p) => `${p.year} ${roundLabel[p.round]}`).join(", ")}</span>
             </th>
             {ranked && <th scope="col" className={cn(th, "min-w-36")}>Reach</th>}
-            <th scope="col" className={cn(th, "min-w-72")}>Fee, stipend, bond and seat-leaving penalty</th>
+            <th scope="col" className={cn(th, "min-w-72")}>Fee, stipend, bond and leaving penalty</th>
           </tr>
         </thead>
         <tbody>
@@ -235,7 +219,10 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
                     {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : <span className="text-xs text-muted-foreground">Not a seat category you can take</span>}
                   </td>
                 )}
-                <td className={cn(td, "text-xs")}><Terms t={r.terms} /></td>
+                <td className={td}>
+                  <TermsSummary t={r.fees} className="text-xs" />
+                  <Link href={L.institute(r.college.slug, "fees")} className={cn(smallLink, "text-xs text-sky")}>Fees &amp; bond<span className="sr-only">: {r.college.name}</span></Link>
+                </td>
               </tr>
             );
           })}

@@ -47,7 +47,7 @@ Official information and reported experiences are never mixed in the same block.
 ## Admitted-list residents (Decide institute "Residents" tab)
 - Names come only from MCC's official admitted-candidates lists (`Resident`, imported from a private bundle that never enters git), with the list PDF as source. Name, course, year, list and the 2025 AIR where known: no roll numbers, and no contact details are held or shown.
 - Shown per institute only, for choosing a college, with the caption "contact people respectfully; ask to be hidden and we will". There is no endpoint across institutes, responses are `Cache-Control: private, no-store`, and the tab is `noindex`.
-- "Hide" records the person in `HiddenResident` (name + college PIN code) and sets `hidden`; hidden rows are never rendered or returned, and both imports keep them hidden, even under a new college key or course.
+- "Hide" records the person in `HiddenResident` (name + college PIN code) and sets `hidden`; hidden rows are never rendered or returned, and both imports keep them hidden, even under a new college key or course (hides are copied to a college's new place when an import changes it: a kept college given a PIN, or a retired key's successor).
 - The rank is where one person got in, not a closing rank or a prediction.
 
 ## Announcements

@@ -3,7 +3,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { optionsCsv, roundViewNote } from "@/app/api/v1/options/export/csv";
+import { GET as collegeApi } from "@/app/api/v1/colleges/[slug]/route";
 import { GET as optionsApi } from "@/app/api/v1/options/route";
+import { db } from "@/lib/db";
 import { eligibleCategories, reachOrder, resultsSpan, roundReachOrder } from "./lib/reach";
 import { profileHasCourse, profileQuotas, profileToParams, type Profile } from "./profile";
 import { listSeats, seatLists } from "./server/seats";
@@ -70,14 +72,15 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     const all = await timed("listOptions her (showClosed)", () => svc.listOptions(her, { ...v, showClosed: true }));
     const shown = await timed("listOptions her (all view)", () => svc.listOptions(her, v));
     console.log("her options", all.rows.length, all.counts, "shown", shown.rows.length, "hidden closed", shown.hiddenClosed);
-    // Every quota ticked: every option in both specialties; 1,338 of them have an Open or OBC allotment.
+    // Every quota ticked: every option in both specialties (cutoffs.ndjson: 1,312 college × course × quota; 1,295 of them
+    // with an Open or OBC allotment). The round-2 bundle's merged colleges hold one option where two keys held two.
     const every = await svc.listOptions({ ...her, quotas: (await svc.getMeta()).quotas }, { ...v, showClosed: true });
-    expect(every.total).toBe(1360);
-    expect(every.counts).toMatchObject({ "reached-latest": 294, "reached-both": 57, "reached-one": 165, "within-10": 102, "closed-before": 653, "no-data": 89 });
-    // None ticked: the open quotas only (31 options in restricted quotas left out).
-    expect(all.total).toBe(1329);
+    expect(every.total).toBe(1312);
+    expect(every.counts).toMatchObject({ "reached-latest": 294, "reached-both": 56, "reached-one": 160, "within-10": 102, "closed-before": 645, "no-data": 55 });
+    // None ticked: the open quotas only (30 options in restricted quotas left out).
+    expect(all.total).toBe(1282);
     expect(all.rows.every((r) => ["All India", "DNB Quota", "Deemed/Paid Seats"].includes(r.quota))).toBe(true);
-    expect(shown.total + shown.hiddenClosed).toBe(1329);
+    expect(shown.total + shown.hiddenClosed).toBe(1282);
     const page2 = await svc.listOptions(her, v, { page: 2, pageSize: 50 });
     expect(page2.rows.map((r) => r.id)).toEqual(shown.rows.slice(50, 100).map((r) => r.id));
     const t = performance.now();
@@ -110,7 +113,7 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     expect(trends.total).toBeGreaterThan(10000);
     expect(trends.rows).toHaveLength(50);
     const inst = await timed("listInstitutes her", () => svc.listInstitutes(her, {}));
-    expect(inst.total).toBe(2194); // colleges.ndjson (2,141) + seat_colleges.ndjson (53) in the bundle manifest
+    expect(inst.total).toBe(2032); // colleges.ndjson (1,985) + seat_colleges.ndjson (47) in the bundle manifest
     const firstPage = await timed("listInstitutes her, page 1", () => svc.listInstitutes(her, {}, { page: 1, pageSize: 48 }));
     expect(firstPage.rows).toHaveLength(48);
     // best reach (per-year maxima in SQL) agrees with the institute page, over the options in her profile only
@@ -228,4 +231,30 @@ describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "seats.ndjson
       expect(csv).toContain(`${summary.options} options have 2026 R2 seats`);
     });
   }
+});
+
+// College keys the bundle retired (key_aliases.json → RetiredCollegeKey): old links and saved ids reach the college now.
+describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "key_aliases.json")))("retired college keys on real MCC data", { timeout: 60_000 }, () => {
+  const aliases: { old?: string; old_sha256?: string; new: string | null }[] = JSON.parse(readFileSync(join(dir, "key_aliases.json"), "utf8"));
+  it("every retired key of the bundle maps to its college; option ids and old slugs follow it", async () => {
+    const map = await svc.retiredKeys();
+    const colleges = (await svc.getDecideData()).colleges;
+    for (const a of aliases) {
+      const r = map[a.old ?? `sha256:${a.old_sha256}`];
+      if (a.new == null) expect(r).toBeUndefined();
+      else expect(r).toEqual({ key: a.new, slug: colleges.find((c) => c.key === a.new)!.slug, name: colleges.find((c) => c.key === a.new)!.name });
+    }
+    const plain = aliases.find((a) => a.old && a.new)!;
+    const keep = `${KOKILA_NM}#400710~DNB~ANAESTHESIOLOGY~DNB Quota`;
+    expect(await svc.currentOptionIds([`${plain.old}~DNB~ANAESTHESIOLOGY~DNB Quota`, keep])).toEqual([`${plain.new}~DNB~ANAESTHESIOLOGY~DNB Quota`, keep]);
+    // An old slug (recorded when an import removed its college: a database that had the earlier bundle) redirects.
+    const [old] = await db.$queryRaw<{ oldSlug: string; newKey: string }[]>`SELECT "oldSlug", "newKey" FROM "RetiredCollegeKey" WHERE "oldSlug" NOT LIKE 'sha256:%' LIMIT 1`;
+    if (old) {
+      const to = colleges.find((c) => c.key === old.newKey)!;
+      expect(await svc.renamedCollege(old.oldSlug)).toMatchObject({ key: old.newKey });
+      const res = await collegeApi(new Request(`http://x/api/v1/colleges/${old.oldSlug}?rank=42284`), { params: Promise.resolve({ slug: old.oldSlug }) });
+      expect([res.status, res.headers.get("Location")]).toEqual([308, `/api/v1/colleges/${to.slug}?rank=42284`]);
+    }
+    expect(await svc.renamedCollege("no-such-college-000000")).toBeNull();
+  });
 });

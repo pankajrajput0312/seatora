@@ -194,6 +194,19 @@ model HiddenResident {
   @@id([name, place])
 }
 
+/// A college key an MCC import retired (key_aliases.json: merged into another college or given a neutral label), kept
+/// across imports so old institute links and saved option ids still reach the college. No foreign key: the import keeps
+/// newKey current. Written and read with raw SQL (import-mcc.ts, server/catalog.ts), like CollegeTerm.details.
+model RetiredCollegeKey {
+  /// The retired College.key, or "sha256:<hex>" of it where the key held a person's name or e-mail (the bundle gives only the hash).
+  oldKey    String   @id
+  /// The college's slug when an import removed it, hashed the same way as oldKey; null when this database never had it.
+  oldSlug   String?  @unique
+  /// The College.key it is now; null when the college is no longer in the data.
+  newKey    String?
+  createdAt DateTime @default(now())
+}
+
 /// Fee, stipend, bond or penalty text exactly as published, per college and program (MD or DNB).
 model CollegeTerm {
   id        String     @id @default(cuid())
@@ -202,8 +215,12 @@ model CollegeTerm {
   program   String // "MD" | "DNB"
   kind      TermKind
   text      String
-  /// Set only when the text contains exactly one rupee figure.
+  /// FEE / STIPEND: the text's rupee figure when it has exactly one. BOND: what a non-service All India candidate pays for
+  /// a PG degree (0 = no bond). PENALTY: the leaving penalty, else the forfeit.
   amountInr Int?
+  /// BOND / PENALTY: the verified record (import-schema.ts bondDetailsSchema / penaltyDetailsSchema). Written and read with
+  /// raw SQL (import-mcc.ts, server/catalog.ts), so a generated client without this field still works.
+  details   Json?
   sourceId  String
   source    DataSource @relation(fields: [sourceId], references: [id])
 

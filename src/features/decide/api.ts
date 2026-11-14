@@ -4,6 +4,7 @@ import { canUseDecide } from "@/features/auth/lib/session";
 import { rankValue, readParams } from "./lib/params";
 import { reachOrder } from "./lib/reach";
 import { profileInput, profileSchema } from "./profile";
+import { renamedCollege } from "./service";
 import { baseCategories, optionsViews, rounds, seatKinds, type SeatList, type Source } from "./types";
 
 // Query schemas and response helpers for the /api/v1 route handlers (thin wrappers over service.ts).
@@ -69,12 +70,6 @@ export const rankScanQuerySchema = z.object({
   year: int.min(2000).max(2100).default(2025),
   window: int.min(1).max(1000).default(500),
 });
-export const feesQuerySchema = pageSchema.extend({
-  program: z.enum(["MD", "DNB"]).optional(),
-  state: z.string().optional(),
-  maxFeeLakh: z.coerce.number().positive().optional(),
-  sort: z.enum(["fee", "stipend", "name"]).default("fee"),
-});
 export const trendsQuerySchema = pageSchema.extend({ specialty: z.string().optional(), degree: z.string().optional() });
 
 type Issue = { path: string; message: string };
@@ -110,6 +105,14 @@ export function invalid(...errors: (z.ZodError | undefined)[]) {
 }
 
 export const notFound = (message: string) => Response.json({ ok: false, error: { code: "not_found", message } } satisfies ApiResult<never>, { status: 404 });
+
+/** An institute endpoint under an old slug (its college key was retired): 308 to the same path under the slug now; else 404. */
+export async function renamedOr404(req: Request, slug: string) {
+  const to = await renamedCollege(slug);
+  if (!to) return notFound("No institute with this slug");
+  const url = new URL(req.url);
+  return new Response(null, { status: 308, headers: { Location: `${url.pathname.replace(`/colleges/${slug}`, `/colleges/${to.slug}`)}${url.search}` } });
+}
 
 const noStore = { "Cache-Control": "private, no-store" };
 

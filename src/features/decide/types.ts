@@ -1,5 +1,6 @@
 // Shapes mirror the MCC export the importer reads (prisma/import-mcc.ts, src/features/cutoffs/lib/import-schema.ts).
 // No person-level data: no names.
+import type { BondDetails, PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
 import type { SourceType } from "@/types/provenance";
 
 export const rounds = ["R1", "R2", "R3", "stray", "special_stray"] as const;
@@ -48,9 +49,14 @@ export type Term = {
   amountInr: number | null;
   /** The document the text was taken from (an MCC institute profile, an NBEMS notice…). */
   source: { name: string; url: string | null; type: SourceType };
+  /** BOND / PENALTY: the verified record (status, years, amounts, penalty items); read by server/terms.ts, never parsed from `text`. */
+  details?: BondDetails | PenaltyDetails;
 };
-/** PENALTY is MCC's seat-leaving forfeit (resign / don't join from Round 2), not a bond penalty. */
-export const termLabel: Record<Term["kind"], string> = { FEE: "Fee", STIPEND: "Stipend", BOND: "Service bond", PENALTY: "Seat-leaving penalty (MCC)" };
+/**
+ * PENALTY holds the college's or state's penalty for leaving the seat or course and MCC's forfeit if you resign or
+ * don't join from Round 2 (its record says which: server/terms.ts); never a "bond penalty".
+ */
+export const termLabel: Record<Term["kind"], string> = { FEE: "Fee", STIPEND: "Stipend", BOND: "Service bond", PENALTY: "Leaving penalty / Round 2 forfeit" };
 export type Allotment = {
   rank: number;
   category: Category;

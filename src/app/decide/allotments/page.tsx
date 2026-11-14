@@ -5,13 +5,14 @@ import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { Dash, PageHead, Provisional, TermText } from "@/features/decide/components/bits";
+import { Dash, PageHead, Provisional } from "@/features/decide/components/bits";
+import { termDocs, TermsSummary } from "@/features/decide/components/fees";
 import { control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankValue } from "@/features/decide/lib/params";
 import { toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getMeta, listAllotments } from "@/features/decide/service";
-import { baseCategories, roundLabel, rounds, termLabel } from "@/features/decide/types";
+import { baseCategories, roundLabel, rounds } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Allotments" };
 const PAGE_SIZE = 50;
@@ -109,8 +110,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
               <th scope="col" className={`${tbl.th} text-right`}>Rank</th>
               <th scope="col" className={tbl.th}>Round, quota and seat</th>
               <th scope="col" className={tbl.th}>Institute and course</th>
-              <th scope="col" className={tbl.th}>Fee and stipend</th>
-              <th scope="col" className={tbl.th}>Bond and seat-leaving penalty</th>
+              <th scope="col" className={tbl.th}>Fee, stipend, bond and leaving penalty</th>
             </tr></thead>
             <tbody>
               {rows.map((a, i) => (
@@ -126,14 +126,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
                       <Link href={L.lastRanks(a.courseSlug, { inst: a.college.slug })} className="inline-flex min-h-6 items-center hover:text-sky hover:underline">{a.courseName}</Link>, {a.college.state ?? <Dash />}
                     </span>
                   </td>
-                  <td className={`${tbl.td} numeric min-w-56`}>
-                    <TermText term={a.terms.fee} />
-                    <span className="mt-1 block text-xs"><span className="text-muted-foreground">{termLabel.STIPEND}: </span><TermText term={a.terms.stipend} /></span>
-                  </td>
-                  <td className={`${tbl.td} numeric min-w-48 text-xs`}>
-                    <span className="block"><span className="text-muted-foreground">{termLabel.BOND}: </span><TermText term={a.terms.bond} /></span>
-                    <span className="mt-1 block"><span className="text-muted-foreground">{termLabel.PENALTY}: </span><TermText term={a.terms.penalty} /></span>
-                  </td>
+                  <td className={`${tbl.td} min-w-64`}><TermsSummary t={a.fees} className="text-xs" /></td>
                 </tr>
               ))}
             </tbody>
@@ -145,7 +138,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <p>Select a rank to scan the allotments around it that year; a course to see its last ranks at that institute. Fees and stipends are per programme (DNB seats follow NBEMS; MD, MS and Diploma seats the college).</p>
         <DataSource
           used={[...new Map(rows.map((a) => [`${a.year}|${a.round}`, { year: a.year, round: a.round }])).values()]}
-          terms={rows.flatMap((a) => [a.terms.fee?.source, a.terms.stipend?.source, a.terms.bond?.source, a.terms.penalty?.source])}
+          terms={termDocs(rows.map((a) => a.fees))}
         />
       </div>
     </AppPage>

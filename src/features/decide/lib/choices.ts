@@ -108,3 +108,37 @@ export function parseChoices(raw: unknown): ChoicesState {
     lists: r.data.lists.map(({ transcribedUpTo, typedIds, ...l }) => ({ ...l, typedIds: typedIds ?? l.items.slice(0, transcribedUpTo ?? 0).map((i) => i.id) })),
   };
 }
+
+/** What a retired college key (RetiredCollegeKey) is now: the API's map, keyed by the old key or "sha256:<hex>" of it. */
+export type RenamedCollege = { key: string; slug: string; name: string };
+type RenamedOf = (collegeKey: string) => RenamedCollege | undefined;
+
+/** The college key of an option id (types.ts optionId: "key~degree~specialty~quota"). */
+export const collegeKeyOf = (id: string) => id.split("~")[0];
+/** The option id under the key its college has now; unchanged when the key was not retired. */
+export function renameOptionId(id: string, of: RenamedOf): string {
+  const r = of(collegeKeyOf(id));
+  return r ? r.key + id.slice(collegeKeyOf(id).length) : id;
+}
+
+/**
+ * Saved choices and compare ids moved off retired college keys (merged colleges, neutral names): ids, links and names
+ * follow the college; an option that now appears twice in a list (two merged colleges) is kept once. `renamed`: the
+ * distinct saved ids that changed (old ids).
+ */
+export function renameSaved(state: ChoicesState, compare: string[], of: RenamedOf) {
+  const changed = new Set<string>();
+  const id = (x: string) => {
+    const y = renameOptionId(x, of);
+    if (y !== x) changed.add(x);
+    return y;
+  };
+  const lists = state.lists.map((l) => {
+    const items = l.items.map((i) => {
+      const r = of(collegeKeyOf(i.id));
+      return r ? { ...i, id: id(i.id), slug: r.slug, institute: r.name } : i;
+    });
+    return { ...l, items: items.filter((i, n) => items.findIndex((x) => x.id === i.id) === n), typedIds: [...new Set(l.typedIds.map(id))] };
+  });
+  return { choices: { ...state, lists }, compare: [...new Set(compare.map(id))], renamed: [...changed] };
+}

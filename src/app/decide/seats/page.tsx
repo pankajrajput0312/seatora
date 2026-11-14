@@ -8,6 +8,7 @@ import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HISTORY_CAPTION, PageHead } from "@/features/decide/components/bits";
+import { termDocs } from "@/features/decide/components/fees";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm } from "@/features/decide/components/filter-form";
 import { courseName } from "@/features/decide/components/options-view";
@@ -211,7 +212,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             {HISTORY_CAPTION}
           </p>
           <SeatTable rows={r.rows} lists={r.lists} current={list.key} sort={sort} ranked={!!profile} L={L} caption={caption} />
-          <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: LATEST_YEAR, round: "R1" }]} terms={r.rows.flatMap((x) => [x.terms.fee?.source, x.terms.stipend?.source, x.terms.bond?.source, x.terms.penalty?.source])} />
+          <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: LATEST_YEAR, round: "R1" }]} terms={termDocs(r.rows.map((x) => x.fees))} />
         </>
       )}
       <Pager page={r.page} pageSize={r.pageSize} total={r.total} href={(n) => L.page("/decide/seats", n)} focusId="results" label="Seats" />

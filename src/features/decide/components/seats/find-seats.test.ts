@@ -155,8 +155,8 @@ describe.skipIf(!process.env.DATABASE_URL)("findSeats on the real import", { tim
   it("a state filter counts the matching seats it drops for having no state", async () => {
     const st = await findSeats({ ...mine, states: ["Maharashtra"] }, { page: 1, pageSize: 1 });
     const all = await findSeats(mine, { page: 1, pageSize: 100000 });
+    // 0 since the round-2 bundle gives every college a state; the count still has to match the rows.
     expect(st.noState[mine.list]).toBe(all.rows.filter((r) => r.college.state == null).reduce((a, r) => a + r.seats, 0));
-    expect(st.noState[mine.list]).toBeGreaterThan(0);
     expect((await findSeats(mine, { page: 1, pageSize: 1 })).noState[mine.list]).toBe(0);
   });
 });

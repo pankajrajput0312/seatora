@@ -32,6 +32,10 @@ export type Catalog = {
   optionById: Map<string, Opt>;
   pairs: Map<string, Pair>; // cs → pair
   sourceById: Map<string, Source>; // DB id (in memory: key) → source
+  /** Retired college key (or "sha256:<hex>" of it) → the key its college has now; only colleges still in the data. */
+  retired: Map<string, string>;
+  /** Slug of a college under a retired key (hashed like the key) → the key its college has now. */
+  retiredSlug: Map<string, string>;
   meta: {
     courses: Course[];
     specialties: { code: string; name: string }[];
@@ -67,8 +71,11 @@ export function indexCatalog(p: {
   pairs: Pair[];
   options: { cs: string; quota: string; year: number; n: number }[];
   terms: Term[];
+  retired?: { oldKey: string; oldSlug: string | null; newKey: string | null }[];
 }): Catalog {
   const pairs = new Map(p.pairs.map((x) => [x.cs, x]));
+  const collegeByKey = new Map(p.colleges.map((c) => [c.key, c]));
+  const retired = (p.retired ?? []).filter((r): r is typeof r & { newKey: string } => r.newKey != null && collegeByKey.has(r.newKey));
   const optionById = new Map<string, Opt>();
   for (const o of p.options) {
     const pair = pairs.get(o.cs);
@@ -90,7 +97,7 @@ export function indexCatalog(p: {
     sources,
     options,
     terms: p.terms,
-    collegeByKey: new Map(p.colleges.map((c) => [c.key, c])),
+    collegeByKey,
     collegeBySlug: new Map(p.colleges.map((c) => [c.slug, c])),
     // Every MCC course, with data or not: a course first seen in a seat list (a new option) still has its name.
     courseOf: new Map(p.courses.map((c) => [`${c.degree}|${c.specialty}`, c])),
@@ -98,6 +105,8 @@ export function indexCatalog(p: {
     optionById,
     pairs,
     sourceById: new Map(p.sources),
+    retired: new Map(retired.map((r) => [r.oldKey, r.newKey])),
+    retiredSlug: new Map(retired.flatMap((r) => (r.oldSlug ? [[r.oldSlug, r.newKey]] : []))),
     meta: {
       courses,
       specialties: specialtyCodes.map((code) => ({ code, name: courses.find((c) => c.specialty === code)!.name })),
@@ -126,15 +135,19 @@ export function memoryCatalog(d: DecideData): Catalog {
 }
 
 async function loadCatalog(): Promise<Catalog> {
-  const [sources, colleges, specialties, pairs, terms, options] = await Promise.all([
+  const [sources, colleges, specialties, pairs, terms, options, details, retired] = await Promise.all([
     db.dataSource.findMany({ select: { id: true, key: true, name: true, url: true, counsellingYear: true, round: true, provisional: true } }),
     db.college.findMany({ select: { id: true, key: true, slug: true, name: true, state: true, pincode: true, address: true }, orderBy: { name: "asc" } }),
     db.specialty.findMany({ select: { id: true, slug: true, name: true, degree: true, code: true } }),
     db.collegeSpecialty.findMany({ select: { id: true, collegeId: true, specialtyId: true } }),
-    db.collegeTerm.findMany({ select: { collegeId: true, program: true, kind: true, text: true, amountInr: true, source: { select: { name: true, url: true, type: true } } } }),
+    db.collegeTerm.findMany({ select: { id: true, collegeId: true, program: true, kind: true, text: true, amountInr: true, source: { select: { name: true, url: true, type: true } } } }),
     db.$queryRaw<{ cs: string; quota: string; year: number; n: number }[]>`
       SELECT "collegeSpecialtyId" AS cs, quota, "counsellingYear" AS year, SUM(n)::int AS n FROM "Cutoff" GROUP BY 1, 2, 3`,
+    // Raw SQL: the generated client may predate the details column (prisma/schema.prisma).
+    db.$queryRaw<{ id: string; details: NonNullable<Term["details"]> }[]>`SELECT id, details FROM "CollegeTerm" WHERE details IS NOT NULL`,
+    db.$queryRaw<{ oldKey: string; oldSlug: string | null; newKey: string | null }[]>`SELECT "oldKey", "oldSlug", "newKey" FROM "RetiredCollegeKey"`,
   ]);
+  const detailsOf = new Map(details.map((d) => [d.id, d.details]));
   const collegeKey = new Map(colleges.map((c) => [c.id, c.key]));
   const spec = new Map(specialties.map((s) => [s.id, s]));
   return indexCatalog({
@@ -154,7 +167,9 @@ async function loadCatalog(): Promise<Catalog> {
       text: t.text,
       amountInr: t.amountInr,
       source: { name: t.source.name, url: t.source.url, type: t.source.type },
+      ...(detailsOf.has(t.id) && { details: detailsOf.get(t.id) }),
     })),
+    retired,
   });
 }
 

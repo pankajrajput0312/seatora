@@ -11,9 +11,10 @@ import type { DecideLinks } from "../lib/links";
 import { useChoices, useCompare, useDecideLinks } from "../lib/use-decide-store";
 import type { OptionRow } from "../service";
 import type { SeatList } from "../types";
-import { ReachBadge, TermText } from "./bits";
+import { ReachBadge } from "./bits";
+import { TermsSummary } from "./fees";
 import { FocusItem } from "./focus-item";
-import { ClosingCell, courseName, FeeText, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, toChoiceItem } from "./options-view";
+import { ClosingCell, courseName, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, toChoiceItem } from "./options-view";
 import { smallLink } from "./ui";
 
 export function ChoiceStar({ item }: { item: ChoiceItem }) {
@@ -60,15 +61,6 @@ export function CompareToggle({ id, label }: { id: string; label: string }) {
  * (clear, virtual, new), one column each, never added (none: no columns).
  */
 type Years = { latestYear: number; pastYears: [number, number]; includeLatest: boolean; seatLists: SeatList[] };
-
-function FeeBond({ r }: { r: OptionRow }) {
-  return (
-    <span className="numeric">
-      <FeeText t={r.terms.fee} />
-      <span className="block text-xs text-muted-foreground">Bond: <TermText term={r.terms.bond} /></span>
-    </span>
-  );
-}
 
 /** Cross-links for one option, each a 44px target (a new option has no closing ranks or allotments to link). */
 function Related({ r, L }: { r: OptionRow; L: DecideLinks }) {
@@ -119,7 +111,7 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeL
               <th scope="col" className="px-3 py-3 text-right">{latestYear} R1 closing</th>
               <th scope="col" className="px-3 py-3 text-right">{last} deepest</th>
               <th scope="col" className="hidden px-3 py-3 text-right xl:table-cell">{older} deepest</th>
-              <th scope="col" className="px-3 py-3">Fee and bond</th>
+              <th scope="col" className="min-w-56 px-3 py-3">Fee, stipend, bond and leaving penalty</th>
               <th scope="col" className="px-3 py-3">Details</th>
               <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Compare</span></th>
             </tr>
@@ -138,7 +130,7 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeL
                 <td className="px-3 py-3 text-right"><ClosingCell d={r.latest} /></td>
                 <td className="px-3 py-3 text-right"><ClosingCell d={r.byYear[last]} /></td>
                 <td className="hidden px-3 py-3 text-right xl:table-cell"><ClosingCell d={r.byYear[older]} /></td>
-                <td className="px-3 py-3"><FeeBond r={r} /></td>
+                <td className="px-3 py-3"><TermsSummary t={r.fees} className="text-xs" /></td>
                 <td className="px-3 py-1 text-xs">
                   <span className="flex min-w-[10rem] flex-wrap items-center gap-x-4">
                     {/* Opens the grid in the full-width row below, so this row stays narrow. */}
@@ -188,7 +180,7 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeL
                 <div><dt className="text-xs text-muted-foreground">{last} deepest</dt><dd><ClosingCell d={r.byYear[last]} /></dd></div>
                 <div><dt className="text-xs text-muted-foreground">{older} deepest</dt><dd><ClosingCell d={r.byYear[older]} /></dd></div>
               </dl>
-              <p className="mt-3 text-sm">Fee: <FeeBond r={r} /></p>
+              <p className="mt-3"><TermsSummary t={r.fees} /></p>
               <details open={open.has(r.id)} onToggle={(e) => toggle(r.id, e.currentTarget.open)} className="mt-1 text-xs">
                 <summary className={summary}>Rounds by year</summary>
                 {open.has(r.id) && <div className="mt-1"><RoundGrid row={r} caption={gridCaption(r)} /></div>}

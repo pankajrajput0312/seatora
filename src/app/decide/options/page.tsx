@@ -8,6 +8,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { HISTORY_CAPTION, PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
+import { termDocs } from "@/features/decide/components/fees";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm } from "@/features/decide/components/filter-form";
 import { OptionsResults } from "@/features/decide/components/option-actions";
@@ -164,7 +165,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <span className="sr-only">Maximum service bond</span>
             <select name="bond" defaultValue={profile.maxBondYears ?? ""} className={control}>
               <option value="">Any bond</option>
-              {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? "No bond" : `Bond up to ${y} ${y === 1 ? "yr" : "yrs"}`}</option>)}
+              {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? "No bond (or unknown)" : `Bond up to ${y} ${y === 1 ? "yr" : "yrs"}`}</option>)}
             </select>
           </label>
           {lists.length > 0 && (
@@ -292,7 +293,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           Within 10%: in a past round the closing rank was at least 90% of yours (AIR <span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or
           later) but before your rank. Options with no fee or bond listed stay in when you set a fee or bond limit.
         </p>
-        <DataSource terms={r.rows.flatMap((x) => [x.terms.fee?.source, x.terms.bond?.source])} />
+        <DataSource terms={termDocs(r.rows.map((x) => x.fees))} />
         {lists.map((l) => <SeatSource key={l.key} list={l} L={L} />)}
       </div>
     </AppPage>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultChoices, duplicateList, markTypedUpTo, move, parseChoices, toCsv, toMccText, toggleItem, typedPrefix, type ChoiceItem } from "./choices";
+import { defaultChoices, duplicateList, markTypedUpTo, move, parseChoices, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, type ChoiceItem, type RenamedCollege } from "./choices";
 
 const item = (id: string): ChoiceItem => ({ id, institute: `Inst ${id}`, slug: id, state: "S", course: "DNB Anaesthesiology", quota: "DNB Quota", reachLabel: "", closedEveryRound: false });
 
@@ -58,5 +58,24 @@ describe("typed into MCC follows items, not positions", () => {
     const p = parseChoices(raw);
     expect(p.lists.map((l) => [l.id, l.items.map((i) => i.id)])).toEqual([["x", ["a", "b"]], ["w", []]]);
     expect(p.activeId).toBe("w");
+  });
+});
+
+describe("retired college keys", () => {
+  const to: RenamedCollege = { key: "SEPNEWNAME#400001", slug: "new-name-400001", name: "New Name" };
+  const of = (k: string) => (k === "OLDA#400001" || k === "OLDB#400001" ? to : undefined);
+  const id = (k: string, sp = "ANAESTHESIOLOGY") => `${k}~DNB~${sp}~DNB Quota`;
+  it("renames an option id's college key, nothing else", () => {
+    expect(renameOptionId(id("OLDA#400001"), of)).toBe(id("SEPNEWNAME#400001"));
+    expect(renameOptionId(id("KEPT#400002"), of)).toBe(id("KEPT#400002"));
+  });
+  it("moves choices and compare ids to the new key, once each, with the college's link and name", () => {
+    const s = { lists: [{ id: "l", name: "L", items: [item(id("OLDA#400001")), item(id("KEPT#400002")), item(id("OLDB#400001"))], typedIds: [id("OLDA#400001"), id("OLDB#400001")] }], activeId: "l" };
+    const r = renameSaved(s, [id("OLDB#400001"), id("OLDA#400001", "FAMILYMEDICINE")], of);
+    expect(r.choices.lists[0].items.map((i) => [i.id, i.slug, i.institute])).toEqual([[id("SEPNEWNAME#400001"), to.slug, to.name], [id("KEPT#400002"), id("KEPT#400002"), `Inst ${id("KEPT#400002")}`]]);
+    expect(r.choices.lists[0].typedIds).toEqual([id("SEPNEWNAME#400001")]);
+    expect(r.compare).toEqual([id("SEPNEWNAME#400001"), id("SEPNEWNAME#400001", "FAMILYMEDICINE")]);
+    expect(r.renamed).toHaveLength(3);
+    expect(renameSaved(r.choices, r.compare, of).renamed).toEqual([]);
   });
 });

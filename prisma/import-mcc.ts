@@ -2,9 +2,10 @@
 // Usage: npm run db:import [-- <bundle dir>]   (default ../neetpg-planner/data/medpath, or MCC_BUNDLE)
 // Validates everything first and aborts on any error; then, in one transaction, makes the database match the bundle:
 // upserts sources, colleges (incl. the seat-list-only ones) and specialties, replaces cutoffs, allotments, terms, seat
-// lists, notices, round steps and the NBEMS score/merit aggregates, and removes the colleges, courses and sources the
-// bundle no longer has. Spot checks run before the commit. Re-running the same bundle is a no-op in effect. Every file
-// and summary file is hash- and count-checked against the manifest.
+// lists, notices, round steps and the NBEMS score/merit aggregates, removes the colleges, courses and sources the
+// bundle no longer has, and records the college keys it retired (key_aliases.json → RetiredCollegeKey, kept across
+// imports: old links and saved option ids reach the college they became). Spot checks run before the commit.
+// Re-running the same bundle is a no-op in effect. Every file and summary file is hash- and count-checked against the manifest.
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -20,6 +21,8 @@ import {
   mccRounds,
   mccSourceSchema,
   mccTermSchema,
+  movedPlaces,
+  termSourceName,
 } from "../src/features/cutoffs/lib/import-schema.ts";
 import { noticeKinds, roundSteps, seatKinds, stepStatuses } from "../src/features/decide/types.ts";
 
@@ -64,6 +67,9 @@ const colleges = parse("colleges.ndjson", mccCollegeSchema);
 const courses = parse("courses.json", mccCourseSchema);
 const cutoffs = parse("cutoffs.ndjson", mccCutoffSchema);
 const terms = parse("terms.ndjson", mccTermSchema);
+// A BOND whose status is unknown and has no document (src_url null): imported with its words (not checked yet, other
+// colleges' terms, ask the college), its source the bond check itself (no document, no URL).
+const BOND_CHECK = { key: "seatora/bond-check", name: "Seatora bond check (no document yet)", type: "THIRD_PARTY_RESEARCH" as const };
 const allotments = parse("allotments.ndjson", mccAllotmentSchema);
 
 // Seat lists, notices, round steps, NBEMS aggregates. Strict like import-schema.ts: an extra key aborts.
@@ -165,6 +171,13 @@ const notices = parse("notices.json", noticeSchema);
 const roundStatus = parseOne("round_status.json", roundStatusSchema);
 const scoreRank = parseOne("score_rank.json", scoreRankSchema);
 const meritPosition = parseOne("merit_position.json", meritPositionSchema);
+// Retired college keys → the key the college has now (null: gone). A key that held a person's name or e-mail comes only
+// as its sha256, and is stored and matched as "sha256:<hex>" (its slug too), never in clear.
+const hex64 = z.string().regex(/^[0-9a-f]{64}$/);
+const aliases = parse(
+  "key_aliases.json",
+  z.union([z.object({ old: ikey, new: ikey.nullable() }).strict(), z.object({ old_sha256: hex64, new: ikey.nullable() }).strict()]),
+).map((a) => ({ oldKey: "old" in a ? a.old : `sha256:${a.old_sha256}`, newKey: a.new }));
 
 const sourceKeys = new Set(sources.map((s) => s.key));
 const collegeKeys = new Set(colleges.map((c) => c.key));
@@ -226,8 +239,20 @@ for (const s of seatSources) if (!seats.some((x) => x.src === s.key)) fail(`seat
 for (const k of seatCollegeKeys) if (!usedSeatColleges.has(k)) fail(`seat_colleges.ndjson: ${k} is in no seat list`);
 const unknownCourses = new Set(seats.filter((s) => !courseSlug.has(`${s.degree}|${s.specialty}`)).map((s) => `${s.degree} ${s.specialty}`));
 
+// retired keys: each once, none a key of this bundle (in clear or hashed), each pointing at a college this bundle has
+const sha = (s: string) => createHash("sha256").update(s).digest("hex");
+const retiredTo = new Map(aliases.map((a) => [a.oldKey, a.newKey]));
+if (retiredTo.size !== aliases.length) fail("key_aliases.json: a retired key twice");
+const hashedKeys = new Set([...allCollegeKeys].map((k) => `sha256:${sha(k)}`));
+for (const a of aliases) {
+  if (allCollegeKeys.has(a.oldKey) || hashedKeys.has(a.oldKey)) fail(`key_aliases.json: ${a.oldKey} is retired but still a college key`);
+  if (a.newKey != null && !allCollegeKeys.has(a.newKey)) fail(`key_aliases.json: ${a.oldKey} -> unknown college ${a.newKey}`);
+}
+/** RetiredCollegeKey.oldKey of a key this bundle retired (the key, or its hash), else null. */
+const retiredAs = (k: string) => (retiredTo.has(k) ? k : retiredTo.has(`sha256:${sha(k)}`) ? `sha256:${sha(k)}` : null);
+
 // notices: DataSource key = URL, so URLs are unique and never a term document's
-const termUrls = new Set(terms.map((t) => t.src_url));
+const termUrls = new Set(terms.flatMap((t) => (t.src_url ? [t.src_url] : [])));
 const noticeByUrl = new Map(notices.map((n) => [n.url, n]));
 if (noticeByUrl.size !== notices.length) fail("notices.json: duplicate url");
 for (const n of notices) if (termUrls.has(n.url)) fail(`notices.json: ${n.url} is also a term document`);
@@ -308,6 +333,22 @@ async function main() {
       const accounts = async () => (await Promise.all([tx.user.count(), tx.session.count(), tx.waitlistEntry.count()])).join("/");
       const accountsBefore = await accounts();
 
+      // Colleges under a key this bundle retired, before their rows go: their slugs (old links redirect) and what the
+      // bundle now has under the new key instead (cutoffs, allotments, seat lines, residents moved).
+      const dbColleges = await tx.college.findMany({ select: { id: true, key: true, slug: true, pincode: true } });
+      const retiredNow = dbColleges.flatMap((c) => {
+        const oldKey = retiredAs(c.key);
+        return oldKey ? [{ ...c, oldKey }] : [];
+      });
+      const ofRetired = { collegeId: { in: retiredNow.map((c) => c.id) } };
+      const moved = {
+        colleges: retiredNow.length,
+        cutoffs: await tx.cutoff.count({ where: { collegeSpecialty: ofRetired } }),
+        allotments: await tx.allotment.count({ where: { collegeSpecialty: ofRetired } }),
+        seatCounts: await tx.seatCount.count({ where: ofRetired }),
+        residents: await tx.resident.count({ where: ofRetired }),
+      };
+
       // remove what the bundle replaces or no longer has. Cutoffs, allotments, terms, seat lists, notices, round steps and
       // the NBEMS aggregates have no other source.
       // Key diffs are done here, not as NOT IN in SQL: that plan (NOT IN + nested NOT EXISTS over 133k cutoffs) can run for many minutes.
@@ -323,7 +364,7 @@ async function main() {
       const pairKeys = new Set(cutoffs.map((c) => `${c.ikey}|${courseSlug.get(`${c.degree}|${c.specialty}`)}`));
       const oldPairs = await tx.collegeSpecialty.findMany({ select: { id: true, college: { select: { key: true } }, specialty: { select: { slug: true } } } });
       const gonePairs = oldPairs.filter((p) => !pairKeys.has(`${p.college.key}|${p.specialty.slug}`)).map((p) => p.id);
-      const goneColleges = (await tx.college.findMany({ select: { id: true, key: true } })).filter((c) => !allCollegeKeys.has(c.key)).map((c) => c.id);
+      const goneColleges = dbColleges.filter((c) => !allCollegeKeys.has(c.key)).map((c) => c.id);
       const goneSpecialties = (await tx.specialty.findMany({ select: { id: true, slug: true } })).filter((s) => !slugs.has(s.slug)).map((s) => s.id);
       // Residents of a removed college (cascade) or course go too; import-residents re-adds them under the new key or course,
       // and their hides live on in HiddenResident.
@@ -340,12 +381,13 @@ async function main() {
         const row = await tx.dataSource.upsert({ where: { key: s.key }, create: { key: s.key, ...data }, update: data, select: { id: true } });
         sourceId.set(s.key, row.id);
       }
-      for (const url of new Set(terms.map((t) => t.src_url))) {
-        const host = new URL(url).hostname;
-        const name = host.includes("mcc.admissions") ? "MCC institute profile (college declaration)" : host.includes("natboard") ? "NBEMS notice" : `Official document (${host})`;
+      for (const url of termUrls) {
+        const name = termSourceName(url);
         const row = await tx.dataSource.upsert({ where: { key: url }, create: { key: url, name, url, type: "OFFICIAL" }, update: { name, url }, select: { id: true } });
         sourceId.set(url, row.id);
       }
+      const check = await tx.dataSource.upsert({ where: { key: BOND_CHECK.key }, create: BOND_CHECK, update: { name: BOND_CHECK.name, type: BOND_CHECK.type }, select: { id: true } });
+      sourceId.set(BOND_CHECK.key, check.id);
       // seat list PDFs: round stays null on the DataSource (year, round, kind on SeatSource), so the catalog never takes
       // one for an allotment result. Dated by the MCC notice that links the PDF, else no date.
       for (const s of seatSources) {
@@ -392,6 +434,36 @@ async function main() {
         const row = await tx.college.upsert({ where: { key: c.key }, create: { key: c.key, slug, ...data }, update: data, select: { id: true } });
         collegeId.set(c.key, row.id);
       }
+
+      // Retired keys, kept across imports (raw SQL: the shared generated client needn't know the table). A slug is
+      // recorded once, when its college goes; a slug recorded before for another key moves to this one.
+      const slugOf = new Map(retiredNow.map((c) => [c.oldKey, c.oldKey.startsWith("sha256:") ? `sha256:${sha(c.slug)}` : c.slug]));
+      await tx.$executeRaw`UPDATE "RetiredCollegeKey" SET "oldSlug" = NULL WHERE "oldSlug" = ANY(${[...slugOf.values()]})`;
+      await tx.$executeRaw`
+        INSERT INTO "RetiredCollegeKey" ("oldKey", "oldSlug", "newKey")
+        SELECT * FROM jsonb_to_recordset(${JSON.stringify(aliases.map((a) => ({ ...a, oldSlug: slugOf.get(a.oldKey) ?? null })))}::jsonb) AS d("oldKey" text, "oldSlug" text, "newKey" text)
+        ON CONFLICT ("oldKey") DO UPDATE SET "newKey" = EXCLUDED."newKey", "oldSlug" = COALESCE(EXCLUDED."oldSlug", "RetiredCollegeKey"."oldSlug")`;
+      // Keys retired by earlier bundles: one that is a key again is not retired; the rest point at the key their college
+      // has now (it was retired too) or at none (gone).
+      await tx.$executeRaw`DELETE FROM "RetiredCollegeKey" WHERE "oldKey" = ANY(${[...allCollegeKeys, ...hashedKeys]})`;
+      const stale = (await tx.$queryRaw<{ oldKey: string; newKey: string }[]>`SELECT "oldKey", "newKey" FROM "RetiredCollegeKey" WHERE "newKey" IS NOT NULL`)
+        .filter((r) => !allCollegeKeys.has(r.newKey))
+        .map((r) => ({ oldKey: r.oldKey, newKey: retiredTo.get(retiredAs(r.newKey) ?? "") ?? null }));
+      await tx.$executeRaw`
+        UPDATE "RetiredCollegeKey" r SET "newKey" = d."newKey"
+        FROM jsonb_to_recordset(${JSON.stringify(stale)}::jsonb) AS d("oldKey" text, "newKey" text) WHERE r."oldKey" = d."oldKey"`;
+      // HiddenResident is by place (PIN code, or the key of a college without one): a hide at a college's old place also
+      // covers its new one when that differs (a kept college given a PIN, or a retired college's successor elsewhere;
+      // the old row stays: it may cover others too).
+      const placeOf = new Map([...colleges, ...seatColleges].map((c) => [c.key, c.pincode ?? c.key]));
+      const moves = movedPlaces(dbColleges, placeOf, (k) => {
+        const old = retiredAs(k);
+        return old ? retiredTo.get(old) : k;
+      });
+      const hidesCopied = await tx.$executeRaw`
+        INSERT INTO "HiddenResident" ("name", "place")
+        SELECT h."name", d."to" FROM "HiddenResident" h JOIN jsonb_to_recordset(${JSON.stringify(moves)}::jsonb) AS d("from" text, "to" text) ON h."place" = d."from"
+        ON CONFLICT DO NOTHING`;
 
       // result PDFs and term documents no longer in the bundle (e.g. a provisional result the final one replaced): nothing
       // references them any more. Admitted-list sources (no round, written by import-residents) and the marker stay.
@@ -463,9 +535,15 @@ async function main() {
           kind: t.kind,
           text: t.text,
           amountInr: t.amount_inr,
-          sourceId: sourceId.get(t.src_url)!,
+          sourceId: sourceId.get(t.src_url ?? BOND_CHECK.key)!,
         })),
       });
+      // BOND / PENALTY details (validated above): raw SQL, so the shared generated client needn't know the column yet.
+      const details = terms.flatMap((t) => (t.details ? [{ collegeId: collegeId.get(t.ikey)!, program: t.program, kind: t.kind, details: t.details }] : []));
+      await tx.$executeRaw`
+        UPDATE "CollegeTerm" t SET details = d.details
+        FROM jsonb_to_recordset(${JSON.stringify(details)}::jsonb) AS d("collegeId" text, program text, kind text, details jsonb)
+        WHERE t."collegeId" = d."collegeId" AND t.program = d.program AND t.kind::text = d.kind`;
 
       // seat lists, row by row as the file has them; linked to the course at the college where Decide has it (an option)
       for (const s of seatSources) {
@@ -562,6 +640,15 @@ async function main() {
         if (got?.bestRank !== best) bad.push(`score_rank ${y}: top score ${score} → rank ${got?.bestRank}, file ${best}`);
       }
 
+      // every retired key of the bundle points where it says; no retired key points at a college the DB doesn't have
+      const [retired] = await tx.$queryRaw<{ total: number; bundle: number; dangling: number; slugs: number }[]>`
+        SELECT COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE "oldKey" = ANY(${aliases.map((a) => a.oldKey)}) AND "newKey" IS NOT DISTINCT FROM (${JSON.stringify(Object.fromEntries(retiredTo))}::jsonb ->> "oldKey"))::int AS bundle,
+          COUNT(*) FILTER (WHERE "newKey" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "College" c WHERE c.key = "newKey"))::int AS dangling,
+          COUNT("oldSlug")::int AS slugs
+        FROM "RetiredCollegeKey"`;
+      if (retired.bundle !== aliases.length || retired.dangling) bad.push(`retired keys: ${retired.bundle} of the bundle's ${aliases.length} as given, ${retired.dangling} pointing at no college`);
+
       const counts = {
         resultSources: await tx.dataSource.count({ where: { round: { not: null } } }),
         sources: await tx.dataSource.count(),
@@ -570,6 +657,7 @@ async function main() {
         collegeSpecialties: await tx.collegeSpecialty.count(),
         cutoffs: await tx.cutoff.count(),
         terms: await tx.collegeTerm.count(),
+        termDetails: (await tx.$queryRaw<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM "CollegeTerm" WHERE details IS NOT NULL`)[0].n,
         allotments: await tx.allotment.count(),
         seatSources: await tx.seatSource.count(),
         seatCounts: await tx.seatCount.count(),
@@ -586,6 +674,7 @@ async function main() {
         collegeSpecialties: pairs.size,
         cutoffs: cutoffs.length,
         terms: terms.length,
+        termDetails: terms.filter((t) => t.details).length,
         allotments: allotments.length,
         seatSources: seatSources.length,
         seatCounts: seats.length,
@@ -602,15 +691,24 @@ async function main() {
 
       const marker = { name: `MCC export bundle (built ${manifest.built})`, type: "OFFICIAL" as const, createdAt: new Date() };
       await tx.dataSource.upsert({ where: { key: MARKER }, create: { key: MARKER, ...marker }, update: marker });
-      return { ...counts, removed: { colleges: goneColleges.length, specialties: goneSpecialties.length, collegeSpecialties: gonePairs.length, sources: goneSources.count, residents: goneResidents }, accounts: accountsAfter };
+      return {
+        ...counts,
+        removed: { colleges: goneColleges.length, specialties: goneSpecialties.length, collegeSpecialties: gonePairs.length, sources: goneSources.count, residents: goneResidents },
+        // keys: RetiredCollegeKey rows (this bundle's and earlier ones'), slugs: of them with an old slug that redirects;
+        // movedNow: what this import found under keys it retired (now under the new key), hidesCopied: hides carried over.
+        retiredKeys: { keys: retired.total, bundle: aliases.length, slugs: retired.slugs, movedNow: moved, hidesCopied },
+        accounts: accountsAfter,
+      };
     },
     // RepeatableRead: the account counts are this transaction's own view, so a sign-in meanwhile doesn't abort it.
     { timeout: 1_800_000, maxWait: 60_000, isolationLevel: "RepeatableRead" },
   );
   console.log(result);
+  const unsourced = terms.filter((t) => t.src_url == null).length;
+  if (unsourced) console.log(`${unsourced} unknown bond term(s) with no document: source "${BOND_CHECK.name}".`);
   if (unknownCourses.size) console.log(`Seat rows with a course not in courses.json (kept, no Specialty link): ${[...unknownCourses].join(", ")}`);
   if (result.removed.residents) console.warn(`${result.removed.residents} resident row(s) went with their college or course: run npm run db:import-residents.`);
-  console.log("Committed. Spot checks passed (Kokilaben DNB Anaesthesiology 2025 R1–stray + 2026 R1 and its stray allotment; GMC Nagpur 2026 R1 closing and 12 allotments; no provisional 2026 R1; every seat list adds up to its file; NBEMS top scores).");
+  console.log("Committed. Spot checks passed (Kokilaben DNB Anaesthesiology 2025 R1–stray + 2026 R1 and its stray allotment; GMC Nagpur 2026 R1 closing and 12 allotments; no provisional 2026 R1; every seat list adds up to its file; NBEMS top scores; every retired key of the bundle points at its college).");
 }
 
 main()

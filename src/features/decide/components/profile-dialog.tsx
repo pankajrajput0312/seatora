@@ -181,7 +181,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
               Max bond
               <select value={draft.maxBondYears ?? ""} onChange={(e) => set("maxBondYears", e.target.value ? Number(e.target.value) : null)} className={control}>
                 <option value="">Any</option>
-                {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? "No bond" : `Up to ${y} ${y === 1 ? "year" : "years"}`}</option>)}
+                {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? "No bond (or unknown)" : `Up to ${y} ${y === 1 ? "year" : "years"}`}</option>)}
               </select>
             </label>
           </div>

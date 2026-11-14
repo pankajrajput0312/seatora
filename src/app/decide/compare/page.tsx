@@ -14,18 +14,21 @@ import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { getMeta, getOptionsByIds, LATEST_YEAR, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
+import { currentOptionIds, getMeta, getOptionsByIds, LATEST_YEAR, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
 import { termLabel } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Compare" };
 
-/** ids: repeated or comma-joined option ids; duplicates and unknown ids are dropped, then anything past the 4th. */
+/**
+ * ids: repeated or comma-joined option ids, under the college key each college has now (an old link's retired keys);
+ * duplicates and unknown ids are dropped, then anything past the 4th.
+ */
 const paramsSchema = z.object({ ids: z.array(z.string().min(1).max(300)).default([]) });
 
 export default async function ComparePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
-  const ids = [...new Set(parseSearchParams(paramsSchema, params, ["ids"]).ids)].slice(0, 5 * MAX_COMPARE);
+  const ids = [...new Set(await currentOptionIds([...new Set(parseSearchParams(paramsSchema, params, ["ids"]).ids)].slice(0, 5 * MAX_COMPARE)))];
   const [known, meta] = await Promise.all([getOptionsByIds(ids, profile), getMeta()]);
   const options = known.slice(0, MAX_COMPARE);
   const L = decideLinks(params);

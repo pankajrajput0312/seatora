@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { handle, invalid, notFound, ok, pageSchema, parseQuery } from "@/features/decide/api";
+import { handle, invalid, ok, pageSchema, parseQuery, renamedOr404 } from "@/features/decide/api";
 import { canSeeResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
 import { getCollege } from "@/features/decide/service";
 
@@ -16,8 +16,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     if (!(await residentsBudget("read"))) return Response.json({ ok: false, error: { code: "rate_limited", message: "Too many requests. Try again later." } }, { status: 429, headers: noStore });
     const q = parseQuery(querySchema, new URL(req.url).searchParams);
     if (!q.success) return invalid(q.error);
-    const college = await getCollege((await params).slug);
-    if (!college) return notFound("No institute with this slug");
+    const slug = (await params).slug;
+    const college = await getCollege(slug);
+    if (college?.slug !== slug) return renamedOr404(req, slug); // an old slug: 308 to the new one
     const { page, pageSize, ...f } = q.data;
     const r = await listResidents(college.key, f, { page, pageSize });
     const res = ok(

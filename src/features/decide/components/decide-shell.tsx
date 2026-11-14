@@ -16,6 +16,7 @@ import { MAX_COMPARE } from "../lib/choices";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
 import { ProfileDialog, type ProfileMeta } from "./profile-dialog";
+import { RenamedSaved } from "./renamed-saved";
 
 const sections = [
   {
@@ -145,7 +146,10 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
           <Button data-profile-edit variant="secondary" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
         </div>
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
-        <div className="isolate pb-24 md:pb-0">{children}</div>
+        <div className="isolate pb-24 md:pb-0">
+          <RenamedSaved />
+          {children}
+        </div>
       </AppShell>
 
       <nav aria-label="Decide shortcuts" className={cn("fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-background md:hidden", compare.length ? "grid-cols-4" : "grid-cols-3")}>

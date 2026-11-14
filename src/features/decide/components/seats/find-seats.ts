@@ -7,6 +7,7 @@ import { getCatalog, type Catalog } from "../../server/catalog";
 import { listNotices } from "../../server/notices";
 import { findCutoffs } from "../../server/queries";
 import { hasOption, listSeats, seatChanges, seatLists, type SeatFilters, type SeatRow } from "../../server/seats";
+import { courseTerms, type ProgrammeTerms } from "../../server/terms";
 import { getCollege, getMeta, programOf, type OptionTerms, type PageQuery } from "../../service";
 import { baseCategories, openQuotas, optionId, roundLabel, seatKindLabel, termLabel, type Category, type Cutoff, type Round, type SeatList, type Term } from "../../types";
 
@@ -30,8 +31,10 @@ export type SeatHistory = {
   reach: Reach | null;
   /** The label rests on a provisional latest-year R1 (as OptionRow.reachProvisional). */
   reachProvisional: boolean;
-  /** Fee, stipend, bond and seat-leaving penalty as published for the row's institute and program, each with its source. */
+  /** Fee, stipend, bond and penalty terms as published for the row's institute and program, each with its source (CSV). */
   terms: OptionTerms;
+  /** The same for the row's programme, read into figures (server/terms.ts): the row shows it with TermsSummary. */
+  fees: ProgrammeTerms;
 };
 /**
  * `byList`: seats per SeatList key, never added across keys. List view: the row's own list. Compare view: every list of
@@ -126,7 +129,7 @@ async function withHistory<T extends SeatRow>(cat: Catalog, rows: T[], reachFor:
     const deepest = rounds.filter(shown).reduce<PastClosing | null>((a, c) => (!a || c.closing > a.closing ? c : a), null);
     const reach = reachFor?.categories.includes(r.category) ? classifyReach(reachFor.rank, used, { ...opt, includeLatest: true }) : null;
     const reachProvisional = !!reach && latestProvisional && classifyReach(reachFor!.rank, used, { ...opt, includeLatest: false }) !== reach;
-    return { ...r, rounds, deepest, reach, reachProvisional, terms: termsOf(cat, r.college.key, r.degree) };
+    return { ...r, rounds, deepest, reach, reachProvisional, terms: termsOf(cat, r.college.key, r.degree), fees: courseTerms(cat, r.college.key, r.degree, r.specialty) };
   });
 }
 
