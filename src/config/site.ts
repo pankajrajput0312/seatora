@@ -9,8 +9,8 @@ export const siteConfig = {
     "The NEET PG planner: institutes, specialties, previous-year ranks, seat matrices, fees, stipends, bonds, resident experiences and counselling updates in one place.",
   nav: [
     { label: "Residents", href: "/#preview" },
+    { label: "Decide", href: "/decide" },
     { label: "Coverage", href: "/#coverage" },
-    { label: "Features", href: "/#features" },
     { label: "FAQ", href: "/#faq" },
   ],
 } as const;

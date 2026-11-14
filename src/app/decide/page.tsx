@@ -27,7 +27,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       {open && (
         <p className="flex flex-wrap items-center gap-2 rounded-xl border border-sky/30 bg-sky/10 p-4 text-sm">
           <span className="rounded-sm bg-sky/20 px-2 py-0.5 text-xs font-medium text-sky">Open now</span>
-          {open.title} ({open.authority}).
+          {open.title.replace(/\s*\(open now\)/i, "")} · {open.authority}.
           <a href={open.url} target="_blank" rel="noopener noreferrer" className="text-sky underline">Official schedule (opens MCC site)</a>
         </p>
       )}

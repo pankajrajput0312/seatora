@@ -44,8 +44,11 @@ features/<name>/
 Features may import from `components`, `lib`, `types` and `config`. A feature imports another feature only through that feature's `services` or `lib`, never its components.
 
 ## Routing conventions
-- Public routes are `/`, `/explore`, `/colleges/[slug]`, `/compare`, `/cutoffs` and `/announcements`.
-- Filter and search state lives in URL search params, so it can be shared and works with the back button. Parse params with Zod in `page.tsx`.
+- Public routes are `/` (landing), `/privacy`, `/login`, `/signup` and `/account`.
+- **Decide** (`src/features/decide`, `src/app/decide`): `/decide` (overview), `/decide/options`, `/decide/choices`, `/decide/compare?ids=`, `/decide/rank-scan`, `/decide/last-ranks`, `/decide/seats` (tabs `?tab=matrix|trends`), `/decide/institutes/[slug]` and `/decide/counselling` (tabs `?tab=schedule|announcements|merit`). Sub-navigation uses links with `aria-current`, not ARIA tabs. On mobile there is a bottom bar with Options, Choices and Rank scan.
+- Filter and search state lives in URL search params, so it can be shared and works with the back button. Parse params with Zod in `page.tsx`. Filter forms are GET forms (`next/form`).
+- **Profile in the URL:** the Decide profile (rank, category, PwD, specialties, degrees, quotas, states, max fee and max bond) is saved in localStorage under `medpath.profile` and mirrored into URL params (`rank`, `cat`, `pwd`, `sp`, `deg`, `quota`, `st`, `fee`, `bond`). URL params override the saved profile. `DecideShell` adds the saved profile to the URL when it's missing and carries the params on every sub-nav link, so all Decide pages are server-rendered from the URL. Choice lists (`medpath.choices`) and the compare tray (`medpath.compare`) stay on the device.
+- **Decide data:** pages call only `src/features/decide/service.ts`. It currently reads `data/decide.demo.ts`, whose shapes mirror the MCC import (`prisma/import-mcc.ts`). Going live means re-implementing the service functions with Prisma; components don't change. Every Decide screen shows the demo banner while `isDemo` is true. Decide never holds person-level data such as names.
 - Use `loading.tsx`, `error.tsx` and `not-found.tsx` per route segment where meaningful.
 
 ## Server and client boundaries
