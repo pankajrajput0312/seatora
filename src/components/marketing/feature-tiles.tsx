@@ -98,17 +98,15 @@ function MoneyBars() {
   );
 }
 
-const experience = [["Academics", 4], ["Clinical exposure", 5], ["Faculty", 4], ["Patient load", 5], ["Work-life", 2], ["Hostel", 3]] as const;
+const residentRows = [["Resident A", "MD Medicine", 8240], ["Resident B", "MS Surgery", 9105], ["Resident C", "MD Paediatrics", 11870]] as const;
 
-function ExperienceMeters() {
+function ResidentsMini() {
   return (
-    <ul className="grid gap-2">
-      {experience.map(([label, n]) => (
-        <li key={label} className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-muted-foreground">{label}</span>
-          <span className="flex gap-0.5" aria-label={`${n} of 5`}>
-            {Array.from({ length: 5 }, (_, i) => <span key={i} className={cn("size-2.5", i < n ? "bg-leaf" : "bg-muted")} />)}
-          </span>
+    <ul className="grid gap-2 text-xs">
+      {residentRows.map(([name, course, rank]) => (
+        <li key={name} className="flex items-center justify-between gap-3">
+          <span>{name} <span className="text-muted-foreground">· {course} · 2025</span></span>
+          <span className="numeric font-mono text-muted-foreground">AIR {formatRank(rank)}</span>
         </li>
       ))}
     </ul>
@@ -127,7 +125,7 @@ function CompareMini() {
     <table className="w-full text-xs">
       <thead>
         <tr className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-          <th className="pb-2 text-left font-normal" />
+          <th className="pb-2 text-left font-normal"><span className="sr-only">Measure</span></th>
           <th className="pb-2 text-right font-normal">College A</th>
           <th className="pb-2 text-right font-normal">College B</th>
         </tr>
@@ -215,7 +213,7 @@ export function FeatureTiles() {
       <Tile title="Previous-year ranks" caption="Closing ranks by round, quota and category." className="sm:col-span-2"><RanksChart /></Tile>
       <Tile title="Seat matrix" caption="Seats per specialty and category."><SeatGrid /></Tile>
       <Tile title="Fees, stipend, bond" caption="Dated and sourced, side by side."><MoneyBars /></Tile>
-      <Tile title="Resident experiences" caption="Six categories, labelled as experiences."><ExperienceMeters /></Tile>
+      <Tile title="Residents" caption="Name, course, year and 2025 AIR, from MCC's lists."><ResidentsMini /></Tile>
       <Tile title="Compare" caption="Differences highlighted, not buried."><CompareMini /></Tile>
       <Tile title="Institutes" caption="Every PG college, one profile each."><InstituteMini /></Tile>
       <Tile title="Shortlist & choice filling" caption="Order choices with history beside each."><ShortlistMini /></Tile>

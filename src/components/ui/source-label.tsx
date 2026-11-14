@@ -1,7 +1,8 @@
 import { Badge } from "./badge";
 import type { Provenance, SourceType } from "@/types/provenance";
 
-const labels: Record<SourceType, { text: string; tone: "success" | "info" | "neutral" | "warning" }> = {
+/** Trust tier → badge (docs/DATA_INTEGRITY.md). */
+export const sourceTypeLabels: Record<SourceType, { text: string; tone: "success" | "info" | "neutral" | "warning" }> = {
   OFFICIAL: { text: "Official", tone: "success" },
   VERIFIED_INSTITUTIONAL: { text: "Verified institutional", tone: "info" },
   THIRD_PARTY_RESEARCH: { text: "Third-party research", tone: "neutral" },
@@ -11,7 +12,7 @@ const labels: Record<SourceType, { text: string; tone: "success" | "info" | "neu
 
 /** Required next to any displayed college, cutoff, fee or announcement data. */
 export function SourceLabel({ provenance }: { provenance: Pick<Provenance, "sourceName" | "sourceUrl" | "sourceType" | "academicYear"> }) {
-  const { text, tone } = labels[provenance.sourceType];
+  const { text, tone } = sourceTypeLabels[provenance.sourceType];
   return (
     <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
       <Badge tone={tone}>{text}</Badge>

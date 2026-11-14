@@ -1,0 +1,14 @@
+import { siteConfig } from "@/config/site";
+
+/** Seller details for the policy pages (an individual seller in India, not a registered business). Empty fields are not rendered. */
+export const business = {
+  sellerName: "Pankaj Rajput",
+  address: "",
+  phone: "",
+  email: siteConfig.contactEmail,
+  price: 499,
+  period: "per NEET PG counselling season",
+  /** What a season is and when access ends (Pricing and Terms). */
+  season:
+    "A season is one year's MCC NEET PG counselling, from Round 1 to the last stray vacancy round. Payments made now are for the 2026 season, and access ends when MCC's 2026 counselling ends.",
+};

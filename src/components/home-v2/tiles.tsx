@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, GripVertical, MessageCircle } from "lucide-react";
+import { Check, GripVertical } from "lucide-react";
 
 // Three tiles, one line each. Visuals are illustrative shapes, not data.
 function StripMini() {
@@ -18,7 +18,7 @@ function ResidentMini() {
       {["MD Anaesthesiology", "DNB Family Medicine"].map((c, i) => (
         <div key={c} className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-sm">
           <span className="flex min-w-0 items-center gap-2"><span className={`size-7 shrink-0 rounded-full ${i ? "bg-sun/30" : "bg-mark/25"}`} />{c}</span>
-          <MessageCircle className="ml-2 size-4 shrink-0 text-sky" />
+          <span className="ml-2 shrink-0 text-xs text-muted-foreground">2025</span>
         </div>
       ))}
     </div>
@@ -41,7 +41,7 @@ function ListMini() {
 
 const tiles = [
   { title: "See where your rank lands", body: "Every college and course, against last years' closing ranks.", href: "/decide/options", visual: <StripMini /> },
-  { title: "Talk to residents", body: "The people already there. One tap to message.", href: "/#preview", visual: <ResidentMini /> },
+  { title: "See who's there", body: "Residents' names, course and year, from MCC's admitted lists.", href: "/#preview", visual: <ResidentMini /> },
   { title: "Fill choices with confidence", body: "Order your list and copy it straight into MCC.", href: "/decide/choices", visual: <ListMini /> },
 ];
 

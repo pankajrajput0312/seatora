@@ -4,7 +4,7 @@ Seatora informs decisions that shape doctors' careers. Wrong data is worse than 
 
 ## Absolute rules
 1. **Never fabricate** college data, cutoffs, seats, fees, stipends, bonds, rankings, reviews, testimonials, user identities or announcements.
-2. **Demo data must be labelled** visibly in the UI as "Demo data — illustrative only", and it lives in clearly named files (`*.demo.ts`).
+2. **Demo data must be labelled** visibly in the UI as "Demo data — illustrative only", and it lives in clearly named files (`*.demo.ts`). Decide has none at runtime: its fixture (`features/decide/test/decide.demo.ts`) is imported by tests only, and with no database Decide shows "Data unavailable", never stand-in numbers.
 3. **Historical is not predictive.** Cutoffs and rank-based results always say they come from previous years and do not guarantee admission. Do not use words like "guaranteed", "you will get" or "chance %" unless a validated statistical method is documented.
 4. **Missing data is shown as missing** ("—" or "Not available"), never as 0 and never estimated silently.
 5. **No invented scores.** Do not create composite "college scores" or rankings unless the method is documented and sourced.
@@ -43,6 +43,12 @@ Official information and reported experiences are never mixed in the same block.
 - Residents are added by hand to `src/features/residents/data/residents.json`, and every entry must have `consent: true`, covering their name and every contact detail listed. Never list a real person or their phone number, email or social handle without their agreement, and never invent residents.
 - Entries show "Resident-reported" unless `verified: true`, which may only be set after checking the allotment letter.
 - A resident's rank is shown as where one person got in, not as a closing rank or a prediction.
+
+## Admitted-list residents (Decide institute "Residents" tab)
+- Names come only from MCC's official admitted-candidates lists (`Resident`, imported from a private bundle that never enters git), with the list PDF as source. Name, course, year, list and the 2025 AIR where known: no roll numbers, and no contact details are held or shown.
+- Shown per institute only, for choosing a college, with the caption "contact people respectfully; ask to be hidden and we will". There is no endpoint across institutes, responses are `Cache-Control: private, no-store`, and the tab is `noindex`.
+- "Hide" records the person in `HiddenResident` (name + college PIN code) and sets `hidden`; hidden rows are never rendered or returned, and both imports keep them hidden, even under a new college key or course.
+- The rank is where one person got in, not a closing rank or a prediction.
 
 ## Announcements
 - Only show announcements traceable to an issuing authority, with a publication date and an official link where one exists.

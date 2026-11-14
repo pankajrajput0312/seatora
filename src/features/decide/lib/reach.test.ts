@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cutoff, Round } from "../types";
-import { buildGrid, classifyReach, deepestByYear, eligibleCategories } from "./reach";
+import { buildGrid, classifyReach, deepestByYear, eligibleCategories, reachLabel, resultsSpan, seatsBelow, seatsBelowText } from "./reach";
 
 const c = (year: number, round: Round, closing: number, category: Cutoff["category"] = "Open"): Cutoff => ({
   college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY", year, round, quota: "All India", category,
@@ -49,5 +49,40 @@ describe("review fixes", () => {
     all[0].n = 5; all[1].n = 3;
     const g = buildGrid(all, new Set(["Open", "OBC"]), new Set(["2026-R1"]));
     expect(g[2026].R1).toEqual({ closing: 17213, category: "OBC", n: 12, provisional: true });
+  });
+});
+
+it("labels name the years they count (2023 is shown in the grids, never counted)", () => {
+  expect(reachLabel("no-data", 2026, [2024, 2025])).toBe("No allotment in your categories in 2024, 2025 or 2026 R1");
+  expect(reachLabel("no-data", 2026, [2024, 2025], false)).toBe("No allotment in your categories in 2024 or 2025");
+  expect(reachLabel("reached-one", 2026, [2024, 2025])).toBe("Reached in 2024 or 2025");
+});
+
+describe("labels on one seat category", () => {
+  it("names the seat category in the no-data wording (a Seats row), hers otherwise", () => {
+    expect(reachLabel("no-data", 2026, [2024, 2025])).toBe("No allotment in your categories in 2024, 2025 or 2026 R1");
+    expect(reachLabel("no-data", 2026, [2024, 2025], true, "OBC")).toBe("No allotment on OBC seats in 2024, 2025 or 2026 R1");
+    expect(reachLabel("closed-before", 2026, [2024, 2025], true, "OBC")).toBe("Closed before your rank");
+  });
+  it("seatsBelow: a list whose seats here are all on categories whose own label is not the option's", () => {
+    // GMERS Vadnagar NBEMS Diploma Anaesthesiology for an OBC profile: the label is OBC's; clear vacancy prints Open seats only.
+    const by = { Open: "closed-before", OBC: "reached-latest" } as const;
+    const below = seatsBelow("reached-latest", by, { clear: ["Open"], virtual: ["OBC", "Open"], new: [] });
+    expect(below).toEqual([{ kind: "clear", on: [{ category: "Open", reach: "closed-before" }] }]);
+    expect(seatsBelowText(below[0], 2026, [2024, 2025])).toBe(
+      "In the clear vacancy list, your seat categories here have only Open seats; on Open seats alone: Closed before your rank.",
+    );
+    // Seats on the category the label comes from, or no seats at all: nothing to say.
+    expect(seatsBelow("reached-latest", by, { clear: ["OBC"], virtual: [] })).toEqual([]);
+    // One seat category: its label is the option's.
+    expect(seatsBelow("within-10", { Open: "within-10" }, { clear: ["Open"] })).toEqual([]);
+  });
+});
+
+describe("resultsSpan", () => {
+  it("names the oldest year to the newest year's last round", () => {
+    expect(resultsSpan([{ year: 2026, rounds: ["R1"] }, { year: 2025, rounds: ["R1", "R2", "R3", "stray"] }, { year: 2023, rounds: ["R1"] }])).toBe("2023 to 2026 R1");
+    expect(resultsSpan([{ year: 2025, rounds: ["R1", "stray"] }])).toBe("2025 Stray");
+    expect(resultsSpan([])).toBe("");
   });
 });

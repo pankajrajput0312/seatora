@@ -1,0 +1,10 @@
+# Never upload secrets or local artefacts to Vercel (it does not skip .env by default).
+.env
+.env.*
+!.env.example
+node_modules
+.next
+test-results
+playwright-report
+coverage
+*.log

@@ -32,39 +32,56 @@ enum CollegeType {
   CENTRAL
 }
 
-enum Quota {
-  AIQ
-  STATE
-  DEEMED
-  CENTRAL_INSTITUTE
-  MANAGEMENT
-  NRI
+enum TermKind {
+  FEE
+  STIPEND
+  BOND
+  PENALTY
 }
 
 model DataSource {
-  id            String         @id @default(cuid())
-  name          String
-  url           String?
-  type          SourceType
-  publishedAt   DateTime?
-  createdAt     DateTime       @default(now())
-  cutoffs       Cutoff[]
-  announcements Announcement[]
-  colleges      College[]
+  id              String         @id @default(cuid())
+  /// Stable import key, e.g. "mcc/2025/R1_final.pdf".
+  key             String         @unique
+  name            String
+  url             String?
+  type            SourceType
+  counsellingYear Int?
+  round           String?
+  /// Provisional result; replaced by the final one for the same year and round.
+  provisional     Boolean        @default(false)
+  publishedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  cutoffs         Cutoff[]
+  announcements   Announcement[]
+  colleges        College[]
+  terms           CollegeTerm[]
+  allotments      Allotment[]
+  seatSource      SeatSource?
+  meritList       MeritList?
 }
 
 model College {
   id                 String             @id @default(cuid())
   slug               String             @unique
+  /// Stable import key from the MCC dataset: 40 name letters + "#" + PIN.
+  key                String             @unique
   name               String
-  city               String
-  state              String
-  type               CollegeType
+  /// Null when the source does not state it. Never guessed.
+  city               String?
+  state              String?
+  pincode            String?
+  /// Address as printed in the MCC allotment PDFs. Null when MCC printed only a short name.
+  address            String?
+  type               CollegeType?
   sourceId           String
   source             DataSource         @relation(fields: [sourceId], references: [id])
   lastVerifiedAt     DateTime?
   verificationStatus VerificationStatus @default(PENDING)
   specialties        CollegeSpecialty[]
+  terms              CollegeTerm[]
+  residents          Resident[]
+  seatCounts         SeatCount[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -72,22 +89,29 @@ model College {
 }
 
 model Specialty {
-  id       String             @id @default(cuid())
-  slug     String             @unique
-  name     String
-  degree   String // MD, MS, DNB, Diploma
-  colleges CollegeSpecialty[]
+  id         String             @id @default(cuid())
+  slug       String             @unique
+  name       String
+  degree     String // MD, MS, DNB, Diploma
+  /// Canonical specialty code shared across degrees, e.g. "ANAESTHESIOLOGY" (MD and DNB Anaesthesiology). Set by the importer.
+  code       String?
+  colleges   CollegeSpecialty[]
+  residents  Resident[]
+  seatCounts SeatCount[]
 }
 
 model CollegeSpecialty {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
   collegeId   String
   specialtyId String
-  college     College   @relation(fields: [collegeId], references: [id])
-  specialty   Specialty @relation(fields: [specialtyId], references: [id])
+  college     College     @relation(fields: [collegeId], references: [id])
+  specialty   Specialty   @relation(fields: [specialtyId], references: [id])
   cutoffs     Cutoff[]
+  allotments  Allotment[]
+  seatCounts  SeatCount[]
 
   @@unique([collegeId, specialtyId])
+  @@index([specialtyId])
 }
 
 /// Historical rank data. Never a prediction.
@@ -96,31 +120,230 @@ model Cutoff {
   collegeSpecialtyId String
   collegeSpecialty   CollegeSpecialty   @relation(fields: [collegeSpecialtyId], references: [id])
   counsellingYear    Int
-  round              String // e.g. "R1", "R2", "Mop-up", "Stray"
-  quota              Quota
-  category           String // e.g. "GEN", "OBC", "SC", "ST", "EWS", "PwD"
+  round              String // MCC: "R1", "R2", "R3", "stray", "special_stray"
+  quota              String // MCC label verbatim, e.g. "All India", "DNB Quota", "Deemed/Paid Seats"
+  category           String // seat category: "Open", "OBC", "SC", "ST", "EWS", "<X> PwD"
   openingRank        Int?
   closingRank        Int?
+  /// Allotments made in this round (R2/R3/stray: new or upgraded only). Not the seat matrix.
+  n                  Int
   sourceId           String
   source             DataSource         @relation(fields: [sourceId], references: [id])
   lastVerifiedAt     DateTime?
   verificationStatus VerificationStatus @default(PENDING)
 
   @@unique([collegeSpecialtyId, counsellingYear, round, quota, category])
+  @@index([counsellingYear, category, closingRank])
+  @@index([sourceId])
+}
+
+/// One seat allotment as printed in an MCC result PDF: rank and seat only, never a name or roll number.
+model Allotment {
+  id                 String           @id @default(cuid())
+  collegeSpecialtyId String
+  collegeSpecialty   CollegeSpecialty @relation(fields: [collegeSpecialtyId], references: [id])
+  counsellingYear    Int
+  round              String // as Cutoff.round
+  /// NEET PG All India Rank.
+  rank               Int
+  quota              String // as Cutoff.quota
+  category           String // seat category, as Cutoff.category
+  status             String // "allotted" (R1, stray) | "fresh" | "upgraded" (R2, R3)
+  sourceId           String
+  source             DataSource       @relation(fields: [sourceId], references: [id])
+
+  @@index([counsellingYear, rank])
+  @@index([collegeSpecialtyId, counsellingYear, round])
+  @@index([sourceId])
+}
+
+/// One name on an MCC admitted-candidates list (PRIVATE bundle, `npm run db:import-residents`, replaced whole on import).
+/// Name, course, year and list only: the source has no roll numbers or contact details, and none are stored.
+model Resident {
+  id          String    @id @default(cuid())
+  /// Cascade: a college the MCC import removes takes its residents with it.
+  collegeId   String
+  college     College   @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  specialtyId String
+  specialty   Specialty @relation(fields: [specialtyId], references: [id])
+  /// Counselling year of the list.
+  year        Int
+  name        String
+  /// NEET PG 2025 All India Rank from the NBEMS merit list; null when not known (always for 2023 and 2024).
+  rank        Int?
+  /// The list as MCC labels it, e.g. "up to Round 3" or "final list (26 Mar 2025)".
+  list        String
+  /// The admitted-list PDF, e.g. "mcc/2025/admitted_upto_R3.pdf" (= DataSource.key).
+  sourceKey   String
+  /// Asked not to be shown: never rendered or returned by the API. Set from HiddenResident on every import.
+  hidden      Boolean   @default(false)
+
+  @@index([collegeId, year])
+  @@index([specialtyId])
+}
+
+/// A person who asked not to be shown (the Residents tab "Hide"). Apart from Resident, which the imports replace or
+/// cascade away, and with no foreign key, so a hide survives a new college key or course. By name and the college's PIN
+/// code: a same-named person at another college with that PIN is hidden too (never the other way round).
+model HiddenResident {
+  name      String
+  /// College.pincode, or College.key for a college without one.
+  place     String
+  createdAt DateTime @default(now())
+
+  @@id([name, place])
+}
+
+/// Fee, stipend, bond or penalty text exactly as published, per college and program (MD or DNB).
+model CollegeTerm {
+  id        String     @id @default(cuid())
+  collegeId String
+  college   College    @relation(fields: [collegeId], references: [id])
+  program   String // "MD" | "DNB"
+  kind      TermKind
+  text      String
+  /// Set only when the text contains exactly one rupee figure.
+  amountInr Int?
+  sourceId  String
+  source    DataSource @relation(fields: [sourceId], references: [id])
+
+  @@unique([collegeId, program, kind])
 }
 
 model Announcement {
   id              String     @id @default(cuid())
   title           String
   authority       String // e.g. "MCC", "DME Maharashtra"
-  category        String // registration, choice-filling, seat-matrix, results...
+  category        String // MCC import: notices.json kind verbatim, "notice" | "seat_matrix" | "result" | "schedule" | "bulletin"
   counsellingYear Int
+  /// MCC: "R1", "R2", "R3", "stray"; null when the notice is not about one round.
+  round           String?
   publishedAt     DateTime
   officialUrl     String?
   sourceId        String
   source          DataSource @relation(fields: [sourceId], references: [id])
 
   @@index([counsellingYear, authority])
+}
+
+/// One MCC seat list PDF of a round, as published (seat_sources.json). kind: "clear" = clear vacancy, "virtual" =
+/// virtual vacancy, "new" = newly added seats. The kinds OVERLAP (a newly added seat is also in that round's clear
+/// vacancy list): never add them together. A snapshot of its PDF: later MCC addition/removal notices are not applied.
+/// Its DataSource has the URL, name and publishedAt (the date of the MCC notice linking it, else null) and keeps
+/// `round` null, so the Decide catalog never counts the list as an allotment result.
+model SeatSource {
+  sourceId String      @id
+  source   DataSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  year     Int
+  round    String // as Cutoff.round
+  kind     String // "clear" | "virtual" | "new"
+  /// Σ seats of the list as the file gives it (the importer checks the rows add up to it).
+  total    Int
+  rows     SeatCount[]
+
+  @@index([year, round, kind])
+}
+
+/// Seats one list prints for a college × course × quota × category. Lines the PDF prints twice stay two rows, so a
+/// list's Σ seats equals the file's.
+model SeatCount {
+  id                 String            @id @default(cuid())
+  seatSourceId       String
+  seatSource         SeatSource        @relation(fields: [seatSourceId], references: [sourceId], onDelete: Cascade)
+  collegeId          String
+  college            College           @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  /// Null when the course is not in the MCC course list (courses.json).
+  specialtyId        String?
+  specialty          Specialty?        @relation(fields: [specialtyId], references: [id])
+  /// Null when the course at this college has no allotment data (no Cutoff), i.e. no Decide option.
+  collegeSpecialtyId String?
+  collegeSpecialty   CollegeSpecialty? @relation(fields: [collegeSpecialtyId], references: [id])
+  degree             String // as printed: "MD", "MS", "DNB", "NBEMS Diploma"...
+  code               String // specialty code, as Specialty.code
+  /// MCC label verbatim; null where the PDF has no quota column.
+  quota              String?
+  category           String // seat category, as Cutoff.category
+  seats              Int
+
+  @@index([seatSourceId, code])
+  @@index([collegeSpecialtyId, seatSourceId])
+  @@index([collegeId, seatSourceId])
+}
+
+/// One step of an MCC round (round_status.json), derived only from MCC notices, as of `asOf`.
+model RoundStep {
+  year          Int
+  round         String // "R1" | "R2" | "R3" | "stray"
+  step          String // "seat_matrix" | "choice_filling" | "provisional_result" | "final_result"
+  status        String // "done" | "open" | "suspended" | "upcoming" | "unknown"
+  /// Date of the notice behind the status (YYYY-MM-DD); null when implied or upcoming. Never guessed.
+  date          String?
+  /// The notice that justifies the status (or the schedule notice for an upcoming step).
+  url           String?
+  title         String?
+  note          String?
+  /// Dates printed in the official schedule notice at `url`, as printed (YYYY-MM-DD or ISO date-time in IST).
+  scheduledFrom String?
+  scheduledTo   String?
+  scheduledOn   String?
+  /// MCC's tentative schedule: may change.
+  tentative     Boolean  @default(false)
+  /// Every notice matched to this step, oldest first: [{ date, status, title, url }].
+  events        Json
+  asOf          DateTime
+
+  @@id([year, round, step])
+}
+
+/// An NBEMS result PDF behind the score→rank and merit-position aggregates (score_rank.json, merit_position.json).
+/// Aggregates only, no candidate rows. History, never a prediction.
+model MeritList {
+  sourceId   String          @id
+  source     DataSource      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  year       Int             @unique
+  /// Total marks of that year's exam (2025: 800, 2026: 720): compare ranks across years, not scores.
+  maxMarks   Int
+  /// Candidates the PDF ranks.
+  candidates Int
+  /// Who the PDF covers, as the exporter states it (e.g. qualified AIQ-eligible candidates only).
+  coverage   String
+  /// The NBEMS notice that publishes the PDF (DataSource.url is the PDF).
+  noticeUrl  String
+  /// merit_position: AIQ ranks between rows; null when the PDF prints no category.
+  step       Int?
+  /// merit_position: qualified candidates per NBEMS category ({"ALL": n, "OBC": n, "OBC PwBD": n...}); null without categories.
+  qualified  Json?
+  scores     ScoreRank[]
+  positions  MeritPosition[]
+}
+
+/// NEET PG rank range per score in one year's NBEMS result (best/worst = lowest/highest rank with that score).
+model ScoreRank {
+  year      Int
+  score     Int
+  bestRank  Int
+  worstRank Int
+  count     Int
+  listId    String
+  list      MeritList @relation(fields: [listId], references: [sourceId], onDelete: Cascade)
+
+  @@id([year, score])
+  @@index([year, bestRank])
+}
+
+/// One NBEMS AIQ merit-list threshold (every MeritList.step AIQ ranks): maxAir = highest NEET PG rank among candidates
+/// at or ahead of AIQ rank `aiqRank`; count = candidates of `category` among them ("<cat> PwBD" also counted in <cat>).
+model MeritPosition {
+  year     Int
+  aiqRank  Int
+  maxAir   Int
+  category String // NBEMS label verbatim: "ALL", "GENERAL", "GENERAL-EWS", "OBC", "SC", "ST", "<X> PwBD"
+  count    Int
+  listId   String
+  list     MeritList @relation(fields: [listId], references: [sourceId], onDelete: Cascade)
+
+  @@id([year, category, aiqRank])
+  @@index([year, category, maxAir])
 }
 
 /// Early-access sign-ups from the landing page.

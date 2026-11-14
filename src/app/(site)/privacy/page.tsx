@@ -1,43 +1,93 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Container } from "@/components/layout/container";
-import { siteConfig } from "@/config/site";
+import { business } from "@/config/business";
 
-export const metadata: Metadata = { title: "Privacy notice" };
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description: "What Seatora collects, why, where it is stored, the cookies it uses, how long data is kept and how to have it deleted.",
+};
 
 export default function PrivacyPage() {
-  const contact = siteConfig.contactEmail;
+  const { email, sellerName } = business;
+  const mail = email && <a href={`mailto:${email}`} className="text-sky underline">{email}</a>;
   return (
     <Container className="py-20 md:py-28">
       <article className="max-w-prose">
-        <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Privacy</p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight">Privacy notice</h1>
+        <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Legal</p>
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight">Privacy Policy</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-14">14 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
+          <section>
+            <h2>Who we are</h2>
+            <p className="mt-2">
+              Seatora is an online NEET PG counselling planner run by {sellerName ? `${sellerName}, an individual` : "an individual"} in India. This policy explains what we collect and what we do with it.
+            </p>
+          </section>
           <section>
             <h2>What we collect</h2>
             <p className="mt-2">
-              If you create an account, we store your name, email address and a one-way hash of your password (never the password
-              itself), plus two strictly necessary cookies that keep you signed in, a record of each sign-in session (when it started and expires), and a count of recent failed sign-in attempts used to protect your account. We don&apos;t use tracking or advertising cookies.
+              Accounts are by invitation only. For an account we store your name, your email address and a one-way hash of your password
+              (never the password itself), a record of each sign-in session (when it started and when it expires), and a count of recent
+              failed sign-in attempts, used to protect your account.
             </p>
-            <p className="mt-2">When you join early access, we store your email address, the NEET PG year you chose and the time you signed up. To stop abuse, your IP address is checked briefly in memory when you submit the form and is not stored with your sign-up; our hosting provider may keep standard server logs.</p>
+            <p className="mt-2">
+              The rank, category, PwD status, filters and choice lists you enter in the planner are saved only in your browser&apos;s local
+              storage, not in our database. They are also put in page addresses so the server can show your results, so they can appear
+              in our hosting provider&apos;s request logs. Clearing this site&apos;s data in your browser removes them.
+            </p>
+            <p className="mt-2">If you join early access, we store your email address, the NEET PG year you chose and the time you signed up.</p>
+            <p className="mt-2">To stop abuse, your IP address is held briefly in memory to limit repeated requests, and we don&apos;t store it. Our hosting provider may keep standard server logs.</p>
           </section>
           <section>
-            <h2>Why</h2>
-            <p className="mt-2">To run your account, and to tell you when the Seatora planner opens for your counselling year. We don&apos;t sell or share your email, and we don&apos;t send marketing from third parties.</p>
+            <h2>Cookies</h2>
+            <p className="mt-2">
+              Seatora uses three strictly necessary cookies and no others: a sign-in cookie that keeps you signed in, a small flag cookie
+              with no personal data that lets the page header show your account link, and an access cookie that lets your browser through
+              the site&apos;s access check. Each expires after 30 days, and signing out removes all three. We use no
+              analytics, tracking or advertising cookies.
+            </p>
           </section>
           <section>
-            <h2>How long</h2>
-            <p className="mt-2">Account data is kept until you ask us to delete your account. Early-access emails are kept until the planner launches for your year or until you ask us to delete them, whichever comes first.</p>
+            <h2>Where it is stored</h2>
+            <p className="mt-2">Your data is kept in a database hosted by Supabase in its Singapore region. The website is hosted on Vercel.</p>
+          </section>
+          <section>
+            <h2>Why we use it</h2>
+            <p className="mt-2">
+              To run your account and the site, to keep them secure, and to tell early-access sign-ups when the planner opens for their
+              year. We don&apos;t sell your data, we don&apos;t show ads, and we don&apos;t send marketing from third parties.
+            </p>
+          </section>
+          <section>
+            <h2>Residents&apos; names</h2>
+            <p className="mt-2">
+              Seatora shows the names of residents at each college, with their course, their year and, where NBEMS has published it, their
+              NEET PG All India Rank. The names come from MCC&apos;s official admitted-candidates lists and the ranks from the NBEMS merit
+              list, both public documents. We hold no contact details for anyone on them. Names are shown only to signed-in accounts that
+              have been given access.
+            </p>
+            <p className="mt-2">
+              If your name is listed and you want it removed, email us{mail && <> at {mail}</>}. We will hide it from the site and keep it
+              hidden when the lists are refreshed.
+            </p>
+          </section>
+          <section>
+            <h2>How long we keep it</h2>
+            <p className="mt-2">Account data is kept until you ask us to delete your account. Early-access emails are kept until the planner opens for your year or until you ask us to delete them, whichever comes first.</p>
           </section>
           <section>
             <h2>Your rights</h2>
             <p className="mt-2">
-              Under India&apos;s Digital Personal Data Protection Act, 2023, you can ask to see, correct or erase your data, withdraw consent, or raise a complaint at any time
-              {contact ? (
-                <> by writing to <a href={`mailto:${contact}`} className="text-sky underline">{contact}</a>.</>
-              ) : (
-                <> by replying to any email from us.</>
-              )}
+              Under India&apos;s Digital Personal Data Protection Act, 2023, you can ask to see, correct or delete your data, withdraw
+              consent, or raise a complaint at any time by emailing us{mail && <> at {mail}</>}.
+              {sellerName && <> Complaints are handled by {sellerName}.</>} We reply within 2 working days. See also our{" "}
+              <Link href="/terms" className="text-sky underline">Terms &amp; Conditions</Link>.
             </p>
+          </section>
+          <section>
+            <h2>Changes</h2>
+            <p className="mt-2">When this policy changes, we update it here and change the date at the top.</p>
           </section>
         </div>
       </article>

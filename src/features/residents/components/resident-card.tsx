@@ -89,7 +89,7 @@ export function ResidentCard({ r, index }: { r: ResidentMatch; index: number }) 
 
 /** Shown while no residents are listed: what each card will hold. Illustrative avatars, no people. */
 export function PortraitPreview() {
-  const labels = ["their rank", "their hospital", "their specialty", "say hello"];
+  const labels = ["their rank", "their hospital", "their specialty", "their year"];
   return (
     <ul className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="What each resident card shows">
       {labels.map((label, i) => (

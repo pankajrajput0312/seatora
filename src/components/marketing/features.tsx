@@ -6,7 +6,7 @@ import { SectionHeading } from "./section-heading";
 const problems = [
   { title: "Cutoffs in scattered PDFs", body: "Round-wise allotments from MCC and every state, in different formats, every year." },
   { title: "Fees and bonds out of date", body: "Stipends, bond penalties and fee hikes are rarely dated or easy to find." },
-  { title: "Residency life in group chats", body: "Patient load, duty hours and teaching quality live in forwarded messages." },
+  { title: "Who's there, buried in PDFs", body: "Admitted-candidate lists are long PDFs with no way to see one college's residents." },
 ];
 
 export function Features() {

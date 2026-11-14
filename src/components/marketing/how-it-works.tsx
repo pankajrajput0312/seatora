@@ -10,7 +10,7 @@ const stages = [
   },
   {
     title: "Choice filling",
-    body: "Ask residents at the hospitals you're considering, compare closing ranks, fees, stipends and bonds, then order your choices.",
+    body: "See who's at the hospitals you're considering, compare closing ranks, fees, stipends and bonds, then order your choices.",
     tools: [
       { label: "Residents by hospital", href: "#preview" },
       { label: "Closing ranks", href: "#features" },
@@ -42,7 +42,7 @@ export function HowItWorks() {
               <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
               <div className="mt-5 flex flex-wrap gap-1.5">
                 {s.tools.map((t) => (
-                  <Link key={t.label} href={t.href} className="rounded-sm bg-sky/10 px-2 py-0.5 text-xs font-medium text-sky hover:bg-sky/20">
+                  <Link key={t.label} href={t.href} className="inline-flex min-h-11 items-center rounded-sm bg-sky/10 px-2 text-xs font-medium text-sky hover:bg-sky/20">
                     {t.label}
                   </Link>
                 ))}

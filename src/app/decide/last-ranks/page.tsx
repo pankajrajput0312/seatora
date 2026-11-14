@@ -1,17 +1,31 @@
 import type { Metadata } from "next";
-import Form from "next/form";
 import Link from "next/link";
+import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
-import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { Dash, HISTORY_CAPTION, PageHead } from "@/features/decide/components/bits";
+import { Dash, HISTORY_CAPTION, PageHead, Provisional } from "@/features/decide/components/bits";
+import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
-import { profileFromParams, profileParamKeys, toURLSearchParams } from "@/features/decide/profile";
-import { getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
+import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
+import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
+import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
 import { baseCategories, roundLabel, rounds, type Round } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Last ranks" };
+const PAGE_SIZE = 50;
+const categories = [...baseCategories, ...baseCategories.map((c) => `${c} PwD` as const)] as const;
+const schema = z.object({
+  course: z.string().max(100).optional(),
+  lcat: z.enum(categories).optional(),
+  lquota: z.string().max(100).optional(),
+  inst: z.string().max(200).optional(),
+  /** A year-round column, e.g. "2025-R1" or "2024-special_stray". */
+  sort: z.string().regex(new RegExp(`^\\d{4}-(${rounds.join("|")})$`)).optional(),
+  dir: z.enum(["asc", "desc"]).default("desc"),
+  since: z.coerce.number().int().optional(),
+  page: pageValue.optional(),
+});
 
 /** R1 closing by year (like for like); a missing year is a gap, never a drop to zero. */
 function Spark({ r, years }: { r: OptionRow; years: number[] }) {
@@ -26,8 +40,8 @@ function Spark({ r, years }: { r: OptionRow; years: number[] }) {
   const desc = `R1 closing by year: ${years.map((yr, i) => `${yr} ${pts[i] != null ? formatRank(pts[i]!) : "no R1 data"}`).join(", ")}`;
   return (
     <svg viewBox="0 0 60 20" className="h-5 w-16" role="img" aria-label={desc}>
-      {segs.filter((sg) => sg.length > 1).map((sg, i) => <polyline key={i} points={sg.join(" ")} className="fill-none stroke-sky" strokeWidth={1.5} />)}
-      {pts.map((v, i) => (v != null ? <rect key={i} x={x(i) - 1.5} y={y(v) - 1.5} width={3} height={3} className="fill-sky" /> : null))}
+      {segs.filter((sg) => sg.length > 1).map((sg, i) => <polyline key={i} points={sg.join(" ")} className="fill-none stroke-mark" strokeWidth={1.5} />)}
+      {pts.map((v, i) => (v != null ? <rect key={i} x={x(i) - 1.5} y={y(v) - 1.5} width={3} height={3} className="fill-mark" /> : null))}
     </svg>
   );
 }
@@ -35,131 +49,127 @@ function Spark({ r, years }: { r: OptionRow; years: number[] }) {
 export default async function LastRanksPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
-  const meta = await getMeta();
-  const course = meta.courses.find((c) => c.slug === params.get("course")) ?? meta.courses.find((c) => profile?.specialties.includes(c.specialty)) ?? meta.courses[0];
-  const allCats = [...baseCategories, ...baseCategories.map((c) => `${c} PwD`)];
-  const category = allCats.includes(params.get("lcat") ?? "") ? params.get("lcat")! : profile?.category ?? "Open";
-  const quota = meta.quotas.includes(params.get("lquota") ?? "") ? params.get("lquota")! : undefined;
-  const sort = params.get("sort"); // e.g. "2025-R1"
-  const dir = params.get("dir") === "asc" ? "asc" : "desc";
-
-  const fetchedAll = await lastRanks({ specialty: course.specialty, degree: course.degree, category, quota });
-  // Columns come from the data: every year and round that has a closing for this course.
-  const cols = [...new Set(fetchedAll.flatMap((r) => Object.keys(r.grid).map(Number)))].sort().map((year) => ({
-    year,
-    rounds: rounds.filter((rd) => fetchedAll.some((r) => r.grid[year]?.[rd])),
-    provisional: fetchedAll.some((r) => Object.values(r.grid[year] ?? {}).some((c) => c?.provisional)),
-  }));
-  const years = cols.map((c) => c.year);
-  const fetched = fetchedAll;
-  let rows = fetched.filter((r) => Object.keys(r.grid).length > 0);
-  const emptyCount = fetched.length - rows.length;
-  if (sort) {
-    const [y, r] = sort.split("-");
-    const v = (x: OptionRow) => x.grid[Number(y)]?.[r as Round]?.closing ?? (dir === "asc" ? Infinity : -1);
-    rows = [...rows].sort((a, b) => (dir === "asc" ? v(a) - v(b) : v(b) - v(a)));
-  } else rows = [...rows].sort((a, b) => a.college.name.localeCompare(b.college.name));
-
-  const sortHref = (key: string) => {
-    const p = new URLSearchParams(params);
-    p.set("sort", key);
-    p.set("dir", sort === key && dir === "desc" ? "asc" : "desc");
-    return `/decide/last-ranks?${p}`;
-  };
   const L = decideLinks(params);
-  const focus = params.get("inst");
-  const caption = `Closing ranks for ${course.degree} ${course.name}, ${category} seats${quota ? `, ${quota}` : ""}`;
+  const f = parseSearchParams(schema, params);
+  const meta = await getMeta();
+  // Default: one of her courses (when she named any), MD/MS first, then DNB, then the rest (meta sorts Diploma first).
+  const order = (d: string) => (["MD", "MS", "DNB"].includes(d) ? ["MD", "MS", "DNB"].indexOf(d) : 3);
+  const mine = profile && (profile.pairs?.length || profile.specialties.length) ? meta.courses.filter((c) => profileHasCourse(profile, c)) : [];
+  const course = meta.courses.find((c) => c.slug === f.course) ?? mine.sort((a, b) => order(a.degree) - order(b.degree))[0] ?? meta.courses[0];
+  const category = f.lcat ?? profile?.category ?? "Open";
+  const quota = f.lquota && meta.quotas.includes(f.lquota) ? f.lquota : undefined;
+  const [sortYear, sortRound] = f.sort?.split("-") ?? [];
+  const sort = f.sort ? { year: Number(sortYear), round: sortRound as Round, dir: f.dir } : undefined;
+  const [lr, inst] = await Promise.all([
+    lastRanks({ specialty: course.specialty, degree: course.degree, category, quota, sort }),
+    f.inst ? getCollege(f.inst) : null,
+  ]);
+
+  // The service builds every row for the course anyway (one SQL read); only this page's rows are rendered. A link
+  // from an institute (inst) opens the page that holds its row unless a page is asked for (so the Pager always sets one).
+  const at = inst ? lr.rows.findIndex((r) => r.college.slug === inst.slug) : -1;
+  const page = Math.min(Math.max(1, Math.ceil(lr.total / PAGE_SIZE)), f.page ?? (at >= 0 ? Math.floor(at / PAGE_SIZE) + 1 : 1));
+  const rows = lr.rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const anchor = inst && rows.find((r) => r.college.slug === inst.slug)?.id;
+  const cols = lr.columns.filter((c) => !f.since || c.year >= f.since);
+  const years = cols.map((c) => c.year);
+  const courseLabel = `${course.degree} ${course.name}`;
+  const caption = `Closing ranks for ${courseLabel}, ${category} seats${quota ? `, ${quota}` : ""}`;
+  const sortHref = (key: string) => L.with("/decide/last-ranks", { sort: key, dir: f.sort === key && f.dir === "desc" ? "asc" : "desc", page: null });
 
   return (
-    <AppPage className="py-6">
-      <PageHead title="Last ranks">Closing rank in each round, with allotments made in brackets. Pick a course and a seat category.</PageHead>
+    <AppPage className="grid grid-cols-1 gap-6">
+      <PageHead title="Last ranks">Closing rank in each round on one seat category, with the allotments made that round in brackets. Pick a course, a seat category and a quota.</PageHead>
 
-      <Form action="/decide/last-ranks" role="search" className="mt-8 grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
-        {profileParamKeys.map((k) => params.get(k) && <input key={k} type="hidden" name={k} value={params.get(k)!} />)}
-        {focus && <input type="hidden" name="inst" value={focus} />}
-        <label className="grid gap-1.5 text-sm">
-          <span className="text-xs font-medium text-muted-foreground">Course</span>
-          <select name="course" defaultValue={course.slug} className="h-11 rounded-md border border-input bg-background px-3">
-            {meta.courses.map((c) => <option key={c.slug} value={c.slug}>{c.degree} {c.name}</option>)}
-          </select>
-        </label>
-        <label className="grid gap-1.5 text-sm">
-          <span className="text-xs font-medium text-muted-foreground">Seat category</span>
-          <select name="lcat" defaultValue={category} className="h-11 rounded-md border border-input bg-background px-3">
-            {allCats.map((c) => <option key={c}>{c}</option>)}
-          </select>
-        </label>
-        <label className="grid gap-1.5 text-sm">
-          <span className="text-xs font-medium text-muted-foreground">Quota</span>
-          <select name="lquota" defaultValue={quota ?? ""} className="h-11 rounded-md border border-input bg-background px-3">
-            <option value="">All quotas</option>
-            {meta.quotas.map((q) => <option key={q}>{q}</option>)}
-          </select>
-        </label>
-        <Button type="submit" className="h-11">Show</Button>
-      </Form>
+      <FilterBar action="/decide/last-ranks" params={params} cols="md:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+        {inst && <input type="hidden" name="inst" value={inst.slug} />}
+        <Field label="Course"><Select name="course" value={course.slug} options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
+        <Field label="Seat category"><Select name="lcat" value={category} options={categories.map((c) => ({ value: c, label: c }))} /></Field>
+        <Field label="Quota"><Select name="lquota" value={quota} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
+        <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={lr.columns.map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
+      </FilterBar>
 
-      <p aria-live="polite" className="mt-6 text-sm text-muted-foreground"><span className="numeric text-foreground">{rows.length}</span> institutes{emptyCount > 0 && <>; <span className="numeric">{emptyCount}</span> more had no {category}-seat allotments for this course</>}.</p>
+      {inst && at < 0 && (
+        <p className="rounded-lg border border-border bg-card px-4 py-2 text-sm">
+          {inst.name} had no {category}-seat allotments for {courseLabel}{quota ? `, ${quota}` : ""} in these results.{" "}
+          {category !== "Open" && <Link href={L.with("/decide/last-ranks", { lcat: "Open", page: null })} className={`${smallLink} text-sky`}>Show Open seats</Link>}{" "}
+          <Link href={L.allotments({ course: course.slug, inst: inst.slug })} className={`${smallLink} text-sky`}>See its allotments</Link>
+        </p>
+      )}
 
-      <div role="region" aria-label={caption} tabIndex={0} className="relative mt-3 overflow-x-auto rounded-xl border border-border bg-card [scroll-padding-inline-start:16rem]">
-        <table className="w-full min-w-[56rem] text-sm">
-          <caption className="sr-only">{caption}</caption>
-          <colgroup span={2} />
-          {cols.map((c) => <colgroup key={c.year} span={c.rounds.length} />)}
-          <thead>
-            <tr className="border-b border-border text-xs text-muted-foreground">
-              <th rowSpan={2} scope="col" className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-semibold">Institute</th>
-              <th rowSpan={2} scope="col" className="px-2 py-2 text-left text-xs font-semibold">R1 trend</th>
-              {cols.map((c) => (
-                <th key={c.year} scope="colgroup" colSpan={c.rounds.length} className="border-l border-border px-2 py-2 text-center font-mono font-normal tracking-widest">
-                  {c.year}{c.provisional && " (provisional)"}
-                </th>
-              ))}
-            </tr>
-            <tr className="border-b border-border text-xs text-muted-foreground">
-              {cols.flatMap((c) =>
-                c.rounds.map((r, i) => {
-                  const key = `${c.year}-${r}`;
-                  return (
-                    <th key={key} scope="col" aria-sort={sort === key ? (dir === "asc" ? "ascending" : "descending") : undefined} className={`px-1 py-1 text-right font-normal ${i === 0 ? "border-l border-border" : ""}`}>
-                      <Link href={sortHref(key)} aria-label={`${c.year} ${roundLabel[r]}, sort ${sort === key && dir === "desc" ? "ascending" : "descending"}`} className="inline-flex min-h-11 items-center justify-end px-1 hover:text-foreground">
-                        {roundLabel[r]}{sort === key ? (dir === "asc" ? " ↑" : " ↓") : ""}
-                      </Link>
-                    </th>
-                  );
-                }),
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} id={`inst-${r.college.slug}`} className={`scroll-mt-24 border-b border-border last:border-0 ${focus === r.college.slug ? "bg-sky/10" : ""}`}>
-                <th scope="row" className={`sticky left-0 z-10 max-w-64 px-3 py-2 text-left font-normal ${focus === r.college.slug ? "bg-mist" : "bg-card"}`}>
-                  <Link href={L.institute(r.college.slug)} className="font-medium hover:text-sky hover:underline">{r.college.name}</Link>
-                  <span className="block text-xs text-muted-foreground">{r.college.state}, {r.quota}</span>
-                  <Link href={L.allotments({ course: course.slug, inst: r.college.slug })} className="text-xs text-sky underline">Allotments</Link>
-                </th>
-                <td className="px-2 py-2"><Spark r={r} years={years} /></td>
+      <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
+        <span className="numeric font-semibold text-foreground">{rangeLabel({ ...lr, rows, page, pageSize: PAGE_SIZE })}</span> options (institute and quota) with a closing on {category} seats
+        {lr.empty > 0 && <>; <span className="numeric">{formatRank(lr.empty)}</span> more had no {category}-seat allotments for this course</>}.
+      </p>
+
+      {lr.total === 0 ? (
+        <EmptyState title={`No ${category}-seat closings for ${courseLabel}${quota ? `, ${quota}` : ""}`} description="Try another seat category or quota." href={L.to("/decide/last-ranks", { course: course.slug })} />
+      ) : (
+        <div role="region" aria-label={caption} tabIndex={0} className="relative overflow-x-auto rounded-xl border border-border bg-card [scroll-padding-inline-start:16rem]">
+          <table className="w-full min-w-[56rem] text-sm">
+            <caption className="sr-only">{caption}, page {page}</caption>
+            <colgroup span={2} />
+            {cols.map((c) => <colgroup key={c.year} span={c.rounds.length} />)}
+            <thead>
+              <tr className="border-b border-border text-xs text-muted-foreground">
+                <th rowSpan={2} scope="col" className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-semibold">Institute</th>
+                <th rowSpan={2} scope="col" className="px-2 py-2 text-left text-xs font-semibold">R1 trend</th>
+                {cols.map((c) => (
+                  <th key={c.year} scope="colgroup" colSpan={c.rounds.length} className="border-l border-border px-2 py-2 text-center text-xs font-semibold">
+                    <span className="numeric">{c.year}</span> <Provisional when={c.provisional} />
+                  </th>
+                ))}
+              </tr>
+              <tr className="border-b border-border text-xs text-muted-foreground">
                 {cols.flatMap((c) =>
-                  c.rounds.map((round, i) => {
-                    const cell = r.grid[c.year]?.[round];
+                  c.rounds.map((r, i) => {
+                    const key = `${c.year}-${r}`;
+                    const on = f.sort === key;
                     return (
-                      <td key={`${c.year}-${round}`} className={`numeric px-2 py-2 text-right ${i === 0 ? "border-l border-border" : ""}`}>
-                        {cell ? <>{formatRank(cell.closing)} <span className="text-xs text-muted-foreground">({cell.n})</span></> : <Dash />}
-                      </td>
+                      <th key={key} scope="col" aria-sort={on ? (f.dir === "asc" ? "ascending" : "descending") : undefined} className={`px-1 py-1 text-right font-normal ${i === 0 ? "border-l border-border" : ""}`}>
+                        <Link href={sortHref(key)} aria-label={`${c.year} ${roundLabel[r]}, sort ${on && f.dir === "desc" ? "ascending" : "descending"}`} className="inline-flex min-h-11 items-center justify-end px-1 hover:text-foreground">
+                          {roundLabel[r]}{on ? (f.dir === "asc" ? " ↑" : " ↓") : ""}
+                        </Link>
+                      </th>
                     );
                   }),
                 )}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const mine = inst?.slug === r.college.slug;
+                return (
+                  <tr key={r.id} id={r.id === anchor ? `inst-${r.college.slug}` : undefined} className={`scroll-mt-24 border-b border-border last:border-0 hover:bg-muted/50 ${mine ? "bg-sky/10" : ""}`}>
+                    <th scope="row" className={`sticky left-0 z-10 max-w-64 px-3 py-2 text-left font-normal ${mine ? "bg-mist" : "bg-card"}`}>
+                      <Link href={L.institute(r.college.slug)} className="font-medium hover:text-sky hover:underline">{r.college.name}</Link>
+                      <span className="block text-xs text-muted-foreground">{r.college.state ?? <Dash />}, {r.quota}</span>
+                      <Link href={L.allotments({ course: course.slug, inst: r.college.slug })} className={`${smallLink} text-xs text-sky`}>Allotments</Link>
+                    </th>
+                    <td className="px-2 py-2"><Spark r={r} years={years} /></td>
+                    {cols.flatMap((c) =>
+                      c.rounds.map((round, i) => {
+                        const cell = r.grid[c.year]?.[round];
+                        return (
+                          <td key={`${c.year}-${round}`} className={`numeric px-2 py-2 text-right ${i === 0 ? "border-l border-border" : ""}`}>
+                            {cell ? <>{formatRank(cell.closing)} <span className="text-xs text-muted-foreground">({formatRank(cell.n)})</span></> : <Dash />}
+                          </td>
+                        );
+                      }),
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <Pager page={page} pageSize={PAGE_SIZE} total={lr.total} href={(n) => L.with("/decide/last-ranks", { page: n })} focusId="results" label="Last ranks" />
 
-      <div className="mt-6 grid gap-2 text-xs text-muted-foreground">
-        <p>Closing = highest All India Rank allotted that round on a {category} seat. Brackets = allotments made that round (new or upgraded only in R2+), not the seat matrix.</p>
+      <div className="grid gap-2 text-xs text-muted-foreground">
+        <p>Closing = highest All India Rank allotted that round on a {category} seat. Brackets = allotments made that round in every seat category (in R2 and later, new or upgraded allotments only), not the seat matrix. The R1 trend draws the R1 columns as a line.</p>
         <p>{HISTORY_CAPTION}</p>
-        <DataSource />
+        <DataSource used={years.map((year) => ({ year }))} />
       </div>
     </AppPage>
   );

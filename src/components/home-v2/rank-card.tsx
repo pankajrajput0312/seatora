@@ -6,7 +6,7 @@ import { ArrowUpRight, Check } from "lucide-react";
 import { formatRank } from "@/features/cutoffs/lib/format";
 
 const categories = ["Open", "OBC", "EWS", "SC", "ST"] as const;
-const points = ["Closing ranks for every round and year", "Residents at each hospital you can message", "Your choice list, in MCC order"];
+const points = ["Closing ranks for every round and year", "Residents at each hospital, from MCC's lists", "Your choice list, in MCC order"];
 
 /** The one standout element: a working rank entry that opens the planner with that rank. */
 export function RankCard() {

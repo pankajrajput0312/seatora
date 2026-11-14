@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { LogoMark } from "@/components/layout/logo";
+import { legalLinks } from "@/components/layout/site-footer";
 import { EcgLine } from "@/components/home-v2/ecg-line";
 import { RankCard } from "@/components/home-v2/rank-card";
 import { Tiles } from "@/components/home-v2/tiles";
@@ -68,7 +69,11 @@ export default function HomeV2() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-8 text-sm text-muted-foreground md:px-8">
           <span className="flex items-center gap-2 font-semibold text-foreground"><LogoMark className="size-5" /> Seatora</span>
           <span>Independent. Not affiliated with MCC, NBEMS or NMC.</span>
-          <nav aria-label="Footer" className="flex gap-5"><Link href="/privacy" className="hover:text-foreground">Privacy</Link><Link href="/" className="hover:text-foreground">Classic home</Link></nav>
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-5">
+            {[...legalLinks, { label: "Classic home", href: "/" }].map((l) => (
+              <Link key={l.href} href={l.href} className="inline-flex min-h-11 items-center hover:text-foreground">{l.label}</Link>
+            ))}
+          </nav>
         </div>
       </footer>
     </>

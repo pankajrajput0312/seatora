@@ -34,10 +34,16 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ];
 
+// The private app (src/middleware.ts) and the auth pages stay out of search; marketing and policy pages are indexable.
+const noindex = ["/decide/:path*", "/api/:path*", "/login", "/signup", "/account"].map((source) => ({
+  source,
+  headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+}));
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [{ source: "/(.*)", headers: securityHeaders }, ...noindex];
   },
 };
 

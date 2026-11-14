@@ -1,6 +1,6 @@
-// DEMO DATA, illustrative only. Every institute is "Example …"; ranks, fees and dates are invented but plausible.
-// Shapes match the real MCC import so the service can switch to Prisma later. No names of any person.
-import type { Allotment, Category, College, Course, Cutoff, DecideData, Notice, Round, Source, Term } from "../types";
+// TEST FIXTURE, illustrative only: unit tests run the service on it (setTestCatalog). Never imported at runtime.
+// Every institute is "Example …"; ranks and fees are invented but plausible. No names of any person.
+import type { Allotment, Category, College, Course, Cutoff, DecideData, Round, Source, Term } from "../types";
 
 function hash(s: string) {
   let h = 2166136261;
@@ -51,6 +51,7 @@ const colleges: College[] = [...gov, ...deemed, ...dnb].map((s) => ({
   name: s.name,
   state: s.state,
   pincode: s.pin,
+  address: null,
   type: s.type,
   beds: s.beds,
   established: s.est,
@@ -102,8 +103,8 @@ dnb.forEach((s, i) => {
   if (i !== 4) addSeries(s, dnbFm, "DNB Quota", s.base * 0.9, ["Open", "OBC", "EWS", "SC"]);
 });
 
-const terms: Term[] = [
-  ...gov.flatMap((s, i): Term[] => {
+const terms: Omit<Term, "source">[] = [
+  ...gov.flatMap((s, i): Omit<Term, "source">[] => {
     const fee = [60000, 85000, 120000, 70000, 45000, 95000, 110000][i];
     const bond = [null, 1, 2, null, 3, 2, 1][i];
     return [
@@ -112,16 +113,16 @@ const terms: Term[] = [
       ...(bond
         ? [
             { college: keyOf(s), program: "MD" as const, kind: "BOND" as const, text: `${bond} ${bond === 1 ? "year" : "years"} state service`, amountInr: null },
-            { college: keyOf(s), program: "MD" as const, kind: "PENALTY" as const, text: `₹${bond * 10} L if bond not served`, amountInr: bond * 1000000 },
+            { college: keyOf(s), program: "MD" as const, kind: "PENALTY" as const, text: `₹${bond * 10},00,000 forfeited if you resign/don't join from Round 2`, amountInr: bond * 1000000 },
           ]
         : []),
     ];
   }),
-  ...deemed.flatMap((s, i): Term[] => [
+  ...deemed.flatMap((s, i): Omit<Term, "source">[] => [
     { college: keyOf(s), program: "MD", kind: "FEE", text: `₹${[18, 22.5, 26, 28][i]} L/yr`, amountInr: [1800000, 2250000, 2600000, 2800000][i] },
     { college: keyOf(s), program: "MD", kind: "STIPEND", text: `₹${(45000 + i * 8000).toLocaleString("en-IN")}/month (Y1)`, amountInr: 45000 + i * 8000 },
   ]),
-  ...dnb.flatMap((s, i): Term[] => [
+  ...dnb.flatMap((s, i): Omit<Term, "source">[] => [
     { college: keyOf(s), program: "DNB", kind: "FEE", text: "₹1.25 L/yr + GST to NBEMS", amountInr: 125000 },
     ...(i === 6 ? [] : [{ college: keyOf(s), program: "DNB" as const, kind: "STIPEND" as const, text: `₹${(72000 + i * 2500).toLocaleString("en-IN")}/month (Y1)`, amountInr: 72000 + i * 2500 }]),
     ...(i === 1 ? [{ college: keyOf(s), program: "DNB" as const, kind: "BOND" as const, text: "1 year service", amountInr: null }] : []),
@@ -138,16 +139,5 @@ const allotments: Allotment[] = cutoffs.flatMap((c) =>
   })),
 );
 
-const MCC = "https://mcc.nic.in/pg-medical-counselling/";
-const notices: Notice[] = [
-  { date: "2026-10-20", kind: "schedule", status: "done", authority: "MCC", url: MCC, title: "Demo: Round 1 registration, choice filling and result" },
-  { date: "2026-11-12", kind: "schedule", status: "open", authority: "MCC", url: MCC, title: "Demo: Round 2 registration and choice filling" },
-  { date: "2026-11-26", kind: "schedule", status: "upcoming", authority: "MCC", url: MCC, title: "Demo: Round 3 (illustrative date)" },
-  { date: "2026-12-10", kind: "schedule", status: "upcoming", authority: "MCC", url: MCC, title: "Demo: Stray vacancy round (illustrative date)" },
-  { date: "2026-11-12", kind: "announcement", status: "open", authority: "MCC", url: MCC, title: "Demo notice: Round 2 registration and choice filling open" },
-  { date: "2026-11-08", kind: "announcement", authority: "MCC", url: MCC, title: "Demo notice: Round 1 provisional result published" },
-  { date: "2026-11-02", kind: "announcement", authority: "MCC", url: MCC, title: "Demo notice: seat matrix for Round 2 added" },
-  { date: "2026-09-30", kind: "merit", authority: "NBEMS", url: "https://natboard.edu.in/", title: "Demo: NEET PG 2026 result and merit list" },
-];
-
-export const decideDemoData: DecideData = { colleges, courses, sources, cutoffs, terms, allotments, notices, isDemo: true };
+const demoSource = { name: "Test fixture, illustrative only", url: null, type: "UNVERIFIED_COMMUNITY" as const };
+export const decideDemoData: DecideData = { colleges, courses, sources, cutoffs, terms: terms.map((t) => ({ ...t, source: demoSource })), allotments };

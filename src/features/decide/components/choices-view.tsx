@@ -1,22 +1,39 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowDown, ArrowUp, Check, GripVertical, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { duplicateList, markTypedUpTo, move, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
-import { useChoices, useProfileHref } from "../lib/use-decide-store";
+import { LATEST_YEAR, PAST_YEARS, reachWindow, seatsBelowText, type Reach, type SeatsBelow } from "../lib/reach";
+import { useChoices, useDecideLinks } from "../lib/use-decide-store";
+import { keepProfileParams } from "../profile";
+import type { SeatsBy } from "../service";
+import { roundLabel, type SeatList } from "../types";
+import { ReachBadge } from "./bits";
 import { CompareToggle } from "./option-actions";
+import { SeatsLink } from "./options-view";
+import { control, EmptyState, smallLink } from "./ui";
 
-export function ChoicesView() {
+type Live = Record<string, { reach: Reach; provisional: boolean; seats: SeatsBy; below: SeatsBelow[] }>;
+/**
+ * Reach labels and seats per list (`lists`: the newest round's clear, virtual, new) from the current data for these ids
+ * and profile params (a server action); null when unavailable.
+ */
+type ReachFor = (ids: string[], profile: string) => Promise<{ lists: SeatList[]; options: Live } | null>;
+
+export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
   const [state, setState, hydrated] = useChoices();
-  const href = useProfileHref();
+  const L = useDecideLinks();
+  const sp = useSearchParams();
   const list = state.lists.find((l) => l.id === state.activeId) ?? state.lists[0];
   const [announce, setAnnounce] = useState("");
   const [picked, setPicked] = useState<{ index: number; origin: number } | null>(null);
-  const [removed, setRemoved] = useState<{ item: ChoiceItem; index: number } | null>(null);
+  // Undo belongs to the list the item was removed from, whichever list is open when she presses it.
+  const [removed, setRemoved] = useState<{ listId: string; listName: string; item: ChoiceItem; index: number } | null>(null);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const dragFrom = useRef<number | null>(null);
   const listRef = useRef<HTMLOListElement>(null);
@@ -24,15 +41,42 @@ export function ChoicesView() {
   const items = list.items;
   const n = items.length;
   const prefix = typedPrefix(list);
+  const missingTyped = list.typedIds.filter((id) => !items.some((i) => i.id === id)).length;
   const name = (i: ChoiceItem) => `${i.institute}, ${i.course}`;
   const setItems = (next: ChoiceItem[]) => setState((s) => updateActive(s, (l) => ({ ...l, items: next })));
-  /** Focus a control of the item with this id after React re-renders. */
-  const focusItem = (id: string | undefined, control: "handle" | "up" | "down" = "handle") =>
+
+  // Relabel from the current data and her rank and category in the URL; the stored labels are the fallback.
+  const url = new URLSearchParams(sp.toString());
+  const who = new URLSearchParams([...keepProfileParams(url)].filter(([k]) => k === "rank" || k === "cat" || k === "pwd")).toString();
+  const liveKey = who.includes("rank=") && n ? JSON.stringify([who, items.map((i) => i.id).sort()]) : "";
+  // Labels gathered for this rank and category (kept across edits, so nothing flickers); `fresh` = the last answer
+  // covered exactly these ids, so a missing id really is missing from the data.
+  const [live, setLive] = useState<{ who: string; key: string; data: Live; lists: SeatList[] } | null>(null);
+  useEffect(() => {
+    if (!hydrated || !reachFor || !liveKey) return;
+    let stale = false;
+    const [qs, ids] = JSON.parse(liveKey) as [string, string[]];
+    reachFor(ids, qs).then(
+      (r) => !stale && r && setLive((prev) => ({ who: qs, key: liveKey, lists: r.lists, data: { ...(prev?.who === qs ? prev.data : {}), ...r.options } })),
+      () => {}, // no data: keep the stored labels
+    );
+    return () => {
+      stale = true;
+    };
+  }, [hydrated, reachFor, liveKey]);
+  const current = live?.who === who ? live.data : null;
+  const lists = (current && live?.lists) || [];
+  const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
+  const fresh = live?.key === liveKey;
+
+  /** Focus a control of the item with this id after React re-renders, and keep it in view (it may have moved). */
+  const focusItem = (id: string | undefined, which: "handle" | "up" | "down" = "handle") =>
     requestAnimationFrame(() => {
-      const el = id ? document.getElementById(`${control}-${id}`) : null;
+      const el = id ? document.getElementById(`${which}-${id}`) : null;
       const handle = id ? document.getElementById(`handle-${id}`) : null;
-      const target = el && !(el as HTMLButtonElement).disabled ? el : handle ?? listRef.current ?? document.getElementById("choices-h");
+      const target = el && !(el as HTMLButtonElement).disabled ? el : handle ?? listRef.current ?? document.getElementById("choices-undo") ?? document.getElementById("choices-h");
       target?.focus();
+      target?.scrollIntoView({ block: "nearest" });
     });
   const reorder = (from: number, to: number) => {
     const target = Math.max(0, Math.min(n - 1, to));
@@ -73,19 +117,23 @@ export function ChoicesView() {
 
   const remove = (index: number) => {
     const item = items[index];
-    setRemoved({ item, index });
+    setRemoved({ listId: list.id, listName: list.name, item, index });
     setItems(items.filter((_, i) => i !== index));
-    // Focus the item that took its place, else the one before, else the list.
+    // Focus the item that took its place, else the one before, else Undo (the list is gone).
     focusItem((items[index + 1] ?? items[index - 1])?.id);
-    setAnnounce(`Removed ${name(item)}. Undo is available.`);
+    setAnnounce(`Removed ${name(item)} from ${list.name}. Undo is available.`);
   };
   const undo = () => {
     if (!removed) return;
-    const next = [...items];
-    next.splice(removed.index, 0, removed.item);
-    setItems(next);
-    focusItem(removed.item.id);
-    setAnnounce(`Restored ${name(removed.item)} at position ${removed.index + 1}.`);
+    const { listId, listName, item, index } = removed;
+    setState((s) => ({
+      activeId: s.lists.some((l) => l.id === listId) ? listId : s.activeId,
+      lists: s.lists.map((l) =>
+        l.id === listId && !l.items.some((i) => i.id === item.id) ? { ...l, items: [...l.items.slice(0, index), item, ...l.items.slice(index)] } : l,
+      ),
+    }));
+    focusItem(item.id);
+    setAnnounce(`Restored ${name(item)} to ${listName} at position ${index + 1}.`);
     setRemoved(null);
   };
 
@@ -119,7 +167,15 @@ export function ChoicesView() {
             {l.name} <span className="opacity-70">({l.items.length})</span>
           </Button>
         ))}
-        <Button variant="ghost" onClick={() => setState((s) => duplicateList(s, list.id))}>Duplicate for next round</Button>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setState((s) => duplicateList(s, list.id));
+            setAnnounce(`Duplicated ${list.name} as ${duplicateList(state, list.id).lists.at(-1)!.name}; now showing it.`);
+          }}
+        >
+          Duplicate for next round
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2" data-print-hide>
@@ -128,94 +184,125 @@ export function ChoicesView() {
         <Button variant="secondary" disabled={!n} onClick={() => window.print()}>Print</Button>
         <label className="ml-auto inline-flex min-h-11 items-center gap-2 text-sm">
           Typed into the MCC portal up to #
-          <input
-            type="number" min={0} max={n} value={prefix}
-            onChange={(e) => setState((s) => updateActive(s, (l) => markTypedUpTo(l, Number(e.target.value) || 0)))}
-            className="numeric h-11 w-20 rounded-md border border-input bg-card px-2"
-          />
+          <span className="w-20">
+            <input
+              type="number" min={0} max={n} value={prefix}
+              onChange={(e) => setState((s) => updateActive(s, (l) => markTypedUpTo(l, Number(e.target.value) || 0)))}
+              className={cn(control, "numeric")}
+            />
+          </span>
         </label>
       </div>
       {copyMsg && <p className="text-sm" data-print-hide>{copyMsg}</p>}
+      {missingTyped > 0 && (
+        <p className="text-sm text-sun" data-print-hide>
+          {missingTyped === 1 ? "1 option you marked as typed into MCC is" : `${missingTyped} options you marked as typed into MCC are`} no longer in this list, but still in the
+          portal. Remove {missingTyped === 1 ? "it" : "them"} there too, then set the typed count again.
+        </p>
+      )}
 
       <p className="sr-only" aria-live="assertive">{announce}</p>
       <p className="sr-only" aria-live="polite">{copyMsg ?? ""}</p>
       {removed && (
         <p className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm" data-print-hide>
-          Removed {name(removed.item)}.
-          <Button variant="ghost" onClick={undo}>Undo</Button>
+          Removed {name(removed.item)} from {removed.listName}.
+          <Button id="choices-undo" variant="ghost" onClick={undo}>Undo</Button>
         </p>
       )}
 
       <h2 id="choices-h" tabIndex={-1} className="sr-only">{list.name}</h2>
       {n === 0 ? (
-        <div className="grid place-items-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
-          <p className="font-medium">{list.name} is empty.</p>
-          <p className="max-w-sm text-sm text-muted-foreground">Add options with the star on the Options screen or an institute page.</p>
-          <Link href={href("/decide/options")} className="text-sm text-sky underline">Go to Options</Link>
-        </div>
+        <EmptyState title={`${list.name} is empty`} description="Add options with the star on the Options screen or an institute page.">
+          <Link href={L.options()} className={cn(smallLink, "text-sm text-sky")}>Go to Options</Link>
+        </EmptyState>
       ) : (
         <>
           <ol ref={listRef} tabIndex={-1} aria-label={`${list.name} choice list, ${n} items`} className="grid gap-2">
             {items.map((item, i) => {
               const typed = list.typedIds.includes(item.id);
+              const lr = current?.[item.id];
+              const closed = lr ? lr.reach === "closed-before" : item.closedEveryRound;
               const flags = [
                 (counts.get(dupKey(item)) ?? 0) > 1 && "Same institute and course listed more than once",
-                item.closedEveryRound && "Closed before your rank in every past round",
+                closed && `Closed before your rank in every round of ${reachWindow(LATEST_YEAR, PAST_YEARS)}${lr ? "" : " (when added)"}`,
+                // Seats are matched to the option by institute and course; say what was found, not what MCC printed.
+                lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
+                ...(lr?.below ?? []).map((b) => seatsBelowText(b, LATEST_YEAR, PAST_YEARS)),
+                fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
                 typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
               ].filter(Boolean) as string[];
+              const picking = picked?.index === i;
               return (
                 <li
                   key={item.id}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => { e.preventDefault(); if (dragFrom.current != null) { const to = reorder(dragFrom.current, i); setAnnounce(`${name(items[dragFrom.current])} moved to position ${to + 1}.`); } dragFrom.current = null; }}
-                  className={cn("grid grid-cols-[auto_auto_1fr] items-start gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[auto_auto_1fr_auto]", picked?.index === i ? "border-sky" : "border-border")}
+                  className={cn("grid grid-cols-[auto_auto_1fr] items-start gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[auto_auto_1fr_auto]", picking ? "border-sky" : "border-border")}
                 >
-                  <button
+                  <Button
                     id={`handle-${item.id}`}
-                    type="button"
+                    size="icon"
+                    variant="ghost"
                     draggable
                     onDragStart={(e) => { dragFrom.current = i; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", item.id); }}
                     onKeyDown={(e) => onHandleKey(e, i)}
                     onBlur={() => picked && setPicked(null)}
-                    aria-label={`Reorder ${name(item)}, position ${i + 1} of ${n}. Press Space to pick up.`}
-                    aria-pressed={picked?.index === i}
-                    className="grid size-11 cursor-grab place-items-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
+                    aria-label={`Reorder ${name(item)}, position ${i + 1} of ${n}. ${picking ? "Picked up: arrows move it, Space drops it, Escape cancels." : "Press Space to pick up."}`}
+                    aria-pressed={picking}
+                    className="cursor-grab active:cursor-grabbing"
                     data-print-hide
                   >
                     <GripVertical className="size-5" aria-hidden />
-                  </button>
+                  </Button>
                   <span className="grid h-11 min-w-11 place-items-center text-xl font-bold tabular-nums">{i + 1}</span>
                   <div className="min-w-0 py-1">
                     <p className="font-medium">
-                      <Link href={href(`/decide/institutes/${item.slug}`)} className="hover:text-sky hover:underline">{item.institute}</Link>
+                      <Link href={L.institute(item.slug)} className="hover:text-sky hover:underline">{item.institute}</Link>
                       {typed && <Badge tone="success" className="ml-2 align-middle"><Check className="mr-1 size-3" aria-hidden />Typed into MCC</Badge>}
                     </p>
-                    <p className="text-sm text-muted-foreground">{item.course}, {item.quota}{item.state ? `, ${item.state}` : ""}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{item.reachLabel} <span className="text-muted-foreground/80">(when added)</span></p>
-                    {item.courseSlug && (
-                      <p className="mt-1 flex gap-3 text-xs" data-print-hide>
-                        <Link href={href("/decide/last-ranks", { course: item.courseSlug, inst: item.slug }, `#inst-${item.slug}`)} className="text-sky underline">Last ranks</Link>
-                        <Link href={href("/decide/allotments", { course: item.courseSlug, inst: item.slug })} className="text-sky underline">Allotments</Link>
+                    <p className="text-sm text-muted-foreground">{item.course}, {item.quota}, {item.state ?? "state not listed"}</p>
+                    <p className="mt-1 text-xs">
+                      {lr ? <ReachBadge reach={lr.reach} provisional={lr.provisional} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>}
+                    </p>
+                    {lr && lists.length > 0 && (
+                      <p className="flex flex-wrap items-center gap-x-3 text-xs">
+                        <span className="text-muted-foreground">{round} seats:</span>
+                        {lists.map((l) => (
+                          <span key={l.key} className="inline-flex items-center gap-1">
+                            {l.kind}
+                            <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${item.quota}`} />
+                          </span>
+                        ))}
+                      </p>
+                    )}
+                    {item.courseSlug && lr?.reach !== "new" && (
+                      <p className="flex flex-wrap gap-x-4 text-xs" data-print-hide>
+                        <Link href={L.lastRanks(item.courseSlug, { inst: item.slug })} className={cn(smallLink, "text-sky")}>Last ranks</Link>
+                        <Link href={L.allotments({ course: item.courseSlug, inst: item.slug })} className={cn(smallLink, "text-sky")}>Allotments</Link>
                       </p>
                     )}
                     {flags.map((f) => <p key={f} className="mt-1 text-xs text-sun">{f}</p>)}
                   </div>
                   <div className="col-span-3 flex flex-wrap items-center gap-1 sm:col-span-1" data-print-hide>
-                    <Button id={`up-${item.id}`} size="icon" variant="ghost" disabled={i === 0} aria-label={`Move ${name(item)} up`} onClick={() => moveBy(i, -1)}><ArrowUp className="size-4" /></Button>
-                    <Button id={`down-${item.id}`} size="icon" variant="ghost" disabled={i === n - 1} aria-label={`Move ${name(item)} down`} onClick={() => moveBy(i, 1)}><ArrowDown className="size-4" /></Button>
+                    <Button id={`up-${item.id}`} size="icon" variant="ghost" disabled={i === 0} aria-label={`Move ${name(item)} up`} onClick={() => moveBy(i, -1)}><ArrowUp className="size-4" aria-hidden /></Button>
+                    <Button id={`down-${item.id}`} size="icon" variant="ghost" disabled={i === n - 1} aria-label={`Move ${name(item)} down`} onClick={() => moveBy(i, 1)}><ArrowDown className="size-4" aria-hidden /></Button>
                     <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("to")); if (v) { const t = reorder(i, v - 1); focusItem(item.id); setAnnounce(`${name(item)} moved to position ${t + 1} of ${n}.`); } }}>
                       <label className="sr-only" htmlFor={`to-${item.id}`}>Move {name(item)} to position</label>
-                      <input id={`to-${item.id}`} name="to" type="number" min={1} max={n} placeholder="#" className="numeric h-11 w-16 rounded-md border border-input bg-background px-2 text-sm" />
+                      <span className="w-16"><input id={`to-${item.id}`} name="to" type="number" min={1} max={n} placeholder="#" className={cn(control, "numeric")} /></span>
                       <Button type="submit" variant="ghost">Move</Button>
                     </form>
                     <CompareToggle id={item.id} label={name(item)} />
-                    <Button size="icon" variant="danger" aria-label={`Remove ${name(item)}`} onClick={() => remove(i)}><Trash2 className="size-4" /></Button>
+                    <Button size="icon" variant="danger" aria-label={`Remove ${name(item)}`} onClick={() => remove(i)}><Trash2 className="size-4" aria-hidden /></Button>
                   </div>
                 </li>
               );
             })}
           </ol>
-          <p className="text-xs text-muted-foreground">Reach labels are from when you added each option, based on previous years&apos; closing ranks. History, not a prediction.</p>
+          <p className="text-xs text-muted-foreground">
+            {current
+              ? `Reach labels use your current rank and category and previous years' closing ranks.${round ? ` ${round} seats: each choice's seats in the ${lists.map((l) => l.kind).join(", ")} lists, in its quota and your seat categories, "—" when a list has none; the lists overlap, so they are never added.` : ""}`
+              : "Labels marked (when added) are from when you added each option. Set your rank to see them for your current profile."}
+          </p>
         </>
       )}
     </div>

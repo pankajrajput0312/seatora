@@ -68,10 +68,13 @@ export function markTypedUpTo(list: ChoiceList, n: number): ChoiceList {
   return { ...list, typedIds: list.items.slice(0, Math.max(0, Math.min(n, list.items.length))).map((i) => i.id) };
 }
 
-/** Length of the unbroken run of typed items from the top: the portal matches the list up to here. */
+/**
+ * How many items from the top are exactly what's in the portal, in portal order (typedIds is stored in the order she
+ * typed them): a swap inside the typed block ends the match there, so the moved items get flagged.
+ */
 export function typedPrefix(list: ChoiceList): number {
   let n = 0;
-  while (n < list.items.length && list.typedIds.includes(list.items[n].id)) n++;
+  while (n < list.items.length && list.items[n].id === list.typedIds[n]) n++;
   return n;
 }
 
@@ -79,18 +82,27 @@ const itemSchema = z.object({
   id: z.string(), institute: z.string(), slug: z.string(), state: z.string().nullable(), course: z.string(),
   courseSlug: z.string().optional(), quota: z.string(), reachLabel: z.string(), closedEveryRound: z.boolean(),
 });
+/** An array where each element is validated on its own: bad elements are dropped, the good ones kept. */
+const salvage = <T>(schema: z.ZodType<T>) =>
+  z.array(z.unknown()).catch([]).transform((xs) => xs.flatMap((x) => {
+    const r = schema.safeParse(x);
+    return r.success ? [r.data] : [];
+  }));
 const listSchema = z.object({
-  id: z.string(), name: z.string(), items: z.array(itemSchema),
-  typedIds: z.array(z.string()).optional(),
-  transcribedUpTo: z.number().optional(), // legacy count, migrated below
+  id: z.string(), name: z.string(), items: salvage(itemSchema),
+  typedIds: z.array(z.string()).optional().catch(undefined),
+  transcribedUpTo: z.number().optional().catch(undefined), // legacy count, migrated below
 });
-export const choicesSchema = z.object({ lists: z.array(listSchema).min(1), activeId: z.string() });
+export const choicesSchema = z.object({ lists: salvage(listSchema), activeId: z.string().catch("") });
 export const compareSchema = z.array(z.string()).max(MAX_COMPARE);
 
-/** Validates stored choices; legacy counts become typed ids; anything malformed falls back to the default. */
+/**
+ * Validates stored choices item by item and list by list, so one bad entry never costs her the rest (the next save
+ * would overwrite them). Legacy counts become typed ids. Only a value with no valid list falls back to the default.
+ */
 export function parseChoices(raw: unknown): ChoicesState {
   const r = choicesSchema.safeParse(raw);
-  if (!r.success) return defaultChoices;
+  if (!r.success || !r.data.lists.length) return defaultChoices;
   return {
     activeId: r.data.lists.some((l) => l.id === r.data.activeId) ? r.data.activeId : r.data.lists[0].id,
     lists: r.data.lists.map(({ transcribedUpTo, typedIds, ...l }) => ({ ...l, typedIds: typedIds ?? l.items.slice(0, transcribedUpTo ?? 0).map((i) => i.id) })),
