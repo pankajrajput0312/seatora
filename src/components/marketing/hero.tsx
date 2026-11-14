@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
-import { PixelEmblem } from "./pixel-emblem";
+import { HeroScene } from "./hero-scene";
 
 const quickLinks = [
   { label: "Residents by hospital", href: "#preview" },
@@ -45,16 +45,7 @@ export function Hero() {
           </nav>
         </div>
 
-        <div className="relative mx-auto w-full max-w-md py-10" aria-hidden>
-          <p className="absolute top-0 left-0 z-10 rounded-full border border-input bg-secondary px-4 py-2 text-sm shadow-overlay">
-            AIQ rank 12,450 · OBC · MD Medicine
-          </p>
-          <PixelEmblem className="bob mx-auto w-4/5" animated />
-          <p className="absolute right-0 bottom-0 z-10 flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground shadow-overlay">
-            <span className="size-1.5 animate-pulse rounded-full bg-sky" />
-            comparing previous-year rounds
-          </p>
-        </div>
+        <HeroScene />
       </Container>
     </section>
   );

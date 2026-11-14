@@ -6,7 +6,6 @@ import { Hero } from "@/components/marketing/hero";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { PlannerPreview } from "@/components/marketing/planner-preview";
 import { QuestionMarquee } from "@/components/marketing/question-marquee";
-import { SeatFactors } from "@/components/marketing/seat-factors";
 import { Trust } from "@/components/marketing/trust";
 
 export default function HomePage() {
@@ -17,7 +16,6 @@ export default function HomePage() {
       <PlannerPreview />
       <Coverage />
       <Features />
-      <SeatFactors />
       <HowItWorks />
       <Trust />
       <Faq />
