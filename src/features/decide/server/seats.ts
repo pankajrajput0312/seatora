@@ -58,6 +58,8 @@ export type SeatFilters = {
   /** Specialty codes (any degree), e.g. ["ANAESTHESIOLOGY", "FAMILYMEDICINE"]. */
   specialties?: string[];
   degrees?: string[];
+  /** Exact courses "degree~SPECIALTY" (profile.ts pairKey), e.g. ["DNB~FAMILYMEDICINE"]. */
+  pairs?: string[];
   /** MCC quota label verbatim, e.g. "All India", "DNB Quota". Rows of a PDF without a quota column (quota null) never match. */
   quota?: string;
   /** Seat categories, e.g. ["Open", "OBC"]. */
@@ -104,6 +106,7 @@ export async function listSeats(f: SeatFilters = {}, pg?: PageQuery): Promise<Pa
       f.courses && Prisma.sql`sp.slug = ANY(${f.courses})`,
       f.specialties && Prisma.sql`x.code = ANY(${f.specialties})`,
       f.degrees && Prisma.sql`x.degree = ANY(${f.degrees})`,
+      f.pairs && Prisma.sql`(x.degree || '~' || x.code) = ANY(${f.pairs})`,
       f.quota && Prisma.sql`x.quota = ${f.quota}`,
       f.categories && Prisma.sql`x.category = ANY(${f.categories})`,
       f.state && Prisma.sql`c.state = ${f.state}`,

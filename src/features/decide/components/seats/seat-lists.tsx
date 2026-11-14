@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
 import { sourceTypeLabels } from "@/components/ui/source-label";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -6,9 +7,12 @@ import { cn } from "@/lib/cn";
 import type { DecideLinks } from "../../lib/links";
 import { roundName } from "../../lib/round-status";
 import type { SeatRow } from "../../server/seats";
-import { roundLabel, seatKindLabel, type MccNotice, type SeatKind, type SeatList } from "../../types";
-import { Dash } from "../bits";
+import type { OptionTerms } from "../../service";
+import { openQuotas, roundLabel, rounds, seatKindLabel, termLabel, type MccNotice, type Round, type SeatKind, type SeatList } from "../../types";
+import { Dash, Provisional, ReachBadge, TermText } from "../bits";
+import { FeeText } from "../options-view";
 import { smallLink, tbl } from "../ui";
+import { PAST_ROUNDS, type SeatLine, type SeatSort } from "./find-seats";
 
 // Seats page parts (src/app/decide/seats): one MCC seat list at a time, never added to another list.
 
@@ -128,41 +132,111 @@ export function UnlistedSeats({ u, profile, here, href }: { u: { list: SeatList;
 }
 
 const courseOf = (r: SeatRow) => `${r.degree} ${r.course?.name ?? r.specialty}`;
-const md = "hidden md:table-cell";
+const kindOf = { fee: "FEE", stipend: "STIPEND", bond: "BOND", penalty: "PENALTY" } as const;
 
-/** Seat rows: institute, state, course, quota, seat category, seats. Under md, state, course and quota move under the name. */
-export function SeatTable({ rows, caption, L }: { rows: SeatRow[]; caption: string; L: DecideLinks }) {
-  const td = "px-3 py-3 align-top md:px-4";
+/** The deepest closing of the shown past rounds (PAST_ROUNDS), and behind a disclosure every round the reach label counts. */
+function PastClosings({ r, name }: { r: SeatLine; name: string }) {
+  if (!r.rounds.length) return <Dash />;
+  const d = r.deepest;
+  const at = (p: { year: number; round: Round }) => r.rounds.find((c) => c.year === p.year && c.round === p.round);
+  const all: { year: number; round: Round; closing: number | null; provisional: boolean }[] = [...PAST_ROUNDS.map((p) => at(p) ?? { ...p, closing: null, provisional: false }), ...r.rounds.filter((c) => !PAST_ROUNDS.some((p) => p.year === c.year && p.round === c.round))]
+    .sort((a, b) => a.year - b.year || rounds.indexOf(a.round) - rounds.indexOf(b.round));
   return (
-    <div role="region" aria-label={caption} tabIndex={0} className={tbl.wrap}>
+    <div className="grid justify-items-end gap-1 whitespace-nowrap">
+      {d ? (
+        <span className="numeric">
+          <span className="text-[15px] font-semibold">{formatRank(d.closing)}</span>
+          <span className="block text-xs text-muted-foreground">{d.year} {roundLabel[d.round]}</span>
+        </span>
+      ) : (
+        <Dash />
+      )}
+      <Provisional when={d?.provisional} />
+      <details className="text-right text-xs">
+        <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky">Every round<span className="sr-only">: {name}</span></summary>
+        <dl className="grid grid-cols-[auto_auto] gap-x-3 text-right">
+          {all.map((c) => (
+            <Fragment key={`${c.year}-${c.round}`}>
+              <dt className="numeric text-left text-muted-foreground">{c.year} {roundLabel[c.round]}</dt>
+              <dd className="numeric">{c.closing != null ? <>{formatRank(c.closing)}{c.provisional && " (provisional)"}</> : <Dash />}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      </details>
+    </div>
+  );
+}
+
+/** Fee, stipend, bond and seat-leaving penalty as published, each with its source; "—" when not listed. */
+function Terms({ t }: { t: OptionTerms }) {
+  return (
+    <dl className="grid gap-1">
+      {(["fee", "stipend", "bond", "penalty"] as const).map((k) => (
+        <div key={k}>
+          <dt className="inline text-muted-foreground">{termLabel[kindOf[k]]}: </dt>
+          <dd className="inline">{k === "fee" ? <FeeText t={t.fee} /> : <TermText term={t[k]} />}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * Seat rows: institute (with course, quota and state; sticky, so a phone scrolls the rest beside it), seat category,
+ * seats in each of `lists` (one list, or every list of a round side by side: never added; `current` orders the seats sort), the deepest past closing on
+ * the row's quota and seat category, her reach label on it (`ranked`), and the published terms.
+ */
+export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { rows: SeatLine[]; lists: SeatList[]; current: string; sort: SeatSort; caption: string; ranked: boolean; L: DecideLinks }) {
+  const td = "px-3 py-3 align-top md:px-4";
+  const th = cn(tbl.th, "px-3 align-bottom md:px-4");
+  const sticky = "sticky left-0 z-[1] w-40 min-w-40 border-r border-border bg-card md:w-72 md:min-w-72";
+  const several = lists.length > 1;
+  return (
+    <div role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, "scroll-pl-44 md:scroll-pl-76")}>
       <table className={tbl.table}>
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr className={tbl.headRow}>
-            <th scope="col" className={cn(tbl.th, "px-3 md:px-4")}>Institute<span className="md:hidden">, course, quota and state</span></th>
-            <th scope="col" className={cn(tbl.th, md)}>State</th>
-            <th scope="col" className={cn(tbl.th, md)}>Course</th>
-            <th scope="col" className={cn(tbl.th, md)}>Quota</th>
-            <th scope="col" className={cn(tbl.th, "px-3 md:px-4")}>Seat category</th>
-            <th scope="col" className={cn(tbl.th, "px-3 text-right md:px-4")}>Seats</th>
+            <th scope="col" className={cn(th, sticky)} aria-sort={sort === "college" ? "ascending" : undefined}>Institute, course, quota and state</th>
+            <th scope="col" className={th}>Seat category</th>
+            {lists.map((l) => (
+              <th key={l.key} scope="col" className={cn(th, "text-right")} aria-sort={sort === "seats" && l.key === current ? "descending" : undefined}>
+                {several ? <>{seatKindLabel[l.kind]}{lists.some((x) => x !== l && x.kind === l.kind) && keyDay(l) && <span className="numeric block font-normal">{fmtDay(keyDay(l)!)} PDF</span>}</> : "Seats"}
+              </th>
+            ))}
+            <th scope="col" className={cn(th, "text-right")} aria-sort={sort === "closing" ? "descending" : undefined}>
+              Deepest past closing<span className="block font-normal">{PAST_ROUNDS.map((p) => `${p.year} ${roundLabel[p.round]}`).join(", ")}</span>
+            </th>
+            {ranked && <th scope="col" className={cn(th, "min-w-36")}>Reach</th>}
+            <th scope="col" className={cn(th, "min-w-72")}>Fee, stipend, bond and seat-leaving penalty</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={`${r.list}|${r.college.key}|${r.degree}|${r.specialty}|${r.quota}|${r.category}|${i}`} className={tbl.row}>
-              <th scope="row" className={cn(td, "min-w-40 text-left font-normal")}>
-                <Link href={L.institute(r.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{r.college.name}</Link>
-                <span className="block text-xs text-muted-foreground md:hidden">
-                  {courseOf(r)}, {r.quota ?? "quota not printed"}, {r.college.state ?? "state not listed"}
-                </span>
-              </th>
-              <td className={cn(td, md)}>{r.college.state ?? <Dash />}</td>
-              <td className={cn(td, md)}>{courseOf(r)}</td>
-              <td className={cn(td, md)}>{r.quota ?? <Dash />}</td>
-              <td className={td}>{r.category}</td>
-              <td className={cn(tbl.num, "px-3 md:px-4")}>{formatRank(r.seats)}</td>
-            </tr>
-          ))}
+          {rows.map((r, i) => {
+            const name = `${r.college.name}, ${courseOf(r)}, ${r.quota ?? "quota not printed"}, ${r.category} seat`;
+            return (
+              <tr key={`${r.list}|${r.college.key}|${r.degree}|${r.specialty}|${r.quota}|${r.category}|${i}`} className={tbl.row}>
+                <th scope="row" className={cn(td, sticky, "text-left font-normal")}>
+                  <Link href={L.institute(r.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{r.college.name}</Link>
+                  <span className="block text-xs text-muted-foreground">
+                    {courseOf(r)}, {r.quota ?? "quota not printed"}, {r.college.state ?? "state not listed"}
+                  </span>
+                  {r.quota != null && !openQuotas.includes(r.quota) && <Badge tone="warning" className="mt-1">Restricted quota</Badge>}
+                </th>
+                <td className={td}>{r.category}</td>
+                {lists.map((l) => (
+                  <td key={l.key} className={cn(tbl.num, "px-3 md:px-4")}>{r.byList[l.key] != null ? formatRank(r.byList[l.key]) : <Dash />}</td>
+                ))}
+                <td className={td}><PastClosings r={r} name={name} /></td>
+                {ranked && (
+                  <td className={td}>
+                    {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} /> : <span className="text-xs text-muted-foreground">Not a seat category you can take</span>}
+                  </td>
+                )}
+                <td className={cn(td, "text-xs")}><Terms t={r.terms} /></td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
-import { feeChoices, keepProfileParams, profileFromParams, profileQuotas, profileToParams, toURLSearchParams, type Profile } from "./profile";
+import {
+  coursesFromPicks, feeChoices, keepProfileParams, pairChoices, picksOf, profileCourseFilter, profileFromParams, profileHasCourse, profileInput, profileQuotas,
+  profileSchema, profileToParams, toURLSearchParams, type Profile,
+} from "./profile";
 
 const her: Profile = {
   rank: 42284, category: "OBC", pwd: false, specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: [],
@@ -41,4 +44,67 @@ it("no quota ticked means the open quotas only; pages read a bad pwd as not PwD"
 it("offers her fee cap even when it isn't a standard choice", () => {
   expect(feeChoices(50)).toContain(50);
   expect(feeChoices(7)).toEqual([2, 5, 7, 10, 20, 30, 50]);
+});
+
+// Her real case: Anaesthesiology in every degree, Family Medicine only as DNB (MD and NBEMS Diploma Family Medicine exist).
+const courses = [
+  ...["Diploma", "DNB", "MD", "NBEMS Diploma"].map((degree) => ({ degree, specialty: "ANAESTHESIOLOGY", name: "Anaesthesiology" })),
+  ...["DNB", "MD", "NBEMS Diploma"].map((degree) => ({ degree, specialty: "FAMILYMEDICINE", name: "Family Medicine" })),
+];
+const pairs = ["Diploma~ANAESTHESIOLOGY", "DNB~ANAESTHESIOLOGY", "MD~ANAESTHESIOLOGY", "NBEMS Diploma~ANAESTHESIOLOGY", "DNB~FAMILYMEDICINE"];
+const withPairs: Profile = { ...her, pairs };
+
+it("exact courses: c params (repeated or comma-joined) round-trip, and links carry them", () => {
+  const p = profileToParams(withPairs);
+  expect(p.get("c")).toBe(pairs.join(","));
+  expect(profileFromParams(p)).toEqual(withPairs);
+  const repeated = toURLSearchParams({ rank: "42284", cat: "OBC", c: ["DNB~FAMILYMEDICINE", "MD~ANAESTHESIOLOGY"] });
+  expect(profileFromParams(repeated)?.pairs).toEqual(["DNB~FAMILYMEDICINE", "MD~ANAESTHESIOLOGY"]);
+  expect(keepProfileParams(repeated).get("c")).toBe("DNB~FAMILYMEDICINE,MD~ANAESTHESIOLOGY");
+});
+
+it("back-compat: old URLs and saved profiles have no pairs and match specialties x degrees as before", () => {
+  const old = profileFromParams(new URLSearchParams("rank=42284&cat=OBC&sp=ANAESTHESIOLOGY,FAMILYMEDICINE&deg=DNB"))!;
+  expect(old).not.toHaveProperty("pairs");
+  expect(profileToParams(old).has("c")).toBe(false);
+  const saved = { rank: 42284, category: "OBC", pwd: false, specialties: ["ANAESTHESIOLOGY"], degrees: [], quotas: [], states: [], maxFeeLakh: 5, maxBondYears: null };
+  expect(profileSchema.safeParse(saved).success).toBe(true); // a localStorage profile from before pairs
+  expect(profileHasCourse(old, { degree: "DNB", specialty: "FAMILYMEDICINE" })).toBe(true);
+  expect(profileHasCourse(old, { degree: "MD", specialty: "FAMILYMEDICINE" })).toBe(false);
+  expect(profileHasCourse({ specialties: [], degrees: [] }, { degree: "MS", specialty: "ORTHOPAEDICS" })).toBe(true);
+  expect(profileCourseFilter(old)).toEqual({ specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: ["DNB"] });
+  expect(profileCourseFilter({ specialties: [], degrees: [], pairs: [] })).toEqual({ specialties: undefined, degrees: undefined });
+});
+
+it("pairs replace specialties x degrees in the matcher and the SQL filter", () => {
+  expect(profileHasCourse(withPairs, { degree: "DNB", specialty: "FAMILYMEDICINE" })).toBe(true);
+  expect(profileHasCourse(withPairs, { degree: "MD", specialty: "FAMILYMEDICINE" })).toBe(false);
+  expect(profileHasCourse(withPairs, { degree: "NBEMS Diploma", specialty: "FAMILYMEDICINE" })).toBe(false);
+  expect(profileHasCourse(withPairs, { degree: "NBEMS Diploma", specialty: "ANAESTHESIOLOGY" })).toBe(true);
+  expect(profileCourseFilter(withPairs)).toEqual({ pairs });
+});
+
+it("a malformed pair is a 400 for the API but only dropped on pages", () => {
+  const p = new URLSearchParams("rank=1&c=DNB~FAMILYMEDICINE,FAMILYMEDICINE");
+  expect(profileSchema.safeParse(profileInput(p)).success).toBe(false);
+  expect(profileFromParams(p)?.pairs).toEqual(["DNB~FAMILYMEDICINE"]);
+  expect(profileFromParams(new URLSearchParams("rank=1&c=bad"))).not.toHaveProperty("pairs");
+});
+
+it("dialog ticks save in the old form when it can say it, else as pairs, and read back the same", () => {
+  // Every degree of each ticked specialty: specialties only, exactly the old profile.
+  expect(coursesFromPicks({ ANAESTHESIOLOGY: ["Diploma", "DNB", "MD", "NBEMS Diploma"], FAMILYMEDICINE: ["DNB", "MD", "NBEMS Diploma"] }, [], courses))
+    .toEqual({ specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: [] });
+  // One set of degrees for every specialty: specialties x degrees.
+  expect(coursesFromPicks({ ANAESTHESIOLOGY: ["DNB"], FAMILYMEDICINE: ["DNB"] }, [], courses)).toEqual({ specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: ["DNB"] });
+  // Hers: only expressible as pairs.
+  const picks = picksOf(withPairs, courses);
+  expect(picks).toEqual({ ANAESTHESIOLOGY: ["Diploma", "DNB", "MD", "NBEMS Diploma"], FAMILYMEDICINE: ["DNB"] });
+  expect(coursesFromPicks(picks, [], courses)).toEqual({ specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: [], pairs });
+  // Nothing ticked (or no degree left): every course of the global degrees.
+  expect(coursesFromPicks({ FAMILYMEDICINE: [] }, ["DNB"], courses)).toEqual({ specialties: [], degrees: ["DNB"] });
+  // An old specialties x degrees profile opens with those degrees ticked and saves back unchanged.
+  const old = { specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: ["MD", "DNB"] };
+  expect(coursesFromPicks(picksOf(old, courses), old.degrees, courses)).toEqual(old);
+  expect(pairChoices(courses).slice(0, 2)).toEqual([{ value: "Diploma~ANAESTHESIOLOGY", label: "Diploma Anaesthesiology" }, { value: "DNB~ANAESTHESIOLOGY", label: "DNB Anaesthesiology" }]);
 });

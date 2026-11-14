@@ -119,7 +119,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
                   <>
                     <p className="mt-0.5 text-2xl font-bold tracking-tight">{formatRank(shown.rank)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {shown.category}{shown.pwd ? " PwD" : ""}, {shown.specialties.length ? `${shown.specialties.length} ${shown.specialties.length === 1 ? "specialty" : "specialties"}` : "all specialties"}
+                      {shown.category}{shown.pwd ? " PwD" : ""}, {shown.pairs?.length ? `${shown.pairs.length} ${shown.pairs.length === 1 ? "course" : "courses"}` : shown.specialties.length ? `${shown.specialties.length} ${shown.specialties.length === 1 ? "specialty" : "specialties"}` : "all specialties"}
                     </p>
                   </>
                 ) : (

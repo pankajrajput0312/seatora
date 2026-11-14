@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { hasSiteAccess } from "@/features/auth/lib/session";
 import { db } from "@/lib/db";
 import { allow } from "@/lib/rate-limit";
-import type { Profile } from "../profile";
+import { profileHasCourse, type Profile } from "../profile";
 import type { Course } from "../types";
 
 // Names from MCC's admitted-candidates lists (private import, prisma/import-residents.ts): name, course, year, list and
@@ -84,7 +84,7 @@ export async function hideResident(id: string) {
 
 /** Rows (in listResidents order) grouped by course, then year newest first; courses in her profile come first. */
 export function groupResidents(rows: Resident[], profile: Profile | null) {
-  const inProfile = (c: Course) => !!profile && (!profile.specialties.length || profile.specialties.includes(c.specialty)) && (!profile.degrees.length || profile.degrees.includes(c.degree));
+  const inProfile = (c: Course) => !!profile && profileHasCourse(profile, c);
   const groups = new Map<string, { course: Course; mine: boolean; years: Map<number, Resident[]> }>();
   for (const r of rows) {
     const g = groups.get(r.course.slug) ?? groups.set(r.course.slug, { course: r.course, mine: inProfile(r.course), years: new Map() }).get(r.course.slug)!;

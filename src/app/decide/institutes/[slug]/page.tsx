@@ -11,22 +11,26 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { Closing, Dash, HISTORY_CAPTION, PageHead, Provisional, ReachBadge, TermText } from "@/features/decide/components/bits";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
-import { courseName, RoundGrid, SeatsCell, SeatsHead, toChoiceItem } from "@/features/decide/components/options-view";
-import { UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
+import { allotmentMixAt, optionSeats, roundSeatsAt } from "@/features/decide/components/institute/institute-data";
+import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, RoundSeatsHead, SeatNumber } from "@/features/decide/components/institute/institute-parts";
+import { courseName, RoundGrid, toChoiceItem } from "@/features/decide/components/options-view";
+import { listTitle, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
+import { eligibleCategories } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, PAST_YEARS, programOf, type OptionTerms } from "@/features/decide/service";
 import { canSeeResidents, groupResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
-import { roundLabel, termLabel } from "@/features/decide/types";
+import { roundLabel, seatKindLabel, termLabel } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 const tabs = [
   { key: "overview", label: "Overview" },
   { key: "courses", label: "Courses" },
+  { key: "seats", label: "Seats" },
   { key: "allotments", label: "Allotments" },
   { key: "fees", label: "Fees & bond" },
   { key: "clinical", label: "Clinical data" },
@@ -34,13 +38,17 @@ const tabs = [
 ] as const;
 const PAGE_SIZE = 50;
 const schema = z.object({
-  tab: z.enum(["overview", "courses", "allotments", "fees", "clinical", "residents"]).default("overview"),
+  tab: z.enum(["overview", "courses", "seats", "allotments", "fees", "clinical", "residents"]).default("overview"),
+  /** Courses tab seat columns: every seat category instead of hers (as Seats' `scat=all`). */
+  scat: z.literal("all").optional(),
   year: z.coerce.number().int().optional(),
   course: z.string().max(100).optional(),
   page: pageValue.default(1),
 });
 const kinds = ["FEE", "STIPEND", "BOND", "PENALTY"] as const;
 const termOf = (t: OptionTerms, k: (typeof kinds)[number]) => ({ FEE: t.fee, STIPEND: t.stipend, BOND: t.bond, PENALTY: t.penalty })[k];
+/** The overview's summary; the Fees tab adds the seat-leaving penalty. */
+const summaryKinds = ["FEE", "STIPEND", "BOND"] as const;
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const college = await getCollege((await params).slug).catch((e) => {
@@ -58,15 +66,15 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
  * Fee, stipend, bond and seat-leaving penalty for one programme, each as published with its own source link. `offered`:
  * the MCC results have courses of this programme here.
  */
-function Terms({ title, t, offered }: { title: string; t: OptionTerms; offered: boolean }) {
+function Terms({ title, t, offered, only = kinds, bare }: { title: string; t: OptionTerms; offered: boolean; only?: readonly (typeof kinds)[number][]; bare?: boolean }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <div className={bare ? undefined : "rounded-xl border border-border bg-card p-5"}>
       <h3 className="text-base font-semibold">{title}</h3>
-      {!kinds.some((k) => termOf(t, k)) ? (
+      {!only.some((k) => termOf(t, k)) ? (
         <p className="mt-2 text-sm text-muted-foreground">{offered ? "Offered here, but no fee, stipend or bond is listed for it." : "No courses of this kind here in the MCC results."}</p>
       ) : (
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
-          {kinds.map((k) => (
+          {only.map((k) => (
             <Fragment key={k}>
               <dt className="text-muted-foreground">{termLabel[k]}</dt>
               <dd className="numeric font-semibold"><TermText term={termOf(t, k)} /></dd>
@@ -86,7 +94,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const f = parseSearchParams(schema, sp);
   const [inst, meta] = await Promise.all([getInstitute(slug, profile), getMeta()]);
   if (!inst) notFound();
-  const { college, options, yours, allotmentsByYear, terms, seatList, unlisted } = inst;
+  const { college, options, yours, allotmentsByYear, terms, unlisted } = inst;
   const offers = (program: "MD" | "DNB") => options.some((o) => programOf(o.course.degree) === program);
   const tab = f.tab;
   const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
@@ -109,6 +117,20 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // Seats here with no past allotments: not options, so not in the lists below; Seats shows them.
   const unlistedNote = unlisted && unlisted.seats > 0 && <UnlistedSeats u={unlisted} profile={!!profile} here href={L.to("/decide/seats", { list: unlisted.list.key, inst: slug, nohist: "1" })} />;
   const termSources = [...kinds.map((k) => termOf(terms.md, k)?.source), ...kinds.map((k) => termOf(terms.dnb, k)?.source)];
+  const programs = [
+    { title: "Medical college seats (MD, MS, Diploma)", t: terms.md, offered: offers("MD") },
+    { title: "DNB and NBEMS Diploma seats", t: terms.dnb, offered: offers("DNB") },
+  ];
+  const summary = programs.filter((p) => p.offered || summaryKinds.some((k) => termOf(p.t, k)));
+  // The newest round's seat lists here (Courses columns, Seats tab), each separate; allotments by quota and seat category (Overview).
+  const [round, mix] = await Promise.all([
+    tab === "courses" || tab === "seats" ? roundSeatsAt(college.key) : [],
+    tab === "overview" ? allotmentMixAt(college.key) : null,
+  ]);
+  const roundLists = round.map((x) => x.list);
+  const roundName = round[0] && `${round[0].list.year} ${roundLabel[round[0].list.round]}`;
+  const mine = profile ? eligibleCategories(profile.category, profile.pwd) : null;
+  const seatCats = mine && f.scat !== "all" ? mine : undefined;
 
   return (
     <AppPage className="grid grid-cols-1 gap-6">
@@ -172,6 +194,22 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <p className="mt-3 text-xs text-muted-foreground">{HISTORY_CAPTION}{!profile && " Closing ranks shown across all seat categories."}</p>
           </section>
 
+          <section aria-labelledby="terms-h" className="grid gap-4 rounded-xl border border-border bg-card p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="terms-h" className="text-lg font-semibold">Fees, stipend and bond</h2>
+              <Link href={L.institute(slug, "fees")} className={`${smallLink} text-sm text-sky`}>Fees &amp; bond, with the seat-leaving penalty</Link>
+            </div>
+            {summary.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No fee, stipend or bond is listed for this institute.</p>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2">
+                {summary.map((p) => <Terms key={p.title} title={p.title} t={p.t} offered={p.offered} only={summaryKinds} bare />)}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">Each value is quoted as published, with a link to its document; a dash when not listed.</p>
+            <DataSource terms={summary.flatMap((p) => summaryKinds.map((k) => termOf(p.t, k)?.source))} results={false} />
+          </section>
+
           <section aria-labelledby="trend" className="rounded-xl border border-border bg-card p-5">
             <h2 id="trend" className="text-lg font-semibold">Allotments made by year</h2>
             <p className="mt-1 text-sm text-muted-foreground">All courses, rounds and seat categories here. This counts allotments, not seats.</p>
@@ -188,7 +226,16 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               </tbody>
             </table>
           </section>
-          <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: LATEST_YEAR }]} />
+
+          <section aria-labelledby="mix-h" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+            <h2 id="mix-h" className="text-lg font-semibold">Allotments by quota and seat category</h2>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              All courses here, from MCC&apos;s allotment results: the latest round, then each year with all its rounds. These count allotments (in R2 and later rounds, only fresh
+              and upgraded ones), not seats. The seat category is the seat&apos;s, not the candidate&apos;s.
+            </p>
+            {mix ? <AllotmentMixTable mix={mix} name={college.name} /> : <p className="text-sm text-muted-foreground">No MCC allotments here in the imported results.</p>}
+          </section>
+          <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: LATEST_YEAR }, ...(mix?.columns.map((c) => ({ year: c.year, round: c.round })) ?? [])]} />
         </>
       )}
 
@@ -196,6 +243,9 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         <section aria-labelledby="courses-h" className="grid grid-cols-1 gap-3">
           <h2 id="courses-h" className="sr-only">Courses</h2>
           {unlistedNote}
+          {mine && round.length > 0 && options.length > 0 && (
+            <CategoryToggle mine={mine} all={!seatCats} href={(all) => L.with(`/decide/institutes/${slug}`, { scat: all ? "all" : null })} />
+          )}
           {options.length === 0 ? (
             <p className="text-sm text-muted-foreground">No courses with past MCC allotments here, so there are no closing ranks to show.</p>
           ) : (
@@ -207,7 +257,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Add to choices</span></th>
                     <th scope="col" className={tbl.th}>Course and quota</th>
                     <th scope="col" className={tbl.th}>{profile ? "Your reach" : "Reach"}</th>
-                    {seatList && <th scope="col" className={`${tbl.th} text-right`}><SeatsHead list={seatList} /></th>}
+                    {roundLists.map((l) => <th key={l.key} scope="col" className={`${tbl.th} text-right`}><RoundSeatsHead list={l} lists={roundLists} /></th>)}
                     <th scope="col" className={`${tbl.th} text-right`}>{LATEST_YEAR} R1</th>
                     <th scope="col" className={`${tbl.th} text-right`}>{PAST_YEARS[1]} deepest</th>
                     <th scope="col" className={tbl.th}>Related</th>
@@ -221,7 +271,15 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       <td className="px-2 py-2">{profile && <ChoiceStar item={toChoiceItem(r)} />}</td>
                       <th scope="row" className={`${tbl.td} text-left font-medium`}>{courseName(r)}<span className="block text-xs font-normal text-muted-foreground">{r.quota}</span></th>
                       <td className={tbl.td}>{profile ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} /> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
-                      {seatList && <td className={`${tbl.td} text-right`}><SeatsCell r={r} list={seatList} L={L} /></td>}
+                      {round.map(({ list, rows }) => (
+                        <td key={list.key} className={`${tbl.td} text-right`}>
+                          <SeatNumber
+                            n={optionSeats(rows, { ...r.course, quota: r.quota }, seatCats)}
+                            href={L.to("/decide/seats", { list: list.key, inst: slug, course: r.course.slug, squota: r.quota, scat: mine && !seatCats ? "all" : undefined })}
+                            label={`seats in the ${listTitle(list)} list, ${seatCats ? "your seat categories" : "every seat category"}: ${college.name}, ${courseName(r)}, ${r.quota}`}
+                          />
+                        </td>
+                      ))}
                       <td className={tbl.num}>
                         <Closing d={r.latest} />
                         {/* ReachBadge already carries the marker for "Reached in R1". */}
@@ -239,7 +297,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     </tr>,
                     <tr key={`${r.id}-rounds`} className="expand-row bg-muted/30">
                       <td />
-                      <td colSpan={seatList ? 7 : 6} className="px-4 pb-4"><RoundGrid row={r} caption={`${courseName(r)}, ${r.quota}: closing ranks by year and round`} /></td>
+                      <td colSpan={6 + round.length} className="px-4 pb-4"><RoundGrid row={r} caption={`${courseName(r)}, ${r.quota}: closing ranks by year and round`} /></td>
                     </tr>,
                   ])}
                 </tbody>
@@ -248,12 +306,45 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           )}
           <p className="text-xs text-muted-foreground">
             {HISTORY_CAPTION}{profile ? " Closing ranks are on the seat categories you can take." : " Closing ranks shown across all seat categories."}
-            {seatList && ` ${roundLabel[seatList.round]} seats: in the ${seatList.year} ${roundLabel[seatList.round]} clear vacancy list, that quota and ${profile ? "your seat categories" : "every seat category"}; "—" when the list has none.`}
+            {roundName &&
+              ` ${roundName} seats: in each of MCC's ${roundName} lists (${[...new Set(roundLists.map((l) => seatKindLabel[l.kind].toLowerCase()))].join(", ")}), that quota and ${seatCats ? "your seat categories" : "every seat category"}; "—" when a list has none. The lists overlap, so their seats are never added together. Each number opens those seats on Seats.`}
           </p>
           <DataSource />
-          <SeatSource list={seatList} L={L} />
+          {roundLists.map((l) => <SeatSource key={l.key} list={l} L={L} />)}
         </section>
       )}
+
+      {tab === "seats" &&
+        (round.length === 0 ? (
+          <EmptyState title="Seat lists not imported yet" description="No MCC seat list is in the data yet, so there are no seats to show here." href={L.institute(slug, "courses")} action="See the courses here" />
+        ) : (
+          <section aria-labelledby="seats-h" className="grid grid-cols-1 gap-8">
+            <div className="grid gap-2">
+              <h2 id="seats-h" className="text-lg font-semibold">{roundName} seat lists at this institute</h2>
+              <p className="max-w-3xl text-sm text-muted-foreground">
+                Every course here, each list as its MCC PDF printed it. The kinds of list overlap (most newly added seats are also clear vacancies), so their seats are never added together.
+              </p>
+            </div>
+            {round.map(({ list, rows }, i) => {
+              const n = rows.reduce((a, r) => a + r.seats, 0);
+              return (
+                <section key={list.key} aria-labelledby={`seats-${i}`} className="grid gap-3">
+                  <h3 id={`seats-${i}`} className="flex flex-wrap items-baseline gap-x-2 text-base font-semibold">
+                    {seatKindLabel[list.kind]}
+                    {rows.length > 0 && <span className="numeric text-sm font-normal text-muted-foreground">{formatRank(n)} {n === 1 ? "seat" : "seats"} here</span>}
+                  </h3>
+                  <p className="max-w-3xl text-sm text-muted-foreground first-letter:uppercase">{seatKindNote[list.kind]}</p>
+                  <SeatSource list={list} L={L} />
+                  {rows.length > 0 ? (
+                    <CollegeSeatTable rows={rows} caption={`${listTitle(list)} seats at ${college.name} (MCC PDF), by course`} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">This list prints no seats at this institute.</p>
+                  )}
+                </section>
+              );
+            })}
+          </section>
+        ))}
 
       {tab === "allotments" && allot && (
         <section aria-labelledby="allot-h" className="grid grid-cols-1 gap-4">

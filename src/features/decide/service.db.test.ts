@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { reachOrder } from "./lib/reach";
 import type { Profile } from "./profile";
+import { listSeats, seatLists } from "./server/seats";
 import * as svc from "./service";
 
 // Real MCC data in Postgres (npm run db:import). Run with DATABASE_URL set, e.g.
@@ -74,6 +75,24 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     const t = performance.now();
     await svc.listOptions(her);
     expect(performance.now() - t).toBeLessThan(1000);
+  });
+
+  it("her exact courses (Family Medicine only as DNB) leave MD and NBEMS Diploma Family Medicine out, in memory and in SQL", async () => {
+    const mine: Profile = { ...her, pairs: [...["Diploma", "DNB", "MD", "NBEMS Diploma"].map((d) => `${d}~ANAESTHESIOLOGY`), "DNB~FAMILYMEDICINE"] };
+    const ok = (c: { degree: string; specialty: string }) => c.specialty !== "FAMILYMEDICINE" || c.degree === "DNB";
+    const [all, exact] = await Promise.all([svc.listOptions(her, { showClosed: true }), svc.listOptions(mine, { showClosed: true })]);
+    expect(exact.rows.every((r) => ok(r.course))).toBe(true);
+    expect(exact.total).toBe(all.rows.filter((r) => ok(r.course)).length);
+    expect(exact.total).toBeLessThan(all.total);
+    expect((await svc.dashboard(mine)).summary.every((s) => ok(s.course))).toBe(true);
+    const list = (await seatLists())[0];
+    if (!list) return;
+    const [byPair, byProduct] = await Promise.all([
+      listSeats({ list: list.key, pairs: ["DNB~FAMILYMEDICINE"] }),
+      listSeats({ list: list.key, specialties: ["FAMILYMEDICINE"], degrees: ["DNB"] }),
+    ]);
+    expect(byPair.total).toBe(byProduct.total);
+    expect(byPair.rows.every((r) => r.degree === "DNB" && r.specialty === "FAMILYMEDICINE")).toBe(true);
   });
 
   it("rank scan, trends, institutes, fees answer from SQL", async () => {

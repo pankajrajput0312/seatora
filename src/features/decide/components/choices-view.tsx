@@ -11,13 +11,19 @@ import { duplicateList, markTypedUpTo, move, toCsv, toMccText, typedPrefix, upda
 import { LATEST_YEAR, PAST_YEARS, reachWindow, type Reach } from "../lib/reach";
 import { useChoices, useDecideLinks } from "../lib/use-decide-store";
 import { keepProfileParams } from "../profile";
+import type { SeatsBy } from "../service";
+import { roundLabel, type SeatList } from "../types";
 import { ReachBadge } from "./bits";
 import { CompareToggle } from "./option-actions";
+import { SeatsLink } from "./options-view";
 import { control, EmptyState, smallLink } from "./ui";
 
-type Live = Record<string, { reach: Reach; provisional: boolean }>;
-/** Reach labels from the current data for these ids and profile params (a server action); null when unavailable. */
-type ReachFor = (ids: string[], profile: string) => Promise<Live | null>;
+type Live = Record<string, { reach: Reach; provisional: boolean; seats: SeatsBy }>;
+/**
+ * Reach labels and seats per list (`lists`: the newest round's clear, virtual, new) from the current data for these ids
+ * and profile params (a server action); null when unavailable.
+ */
+type ReachFor = (ids: string[], profile: string) => Promise<{ lists: SeatList[]; options: Live } | null>;
 
 export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
   const [state, setState, hydrated] = useChoices();
@@ -45,13 +51,13 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
   const liveKey = who.includes("rank=") && n ? JSON.stringify([who, items.map((i) => i.id).sort()]) : "";
   // Labels gathered for this rank and category (kept across edits, so nothing flickers); `fresh` = the last answer
   // covered exactly these ids, so a missing id really is missing from the data.
-  const [live, setLive] = useState<{ who: string; key: string; data: Live } | null>(null);
+  const [live, setLive] = useState<{ who: string; key: string; data: Live; lists: SeatList[] } | null>(null);
   useEffect(() => {
     if (!hydrated || !reachFor || !liveKey) return;
     let stale = false;
     const [qs, ids] = JSON.parse(liveKey) as [string, string[]];
     reachFor(ids, qs).then(
-      (data) => !stale && data && setLive((prev) => ({ who: qs, key: liveKey, data: { ...(prev?.who === qs ? prev.data : {}), ...data } })),
+      (r) => !stale && r && setLive((prev) => ({ who: qs, key: liveKey, lists: r.lists, data: { ...(prev?.who === qs ? prev.data : {}), ...r.options } })),
       () => {}, // no data: keep the stored labels
     );
     return () => {
@@ -59,6 +65,8 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
     };
   }, [hydrated, reachFor, liveKey]);
   const current = live?.who === who ? live.data : null;
+  const lists = (current && live?.lists) || [];
+  const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
   const fresh = live?.key === liveKey;
 
   /** Focus a control of the item with this id after React re-renders, and keep it in view (it may have moved). */
@@ -217,6 +225,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
               const flags = [
                 (counts.get(dupKey(item)) ?? 0) > 1 && "Same institute and course listed more than once",
                 closed && `Closed before your rank in every round of ${reachWindow(LATEST_YEAR, PAST_YEARS)}${lr ? "" : " (when added)"}`,
+                lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats in the ${round} seat lists in this quota and your seat categories, as MCC published them.`,
                 fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
                 typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
               ].filter(Boolean) as string[];
@@ -253,6 +262,17 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
                     <p className="mt-1 text-xs">
                       {lr ? <ReachBadge reach={lr.reach} provisional={lr.provisional} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>}
                     </p>
+                    {lr && lists.length > 0 && (
+                      <p className="flex flex-wrap items-center gap-x-3 text-xs">
+                        <span className="text-muted-foreground">{round} seats:</span>
+                        {lists.map((l) => (
+                          <span key={l.key} className="inline-flex items-center gap-1">
+                            {l.kind}
+                            <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${item.quota}`} />
+                          </span>
+                        ))}
+                      </p>
+                    )}
                     {item.courseSlug && (
                       <p className="flex flex-wrap gap-x-4 text-xs" data-print-hide>
                         <Link href={L.lastRanks(item.courseSlug, { inst: item.slug })} className={cn(smallLink, "text-sky")}>Last ranks</Link>
@@ -278,7 +298,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
           </ol>
           <p className="text-xs text-muted-foreground">
             {current
-              ? "Reach labels use your current rank and category and previous years' closing ranks."
+              ? `Reach labels use your current rank and category and previous years' closing ranks.${round ? ` ${round} seats: each choice's seats in the ${lists.map((l) => l.kind).join(", ")} lists, in its quota and your seat categories, "—" when a list has none; the lists overlap, so they are never added.` : ""}`
               : "Labels marked (when added) are from when you added each option. Set your rank to see them for your current profile."}
           </p>
         </>

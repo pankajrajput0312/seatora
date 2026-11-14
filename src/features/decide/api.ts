@@ -8,7 +8,7 @@ import { baseCategories, rounds, type SeatList, type Source } from "./types";
 
 // Query schemas and response helpers for the /api/v1 route handlers (thin wrappers over service.ts).
 // Lists accept repeated or comma-separated params: ?sp=A&sp=B or ?sp=A,B. Profile params use the URL keys of
-// profile.ts (rank, cat, pwd, sp, deg, quota, st, fee, bond).
+// profile.ts (rank, cat, pwd, sp, deg, c, quota, st, fee, bond).
 
 const int = z.coerce.number().int();
 const bool = z.enum(["0", "1", "true", "false"]).transform((v) => v === "1" || v === "true");

@@ -8,7 +8,7 @@ import { Dash, HISTORY_CAPTION, PageHead, Provisional } from "@/features/decide/
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
+import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
 import { baseCategories, roundLabel, rounds, type Round } from "@/features/decide/types";
 
@@ -52,9 +52,9 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
   const meta = await getMeta();
-  // Default: one of her courses (her degrees, if set), MD/MS first, then DNB, then the rest (meta sorts Diploma first).
+  // Default: one of her courses (when she named any), MD/MS first, then DNB, then the rest (meta sorts Diploma first).
   const order = (d: string) => (["MD", "MS", "DNB"].includes(d) ? ["MD", "MS", "DNB"].indexOf(d) : 3);
-  const mine = meta.courses.filter((c) => profile?.specialties.includes(c.specialty) && (!profile.degrees.length || profile.degrees.includes(c.degree)));
+  const mine = profile && (profile.pairs?.length || profile.specialties.length) ? meta.courses.filter((c) => profileHasCourse(profile, c)) : [];
   const course = meta.courses.find((c) => c.slug === f.course) ?? mine.sort((a, b) => order(a.degree) - order(b.degree))[0] ?? meta.courses[0];
   const category = f.lcat ?? profile?.category ?? "Open";
   const quota = f.lquota && meta.quotas.includes(f.lquota) ? f.lquota : undefined;

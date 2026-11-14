@@ -22,19 +22,27 @@ export function toChoiceItem(r: OptionRow): ChoiceItem {
   };
 }
 
-/** Column heading for an option's seats in one list, e.g. "R2 seats" over "clear vacancy" (the year is in each cell's name and the source line). */
-export function SeatsHead({ list }: { list: SeatList }) {
-  return <span className="whitespace-nowrap">{roundLabel[list.round]} seats<span className="block font-normal">{seatKindLabel[list.kind].toLowerCase()}</span></span>;
+/**
+ * Column heading for an option's seats in one list, e.g. "R2 seats" over "clear vacancy" (`short`: over "clear"; the
+ * year is in each cell's name and the source line).
+ */
+export function SeatsHead({ list, short }: { list: SeatList; short?: boolean }) {
+  return <span className="whitespace-nowrap">{roundLabel[list.round]} seats<span className="block font-normal">{short ? list.kind : seatKindLabel[list.kind].toLowerCase()}</span></span>;
 }
 
-/** One option's seats in that one list, linking to them on Seats; "—" when the list prints none. */
-export function SeatsCell({ r, list, L }: { r: OptionRow; list: SeatList; L: DecideLinks }) {
-  if (r.seats == null) return <Dash />;
+/** `n` seats of one option (`at`, named `name`) in one list, linking to them on Seats; "—" when the list prints none. `end`: right-aligned (columns). */
+export function SeatsLink({ n, list, L, at, name, end }: { n: number | null | undefined; list: SeatList; L: DecideLinks; at: { inst: string; course?: string; quota: string }; name: string; end?: boolean }) {
+  if (n == null) return <Dash />;
   return (
-    <Link href={L.seats({ list: list.key, inst: r.college.slug, course: r.course.slug, quota: r.quota })} className={`${smallLink} numeric min-w-11 justify-end font-semibold text-sky`}>
-      {formatRank(r.seats)}<span className="sr-only"> seats in the {list.year} {roundLabel[list.round]} {seatKindLabel[list.kind].toLowerCase()} list: {r.college.name}, {courseName(r)}, {r.quota}</span>
+    <Link href={L.seats({ list: list.key, ...at })} className={`${smallLink} numeric min-w-11 font-semibold text-sky ${end ? "justify-end" : ""}`}>
+      {formatRank(n)}<span className="sr-only"> seats in the {list.year} {roundLabel[list.round]} {seatKindLabel[list.kind].toLowerCase()} list: {name}</span>
     </Link>
   );
+}
+
+/** One option's seats in that one list (`n`, default its clear vacancy `seats`), linking to them on Seats; "—" when none. */
+export function SeatsCell({ r, list, L, n = r.seats, end = true }: { r: OptionRow; list: SeatList; L: DecideLinks; n?: number | null; end?: boolean }) {
+  return <SeatsLink n={n} list={list} L={L} at={{ inst: r.college.slug, course: r.course.slug, quota: r.quota }} name={`${r.college.name}, ${courseName(r)}, ${r.quota}`} end={end} />;
 }
 
 /** A closing rank with its round and seat category, marked Provisional when its MCC result is. */

@@ -6,12 +6,14 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { baseCategories, openQuotas } from "../types";
-import { BOND_YEAR_CHOICES, feeChoices, profileSchema, type Profile } from "../profile";
+import { BOND_YEAR_CHOICES, coursesFromPicks, feeChoices, picksOf, profileSchema, type Profile } from "../profile";
 import { control } from "./ui";
 
-export type ProfileMeta = { specialties: { code: string; name: string }[]; degrees: string[]; quotas: string[]; states: string[] };
+export type ProfileMeta = { courses: { degree: string; specialty: string }[]; specialties: { code: string; name: string }[]; degrees: string[]; quotas: string[]; states: string[] };
 
 const empty: Profile = { rank: 0, category: "Open", pwd: false, specialties: [], degrees: [], quotas: [], states: [], maxFeeLakh: null, maxBondYears: null };
+
+const pill = "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-input bg-secondary px-3 text-sm has-checked:border-sky";
 
 function Checks({ legend, options, value, onChange, note = "None ticked = all." }: { legend: string; options: { value: string; label: string }[]; value: string[]; onChange: (v: string[]) => void; note?: string }) {
   return (
@@ -20,7 +22,7 @@ function Checks({ legend, options, value, onChange, note = "None ticked = all." 
       <p className="text-xs text-muted-foreground">{note}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {options.map((o) => (
-          <label key={o.value} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-input bg-secondary px-3 text-sm has-checked:border-sky">
+          <label key={o.value} className={pill}>
             <input type="checkbox" className="size-4 accent-sky" checked={value.includes(o.value)} onChange={(e) => onChange(e.target.checked ? [...value, o.value] : value.filter((x) => x !== o.value))} />
             {o.label}
           </label>
@@ -35,10 +37,21 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
   const [rankText, setRankText] = useState(profile ? String(profile.rank) : "");
   const [error, setError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  // Her courses: specialty code → ticked degrees (exact pairs); saved through coursesFromPicks.
+  const [picked, setPicked] = useState(() => picksOf(profile ?? empty, meta.courses));
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setDraft((d) => ({ ...d, [k]: v }));
+  const offered = (s: string) => meta.courses.filter((c) => c.specialty === s).map((c) => c.degree);
+  /** A newly ticked specialty: all its degrees, or the degrees she ticked before (when it has any of them). */
+  const fresh = (s: string) => {
+    const ds = offered(s).filter((d) => draft.degrees.includes(d));
+    return ds.length ? ds : offered(s);
+  };
+  const pickSpecialties = (v: string[]) => setPicked((p) => Object.fromEntries(v.map((s) => [s, p[s] ?? fresh(s)])));
+  const pickDegrees = (s: string, ds: string[]) => setPicked((p) => ({ ...p, [s]: offered(s).filter((d) => ds.includes(d)) }));
+  const current = () => ({ ...draft, pairs: undefined, ...coursesFromPicks(picked, draft.degrees, meta.courses) });
 
   const save = () => {
-    const r = profileSchema.safeParse({ ...draft, rank: Number(rankText.replace(/\D/g, "")) });
+    const r = profileSchema.safeParse({ ...current(), rank: Number(rankText.replace(/\D/g, "")) });
     if (!r.success) return setError("Enter your All India Rank (a number up to 3,00,000).");
     setError(null);
     onSave(r.data);
@@ -47,7 +60,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
 
   const exportJson = () => {
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(draft, null, 2)], { type: "application/json" }));
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(current(), null, 2)], { type: "application/json" }));
     a.download = "seatora-profile.json";
     a.click();
   };
@@ -62,6 +75,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
     if (!r.success) return setImportError("That file isn't a Seatora profile.");
     setImportError(null);
     setDraft(r.data);
+    setPicked(picksOf(r.data, meta.courses));
     setRankText(String(r.data.rank));
     setError(null);
   };
@@ -99,8 +113,41 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
           </div>
           {error && <p id="profile-error" role="alert" className="text-sm text-ember">{error}</p>}
 
-          <Checks legend="Specialties" options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} value={draft.specialties} onChange={(v) => set("specialties", v)} />
-          <Checks legend="Degrees" options={meta.degrees.map((d) => ({ value: d, label: d }))} value={draft.degrees} onChange={(v) => set("degrees", v)} />
+          <Checks legend="Specialties" options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} value={Object.keys(picked)} onChange={pickSpecialties} />
+          {Object.keys(picked).length ? (
+            <fieldset>
+              <legend className="text-sm font-medium">Degrees</legend>
+              <p className="text-xs text-muted-foreground">Per specialty: untick a degree to leave that course out, e.g. keep only DNB for Family Medicine.</p>
+              <div className="mt-2 grid gap-3">
+                {meta.specialties.filter((s) => picked[s.code]).map((s) => {
+                  const all = offered(s.code);
+                  const ds = picked[s.code];
+                  return (
+                    <fieldset key={s.code}>
+                      <legend className="text-sm">{s.name}</legend>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {all.length > 1 && (
+                          <label className={pill}>
+                            <input type="checkbox" className="size-4 accent-sky" checked={ds.length === all.length} ref={(el) => { if (el) el.indeterminate = ds.length > 0 && ds.length < all.length; }} onChange={() => pickDegrees(s.code, ds.length === all.length ? [] : all)} />
+                            All degrees
+                          </label>
+                        )}
+                        {all.map((d) => (
+                          <label key={d} className={pill}>
+                            <input type="checkbox" className="size-4 accent-sky" checked={ds.includes(d)} onChange={(e) => pickDegrees(s.code, e.target.checked ? [...ds, d] : ds.filter((x) => x !== d))} />
+                            {d}
+                          </label>
+                        ))}
+                      </div>
+                      {!ds.length && <p className="mt-1 text-xs text-muted-foreground">No degree ticked: {s.name} is left out.</p>}
+                    </fieldset>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : (
+            <Checks legend="Degrees" note="None ticked = all. Tick a specialty to choose its degrees." options={meta.degrees.map((d) => ({ value: d, label: d }))} value={draft.degrees} onChange={(v) => set("degrees", v)} />
+          )}
           <Checks
             legend="Quotas"
             note={`None ticked = ${openQuotas.join(", ")}, the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible.`}

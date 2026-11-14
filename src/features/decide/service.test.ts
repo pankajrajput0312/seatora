@@ -144,7 +144,7 @@ describe("service on the test fixture", () => {
   });
 
   it("trends come from Σn per option and year, filtered by specialties, paged", async () => {
-    const t = await svc.allotmentTrends({ specialties: ["FAMILYMEDICINE"] }, { page: 1, pageSize: 2 });
+    const t = await svc.allotmentTrends({ profile: { ...her, specialties: ["FAMILYMEDICINE"] } }, { page: 1, pageSize: 2 });
     expect(t.rows).toHaveLength(2);
     expect(t.rows.every((r) => r.course.specialty === "FAMILYMEDICINE")).toBe(true);
     const r = t.rows[0];

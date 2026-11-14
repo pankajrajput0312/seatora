@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { reachOrder, type Reach } from "../../lib/reach";
+import { profileFromParams } from "../../profile";
 import type { SeatRow } from "../../server/seats";
-import type { College } from "../../types";
+import { optionId, type College } from "../../types";
 import { listOptions, unlistedSeats } from "../../service";
-import { findSeats, refineSeats } from "./find-seats";
+import { csvLine, findSeats, parseSeatsParams, refineSeats, seatsCsv, seatsView, type PastClosing } from "./find-seats";
 
 const row = (name: string, state: string | null, quota: string | null, seats: number): SeatRow => ({
   list: "l", college: { key: name, slug: name, name, state } as College, course: null, degree: "MD", specialty: "X", quota, category: "Open", seats, cs: null,
@@ -23,6 +25,17 @@ describe("refineSeats", () => {
     expect(names(refineSeats(rows, { sort: "seats" }))).toBe("BCDA");
     expect(names(refineSeats(rows, {}))).toBe("ABCD");
   });
+  it("sorts by reach (beyond her rank first, then deepest) or deepest past closing, missing last", () => {
+    const d = (closing: number) => ({ year: 2025, round: "R3", closing, provisional: false }) as PastClosing;
+    const h = (r: SeatRow, reach: Reach | null, deepest: PastClosing | null) => ({ ...r, reach, deepest });
+    const xs = [h(rows[0], "closed-before", d(9)), h(rows[1], null, null), h(rows[2], "reached-both", d(5)), h(rows[3], "reached-both", d(7))];
+    expect(names(refineSeats(xs, { sort: "reach" }))).toBe("DCAB");
+    expect(names(refineSeats(xs, { sort: "closing" }))).toBe("ADCB");
+  });
+});
+
+it("csvLine: quotes when needed, never runs a formula, — for missing", () => {
+  expect(csvLine(["a,b", 'say "hi"', null, 42, "=1+1", "-x", "", "plain"])).toBe(`"a,b","say ""hi""",—,42,'=1+1,'-x,—,plain`);
 });
 
 // Her filter on the 2026 R2 clear vacancy list, against the local import (set -a; . ~/.config/seatora/db.env; set +a).
@@ -65,6 +78,50 @@ describe.skipIf(!process.env.DATABASE_URL)("findSeats on the real import", { tim
     expect(opts.virtualOnly!.options).toBeGreaterThan(0);
     const every = await listOptions(profile, { showClosed: true });
     expect(opts.total + opts.virtualOnly!.options).toBeLessThanOrEqual(every.total);
+  });
+
+  it("compare: every list of the round side by side, one row per institute, course, quota and seat category; each column = that list alone", async () => {
+    const c = await findSeats({ ...mine, compare: true });
+    expect(c.lists.map((l) => l.kind)).toEqual(["clear", "virtual", "new"]);
+    for (const l of c.lists) expect(c.seats[l.key]).toBe((await findSeats({ ...mine, list: l.key }, { page: 1, pageSize: 1 })).seats[l.key]);
+    expect(new Set(c.rows.map((r) => [r.college.key, r.degree, r.specialty, r.quota, r.category].join("|"))).size).toBe(c.total);
+    expect(c.rows.every((r) => Object.keys(r.byList).length > 0)).toBe(true);
+  });
+
+  it("past closings per seat category, and the reach label Options gives on that one category", async () => {
+    // Kokilaben Navi Mumbai, DNB Anaesthesiology, DNB Quota, Open seats: 1 in the 2026 R2 virtual vacancy list.
+    const f = { list: "mcc/2026/R2_virtual_vacancy.pdf", specialties: ["ANAESTHESIOLOGY"], degrees: ["DNB"], categories: ["Open"], quotas: ["DNB Quota"], sort: "reach" as const, reachFor: { rank: 42284, categories: ["Open"] } };
+    const v = await findSeats(f);
+    const k = v.rows.find((r) => r.college.key.startsWith("KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8"))!;
+    expect(k.seats).toBe(1);
+    expect(k.deepest).toMatchObject({ year: 2025, round: "R3", closing: 29892 });
+    expect(k.rounds.find((c) => c.year === 2025 && c.round === "stray")?.closing).toBe(33685);
+    expect(k.rounds.find((c) => c.year === 2026)).toMatchObject({ round: "R1", closing: 20132 });
+    // An Open-category profile has one seat category, so Options' label per option must be the seat row's.
+    const open = { ...profile, category: "Open" as const, specialties: ["ANAESTHESIOLOGY"], degrees: ["DNB"], quotas: ["DNB Quota"] };
+    const opts = new Map((await listOptions(open, { showClosed: true })).rows.map((o) => [o.id, o.reach]));
+    const both = v.rows.filter((r) => opts.has(optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota! })));
+    expect(both.length).toBeGreaterThan(20);
+    for (const r of both) expect(r.reach).toBe(opts.get(optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota! })));
+    const pos = v.rows.map((r) => reachOrder.indexOf(r.reach!));
+    expect(pos).toEqual([...pos].sort((a, b) => a - b));
+    // A seat category she can't take gets no label.
+    const sc = await findSeats({ ...f, categories: ["SC"], reachFor: { rank: 42284, categories: ["Open", "OBC"] } }, { page: 1, pageSize: 5 });
+    expect(sc.rows.length).toBeGreaterThan(0);
+    expect(sc.rows.every((r) => r.reach === null)).toBe(true);
+  });
+
+  it("CSV of her view: every row, page order, sources in columns", async () => {
+    const p = new URLSearchParams("rank=42284&cat=OBC&sp=ANAESTHESIOLOGY,FAMILYMEDICINE&view=compare");
+    const v = await seatsView(parseSeatsParams(p), profileFromParams(p));
+    const csv = await seatsCsv({ ...v, r: v.r! });
+    const lines = csv.split("\r\n");
+    expect(lines.indexOf("")).toBe(v.r!.total + 1); // header, rows, then a blank row before the notes and sources
+    expect(lines[0]).toContain("2026 R2 clear vacancy seats,2026 R2 virtual vacancy seats,2026 R2 newly added seats,2024 R2 closing rank");
+    expect(lines[0]).toContain("Reach at AIR 42284 (history, not a prediction)");
+    expect(lines.some((l) => l.startsWith("MCC PG 2026 Round 2 clear vacancy (list as published),https://"))).toBe(true);
+    expect(lines.some((l) => l.startsWith("MCC PG 2025 Round 3 allotment result (final),https://"))).toBe(true);
+    expect(v.sort).toBe("reach");
   });
 
   it("a state filter counts the matching seats it drops for having no state", async () => {

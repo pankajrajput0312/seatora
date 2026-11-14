@@ -27,7 +27,7 @@ export default async function DecideLayout({ children }: { children: React.React
   let meta: ProfileMeta | null = null;
   try {
     const m = await getMeta();
-    meta = { specialties: m.specialties, degrees: m.degrees, quotas: m.quotas, states: m.states };
+    meta = { courses: m.courses, specialties: m.specialties, degrees: m.degrees, quotas: m.quotas, states: m.states };
   } catch (e) {
     unstable_rethrow(e); // the sign-in redirect when access is gone
     console.error("[decide] data unavailable", e);
@@ -35,7 +35,7 @@ export default async function DecideLayout({ children }: { children: React.React
   return (
     <div className={`app ${app.variable} min-h-screen`}>
       <AstryxProvider>
-        <DecideShell meta={meta ?? { specialties: [], degrees: [], quotas: [], states: [] }}>
+        <DecideShell meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (
             children
           ) : (

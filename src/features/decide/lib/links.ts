@@ -10,7 +10,7 @@ const href = (path: string, p: URLSearchParams, hash = "") => {
 /**
  * One place for every link between Decide screens: each link keeps the profile params (server pages render from
  * them), with repeated values kept (sp=A&sp=B becomes sp=A,B). Server: decideLinks(params). Client: useDecideLinks().
- * Page filters never reuse a profile key (rank, cat, pwd, sp, deg, quota, st, fee, bond), or they would leak into her
+ * Page filters never reuse a profile key (rank, cat, pwd, sp, deg, c, quota, st, fee, bond), or they would leak into her
  * profile on the next link: Allotments' quota filter is `aq`, its seat category `acat`; Last ranks uses lcat/lquota.
  */
 export function decideLinks(params: URLSearchParams | string = "") {

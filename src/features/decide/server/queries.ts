@@ -146,3 +146,24 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
   });
   return { total: opts.count ? total : out.length + offset, rows: out };
 }
+
+export type AllotmentCount = { year: number; round: Round; quota: string; category: Category; n: number };
+
+/** Allotments made (rows of MCC's results, not seats) per year, round, quota and seat category, for these CollegeSpecialty ids. */
+export async function countAllotments(cat: Catalog, cs: string[]): Promise<AllotmentCount[]> {
+  if (!cs.length) return [];
+  if (cat.mem) {
+    const ids = new Set(cs);
+    const out = new Map<string, AllotmentCount>();
+    for (const a of cat.mem.allotments) {
+      if (!ids.has(memCs(a))) continue;
+      const k = [a.year, a.round, a.quota, a.category].join("|");
+      (out.get(k) ?? out.set(k, { year: a.year, round: a.round, quota: a.quota, category: a.category, n: 0 }).get(k)!).n++;
+    }
+    return [...out.values()];
+  }
+  const rows = await db.$queryRaw<{ y: number; r: string; q: string; c: string; n: number }[]>`
+    SELECT "counsellingYear" AS y, round AS r, quota AS q, category AS c, COUNT(*)::int AS n
+    FROM "Allotment" WHERE ${csIn(cs)} GROUP BY 1, 2, 3, 4`;
+  return rows.map((r) => ({ year: r.y, round: r.r as Round, quota: r.q, category: r.c as Category, n: r.n }));
+}
