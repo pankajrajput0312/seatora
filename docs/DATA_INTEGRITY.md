@@ -40,7 +40,7 @@ Official information and reported experiences are never mixed in the same block.
 - Show the review date and residency year. Do not show a real name without consent.
 
 ## Residents list
-- Residents are added by hand to `src/features/residents/data/residents.json`, and every entry must have `consent: true`. Never list a real person by name without their agreement, and never invent residents.
+- Residents are added by hand to `src/features/residents/data/residents.json`, and every entry must have `consent: true`, covering their name and every contact detail listed. Never list a real person or their phone number, email or social handle without their agreement, and never invent residents.
 - Entries show "Resident-reported" unless `verified: true`, which may only be set after checking the allotment letter.
 - A resident's rank is shown as where one person got in, not as a closing rank or a prediction.
 

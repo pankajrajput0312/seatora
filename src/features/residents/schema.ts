@@ -4,6 +4,20 @@ export const residentCategories = ["Open", "EWS", "OBC", "SC", "ST", "Open PwD",
 export const residentQuotas = ["AIQ", "State", "Deemed", "Central institute", "Management", "NRI"] as const;
 export const residentRounds = ["R1", "R2", "R3", "Stray", "Special stray", "State round"] as const;
 
+const phone = z.string().regex(/^\+?\d{10,15}$/, "Digits only, with country code, e.g. +919812345678");
+
+/** Ways to reach a resident. All optional; only add what they agreed to share. */
+export const contactSchema = z
+  .object({
+    whatsapp: phone.optional(),
+    phone: phone.optional(),
+    email: z.email().optional(),
+    instagram: z.string().regex(/^[A-Za-z0-9._]{1,30}$/, "Instagram handle without @").optional(),
+    linkedin: z.url().refine((u) => new URL(u).hostname.endsWith("linkedin.com"), "Must be a linkedin.com URL").optional(),
+  })
+  .strict();
+export type Contact = z.infer<typeof contactSchema>;
+
 /** One resident, added by hand to data/residents.json. See README "Adding residents". */
 export const residentSchema = z
   .object({
@@ -19,10 +33,11 @@ export const residentSchema = z
     state: z.string().trim().min(1).optional(),
     /** e.g. "MD General Medicine". */
     course: z.string().trim().min(1),
+    contact: contactSchema.default({}),
     /** Set true only after checking their allotment letter. */
     verified: z.boolean().default(false),
-    /** Names are shown publicly, so every entry needs the resident's agreement. */
-    consent: z.literal(true, "Only add residents who agreed to be listed by name (consent: true)"),
+    /** Name and contact details are public, so every entry needs the resident's agreement to both. */
+    consent: z.literal(true, "Only add residents who agreed to be listed with their name and contact details (consent: true)"),
   })
   .strict();
 

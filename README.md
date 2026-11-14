@@ -28,7 +28,7 @@ The page renders without a database; only waitlist submissions need one (they sh
 | `npm run db:studio` | Browse data, including waitlist sign-ups |
 
 ## Adding residents
-The landing page's main section lists residents, their NEET PG rank and the college they joined, ordered by closeness to the visitor's rank. Add people to `src/features/residents/data/residents.json` (a JSON array):
+The landing page's main section shows residents grouped by the hospital or college they joined, with their NEET PG rank, course and contact buttons. Visitors can search, and optionally enter a rank to see the closest residents first. Add people to `src/features/residents/data/residents.json` (a JSON array):
 
 ```json
 [
@@ -42,13 +42,20 @@ The landing page's main section lists residents, their NEET PG rank and the coll
     "college": "College name",
     "state": "State",
     "course": "MD General Medicine",
+    "contact": {
+      "whatsapp": "+919812345678",
+      "email": "name@example.com",
+      "instagram": "handle",
+      "linkedin": "https://www.linkedin.com/in/handle"
+    },
     "verified": false,
     "consent": true
   }
 ]
 ```
 - `category`: Open, EWS, OBC, SC, ST, or any of those with " PwD". `quota`: AIQ, State, Deemed, Central institute, Management, NRI. `round` (optional): R1, R2, R3, Stray, Special stray, State round. `state` is optional.
-- `consent` must be `true`. Only list people who agreed to be shown by name.
+- `contact` is optional, and every field inside it is optional: `whatsapp`, `phone` (digits with country code, e.g. `+919812345678`), `email`, `instagram` (handle without @) and `linkedin` (full URL). Each one becomes a button.
+- `consent` must be `true`. Only list people who agreed to be shown publicly with their name **and** the contact details you add. Anything on the page can be copied by anyone.
 - Set `verified` to `true` only after checking their allotment letter.
 - A bad entry fails `npm run build` with a message naming the field. Rebuild after editing.
 

@@ -10,9 +10,9 @@ const stages = [
   },
   {
     title: "Choice filling",
-    body: "See where residents near your rank got in, compare closing ranks, fees, stipends and bonds, then order your choices.",
+    body: "Ask residents at the hospitals you're considering, compare closing ranks, fees, stipends and bonds, then order your choices.",
     tools: [
-      { label: "Residents by rank", href: "#preview" },
+      { label: "Residents by hospital", href: "#preview" },
       { label: "Closing ranks", href: "#features" },
       { label: "Compare", href: "#features" },
     ],

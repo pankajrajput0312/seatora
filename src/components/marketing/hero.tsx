@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PixelEmblem } from "./pixel-emblem";
 
 const quickLinks = [
-  { label: "Residents by rank", href: "#preview" },
+  { label: "Residents by hospital", href: "#preview" },
   { label: "Counselling routes", href: "#coverage" },
   { label: "Closing ranks & seats", href: "#features" },
   { label: "Step by step", href: "#how" },
@@ -22,14 +22,14 @@ export function Hero() {
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
             Previous-year closing ranks, seat matrices, fees, stipends and bonds across All India, State, Deemed and DNB
-            counselling, plus residents who got in near your rank. One planner, every number sourced.
+            counselling, plus residents at each hospital you can contact directly. One planner, every number sourced.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
               <Link href="#waitlist">Get early access <ArrowRight className="size-4" /></Link>
             </Button>
             <Button asChild size="lg" variant="ghost">
-              <Link href="#preview">Find residents near your rank</Link>
+              <Link href="#preview">Find residents at a hospital</Link>
             </Button>
           </div>
           <nav aria-label="Jump to" className="mt-8 flex flex-wrap gap-2">

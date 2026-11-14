@@ -1,31 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { residentSchema, type Resident } from "../schema";
-import { matchResidents } from "./match";
+import { groupByCollege } from "./match";
 
 // Test fixtures only; never rendered.
-const r = (name: string, rank: number, extra: Partial<Resident> = {}): Resident =>
-  residentSchema.parse({ name, rank, category: "Open", quota: "AIQ", year: 2025, college: `College ${name}`, course: "MD General Medicine", consent: true, ...extra });
+const r = (name: string, rank: number, college: string, extra: Partial<Resident> = {}): Resident =>
+  residentSchema.parse({ name, rank, category: "Open", quota: "AIQ", year: 2025, college, course: "MD General Medicine", consent: true, ...extra });
 
-const list = [r("A", 20000), r("B", 5000, { category: "OBC" }), r("C", 11000, { course: "MS Orthopaedics" })];
+const list = [r("A", 20000, "Zeta College"), r("B", 5000, "Alpha College"), r("C", 11000, "Zeta College", { course: "MS Orthopaedics" })];
 
-describe("matchResidents", () => {
-  it("sorts by rank when no rank is entered", () => {
-    expect(matchResidents(list, { rank: null, category: "All", query: "" }).map((m) => m.name)).toEqual(["B", "C", "A"]);
+describe("groupByCollege", () => {
+  it("groups residents under their college, alphabetically without a rank", () => {
+    const g = groupByCollege(list, { rank: null, query: "" });
+    expect(g.map((x) => x.college)).toEqual(["Alpha College", "Zeta College"]);
+    expect(g[1].residents.map((x) => x.name)).toEqual(["C", "A"]);
   });
-  it("orders by closeness to your rank and labels fit", () => {
-    const m = matchResidents(list, { rank: 10000, category: "All", query: "" });
-    expect(m.map((x) => x.name)).toEqual(["C", "B", "A"]);
-    expect(m.map((x) => x.fit)).toEqual(["near", "beyond", "inside"]);
+  it("orders colleges and residents by closeness to your rank", () => {
+    const g = groupByCollege(list, { rank: 12000, query: "" });
+    expect(g.map((x) => x.college)).toEqual(["Zeta College", "Alpha College"]);
+    expect(g[0].residents.map((x) => [x.name, x.fit])).toEqual([["C", "near"], ["A", "inside"]]);
   });
-  it("filters by category and search text", () => {
-    expect(matchResidents(list, { rank: null, category: "OBC", query: "" }).map((m) => m.name)).toEqual(["B"]);
-    expect(matchResidents(list, { rank: null, category: "All", query: "ortho" }).map((m) => m.name)).toEqual(["C"]);
+  it("searches name, college, course and state", () => {
+    expect(groupByCollege(list, { rank: null, query: "ortho" }).flatMap((g) => g.residents.map((x) => x.name))).toEqual(["C"]);
+    expect(groupByCollege(list, { rank: null, query: "alpha" }).map((g) => g.college)).toEqual(["Alpha College"]);
   });
 });
 
 describe("residentSchema", () => {
+  const base = { name: "X", rank: 1, category: "Open", quota: "AIQ", year: 2025, college: "Y", course: "Z" };
   it("rejects entries without consent or with unknown fields", () => {
-    expect(residentSchema.safeParse({ name: "X", rank: 1, category: "Open", quota: "AIQ", year: 2025, college: "Y", course: "Z" }).success).toBe(false);
-    expect(residentSchema.safeParse({ name: "X", rank: 1, category: "Open", quota: "AIQ", year: 2025, college: "Y", course: "Z", consent: true, phone: "1" }).success).toBe(false);
+    expect(residentSchema.safeParse(base).success).toBe(false);
+    expect(residentSchema.safeParse({ ...base, consent: true, phone: "1" }).success).toBe(false);
+  });
+  it("validates contact details", () => {
+    expect(residentSchema.safeParse({ ...base, consent: true, contact: { whatsapp: "+919812345678", instagram: "dr.x" } }).success).toBe(true);
+    expect(residentSchema.safeParse({ ...base, consent: true, contact: { whatsapp: "98123" } }).success).toBe(false);
+    expect(residentSchema.safeParse({ ...base, consent: true, contact: { linkedin: "https://evil.com/x" } }).success).toBe(false);
   });
 });

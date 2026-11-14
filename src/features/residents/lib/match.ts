@@ -1,17 +1,29 @@
 import { rankFit, type RankFit } from "@/features/rank-predictor/lib/rank-fit";
-import type { Resident, ResidentCategory } from "../schema";
+import type { Resident } from "../schema";
 
-export type ResidentFilters = { rank: number | null; category: ResidentCategory | "All"; query: string };
 export type ResidentMatch = Resident & { fit: RankFit | null };
+export type CollegeGroup = { college: string; state?: string; residents: ResidentMatch[] };
 
-/** Filters residents and, when a rank is given, orders them by how close their rank was to it. */
-export function matchResidents(list: Resident[], { rank, category, query }: ResidentFilters): ResidentMatch[] {
+/**
+ * Groups residents by college. With a rank, colleges are ordered by their resident whose rank was closest to it
+ * (and residents within a college likewise); without one, by college name.
+ */
+export function groupByCollege(list: Resident[], { rank, query }: { rank: number | null; query: string }): CollegeGroup[] {
   const q = query.trim().toLowerCase();
-  return list
-    .filter((r) => category === "All" || r.category === category)
-    .filter((r) => !q || [r.name, r.college, r.course, r.state ?? ""].some((f) => f.toLowerCase().includes(q)))
-    .map((r) => ({ ...r, fit: rank ? rankFit(rank, r.rank) : null }))
-    .sort((a, b) => (rank ? Math.abs(a.rank - rank) - Math.abs(b.rank - rank) : 0) || a.rank - b.rank);
+  const distance = (r: Resident) => (rank ? Math.abs(r.rank - rank) : 0);
+  const groups = new Map<string, CollegeGroup>();
+
+  for (const r of list) {
+    if (q && ![r.name, r.college, r.course, r.state ?? ""].some((f) => f.toLowerCase().includes(q))) continue;
+    const key = `${r.college}|${r.state ?? ""}`;
+    const g = groups.get(key) ?? { college: r.college, state: r.state, residents: [] };
+    g.residents.push({ ...r, fit: rank ? rankFit(rank, r.rank) : null });
+    groups.set(key, g);
+  }
+
+  const out = [...groups.values()];
+  for (const g of out) g.residents.sort((a, b) => distance(a) - distance(b) || a.rank - b.rank);
+  return out.sort((a, b) => distance(a.residents[0]) - distance(b.residents[0]) || a.college.localeCompare(b.college));
 }
 
 export const fitLabel: Record<RankFit, string> = {
