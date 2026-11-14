@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultChoices, duplicateList, move, toCsv, toMccText, toggleItem, type ChoiceItem } from "./choices";
+import { defaultChoices, duplicateList, markTypedUpTo, move, parseChoices, toCsv, toMccText, toggleItem, typedPrefix, type ChoiceItem } from "./choices";
 
 const item = (id: string): ChoiceItem => ({ id, institute: `Inst ${id}`, slug: id, state: "S", course: "DNB Anaesthesiology", quota: "DNB Quota", reachLabel: "", closedEveryRound: false });
 
@@ -26,5 +26,23 @@ describe("lists", () => {
     const s = toggleItem(defaultChoices, item("x"));
     expect(toMccText(s.lists[0])).toBe("1. Inst x — DNB Anaesthesiology — DNB Quota");
     expect(toCsv(s.lists[0]).split("\n")[1]).toBe('1,"Inst x","S","DNB Anaesthesiology","DNB Quota"');
+  });
+});
+
+describe("typed into MCC follows items, not positions", () => {
+  it("keeps marks on the same items after a reorder and reports the broken prefix", () => {
+    let s = defaultChoices;
+    for (const id of ["a", "b", "c", "d"]) s = toggleItem(s, item(id));
+    let l = markTypedUpTo(s.lists[0], 2); // a, b typed
+    expect(l.typedIds).toEqual(["a", "b"]);
+    l = { ...l, items: move(l.items, 3, 1) }; // d moves to #2: a, d, b, c
+    expect(l.items.filter((i) => l.typedIds.includes(i.id)).map((i) => i.id)).toEqual(["a", "b"]);
+    expect(typedPrefix(l)).toBe(1); // portal matches only up to #1 now
+  });
+  it("validates stored data, migrates the legacy count, and survives garbage", () => {
+    const legacy = { lists: [{ id: "x", name: "R2", items: [item("a"), item("b")], transcribedUpTo: 1 }], activeId: "x" };
+    expect(parseChoices(legacy).lists[0].typedIds).toEqual(["a"]);
+    expect(parseChoices({ lists: "nope" })).toEqual(defaultChoices);
+    expect(parseChoices(null)).toEqual(defaultChoices);
   });
 });

@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { SourceLabel } from "@/components/ui/source-label";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { reachLabel, reachTone, type Deepest, type Reach } from "../lib/reach";
 import { roundLabel } from "../types";
@@ -20,7 +20,10 @@ export function PageHead({ title, children }: { title: string; children?: React.
 export function ReachBadge({ reach, provisional }: { reach: Reach; provisional?: boolean }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <Badge tone={reachTone[reach]} className={reach === "closed-before" ? "text-muted-foreground" : undefined}>{reachLabel(reach, 2026, [2024, 2025])}</Badge>
+      <Badge tone={reachTone[reach]} className={reach === "closed-before" ? "text-muted-foreground" : undefined}>
+        {reach === "reached-both" && <History className="mr-1 size-3" aria-hidden />}
+        {reachLabel(reach, 2026, [2024, 2025])}
+      </Badge>
       {reach === "reached-latest" && provisional && <Badge tone="warning">Provisional</Badge>}
     </span>
   );
@@ -39,10 +42,6 @@ export function Closing({ d }: { d: Deepest | null | undefined }) {
 
 export function Dash() {
   return <span>—<span className="sr-only">not available</span></span>;
-}
-
-export function DemoSource() {
-  return <SourceLabel provenance={{ sourceName: "Demo data — illustrative only", sourceUrl: null, sourceType: "UNVERIFIED_COMMUNITY", academicYear: "2026-27" }} />;
 }
 
 export function SetRankPrompt({ path }: { path: string }) {

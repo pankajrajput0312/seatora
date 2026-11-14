@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
+import { DataSource } from "@/features/decide/components/data-source";
+import { FocusItem } from "@/features/decide/components/focus-item";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { Dash, DemoSource, PageHead } from "@/features/decide/components/bits";
+import { Dash, PageHead } from "@/features/decide/components/bits";
 import { control, Empty, Field, FilterBar, hrefWith, profileOnly, Select, tbl } from "@/features/decide/components/ui";
 import { formatLakh } from "@/features/decide/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
@@ -75,15 +77,15 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
             </tr></thead>
             <tbody>
               {rows.map((a, i) => (
-                <tr key={i} id={`row-${i + 1}`} tabIndex={-1} className={tbl.row}>
+                <tr key={i} data-item={i + 1} tabIndex={-1} className={tbl.row}>
                   <td className={tbl.num}><Link href={L.rankScan(a.rank, a.year)} className="hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link></td>
-                  <td className={tbl.td}>{a.year} {roundLabel[a.round]}{a.year === 2026 && <span className="block text-xs text-sun">Provisional</span>}</td>
+                  <td className={tbl.td}>{a.year} {roundLabel[a.round]}{a.provisional && <span className="block text-xs text-sun">Provisional</span>}</td>
                   <td className={tbl.td}>{a.quota}<span className="block text-xs text-muted-foreground">{a.category} seat</span></td>
                   <td className={tbl.td}><Link href={L.institute(a.college.slug)} className="font-medium hover:text-sky hover:underline">{a.college.name}</Link><span className="block text-xs text-muted-foreground">{a.college.state}, {a.college.type}</span></td>
                   <td className={tbl.td}><Link href={L.lastRanks(a.courseSlug, { inst: a.college.slug })} className="hover:text-sky hover:underline">{a.courseName}</Link><span className="block text-xs text-muted-foreground">{a.remark}</span></td>
                   <td className={tbl.num}>{a.feeInr != null ? formatLakh(a.feeInr) : <Dash />}</td>
                   <td className={tbl.td}>{a.stipendText ?? <Dash />}</td>
-                  <td className={tbl.td}>{a.bondText ?? "No bond listed"}{a.penaltyText && <span className="block text-xs text-muted-foreground">{a.penaltyText}</span>}</td>
+                  <td className={tbl.td}>{a.bondText ?? <Dash />}{a.penaltyText && <span className="block text-xs text-muted-foreground">{a.penaltyText}</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -91,10 +93,11 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         </div>
       )}
       {total > rows.length && (
-        <div className="text-center"><Button asChild variant="secondary"><Link href={link({ limit: String(limit + PAGE) }, `#row-${limit + 1}`)}>Show {PAGE} more</Link></Button></div>
+        <div className="text-center"><Button asChild variant="secondary"><Link href={link({ limit: String(limit + PAGE), focus: String(limit + 1) })} scroll={false}>Show {PAGE} more</Link></Button></div>
       )}
+      <FocusItem n={Number(params.get("focus")) || null} />
       <p className="text-xs text-muted-foreground">Select a rank to scan seats allotted around it; a course to see its last ranks at that institute.</p>
-      <DemoSource />
+      <DataSource />
     </Container>
   );
 }

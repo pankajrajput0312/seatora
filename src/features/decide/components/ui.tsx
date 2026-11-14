@@ -7,7 +7,7 @@ import { profileParamKeys } from "../profile";
 // Shared building blocks so every Decide screen reads the same way.
 
 export const tbl = {
-  wrap: "overflow-x-auto rounded-xl border border-border bg-card",
+  wrap: "relative overflow-x-auto rounded-xl border border-border bg-card",
   table: "w-full text-sm",
   headRow: "border-b border-border text-left",
   th: "px-4 py-3 text-xs font-semibold text-muted-foreground",
@@ -19,7 +19,7 @@ export const tbl = {
 /** GET filter form that keeps the profile params. */
 export function FilterBar({ action, params, children, cols = "md:grid-cols-4" }: { action: string; params: URLSearchParams; children: React.ReactNode; cols?: string }) {
   return (
-    <Form action={action} role="search" className={cn("grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2", cols, "md:items-end")}>
+    <Form key={params.toString()} action={action} role="search" className={cn("grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2", cols, "md:items-end")}>
       {profileParamKeys.map((k) => params.get(k) && <input key={k} type="hidden" name={k} value={params.get(k)!} />)}
       {children}
       <Button type="submit" className="h-11">Apply</Button>

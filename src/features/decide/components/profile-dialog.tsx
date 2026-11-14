@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { baseCategories } from "../types";
 import { profileSchema, type Profile } from "../profile";
 
-export type ProfileMeta = { specialties: { code: string; name: string }[]; degrees: string[]; quotas: string[]; states: string[] };
+export type ProfileMeta = { specialties: { code: string; name: string }[]; degrees: string[]; quotas: string[]; states: string[]; isDemo?: boolean };
 
 const empty: Profile = { rank: 0, category: "Open", pwd: false, specialties: [], degrees: [], quotas: [], states: [], maxFeeLakh: null, maxBondYears: null };
 
@@ -33,6 +33,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
   const [draft, setDraft] = useState<Profile>(profile ?? empty);
   const [rankText, setRankText] = useState(profile ? String(profile.rank) : "");
   const [error, setError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
   const save = () => {
@@ -50,22 +51,29 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
     a.click();
   };
   const importJson = async (file: File) => {
-    const r = profileSchema.safeParse(JSON.parse(await file.text()));
-    if (!r.success) return setError("That file isn't a MEDPATH profile.");
+    let data: unknown;
+    try {
+      data = JSON.parse(await file.text());
+    } catch {
+      return setImportError("That file isn't JSON. Choose a file exported from MEDPATH.");
+    }
+    const r = profileSchema.safeParse(data);
+    if (!r.success) return setImportError("That file isn't a MEDPATH profile.");
+    setImportError(null);
     setDraft(r.data);
     setRankText(String(r.data.rank));
     setError(null);
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => { if (o) { setDraft(profile ?? empty); setRankText(profile ? String(profile.rank) : ""); } onOpenChange(o); }}>
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
         <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-xl border border-border bg-popover p-6 shadow-overlay md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
           <div className="flex items-start justify-between gap-4">
             <div>
               <Dialog.Title className="text-xl font-semibold">Your rank and preferences</Dialog.Title>
-              <Dialog.Description className="mt-1 text-sm text-muted-foreground">Saved on this device only. Every screen uses it.</Dialog.Description>
+              <Dialog.Description className="mt-1 text-sm text-muted-foreground">Saved on this device, and added to Decide page links so every screen can use it. Shared links include your rank.</Dialog.Description>
             </div>
             <Dialog.Close className="grid size-11 place-items-center rounded-md text-muted-foreground hover:bg-muted" aria-label="Close">
               <X className="size-5" />
@@ -93,6 +101,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
             <Checks legend="Specialties" options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} value={draft.specialties} onChange={(v) => set("specialties", v)} />
             <Checks legend="Degrees" options={meta.degrees.map((d) => ({ value: d, label: d }))} value={draft.degrees} onChange={(v) => set("degrees", v)} />
             <Checks legend="Quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} value={draft.quotas} onChange={(v) => set("quotas", v)} />
+            <Checks legend="States" options={meta.states.map((st) => ({ value: st, label: st }))} value={draft.states} onChange={(v) => set("states", v)} />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-1.5 text-sm font-medium">
@@ -112,10 +121,11 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
               </label>
             </div>
 
+            {importError && <p role="alert" className="text-sm text-ember">{importError}</p>}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
               <div className="flex gap-2">
-                <Button type="button" variant="ghost" size="sm" onClick={exportJson}>Export JSON</Button>
-                <label className="inline-flex h-8 cursor-pointer items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+                <Button type="button" variant="ghost" className="h-11" onClick={exportJson}>Export JSON</Button>
+                <label className="inline-flex h-11 cursor-pointer items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-ring">
                   Import JSON
                   <input type="file" accept="application/json" className="sr-only" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />
                 </label>

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
-import { Dash, DemoSource, PageHead } from "@/features/decide/components/bits";
+import { DataSource } from "@/features/decide/components/data-source";
+import { Dash, PageHead } from "@/features/decide/components/bits";
 import { Empty, Field, FilterBar, profileOnly, Select, tbl } from "@/features/decide/components/ui";
 import { formatLakh } from "@/features/decide/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
@@ -55,7 +56,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                   <td className={tbl.td}>{r.program === "MD" ? "MD" : "DNB / Diploma"}</td>
                   <td className={tbl.num}>{r.fee?.amountInr != null ? formatLakh(r.fee.amountInr) : <Dash />}<span className="block text-xs font-normal text-muted-foreground">{r.fee?.text}</span></td>
                   <td className={tbl.num}>{r.stipend?.amountInr != null ? `₹${r.stipend.amountInr.toLocaleString("en-IN")}` : <Dash />}<span className="block text-xs font-normal text-muted-foreground">per month</span></td>
-                  <td className={tbl.td}>{r.bond?.text ?? "No bond listed"}</td>
+                  <td className={tbl.td}>{r.bond?.text ?? <Dash />}</td>
                   <td className={tbl.td}>{r.penalty?.text ?? <Dash />}</td>
                   <td className={`${tbl.td} whitespace-nowrap`}>
                     <Link href={L.institute(r.college.slug, "courses")} className="block text-sky underline">Courses</Link>
@@ -67,7 +68,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           </table>
         </div>
       )}
-      <DemoSource />
+      <DataSource />
     </Container>
   );
 }

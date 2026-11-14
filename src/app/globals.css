@@ -188,6 +188,9 @@
   }
 }
 
+/* Keep focused elements clear of the sticky header and the mobile bottom bar / floating Compare button. */
+html:has(.app) { scroll-padding-top: 5rem; scroll-padding-bottom: 6rem; }
+
 @media print {
   header, footer, [data-print-hide], nav[aria-label="Decide"], nav[aria-label="Decide shortcuts"] { display: none !important; }
   html, body { background: white !important; color: black !important; }

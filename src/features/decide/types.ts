@@ -48,7 +48,7 @@ export type Allotment = {
   quota: string;
   remark: "Fresh" | "Upgraded" | "Not reported";
 };
-export type Notice = { date: string; title: string; authority: string; url: string; kind: "schedule" | "announcement" | "merit" };
+export type Notice = { date: string; title: string; authority: string; url: string; kind: "schedule" | "announcement" | "merit"; status?: "done" | "open" | "upcoming" };
 
 export type DecideData = {
   colleges: College[];

@@ -5,9 +5,11 @@ const variants = {
   primary: "bg-primary text-primary-foreground hover:bg-primary/90",
   secondary: "border border-input bg-secondary text-foreground hover:bg-raised",
   ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
+  danger: "text-ember hover:bg-ember/10",
 } as const;
 
-const sizes = { sm: "h-8 px-3 text-sm", md: "h-10 px-4 text-sm", lg: "h-12 px-6 text-base" } as const;
+// md and icon meet the 44px touch target; sm is for dense desktop-only rows.
+const sizes = { sm: "h-9 px-3 text-sm", md: "h-11 px-4 text-sm", lg: "h-12 px-6 text-base", icon: "size-11" } as const;
 
 type ButtonProps = React.ComponentProps<"button"> & {
   variant?: keyof typeof variants;

@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { CHOICES_KEY, defaultChoices, type ChoicesState } from "../lib/choices";
-import { useLocal } from "../lib/local-store";
+import { typedPrefix } from "../lib/choices";
+import { useChoices } from "../lib/use-decide-store";
 
 /** Ruled strip of headline numbers: one band split by hairlines, not floating cards. */
 export function StatStrip({ items }: { items: { label: string; value: string; note?: string; href?: string }[] }) {
-  const [choices] = useLocal<ChoicesState>(CHOICES_KEY, defaultChoices);
+  const [choices] = useChoices();
   const r2 = choices.lists.find((l) => l.id === choices.activeId) ?? choices.lists[0];
-  const all = [...items, { label: `In your ${r2?.name ?? "choice"} list`, value: String(r2?.items.length ?? 0), note: r2?.transcribedUpTo ? `${r2.transcribedUpTo} typed into MCC` : "None typed into MCC yet", href: "/decide/choices" }];
+  const all = [...items, { label: `In your ${r2?.name ?? "choice"} list`, value: String(r2?.items.length ?? 0), note: r2 && typedPrefix(r2) ? `${typedPrefix(r2)} typed into MCC` : "None typed into MCC yet", href: "/decide/choices" }];
   return (
     <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border xl:grid-cols-4">
       {all.map((s) => (
@@ -23,7 +23,7 @@ export function StatStrip({ items }: { items: { label: string; value: string; no
 }
 
 export function TopChoices({ href }: { href: string }) {
-  const [state] = useLocal<ChoicesState>(CHOICES_KEY, defaultChoices);
+  const [state] = useChoices();
   const list = state.lists.find((l) => l.id === state.activeId) ?? state.lists[0];
   const top = list?.items.slice(0, 5) ?? [];
   return (

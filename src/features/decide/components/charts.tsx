@@ -22,7 +22,7 @@ function Tooltip({ tip }: { tip: Tip }) {
   );
 }
 
-export function ChartCard({ title, subtitle, legend, table, children, className }: { title: string; subtitle?: string; legend?: React.ReactNode; table: React.ReactNode; children: React.ReactNode; className?: string }) {
+export function ChartCard({ title, subtitle, legend, table, children, className, source }: { title: string; subtitle?: string; legend?: React.ReactNode; table: React.ReactNode; children: React.ReactNode; className?: string; source?: React.ReactNode }) {
   const [asTable, setAsTable] = useState(false);
   const id = useId();
   return (
@@ -37,7 +37,8 @@ export function ChartCard({ title, subtitle, legend, table, children, className 
         </button>
       </div>
       {legend && !asTable && <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">{legend}</div>}
-      <div className="mt-4">{asTable ? <div className="max-h-96 overflow-auto">{table}</div> : children}</div>
+      <div className="mt-4">{asTable ? <div className="relative max-h-96 overflow-auto">{table}</div> : children}</div>
+      {source && <div className="mt-4">{source}</div>}
     </figure>
   );
 }
@@ -121,7 +122,7 @@ export function LabelBars({ rows }: { rows: { label: string; count: number; href
             <span className="truncate text-sm text-muted-foreground group-hover:text-foreground">{r.label}</span>
             <span className="flex items-center gap-2">
               <span className={cn("h-3 rounded-r-[4px]", r.accent ? "bg-sky" : "bg-muted-foreground/50")} style={{ width: `${(r.count / max) * 85}%` }} aria-hidden />
-              <span className="text-sm font-semibold text-foreground">{r.count}</span>
+              <span className="text-sm font-semibold text-foreground">{r.count}<span className="sr-only"> options</span></span>
             </span>
           </Link>
         </li>

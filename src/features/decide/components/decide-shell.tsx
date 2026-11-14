@@ -94,7 +94,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
       <AppShell
         height="auto"
         variant="section"
-        banner={<p className="bg-sun/10 px-4 py-1.5 text-center text-xs text-sun"><strong className="font-semibold">Demo data — illustrative only.</strong> Institutes are examples; real MCC data will replace them.</p>}
+        banner={meta.isDemo && <p className="bg-sun/10 px-4 py-1.5 text-center text-xs text-sun"><strong className="font-semibold">Demo data — illustrative only.</strong> Institutes are examples; real MCC data will replace them.</p>}
         topNav={
           <TopNav
             label="App"
@@ -118,7 +118,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
                 ) : (
                   <p className="mt-0.5 text-sm">Not set yet</p>
                 )}
-                <Button variant="secondary" size="sm" className="mt-2 min-h-10 w-full" onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
+                <Button data-profile-edit variant="secondary" className="mt-2 w-full" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
               </div>
             }
           >
@@ -132,11 +132,16 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
           </SideNav>
         }
       >
+        {/* Phones: the sidebar lives in the drawer, so keep the rank and Edit visible here. */}
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-2 md:hidden">
+          <p className="text-sm">{shown ? <><span className="font-bold">AIR {formatRank(shown.rank)}</span> <span className="text-muted-foreground">{shown.category}{shown.pwd ? " PwD" : ""}</span></> : "Rank not set"}</p>
+          <Button data-profile-edit variant="secondary" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
+        </div>
         <div className="pb-24 md:pb-0">{children}</div>
       </AppShell>
 
       {compare.length > 0 && (
-        <div className="fixed right-4 bottom-20 z-30 md:bottom-6">
+        <div className="fixed right-4 bottom-20 z-30 md:bottom-6" data-print-hide>
           <Button asChild className="shadow-overlay">
             <Link href={withProfile("/decide/compare", { ids: compare.join(",") })}>
               <GitCompareArrows className="size-4" /> Compare {compare.length}/{MAX_COMPARE}
@@ -154,7 +159,19 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
         ))}
       </nav>
 
-      <ProfileDialog open={editing} onOpenChange={setEditing} profile={shown} meta={meta} onSave={save} />
+      {editing && (
+        <ProfileDialog
+          key={JSON.stringify(shown)}
+          open
+          onOpenChange={(o) => {
+            setEditing(o);
+            if (!o) setTimeout(() => [...document.querySelectorAll<HTMLElement>("[data-profile-edit]")].find((e) => e.offsetParent !== null)?.focus(), 50);
+          }}
+          profile={shown}
+          meta={meta}
+          onSave={save}
+        />
+      )}
     </>
   );
 }

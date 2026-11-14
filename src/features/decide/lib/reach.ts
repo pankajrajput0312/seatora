@@ -20,6 +20,27 @@ export function deepestByYear(cutoffs: Cutoff[], provisionalSrc: Set<string>): M
   return out;
 }
 
+export type GridCell = { closing: number; category: Category; n: number; provisional: boolean };
+
+/**
+ * Year × round grid. Closing (and its seat category) comes from the categories she can take; the bracketed
+ * count is allotments made that round across ALL categories (the planner judge's rule: every category counts).
+ */
+export function buildGrid(all: Cutoff[], eligible: Set<string> | null, provisionalSrc: Set<string>) {
+  const grid: Record<number, Partial<Record<Round, GridCell>>> = {};
+  for (const c of all) {
+    const cell = ((grid[c.year] ??= {})[c.round] ??= { closing: 0, category: c.category, n: 0, provisional: provisionalSrc.has(c.src) });
+    cell.n += c.n;
+    if ((!eligible || eligible.has(c.category)) && c.closing > cell.closing) Object.assign(cell, { closing: c.closing, category: c.category });
+  }
+  // Drop cells where none of her categories had an allotment, but keep the year if any cell remains.
+  for (const y of Object.keys(grid)) {
+    for (const r of Object.keys(grid[+y]) as Round[]) if (!grid[+y][r]!.closing) delete grid[+y][r];
+    if (!Object.keys(grid[+y]).length) delete grid[+y];
+  }
+  return grid;
+}
+
 export const reachOrder = ["reached-latest", "reached-both", "reached-one", "within-10", "closed-before", "no-data"] as const;
 export type Reach = (typeof reachOrder)[number];
 
@@ -32,14 +53,16 @@ export function classifyReach(
   cutoffs: Cutoff[],
   { latestYear, pastYears, includeLatest }: { latestYear: number; pastYears: [number, number]; includeLatest: boolean },
 ): Reach {
-  const used = includeLatest ? cutoffs : cutoffs.filter((c) => c.year !== latestYear);
+  // Only the years and rounds the labels talk about: the two past years, plus the latest year's R1.
+  const used = cutoffs.filter((c) => pastYears.includes(c.year) || (includeLatest && c.year === latestYear && c.round === "R1"));
   if (used.length === 0) return "no-data";
   const reachedIn = (y: number) => used.some((c) => c.year === y && c.closing >= rank);
   if (includeLatest && used.some((c) => c.year === latestYear && c.round === "R1" && c.closing >= rank)) return "reached-latest";
   const [a, b] = pastYears;
   if (reachedIn(a) && reachedIn(b)) return "reached-both";
   if (reachedIn(a) || reachedIn(b)) return "reached-one";
-  if (used.some((c) => c.closing * 1.1 >= rank)) return "within-10";
+  // Agreed definition (neetpg-planner export_her.py): closing within 10% of her rank, i.e. closing >= rank * 0.9.
+  if (used.some((c) => c.closing >= rank * 0.9)) return "within-10";
   return "closed-before";
 }
 

@@ -2,34 +2,33 @@ import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
+import { DataSource } from "@/features/decide/components/data-source";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { Dash, DemoSource, HISTORY_CAPTION, PageHead } from "@/features/decide/components/bits";
+import { Dash, HISTORY_CAPTION, PageHead } from "@/features/decide/components/bits";
 import { decideLinks } from "@/features/decide/lib/links";
 import { profileFromParams, profileParamKeys, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
-import { baseCategories, roundLabel, type Round } from "@/features/decide/types";
+import { baseCategories, roundLabel, rounds, type Round } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Last ranks" };
-const cols: { year: number; rounds: Round[] }[] = [
-  { year: 2024, rounds: ["R1", "R2", "R3", "stray"] },
-  { year: 2025, rounds: ["R1", "R2", "R3", "stray"] },
-  { year: 2026, rounds: ["R1"] },
-];
 
-function Spark({ r }: { r: OptionRow }) {
-  const pts = cols.map((c) => Math.max(0, ...c.rounds.map((x) => r.grid[c.year]?.[x]?.closing ?? 0)));
-  const max = Math.max(...pts);
-  const desc = cols.map((c, i) => `${c.year}${c.year === 2026 ? " R1" : ""}: ${pts[i] ? formatRank(pts[i]) : "none"}`).join(", ");
-  if (!max) return <Dash />;
+/** R1 closing by year (like for like); a missing year is a gap, never a drop to zero. */
+function Spark({ r, years }: { r: OptionRow; years: number[] }) {
+  const pts = years.map((y) => r.grid[y]?.R1?.closing ?? null);
+  const vals = pts.filter((v): v is number => v != null);
+  if (!vals.length) return <Dash />;
+  const max = Math.max(...vals);
+  const x = (i: number) => 5 + (i * 50) / Math.max(1, years.length - 1);
+  const y = (v: number) => 18 - (v / max) * 16;
+  const segs: string[][] = [[]];
+  pts.forEach((v, i) => (v == null ? segs.push([]) : segs[segs.length - 1].push(`${x(i)},${y(v)}`)));
+  const desc = `R1 closing by year: ${years.map((yr, i) => `${yr} ${pts[i] != null ? formatRank(pts[i]!) : "no R1 data"}`).join(", ")}`;
   return (
-    <figure className="m-0">
-      <svg viewBox="0 0 60 20" className="h-5 w-16" role="img" aria-label={`Deepest closing by year: ${desc}`}>
-        <polyline points={pts.map((v, i) => `${5 + i * 25},${18 - (v / max) * 16}`).join(" ")} className="fill-none stroke-sky" strokeWidth={1.5} />
-        {pts.map((v, i) => v ? <rect key={i} x={3.5 + i * 25} y={16.5 - (v / max) * 16} width={3} height={3} className="fill-sky" /> : null)}
-      </svg>
-      <figcaption className="sr-only">{desc}</figcaption>
-    </figure>
+    <svg viewBox="0 0 60 20" className="h-5 w-16" role="img" aria-label={desc}>
+      {segs.filter((sg) => sg.length > 1).map((sg, i) => <polyline key={i} points={sg.join(" ")} className="fill-none stroke-sky" strokeWidth={1.5} />)}
+      {pts.map((v, i) => (v != null ? <rect key={i} x={x(i) - 1.5} y={y(v) - 1.5} width={3} height={3} className="fill-sky" /> : null))}
+    </svg>
   );
 }
 
@@ -38,12 +37,21 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const profile = profileFromParams(params);
   const meta = await getMeta();
   const course = meta.courses.find((c) => c.slug === params.get("course")) ?? meta.courses.find((c) => profile?.specialties.includes(c.specialty)) ?? meta.courses[0];
-  const category = (baseCategories as readonly string[]).includes(params.get("lcat") ?? "") ? params.get("lcat")! : profile?.category ?? "Open";
+  const allCats = [...baseCategories, ...baseCategories.map((c) => `${c} PwD`)];
+  const category = allCats.includes(params.get("lcat") ?? "") ? params.get("lcat")! : profile?.category ?? "Open";
   const quota = meta.quotas.includes(params.get("lquota") ?? "") ? params.get("lquota")! : undefined;
   const sort = params.get("sort"); // e.g. "2025-R1"
   const dir = params.get("dir") === "asc" ? "asc" : "desc";
 
-  const fetched = await lastRanks({ specialty: course.specialty, degree: course.degree, category, quota });
+  const fetchedAll = await lastRanks({ specialty: course.specialty, degree: course.degree, category, quota });
+  // Columns come from the data: every year and round that has a closing for this course.
+  const cols = [...new Set(fetchedAll.flatMap((r) => Object.keys(r.grid).map(Number)))].sort().map((year) => ({
+    year,
+    rounds: rounds.filter((rd) => fetchedAll.some((r) => r.grid[year]?.[rd])),
+    provisional: fetchedAll.some((r) => Object.values(r.grid[year] ?? {}).some((c) => c?.provisional)),
+  }));
+  const years = cols.map((c) => c.year);
+  const fetched = fetchedAll;
   let rows = fetched.filter((r) => Object.keys(r.grid).length > 0);
   const emptyCount = fetched.length - rows.length;
   if (sort) {
@@ -78,7 +86,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         <label className="grid gap-1.5 text-sm">
           <span className="text-xs font-medium text-muted-foreground">Seat category</span>
           <select name="lcat" defaultValue={category} className="h-11 rounded-md border border-input bg-background px-3">
-            {baseCategories.map((c) => <option key={c}>{c}</option>)}
+            {allCats.map((c) => <option key={c}>{c}</option>)}
           </select>
         </label>
         <label className="grid gap-1.5 text-sm">
@@ -93,18 +101,18 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
 
       <p aria-live="polite" className="mt-6 text-sm text-muted-foreground"><span className="numeric text-foreground">{rows.length}</span> institutes{emptyCount > 0 && <>; <span className="numeric">{emptyCount}</span> more had no {category}-seat allotments for this course</>}.</p>
 
-      <div role="region" aria-label={caption} tabIndex={0} className="mt-3 overflow-x-auto rounded-xl border border-border bg-card">
+      <div role="region" aria-label={caption} tabIndex={0} className="relative mt-3 overflow-x-auto rounded-xl border border-border bg-card [scroll-padding-inline-start:16rem]">
         <table className="w-full min-w-[960px] text-sm">
           <caption className="sr-only">{caption}</caption>
           <colgroup span={2} />
           {cols.map((c) => <colgroup key={c.year} span={c.rounds.length} />)}
           <thead>
             <tr className="border-b border-border text-xs text-muted-foreground">
-              <td rowSpan={2} className="sticky left-0 z-10 bg-card" />
-              <td rowSpan={2} />
+              <th rowSpan={2} scope="col" className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-semibold">Institute</th>
+              <th rowSpan={2} scope="col" className="px-2 py-2 text-left text-xs font-semibold">R1 trend</th>
               {cols.map((c) => (
                 <th key={c.year} scope="colgroup" colSpan={c.rounds.length} className="border-l border-border px-2 py-2 text-center font-mono font-normal tracking-widest">
-                  {c.year}{c.year === 2026 && " (provisional)"}
+                  {c.year}{c.provisional && " (provisional)"}
                 </th>
               ))}
             </tr>
@@ -113,10 +121,9 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                 c.rounds.map((r, i) => {
                   const key = `${c.year}-${r}`;
                   return (
-                    <th key={key} scope="col" aria-sort={sort === key ? (dir === "asc" ? "ascending" : "descending") : "none"} className={`px-1 py-1 text-right font-normal ${i === 0 ? "border-l border-border" : ""}`}>
-                      <Link href={sortHref(key)} className="inline-flex min-h-11 items-center justify-end px-1 hover:text-foreground">
+                    <th key={key} scope="col" aria-sort={sort === key ? (dir === "asc" ? "ascending" : "descending") : undefined} className={`px-1 py-1 text-right font-normal ${i === 0 ? "border-l border-border" : ""}`}>
+                      <Link href={sortHref(key)} aria-label={`${c.year} ${roundLabel[r]}, sort ${sort === key && dir === "desc" ? "ascending" : "descending"}`} className="inline-flex min-h-11 items-center justify-end px-1 hover:text-foreground">
                         {roundLabel[r]}{sort === key ? (dir === "asc" ? " ↑" : " ↓") : ""}
-                        <span className="sr-only">, sort</span>
                       </Link>
                     </th>
                   );
@@ -132,7 +139,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                   <span className="block text-xs text-muted-foreground">{r.college.state}, {r.quota}</span>
                   <Link href={L.allotments({ course: course.slug, inst: r.college.slug })} className="text-xs text-sky underline">Allotments</Link>
                 </th>
-                <td className="px-2 py-2"><Spark r={r} /></td>
+                <td className="px-2 py-2"><Spark r={r} years={years} /></td>
                 {cols.flatMap((c) =>
                   c.rounds.map((round, i) => {
                     const cell = r.grid[c.year]?.[round];
@@ -152,7 +159,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       <div className="mt-6 grid gap-2 text-xs text-muted-foreground">
         <p>Closing = highest All India Rank allotted that round on a {category} seat. Brackets = allotments made that round (new or upgraded only in R2+), not the seat matrix.</p>
         <p>{HISTORY_CAPTION}</p>
-        <DemoSource />
+        <DataSource />
       </div>
     </Container>
   );

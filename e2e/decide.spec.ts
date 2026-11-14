@@ -19,15 +19,16 @@ test("every Decide route renders with the demo banner", async ({ page }) => {
 test("set profile, label options, and reorder choices with the keyboard only", async ({ page }) => {
   await page.goto("/decide/options");
   await page.getByRole("link", { name: "Set your rank" }).first().click();
-  await page.getByLabel("All India Rank").fill("42284");
-  await page.getByLabel("Category").selectOption("OBC");
-  await page.getByLabel("Anaesthesiology").check();
-  await page.getByRole("button", { name: "Save" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("All India Rank").fill("42284");
+  await dialog.getByLabel("Category").selectOption("OBC");
+  await dialog.getByLabel("Anaesthesiology").check();
+  await dialog.getByRole("button", { name: "Save" }).click();
   await expect(page).toHaveURL(/rank=42284/);
   await expect(page.getByText("Reached in 2026 R1").filter({ visible: true }).first()).toBeVisible();
 
-  const stars = page.getByRole("button", { name: /^Add to Round 2 · 2026/ });
-  for (let i = 0; i < 3; i++) await stars.first().click(); // each click turns that star off-list, next "Add" is the next row
+  const stars = page.locator('button[aria-pressed="false"][aria-label^="In Round 2"]').filter({ visible: true });
+  for (let i = 0; i < 3; i++) await stars.first().click(); // a clicked star becomes pressed, so .first() moves to the next row
 
   await page.goto(`/decide/choices?${PROFILE}`);
   const list = page.getByRole("list", { name: /Round 2 · 2026 choice list, 3 items/ });
@@ -65,4 +66,23 @@ test("related data is linked: institute → course last ranks → allotments →
 
   await page.getByTitle("Scan ranks around this one").first().click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Rank scan");
+});
+
+test("edit dialog opens with the saved profile and saving keeps the category", async ({ page }) => {
+  await page.goto("/decide");
+  await page.evaluate(() =>
+    localStorage.setItem("medpath.profile", JSON.stringify({ rank: 42284, category: "OBC", pwd: false, specialties: ["ANAESTHESIOLOGY"], degrees: [], quotas: [], states: [], maxFeeLakh: 5, maxBondYears: null })),
+  );
+  await page.goto("/decide/options"); // full load without params: the bug case
+  await expect(page).toHaveURL(/rank=42284/);
+  await page.getByRole("button", { name: "Edit your rank and preferences" }).filter({ visible: true }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("All India Rank")).toHaveValue("42284");
+  await expect(dialog.getByLabel("Category")).toHaveValue("OBC");
+  await expect(dialog.getByLabel("Anaesthesiology")).toBeChecked();
+  await dialog.getByLabel("All India Rank").fill("40000");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveURL(/rank=40000/);
+  await expect(page).toHaveURL(/cat=OBC/);
+  await expect(page).toHaveURL(/fee=5/);
 });

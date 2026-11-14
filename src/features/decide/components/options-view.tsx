@@ -10,7 +10,6 @@ import { roundLabel, rounds, type Round } from "../types";
 import { Closing, Dash, ReachBadge } from "./bits";
 import { ChoiceStar, CompareToggle } from "./option-actions";
 
-const YEARS = [2024, 2025, 2026];
 export const courseName = (r: Pick<OptionRow, "course">) => `${r.course.degree} ${r.course.name}`;
 
 export function toChoiceItem(r: OptionRow): ChoiceItem {
@@ -20,11 +19,13 @@ export function toChoiceItem(r: OptionRow): ChoiceItem {
   };
 }
 
-/** Year × round grid: "closing (allotments)" per cell, "—" when none. */
+/** Year × round grid: closing rank with its seat category, and allotments made (all categories) in brackets. */
 export function RoundGrid({ row, caption }: { row: OptionRow; caption: string }) {
-  const used = rounds.filter((r) => YEARS.some((y) => row.grid[y]?.[r]));
+  const years = Object.keys(row.grid).map(Number).sort();
+  const used = rounds.filter((r) => years.some((y) => row.grid[y]?.[r]));
+  if (!years.length) return <p className="text-xs text-muted-foreground">No allotments in your seat categories.</p>;
   return (
-    <div role="region" aria-label={caption} tabIndex={0} className="overflow-x-auto">
+    <div role="region" aria-label={caption} tabIndex={0} className="relative overflow-x-auto">
       <table className="text-xs">
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -34,14 +35,14 @@ export function RoundGrid({ row, caption }: { row: OptionRow; caption: string })
           </tr>
         </thead>
         <tbody>
-          {YEARS.map((y) => (
+          {years.map((y) => (
             <tr key={y} className="border-t border-border">
-              <th scope="row" className="py-1 pr-3 text-left font-normal">{y}{y === 2026 && <span className="text-sun"> prov.</span>}</th>
+              <th scope="row" className="py-1 pr-3 text-left font-normal">{y}{Object.values(row.grid[y] ?? {}).some((c) => c?.provisional) && <span className="block text-sun">provisional</span>}</th>
               {used.map((r) => {
                 const c = row.grid[y]?.[r as Round];
                 return (
                   <td key={r} className="numeric px-2 py-1 text-right">
-                    {c ? <>{formatRank(c.closing)} <span className="text-muted-foreground">({c.n})</span></> : <Dash />}
+                    {c ? <><span className="font-semibold">{formatRank(c.closing)}</span> <span className="text-muted-foreground">({c.n})</span><span className="block text-muted-foreground">{c.category} seat</span></> : <Dash />}
                   </td>
                 );
               })}
@@ -49,7 +50,7 @@ export function RoundGrid({ row, caption }: { row: OptionRow; caption: string })
           ))}
         </tbody>
       </table>
-      <p className="mt-1 text-xs text-muted-foreground">Closing rank, with allotments made that round in brackets.</p>
+      <p className="mt-1 text-xs text-muted-foreground">Closing rank on that seat category; allotments made that round, all categories, in brackets.</p>
     </div>
   );
 }
@@ -58,7 +59,7 @@ function FeeBond({ r }: { r: OptionRow }) {
   return (
     <span className="numeric">
       {r.feeInr != null ? `${formatLakh(r.feeInr)}/yr` : r.feeText ?? <Dash />}
-      <span className="block text-xs text-muted-foreground">{r.bondText ? `Bond: ${r.bondText}` : "No bond listed"}</span>
+      <span className="block text-xs text-muted-foreground">Bond: {r.bondText ?? <Dash />}</span>
     </span>
   );
 }
@@ -76,7 +77,7 @@ function Related({ r, L }: { r: OptionRow; L: DecideLinks }) {
 export function OptionsTable({ rows, caption, start, L }: { rows: OptionRow[]; caption: string; start: number; L: DecideLinks }) {
   return (
     <>
-      <div role="region" aria-label={caption} tabIndex={0} className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
+      <div role="region" aria-label={caption} tabIndex={0} className="relative hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
         <table className="w-full min-w-[1000px] text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead>
@@ -94,7 +95,7 @@ export function OptionsTable({ rows, caption, start, L }: { rows: OptionRow[]; c
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.id} id={`row-${start + i + 1}`} tabIndex={-1} className="border-b border-border align-top last:border-0 hover:bg-muted/40">
+              <tr key={r.id} data-item={start + i + 1} tabIndex={-1} className="border-b border-border align-top last:border-0 hover:bg-muted/40">
                 <td className="px-2 py-2"><ChoiceStar item={toChoiceItem(r)} /></td>
                 <th scope="row" className="px-3 py-3 text-left font-normal">
                   <Link href={L.institute(r.college.slug)} className="font-medium hover:text-sky hover:underline">{r.college.name}</Link>
@@ -106,9 +107,9 @@ export function OptionsTable({ rows, caption, start, L }: { rows: OptionRow[]; c
                   </details>
                 </th>
                 <td className="px-3 py-3"><Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link></td>
-                <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional /></td>
+                <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} /></td>
                 <td className="px-3 py-3 text-right">
-                  {r.latest ? <span className="numeric">{formatRank(r.latest.closing)}<Badge tone="warning" className="mt-1 block w-fit justify-self-end">Provisional</Badge></span> : <Dash />}
+                  {r.latest ? <><Closing d={r.latest} />{r.latest.provisional && <Badge tone="warning" className="mt-1">Provisional</Badge>}</> : <Dash />}
                 </td>
                 <td className="px-3 py-3 text-right"><Closing d={r.byYear[2025]} /></td>
                 <td className="px-3 py-3 text-right"><Closing d={r.byYear[2024]} /></td>
@@ -122,11 +123,11 @@ export function OptionsTable({ rows, caption, start, L }: { rows: OptionRow[]; c
 
       <ul className="grid gap-3 md:hidden" aria-label={caption}>
         {rows.map((r, i) => (
-          <li key={r.id} id={`card-${start + i + 1}`}>
+          <li key={r.id} data-item={start + i + 1} tabIndex={-1}>
             <article className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="font-medium"><Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link></h3>
+                  <h2 className="font-medium"><Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link></h2>
                   <p className="text-xs text-muted-foreground">{courseName(r)} · {r.college.state} · {r.quota}</p>
                 </div>
                 <div className="flex shrink-0">
@@ -134,9 +135,9 @@ export function OptionsTable({ rows, caption, start, L }: { rows: OptionRow[]; c
                   <CompareToggle id={r.id} label={`${r.college.name}, ${courseName(r)}`} />
                 </div>
               </div>
-              <div className="mt-2"><ReachBadge reach={r.reach} provisional /></div>
+              <div className="mt-2"><ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} /></div>
               <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                <div><dt className="text-xs text-muted-foreground">2026 R1 (prov.)</dt><dd className="numeric">{r.latest ? formatRank(r.latest.closing) : <Dash />}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">2026 R1{r.latest?.provisional ? " (provisional)" : ""}</dt><dd><Closing d={r.latest} /></dd></div>
                 <div><dt className="text-xs text-muted-foreground">2025 deepest</dt><dd><Closing d={r.byYear[2025]} /></dd></div>
                 <div><dt className="text-xs text-muted-foreground">2024 deepest</dt><dd><Closing d={r.byYear[2024]} /></dd></div>
               </dl>

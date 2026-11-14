@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { Container } from "@/components/layout/container";
+import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { DemoSource, PageHead, ReachBadge } from "@/features/decide/components/bits";
+import { PageHead, ReachBadge } from "@/features/decide/components/bits";
 import { control, Empty, Field, FilterBar, profileOnly, Select } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
@@ -63,7 +64,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
                 <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4">
                   <div><dt className="text-xs text-muted-foreground">Beds</dt><dd className="text-lg font-bold">{r.college.beds != null ? formatRank(r.college.beds) : "—"}</dd></div>
                   <div><dt className="text-xs text-muted-foreground">Established</dt><dd className="text-lg font-bold">{r.college.established ?? "—"}</dd></div>
-                  <div><dt className="text-xs text-muted-foreground">Allotments 2025</dt><dd className="text-lg font-bold">{r.allotments2025}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Allotments 2025</dt><dd className="text-lg font-bold">{r.allotments2025 ?? "—"}</dd></div>
                 </dl>
                 <div className="mt-4 flex flex-wrap gap-1.5">
                   {r.courses.map((c) => (
@@ -82,7 +83,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
           ))}
         </ul>
       )}
-      <DemoSource />
+      <DataSource />
     </Container>
   );
 }

@@ -11,6 +11,9 @@ import { getMeta } from "@/features/decide/service";
 // Inside app uses its own "case sheet" system (docs/APP_DESIGN_SYSTEM.md): light, hyperlegible numerals.
 const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
 
+// Every Decide page reads profile params, so render on request (no client-only bailout behind Suspense).
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = { title: { default: "Decide", template: "%s · Decide · MEDPATH" } };
 
 export default async function DecideLayout({ children }: { children: React.ReactNode }) {

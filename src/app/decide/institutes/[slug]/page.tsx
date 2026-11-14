@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/layout/container";
+import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { Closing, Dash, DemoSource, HISTORY_CAPTION, ReachBadge } from "@/features/decide/components/bits";
+import { Closing, Dash, HISTORY_CAPTION, ReachBadge } from "@/features/decide/components/bits";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { courseName, RoundGrid, toChoiceItem } from "@/features/decide/components/options-view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
@@ -39,7 +40,7 @@ function Terms({ title, t }: { title: string; t: T }) {
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
           <dt className="text-muted-foreground">Fee</dt><dd className="font-semibold">{t.fee?.amountInr != null ? `${formatLakh(t.fee.amountInr)} per year` : t.fee?.text ?? <Dash />}{t.fee?.amountInr != null && <span className="block text-xs font-normal text-muted-foreground">{t.fee.text}</span>}</dd>
           <dt className="text-muted-foreground">Stipend</dt><dd className="font-semibold">{t.stipend?.text ?? <Dash />}</dd>
-          <dt className="text-muted-foreground">Bond</dt><dd className="font-semibold">{t.bond?.text ?? "No bond listed"}</dd>
+          <dt className="text-muted-foreground">Bond</dt><dd className="font-semibold">{t.bond?.text ?? <Dash />}</dd>
           <dt className="text-muted-foreground">Bond penalty</dt><dd className="font-semibold">{t.penalty?.text ?? <Dash />}</dd>
         </dl>
       )}
@@ -56,7 +57,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   if (!inst) notFound();
   const { college, options, allotmentsByYear, terms } = inst;
   const tab = tabs.find((t) => t.key === sp.get("tab"))?.key ?? "overview";
-  const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n));
+  const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n ?? 0));
   const courses = [...new Map(options.map((o) => [o.course.slug, o.course])).values()];
 
   const year = Number(sp.get("year")) || undefined;
@@ -78,7 +79,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
             {[
               ["Courses here", String(courses.length)],
-              ["Allotments in 2025", String(allotmentsByYear.find((a) => a.year === 2025)?.n ?? 0)],
+              ["Allotments in 2025", allotmentsByYear.find((a) => a.year === 2025)?.n != null ? String(allotmentsByYear.find((a) => a.year === 2025)!.n) : "—"],
               ["Beds", college.beds != null ? formatRank(college.beds) : "—"],
               ["Established", college.established ? String(college.established) : "—"],
             ].map(([k, v]) => (
@@ -102,7 +103,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     </span>
                   </span>
                   <span className="flex items-center gap-4">
-                    {profile && <ReachBadge reach={o.reach} provisional />}
+                    {profile && <ReachBadge reach={o.reach} provisional={!!o.latest?.provisional} />}
                     <span className="text-right"><span className="block text-xs text-muted-foreground">2025 deepest</span><Closing d={o.byYear[2025]} /></span>
                   </span>
                 </li>
@@ -119,8 +120,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                 {allotmentsByYear.map((a) => (
                   <tr key={a.year}>
                     <th scope="row" className="w-28 py-1.5 text-left font-normal text-muted-foreground">{a.year}{a.year === 2026 && " (R1)"}</th>
-                    <td className="py-1.5"><div className="h-3 rounded-r-[4px] bg-sky" style={{ width: `${(a.n / maxN) * 100}%` }} aria-hidden /></td>
-                    <td className="w-12 py-1.5 text-right font-semibold">{a.n}</td>
+                    <td className="py-1.5">{a.n != null && <div className="h-3 rounded-r-[4px] bg-sky" style={{ width: `${(a.n / maxN) * 100}%` }} aria-hidden />}</td>
+                    <td className="w-12 py-1.5 text-right font-semibold">{a.n ?? <Dash />}</td>
                   </tr>
                 ))}
               </tbody>
@@ -139,6 +140,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Add to choices</span></th>
                   <th scope="col" className={tbl.th}>Course and quota</th>
                   <th scope="col" className={tbl.th}>{profile ? "Your reach" : "Reach"}</th>
+                  <th scope="col" className={`${tbl.th} text-right`}>2026 R1</th>
                   <th scope="col" className={`${tbl.th} text-right`}>2025 deepest</th>
                   <th scope="col" className={tbl.th}>By year and round</th>
                   <th scope="col" className={tbl.th}>Related</th>
@@ -150,7 +152,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   <tr key={r.id} className={tbl.row}>
                     <td className="px-2 py-2"><ChoiceStar item={toChoiceItem(r)} /></td>
                     <th scope="row" className={`${tbl.td} text-left font-medium`}>{courseName(r)}<span className="block text-xs font-normal text-muted-foreground">{r.quota}</span></th>
-                    <td className={tbl.td}>{profile ? <ReachBadge reach={r.reach} provisional /> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
+                    <td className={tbl.td}>{profile ? <ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} /> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
+                    <td className={tbl.num}><Closing d={r.latest} />{r.latest?.provisional && <span className="block text-xs font-normal text-sun">Provisional</span>}</td>
                     <td className={tbl.num}><Closing d={r.byYear[2025]} /></td>
                     <td className={tbl.td}><RoundGrid row={r} caption={`${courseName(r)}, ${r.quota}: closing ranks by year and round`} /></td>
                     <td className={`${tbl.td} whitespace-nowrap`}>
@@ -218,7 +221,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         </section>
       )}
 
-      <DemoSource />
+      <DataSource />
     </Container>
   );
 }

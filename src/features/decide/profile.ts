@@ -21,23 +21,31 @@ export type Profile = z.infer<typeof profileSchema>;
 export const PROFILE_KEY = "medpath.profile";
 export const profileParamKeys = ["rank", "cat", "pwd", "sp", "deg", "quota", "st", "fee", "bond"] as const;
 
-const list = (v: string | null) => (v ? v.split(",").filter(Boolean) : []);
-const num = (v: string | null) => (v && !Number.isNaN(Number(v)) ? Number(v) : null);
+const list = (p: URLSearchParams, k: string) => p.getAll(k).flatMap((v) => v.split(",")).map((v) => v.trim()).filter(Boolean);
+const num = (v: string | null) => (v && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : null);
 
-/** Reads a profile from URL params; null when there's no valid rank. Invalid optional parts fall back to defaults. */
+/**
+ * Reads a profile from URL params; null when there's no valid rank. Each optional field is validated on its own,
+ * so one bad optional value falls back to its default instead of discarding the whole profile.
+ */
 export function profileFromParams(p: URLSearchParams): Profile | null {
-  const r = profileSchema.safeParse({
-    rank: num(p.get("rank")),
-    category: p.get("cat") ?? "Open",
+  const rank = profileSchema.shape.rank.safeParse(num(p.get("rank")?.replace(/[,\s]/g, "") ?? null));
+  if (!rank.success) return null;
+  const field = <K extends keyof Profile>(k: K, v: unknown, fallback: Profile[K]): Profile[K] => {
+    const r = profileSchema.shape[k].safeParse(v);
+    return r.success ? (r.data as Profile[K]) : fallback;
+  };
+  return {
+    rank: rank.data,
+    category: field("category", p.get("cat"), "Open"),
     pwd: p.get("pwd") === "1",
-    specialties: list(p.get("sp")),
-    degrees: list(p.get("deg")),
-    quotas: list(p.get("quota")),
-    states: list(p.get("st")),
-    maxFeeLakh: num(p.get("fee")),
-    maxBondYears: num(p.get("bond")),
-  });
-  return r.success ? r.data : null;
+    specialties: field("specialties", list(p, "sp"), []),
+    degrees: field("degrees", list(p, "deg"), []),
+    quotas: field("quotas", list(p, "quota"), []),
+    states: field("states", list(p, "st"), []),
+    maxFeeLakh: field("maxFeeLakh", num(p.get("fee")), null),
+    maxBondYears: field("maxBondYears", num(p.get("bond")), null),
+  };
 }
 
 export function profileToParams(profile: Profile, base = new URLSearchParams()): URLSearchParams {

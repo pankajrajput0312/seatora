@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
+import { DataSource } from "@/features/decide/components/data-source";
 import { Badge } from "@/components/ui/badge";
-import { DemoSource, PageHead } from "@/features/decide/components/bits";
+import { PageHead } from "@/features/decide/components/bits";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { profileParamKeys, toURLSearchParams } from "@/features/decide/profile";
 import { getNotices } from "@/features/decide/service";
@@ -30,7 +31,7 @@ export default async function CounsellingPage({ searchParams }: { searchParams: 
 
       <ol className="mt-6 grid gap-2">
         {notices.map((n) => {
-          const open = /open now/i.test(n.title);
+          const open = n.status === "open";
           return (
             <li key={n.title} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
               <div>
@@ -38,13 +39,13 @@ export default async function CounsellingPage({ searchParams }: { searchParams: 
                 <p className="mt-1">{n.title} {open && <Badge tone="info" className="ml-1 align-middle">Open now</Badge>}</p>
               </div>
               <a href={n.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-sky underline">
-                Official page (opens {n.authority} site)
+                Official page<span className="sr-only"> on the {n.authority} site (opens in a new tab)</span>
               </a>
             </li>
           );
         })}
       </ol>
-      <div className="mt-6"><DemoSource /></div>
+      <div className="mt-6"><DataSource /></div>
     </Container>
   );
 }

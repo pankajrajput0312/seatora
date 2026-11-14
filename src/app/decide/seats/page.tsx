@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
 import { Container } from "@/components/layout/container";
-import { DemoSource, PageHead } from "@/features/decide/components/bits";
+import { DataSource } from "@/features/decide/components/data-source";
+import { Dash, PageHead } from "@/features/decide/components/bits";
 import { courseName } from "@/features/decide/components/options-view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { decideLinks } from "@/features/decide/lib/links";
@@ -23,7 +24,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
   const all = tab === "trends" ? await allotmentTrends({}) : [];
   const rows = all.filter((r) => !profile?.specialties.length || profile.specialties.includes(r.course.specialty));
   const L = decideLinks(params);
-  const max = Math.max(1, ...rows.flatMap((r) => YEARS.map((y) => r.byYear[y])));
+  const max = Math.max(1, ...rows.flatMap((r) => YEARS.map((y) => r.byYear[y] ?? 0)));
 
   return (
     <Container className="py-10">
@@ -39,7 +40,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
       ) : (
         <>
           <p className="mt-6 text-sm text-muted-foreground">Allotments made per year (all rounds), for the courses in your profile. This is not the number of seats.</p>
-          <div role="region" aria-label="Allotments made by year" tabIndex={0} className="mt-4 overflow-x-auto rounded-xl border border-border bg-card">
+          <div role="region" aria-label="Allotments made by year" tabIndex={0} className="relative mt-4 overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full min-w-[720px] text-sm">
               <caption className="sr-only">Allotments made by year per institute and course</caption>
               <thead>
@@ -51,19 +52,19 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
               </thead>
               <tbody>
                 {rows.map((r) => {
-                  const change = r.byYear[2025] - r.byYear[2024];
+                  const change = r.byYear[2025] != null && r.byYear[2024] != null ? r.byYear[2025]! - r.byYear[2024]! : null;
                   return (
                     <tr key={r.id} className="border-b border-border last:border-0">
                       <th scope="row" className="px-3 py-2 text-left font-normal"><Link href={L.institute(r.college.slug)} className="font-medium hover:text-sky hover:underline">{r.college.name}</Link><Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="block text-xs text-muted-foreground hover:text-sky hover:underline">{courseName(r)}, {r.quota}</Link></th>
                       {YEARS.map((y) => (
                         <td key={y} className="px-3 py-2">
                           <div className="flex items-center gap-2">
-                            <div className="h-2 bg-sky" style={{ width: `${(r.byYear[y] / max) * 80}px` }} aria-hidden />
-                            <span className="numeric">{r.byYear[y]}</span>
+                            {r.byYear[y] != null && <div className="h-2 rounded-r-[4px] bg-sky" style={{ width: `${(r.byYear[y]! / max) * 80}px` }} aria-hidden />}
+                            <span className="numeric font-semibold">{r.byYear[y] ?? <Dash />}</span>
                           </div>
                         </td>
                       ))}
-                      <td className="numeric px-3 py-2 text-right">{change > 0 ? `+${change}` : change} <span className="sr-only">2025 vs 2024</span></td>
+                      <td className="numeric px-3 py-2 text-right font-semibold">{change == null ? <Dash /> : change > 0 ? `+${change}` : change} <span className="sr-only">2025 vs 2024</span></td>
                     </tr>
                   );
                 })}
@@ -72,7 +73,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
           </div>
         </>
       )}
-      <div className="mt-6"><DemoSource /></div>
+      <div className="mt-6"><DataSource /></div>
     </Container>
   );
 }

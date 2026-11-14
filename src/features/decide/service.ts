@@ -1,7 +1,7 @@
 import "server-only";
 import { decideDemoData } from "./data/decide.demo";
 import { bondYears } from "./lib/format";
-import { classifyReach, deepestByYear, eligibleCategories, reachOrder, type Deepest, type Reach } from "./lib/reach";
+import { buildGrid, classifyReach, deepestByYear, eligibleCategories, reachOrder, type Deepest, type GridCell, type Reach } from "./lib/reach";
 import type { Profile } from "./profile";
 import { optionId, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Term } from "./types";
 
@@ -23,8 +23,8 @@ export type OptionRow = {
   reach: Reach;
   latest: Deepest | null; // 2026 R1 (provisional)
   byYear: Record<number, Deepest | null>;
-  /** year → round → deepest closing among eligible categories, with allotments made */
-  grid: Record<number, Partial<Record<Round, { closing: number; n: number; category: string }>>>;
+  /** year → round → deepest closing among eligible categories (with its seat category); n = allotments, all categories */
+  grid: Record<number, Partial<Record<Round, GridCell>>>;
   feeInr: number | null;
   feeText: string | null;
   stipendText: string | null;
@@ -49,12 +49,7 @@ function buildRow(d: DecideData, key: string, list: Cutoff[], profile: Profile |
   const mine = eligible ? list.filter((c) => eligible.has(c.category)) : list;
   const provisional = new Set(d.sources.filter((s) => s.provisional).map((s) => s.key));
   const deepest = deepestByYear(mine, provisional);
-  const grid: OptionRow["grid"] = {};
-  for (const c of mine) {
-    const cell = ((grid[c.year] ??= {})[c.round] ??= { closing: 0, n: 0, category: c.category });
-    cell.n += c.n;
-    if (c.closing > cell.closing) Object.assign(cell, { closing: c.closing, category: c.category });
-  }
+  const grid = buildGrid(list, eligible, provisional);
   const t = termsFor(d.terms, college.key, course.degree);
   return {
     id: key,
@@ -62,7 +57,7 @@ function buildRow(d: DecideData, key: string, list: Cutoff[], profile: Profile |
     course,
     quota: c0.quota,
     reach: profile ? classifyReach(profile.rank, mine, { latestYear: LATEST_YEAR, pastYears: PAST_YEARS, includeLatest: includeProvisional }) : "no-data",
-    latest: mine.find((c) => c.year === LATEST_YEAR && c.round === "R1") ? deepest.get(LATEST_YEAR) ?? null : null,
+    latest: deepestByYear(mine.filter((c) => c.year === LATEST_YEAR && c.round === "R1"), provisional).get(LATEST_YEAR) ?? null,
     byYear: Object.fromEntries(YEARS.map((y) => [y, deepest.get(y) ?? null])),
     grid,
     feeInr: t.fee?.amountInr ?? null,
@@ -127,10 +122,10 @@ export async function getInstitute(slug: string, profile: Profile | null) {
   if (!college) return null;
   const groups = groupOptions(d);
   const options = [...groups].filter(([, l]) => l[0].college === college.key).map(([k, l]) => buildRow(d, k, l, profile, true));
-  const allotmentsByYear = YEARS.map((year) => ({
-    year,
-    n: d.cutoffs.filter((c) => c.college === college.key && c.year === year).reduce((s, c) => s + c.n, 0),
-  }));
+  const allotmentsByYear = YEARS.map((year) => {
+    const rows = d.cutoffs.filter((c) => c.college === college.key && c.year === year);
+    return { year, n: rows.length ? rows.reduce((s, c) => s + c.n, 0) : null };
+  });
   const terms = { md: termsFor(d.terms, college.key, "MD"), dnb: termsFor(d.terms, college.key, "DNB") };
   return { college, options, allotmentsByYear, terms, isDemo: d.isDemo };
 }
@@ -160,9 +155,13 @@ export async function allotmentTrends(f: { specialty?: string; degree?: string }
   const groups = [...groupOptions(d)].filter(([, l]) => (!f.specialty || l[0].specialty === f.specialty) && (!f.degree || l[0].degree === f.degree));
   return groups.map(([k, list]) => {
     const row = buildRow(d, k, list, null, true);
-    const byYear = Object.fromEntries(YEARS.map((y) => [y, list.filter((c) => c.year === y).reduce((s, c) => s + c.n, 0)])) as Record<number, number>;
+    const byYear = Object.fromEntries(YEARS.map((y) => { const rows = list.filter((c) => c.year === y); return [y, rows.length ? rows.reduce((s, c) => s + c.n, 0) : null]; })) as Record<number, number | null>;
     return { id: k, college: row.college, course: row.course, quota: row.quota, byYear };
   });
+}
+
+export async function isDemoData() {
+  return (await getDecideData()).isDemo;
 }
 
 export async function getMeta() {
@@ -228,7 +227,7 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
       college,
       courses: [...new Map(options.map((o) => [o.course.slug, o.course])).values()],
       quotas: [...new Set(options.map((o) => o.quota))],
-      allotments2025: d.cutoffs.filter((c) => c.college === college.key && c.year === 2025).reduce((s, c) => s + c.n, 0),
+      allotments2025: d.cutoffs.some((c) => c.college === college.key && c.year === 2025) ? d.cutoffs.filter((c) => c.college === college.key && c.year === 2025).reduce((s, c) => s + c.n, 0) : null,
       bestReach: (profile ? best : "no-data") as Reach,
     };
   });
@@ -241,7 +240,7 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
   return filtered.sort((a, b) =>
     by === "beds" ? (b.college.beds ?? 0) - (a.college.beds ?? 0)
     : by === "established" ? (a.college.established ?? 9999) - (b.college.established ?? 9999)
-    : by === "allotments" ? b.allotments2025 - a.allotments2025
+    : by === "allotments" ? (b.allotments2025 ?? -1) - (a.allotments2025 ?? -1)
     : a.college.name.localeCompare(b.college.name),
   );
 }
@@ -268,6 +267,7 @@ export async function listAllotments(f: AllotmentFilters, limit: number, college
         college,
         courseName: `${a.degree} ${d.courses.find((c) => c.degree === a.degree && c.specialty === a.specialty)?.name ?? a.specialty}`,
         courseSlug: d.courses.find((c) => c.degree === a.degree && c.specialty === a.specialty)?.slug ?? "",
+        provisional: d.sources.some((s) => s.year === a.year && s.round === a.round && s.provisional),
         feeInr: t.fee?.amountInr ?? null,
         stipendText: t.stipend?.text ?? null,
         bondText: t.bond?.text ?? null,

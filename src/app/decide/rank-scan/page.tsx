@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
+import { DataSource } from "@/features/decide/components/data-source";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { DemoSource, PageHead } from "@/features/decide/components/bits";
+import { PageHead } from "@/features/decide/components/bits";
 import { decideLinks } from "@/features/decide/lib/links";
 import { profileFromParams, profileParamKeys, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankScan } from "@/features/decide/service";
@@ -15,7 +16,10 @@ export const metadata: Metadata = { title: "Rank scan" };
 export default async function RankScanPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
-  const rank = Number(params.get("scan")) || profile?.rank || null;
+  const typed = params.get("scan");
+  const typedRank = typed != null && typed.trim() !== "" ? Number(typed.replace(/[,\s]/g, "")) : null;
+  const invalid = typedRank != null && !(Number.isInteger(typedRank) && typedRank >= 1 && typedRank <= 300000);
+  const rank = invalid ? null : typedRank ?? profile?.rank ?? null;
   const year = [2024, 2025, 2026].includes(Number(params.get("year"))) ? Number(params.get("year")) : 2025;
   const window = [250, 500, 1000].includes(Number(params.get("w"))) ? Number(params.get("w")) : 500;
   const [groups, meta] = await Promise.all([rank ? rankScan(rank, year, window) : [], getMeta()]);
@@ -48,7 +52,9 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         <Button type="submit" className="h-11">Scan</Button>
       </Form>
 
-      {!rank ? (
+      {invalid ? (
+        <p role="alert" className="mt-8 text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example 42,284.</p>
+      ) : !rank ? (
         <p className="mt-8 text-sm text-muted-foreground">Enter a rank to scan.</p>
       ) : (
         <>
@@ -59,7 +65,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
           {groups.map((g) => (
             <section key={g.round} aria-labelledby={`r-${g.round}`} className="mt-6">
               <h2 id={`r-${g.round}`} className="text-lg font-medium">{year} {roundLabel[g.round]}</h2>
-              <div role="region" aria-label={`${year} ${roundLabel[g.round]} allotments`} tabIndex={0} className="mt-3 overflow-x-auto rounded-xl border border-border bg-card">
+              <div role="region" aria-label={`${year} ${roundLabel[g.round]} allotments`} tabIndex={0} className="relative mt-3 overflow-x-auto rounded-xl border border-border bg-card">
                 <table className="w-full min-w-[720px] text-sm">
                   <caption className="sr-only">{year} {roundLabel[g.round]}: allotments to ranks near {formatRank(rank)}</caption>
                   <thead>
@@ -72,24 +78,27 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                     </tr>
                   </thead>
                   <tbody>
-                    {g.rows.map((a, i) => (
-                      <tr key={i} className={`border-b border-border last:border-0 ${a.rank >= rank && (i === 0 || g.rows[i - 1].rank < rank) ? "border-t-2 border-t-sky" : ""}`}>
+                    {g.rows.flatMap((a, i) => [
+                      ...(a.rank >= rank && (i === 0 || g.rows[i - 1].rank < rank)
+                        ? [<tr key={`you-${i}`} className="bg-sky/10"><td colSpan={5} className="px-3 py-1.5 text-xs font-semibold text-sky">Your rank, {formatRank(rank)}, falls here</td></tr>]
+                        : []),
+                      <tr key={i} className="border-b border-border last:border-0">
                         <td className="numeric px-3 py-2 text-right">{formatRank(a.rank)}</td>
                         <td className="px-3 py-2">{a.category}</td>
                         <td className="px-3 py-2"><Link href={L.institute(a.collegeSlug)} className="font-medium hover:text-sky hover:underline">{a.collegeName}</Link></td>
                         <td className="px-3 py-2"><Link href={L.allotments({ course: slugOf(a.degree, a.specialty), inst: a.collegeSlug, year, round: g.round })} className="hover:text-sky hover:underline">{course(a.degree, a.specialty)}</Link><span className="block text-xs text-muted-foreground">{a.quota}</span></td>
                         <td className="px-3 py-2 text-muted-foreground">{a.remark}</td>
-                      </tr>
-                    ))}
+                      </tr>,
+                    ])}
                   </tbody>
                 </table>
               </div>
             </section>
           ))}
-          <p className="mt-3 text-xs text-muted-foreground">A blue line marks where ranks pass yours.</p>
+          <p className="mt-3 text-xs text-muted-foreground">A “Your rank falls here” row marks where ranks pass yours.</p>
         </>
       )}
-      <div className="mt-6"><DemoSource /></div>
+      <div className="mt-6"><DataSource /></div>
     </Container>
   );
 }

@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { CHOICES_KEY, defaultChoices, type ChoicesState } from "../lib/choices";
-import { useLocal } from "../lib/local-store";
+import { useChoices } from "../lib/use-decide-store";
 
 export function ChoiceSummary({ choicesHref }: { choicesHref: string }) {
-  const [state] = useLocal<ChoicesState>(CHOICES_KEY, defaultChoices);
+  const [state] = useChoices();
   return (
     <section aria-labelledby="choices-h" className="rounded-xl border border-border bg-card p-6">
       <h2 id="choices-h" className="text-lg font-medium">Choice lists</h2>

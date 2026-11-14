@@ -16,3 +16,8 @@ it("returns null without a valid rank", () => {
   expect(profileFromParams(new URLSearchParams("cat=OBC"))).toBeNull();
   expect(profileFromParams(new URLSearchParams("rank=abc"))).toBeNull();
 });
+
+it("keeps the profile when one optional param is bad, reads repeated params, and strips commas from rank", () => {
+  const p = profileFromParams(new URLSearchParams("rank=42,284&cat=OBC&fee=abc&sp=ANAESTHESIOLOGY&sp=FAMILYMEDICINE"));
+  expect(p).toMatchObject({ rank: 42284, category: "OBC", maxFeeLakh: null, specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"] });
+});

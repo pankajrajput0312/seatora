@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cutoff, Round } from "../types";
-import { classifyReach, deepestByYear, eligibleCategories } from "./reach";
+import { buildGrid, classifyReach, deepestByYear, eligibleCategories } from "./reach";
 
 const c = (year: number, round: Round, closing: number, category: Cutoff["category"] = "Open"): Cutoff => ({
   college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY", year, round, quota: "All India", category,
@@ -33,4 +33,21 @@ describe("classifyReach", () => {
 it("deepestByYear keeps the highest closing per year with its round", () => {
   const d = deepestByYear([c(2025, "R1", 30000), c(2025, "R3", 38000), c(2025, "R2", 35000, "OBC")], new Set());
   expect(d.get(2025)).toMatchObject({ closing: 38000, round: "R3", category: "Open" });
+});
+
+describe("review fixes", () => {
+  it("ignores years outside the labels (a 2023 closing can't make it 'within 10%')", () => {
+    expect(classifyReach(42284, [c(2023, "R1", 60000)], opts)).toBe("no-data");
+    expect(classifyReach(42284, [c(2023, "R1", 60000), c(2025, "R1", 20000)], opts)).toBe("closed-before");
+  });
+  it("uses the agreed within-10% boundary: closing >= rank * 0.9", () => {
+    expect(classifyReach(42284, [c(2025, "R1", 38100)], opts)).toBe("within-10");
+    expect(classifyReach(42284, [c(2025, "R1", 38000)], opts)).toBe("closed-before");
+  });
+  it("grid counts allotments in every category but takes closing from hers", () => {
+    const all = [c(2026, "R1", 17213, "OBC"), c(2026, "R1", 9000, "Open"), { ...c(2026, "R1", 30000, "SC"), n: 4 }];
+    all[0].n = 5; all[1].n = 3;
+    const g = buildGrid(all, new Set(["Open", "OBC"]), new Set(["2026-R1"]));
+    expect(g[2026].R1).toEqual({ closing: 17213, category: "OBC", n: 12, provisional: true });
+  });
 });

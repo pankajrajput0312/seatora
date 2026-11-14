@@ -140,11 +140,11 @@ const allotments: Allotment[] = cutoffs.flatMap((c) =>
 
 const MCC = "https://mcc.nic.in/pg-medical-counselling/";
 const notices: Notice[] = [
-  { date: "2026-10-20", kind: "schedule", authority: "MCC", url: MCC, title: "Round 1: registration, choice filling and result (done)" },
-  { date: "2026-11-12", kind: "schedule", authority: "MCC", url: MCC, title: "Round 2: registration and choice filling (open now)" },
-  { date: "2026-11-26", kind: "schedule", authority: "MCC", url: MCC, title: "Round 3: dates to be announced" },
-  { date: "2026-12-10", kind: "schedule", authority: "MCC", url: MCC, title: "Stray vacancy round: dates to be announced" },
-  { date: "2026-11-12", kind: "announcement", authority: "MCC", url: MCC, title: "Demo notice: Round 2 schedule for PG counselling 2026" },
+  { date: "2026-10-20", kind: "schedule", status: "done", authority: "MCC", url: MCC, title: "Demo: Round 1 registration, choice filling and result" },
+  { date: "2026-11-12", kind: "schedule", status: "open", authority: "MCC", url: MCC, title: "Demo: Round 2 registration and choice filling" },
+  { date: "2026-11-26", kind: "schedule", status: "upcoming", authority: "MCC", url: MCC, title: "Demo: Round 3 (illustrative date)" },
+  { date: "2026-12-10", kind: "schedule", status: "upcoming", authority: "MCC", url: MCC, title: "Demo: Stray vacancy round (illustrative date)" },
+  { date: "2026-11-12", kind: "announcement", status: "open", authority: "MCC", url: MCC, title: "Demo notice: Round 2 registration and choice filling open" },
   { date: "2026-11-08", kind: "announcement", authority: "MCC", url: MCC, title: "Demo notice: Round 1 provisional result published" },
   { date: "2026-11-02", kind: "announcement", authority: "MCC", url: MCC, title: "Demo notice: seat matrix for Round 2 added" },
   { date: "2026-09-30", kind: "merit", authority: "NBEMS", url: "https://natboard.edu.in/", title: "Demo: NEET PG 2026 result and merit list" },

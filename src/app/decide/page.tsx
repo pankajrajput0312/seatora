@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
+import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { DemoSource, HISTORY_CAPTION, SetRankPrompt } from "@/features/decide/components/bits";
+import { HISTORY_CAPTION, SetRankPrompt } from "@/features/decide/components/bits";
 import { ChartCard, LabelBars, RankStrip, RoundTrend } from "@/features/decide/components/charts";
 import { StatStrip, TopChoices } from "@/features/decide/components/dashboard-parts";
 import { reachLabel, reachOrder } from "@/features/decide/lib/reach";
 import { profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
-import { dashboard, getNotices } from "@/features/decide/service";
+import { dashboard, getNotices, isDemoData } from "@/features/decide/service";
 import { roundLabel } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Overview" };
@@ -20,7 +21,9 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const [d, notices] = await Promise.all([dashboard(profile), getNotices()]);
   const q = (extra: Record<string, string>) => `?${new URLSearchParams({ ...Object.fromEntries(profileToParams(profile)), ...extra })}`;
   const schedule = notices.filter((n) => n.kind === "schedule").sort((a, b) => a.date.localeCompare(b.date));
-  const open = schedule.find((n) => /open now/i.test(n.title));
+  // Round status comes from announcements only (brief); hidden when there is none.
+  const open = notices.find((n) => n.kind === "announcement" && n.status === "open");
+  const demo = await isDemoData();
   const reached = d.counts["reached-latest"] + d.counts["reached-both"] + d.counts["reached-one"];
 
   return (
@@ -33,8 +36,9 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         {open && (
           <p className="flex items-center gap-2 rounded-lg border border-sky/30 bg-sky/10 px-3 py-2 text-sm">
             <span className="size-2 rounded-full bg-leaf" aria-hidden />
-            <strong className="font-semibold">Round 2 choice filling is open.</strong>
-            <a href={open.url} target="_blank" rel="noopener noreferrer" className="text-sky underline">MCC schedule (opens MCC site)</a>
+            <strong className="font-semibold">{open.title.replace(/^Demo notice:\s*/, "")}</strong>
+            {demo && <span className="rounded-sm bg-sun/15 px-1.5 text-xs text-sun">Demo</span>}
+            <a href={open.url} target="_blank" rel="noopener noreferrer" className="text-sky underline">MCC site<span className="sr-only"> (opens in a new tab)</span></a>
           </p>
         )}
       </div>
@@ -48,6 +52,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       />
 
       <ChartCard
+        source={<DataSource />}
         className="chart-paper"
         title="Where your rank sits"
         subtitle="Each dot is one option's deepest closing rank in 2025, in seat categories you can take. Dots right of your line closed after your rank."
@@ -79,6 +84,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
         <ChartCard
+          source={<DataSource />}
           title="Options by label"
           subtitle="From past closing ranks only. Select a label to see those options."
           table={
@@ -92,6 +98,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         </ChartCard>
 
         <ChartCard
+          source={<DataSource />}
           title="How closing ranks moved through 2025"
           subtitle="Median closing rank per round for each course. Later rounds usually close deeper."
           table={
@@ -113,7 +120,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
           <h2 id="timeline" className="text-base font-semibold">Counselling timeline</h2>
           <ol className="mt-4 grid gap-0">
             {schedule.map((n, i) => {
-              const done = /\(done\)/i.test(n.title), now = /open now/i.test(n.title);
+              const done = n.status === "done", now = n.status === "open";
               return (
                 <li key={n.title} className="grid grid-cols-[1.25rem_1fr] gap-3">
                   <span className="flex flex-col items-center" aria-hidden>
@@ -121,7 +128,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                     {i < schedule.length - 1 && <span className="w-px flex-1 bg-border" />}
                   </span>
                   <span className="pb-4">
-                    <span className="block text-sm font-medium">{n.title.replace(/\s*\((done|open now)\)/i, "")}</span>
+                    <span className="block text-sm font-medium">{n.title}</span>
                     <span className="block text-xs text-muted-foreground">{fmtDate(n.date)}{now ? ", open now" : done ? ", done" : ""}</span>
                   </span>
                 </li>
@@ -134,7 +141,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
       <div className="grid gap-2 text-xs text-muted-foreground">
         <p>{HISTORY_CAPTION}</p>
-        <DemoSource />
+        <DataSource />
       </div>
     </Container>
   );
