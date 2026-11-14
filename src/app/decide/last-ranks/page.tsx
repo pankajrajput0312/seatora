@@ -5,6 +5,7 @@ import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, DemoSource, HISTORY_CAPTION, PageHead } from "@/features/decide/components/bits";
+import { decideLinks } from "@/features/decide/lib/links";
 import { profileFromParams, profileParamKeys, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
 import { baseCategories, roundLabel, type Round } from "@/features/decide/types";
@@ -57,6 +58,8 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
     p.set("dir", sort === key && dir === "desc" ? "asc" : "desc");
     return `/decide/last-ranks?${p}`;
   };
+  const L = decideLinks(params);
+  const focus = params.get("inst");
   const caption = `Closing ranks for ${course.degree} ${course.name}, ${category} seats${quota ? `, ${quota}` : ""}`;
 
   return (
@@ -65,6 +68,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
 
       <Form action="/decide/last-ranks" role="search" className="mt-8 grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
         {profileParamKeys.map((k) => params.get(k) && <input key={k} type="hidden" name={k} value={params.get(k)!} />)}
+        {focus && <input type="hidden" name="inst" value={focus} />}
         <label className="grid gap-1.5 text-sm">
           <span className="text-xs font-medium text-muted-foreground">Course</span>
           <select name="course" defaultValue={course.slug} className="h-11 rounded-md border border-input bg-background px-3">
@@ -122,10 +126,11 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-b border-border last:border-0">
-                <th scope="row" className="sticky left-0 z-10 max-w-64 bg-card px-3 py-2 text-left font-normal">
-                  <Link href={`/decide/institutes/${r.college.slug}`} className="hover:text-sky">{r.college.name}</Link>
-                  <span className="block text-xs text-muted-foreground">{r.college.state} · {r.quota}</span>
+              <tr key={r.id} id={`inst-${r.college.slug}`} className={`scroll-mt-24 border-b border-border last:border-0 ${focus === r.college.slug ? "bg-sky/10" : ""}`}>
+                <th scope="row" className={`sticky left-0 z-10 max-w-64 px-3 py-2 text-left font-normal ${focus === r.college.slug ? "bg-mist" : "bg-card"}`}>
+                  <Link href={L.institute(r.college.slug)} className="font-medium hover:text-sky hover:underline">{r.college.name}</Link>
+                  <span className="block text-xs text-muted-foreground">{r.college.state}, {r.quota}</span>
+                  <Link href={L.allotments({ course: course.slug, inst: r.college.slug })} className="text-xs text-sky underline">Allotments</Link>
                 </th>
                 <td className="px-2 py-2"><Spark r={r} /></td>
                 {cols.flatMap((c) =>

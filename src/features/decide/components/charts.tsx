@@ -131,7 +131,7 @@ export function LabelBars({ rows }: { rows: { label: string; count: number; href
 }
 
 /** Small multiple: median 2025 closing by round for one course, with a hairline at your rank. */
-export function RoundTrend({ title, rank, points }: { title: string; rank: number; points: { round: Round; median: number | null; n: number }[] }) {
+export function RoundTrend({ title, href, rank, points }: { title: string; href?: string; rank: number; points: { round: Round; median: number | null; n: number }[] }) {
   const [tip, setTip] = useState<Tip>(null);
   const vals = points.flatMap((p) => (p.median ? [p.median] : []));
   const max = niceMax(Math.max(rank * 1.15, ...vals));
@@ -142,7 +142,7 @@ export function RoundTrend({ title, rank, points }: { title: string; rank: numbe
   const last = [...points].reverse().find((p) => p.median);
   return (
     <div className="relative rounded-lg border border-border p-3" onPointerLeave={() => setTip(null)}>
-      <p className="text-sm font-medium">{title}</p>
+      <p className="text-sm font-medium">{href ? <Link href={href} className="hover:text-sky hover:underline">{title}</Link> : title}</p>
       <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" role="img" aria-label={`${title}: median closing rank by round in 2025. ${points.map((p) => `${roundLabel[p.round]} ${p.median ? formatRank(p.median) : "none"}`).join(", ")}. Your rank ${formatRank(rank)}.`}>
         <line x1={L} x2={W - R} y1={y(rank)} y2={y(rank)} className="stroke-foreground/70" strokeWidth={1} />
         <text x={L} y={y(rank) - 4} className="numeric fill-muted-foreground text-[10px]">You, {formatRank(rank)}</text>

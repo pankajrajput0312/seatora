@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, GitCompareArrows, LayoutDashboard, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, TrendingUp } from "lucide-react";
+import { Building2, CalendarDays, GitCompareArrows, IndianRupee, LayoutDashboard, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -16,15 +16,28 @@ import { useLocal } from "../lib/local-store";
 import { PROFILE_KEY, profileFromParams, profileParamKeys, profileSchema, profileToParams, type Profile } from "../profile";
 import { ProfileDialog, type ProfileMeta } from "./profile-dialog";
 
-const nav = [
-  { href: "/decide", label: "Overview", icon: LayoutDashboard },
-  { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
-  { href: "/decide/choices", label: "Choices", icon: ListOrdered },
-  { href: "/decide/compare", label: "Compare", icon: GitCompareArrows },
-  { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch },
-  { href: "/decide/last-ranks", label: "Last ranks", icon: TrendingUp },
-  { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
-  { href: "/decide/counselling", label: "Counselling", icon: CalendarDays },
+const sections = [
+  {
+    title: "Plan",
+    items: [
+      { href: "/decide", label: "Overview", icon: LayoutDashboard },
+      { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
+      { href: "/decide/choices", label: "Choices", icon: ListOrdered },
+      { href: "/decide/compare", label: "Compare", icon: GitCompareArrows },
+    ],
+  },
+  {
+    title: "Research",
+    items: [
+      { href: "/decide/institutes", label: "Institutes", icon: Building2 },
+      { href: "/decide/last-ranks", label: "Last ranks", icon: TrendingUp },
+      { href: "/decide/allotments", label: "Allotments", icon: Table2 },
+      { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch },
+      { href: "/decide/fees", label: "Fees & bond", icon: IndianRupee },
+      { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
+    ],
+  },
+  { title: "Counselling", items: [{ href: "/decide/counselling", label: "Schedule & notices", icon: CalendarDays }] },
 ];
 const bottom = [
   { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
@@ -109,11 +122,13 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
               </div>
             }
           >
-            <SideNavSection title="Decide">
-              {nav.map(({ href, label, icon }) => (
-                <SideNavItem key={href} label={label} icon={icon} href={withProfile(href)} isSelected={isCurrent(href)} />
-              ))}
-            </SideNavSection>
+            {sections.map((sec) => (
+              <SideNavSection key={sec.title} title={sec.title}>
+                {sec.items.map(({ href, label, icon }) => (
+                  <SideNavItem key={href} label={label} icon={icon} href={withProfile(href)} isSelected={isCurrent(href)} />
+                ))}
+              </SideNavSection>
+            ))}
           </SideNav>
         }
       >

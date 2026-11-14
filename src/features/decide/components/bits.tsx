@@ -11,8 +11,8 @@ export const HISTORY_CAPTION =
 export function PageHead({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <div className="max-w-3xl">
-      <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{title}</h1>
-      {children && <p className="mt-3 text-base leading-relaxed text-muted-foreground">{children}</p>}
+      <h1 className="text-3xl font-bold tracking-tight md:text-[2.25rem]">{title}</h1>
+      {children && <p className="mt-2 text-base leading-relaxed text-muted-foreground">{children}</p>}
     </div>
   );
 }
@@ -31,8 +31,8 @@ export function Closing({ d }: { d: Deepest | null | undefined }) {
   if (!d) return <span>—<span className="sr-only">not available</span></span>;
   return (
     <span className="numeric">
-      {formatRank(d.closing)}
-      <span className="block text-xs text-muted-foreground">{roundLabel[d.round]} · {d.category} seat</span>
+      <span className="text-[15px] font-semibold">{formatRank(d.closing)}</span>
+      <span className="block text-xs font-normal text-muted-foreground">{roundLabel[d.round]}, {d.category} seat</span>
     </span>
   );
 }

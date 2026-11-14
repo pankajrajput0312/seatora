@@ -7,6 +7,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { DemoSource, HISTORY_CAPTION, PageHead, SetRankPrompt } from "@/features/decide/components/bits";
 import { OptionsTable } from "@/features/decide/components/options-view";
 import { reachLabel, reachOrder, type Reach } from "@/features/decide/lib/reach";
+import { decideLinks } from "@/features/decide/lib/links";
 import { profileFromParams, profileParamKeys, toURLSearchParams } from "@/features/decide/profile";
 import { listOptions } from "@/features/decide/service";
 
@@ -25,6 +26,9 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const limit = Math.max(PAGE, Number(params.get("limit")) || PAGE);
   const { rows, hiddenClosed } = await listOptions(profile, { search, reach: reach ? [reach] : undefined, includeProvisional, showClosed });
   const shown = rows.slice(0, limit);
+  const L = decideLinks(params);
+  const { rows: everything } = await listOptions(profile, { search, includeProvisional, showClosed: true });
+  const counts = Object.fromEntries(reachOrder.map((r) => [r, everything.filter((x) => x.reach === r).length]));
 
   const link = (changes: Record<string, string | null>, hash = "") => {
     const p = new URLSearchParams(params);
@@ -65,7 +69,18 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         </p>
       </Form>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+      <nav aria-label="Filter by reach" className="mt-6 flex flex-wrap gap-2">
+        <Link href={link({ reach: null })} aria-current={!reach ? "true" : undefined} className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3 text-sm ${!reach ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`}>
+          All <span className="font-semibold">{everything.length}</span>
+        </Link>
+        {reachOrder.filter((r) => counts[r] > 0).map((r) => (
+          <Link key={r} href={link({ reach: r, closed: r === "closed-before" ? "1" : null })} aria-current={reach === r ? "true" : undefined} className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3 text-sm ${reach === r ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`}>
+            {reachLabel(r, 2026, [2024, 2025])} <span className="font-semibold">{counts[r]}</span>
+          </Link>
+        ))}
+      </nav>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <p aria-live="polite" className="text-sm text-muted-foreground">
           <span className="numeric text-foreground">{rows.length}</span> options{reach ? ` labelled “${reachLabel(reach, 2026, [2024, 2025])}”` : ""}.
         </p>
@@ -78,7 +93,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
 
       <div className="mt-4">
         {shown.length ? (
-          <OptionsTable rows={shown} caption={caption} start={0} />
+          <OptionsTable rows={shown} caption={caption} start={0} L={L} />
         ) : (
           <div className="grid place-items-center gap-3 rounded-xl border border-dashed border-border px-6 py-16 text-center">
             <p className="font-medium">No options match.</p>

@@ -103,7 +103,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
           }
         >
           <div className="grid gap-3 sm:grid-cols-2">
-            {d.trend.map((t) => <RoundTrend key={t.course.slug} title={`${t.course.degree} ${t.course.name}`} rank={profile.rank} points={t.points} />)}
+            {d.trend.map((t) => <RoundTrend key={t.course.slug} title={`${t.course.degree} ${t.course.name}`} href={`/decide/last-ranks${q({ course: t.course.slug })}`} rank={profile.rank} points={t.points} />)}
           </div>
         </ChartCard>
       </div>

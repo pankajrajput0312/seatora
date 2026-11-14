@@ -155,7 +155,13 @@ export function ChoicesView() {
                     <Link href={`/decide/institutes/${item.slug}`} className="hover:text-sky">{item.institute}</Link>
                     {typed && <Badge tone="success" className="ml-2 align-middle"><Check className="mr-1 size-3" aria-hidden />Typed into MCC</Badge>}
                   </p>
-                  <p className="text-sm text-muted-foreground">{item.course} · {item.quota}{item.state ? ` · ${item.state}` : ""}</p>
+                  <p className="text-sm text-muted-foreground">{item.course}, {item.quota}{item.state ? `, ${item.state}` : ""}</p>
+                  {item.courseSlug && (
+                    <p className="mt-1 flex gap-3 text-xs" data-print-hide>
+                      <Link href={`/decide/last-ranks?course=${item.courseSlug}&inst=${item.slug}#inst-${item.slug}`} className="text-sky underline">Last ranks</Link>
+                      <Link href={`/decide/allotments?course=${item.courseSlug}&inst=${item.slug}`} className="text-sky underline">Allotments</Link>
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-muted-foreground">{item.reachLabel}</p>
                   {flags.map((f) => <p key={f} className="mt-1 text-xs text-sun">{f}</p>)}
                 </div>

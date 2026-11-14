@@ -7,6 +7,7 @@ import { CompareFromDevice, RemoveFromCompare } from "@/features/decide/componen
 import { courseName } from "@/features/decide/components/options-view";
 import { formatLakh } from "@/features/decide/lib/format";
 import { MAX_COMPARE } from "@/features/decide/lib/choices";
+import { decideLinks } from "@/features/decide/lib/links";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getOptionsByIds, type OptionRow } from "@/features/decide/service";
 
@@ -36,6 +37,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const profile = profileFromParams(params);
   const ids = (params.get("ids") ?? "").split(",").filter(Boolean).slice(0, MAX_COMPARE);
   const options = await getOptionsByIds(ids, profile);
+  const L = decideLinks(params);
 
   return (
     <Container className="py-10">
@@ -57,7 +59,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                 {options.map((r) => (
                   <th key={r.id} scope="col" className="p-3 text-left font-medium">
                     <div className="flex items-start justify-between gap-2">
-                      <Link href={`/decide/institutes/${r.college.slug}`} className="hover:text-sky">{r.college.name}</Link>
+                      <span><Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link><span className="mt-1 flex gap-3 text-xs font-normal"><Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="text-sky underline">Last ranks</Link><Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className="text-sky underline">Allotments</Link></span></span>
                       <RemoveFromCompare id={r.id} label={r.college.name} />
                     </div>
                   </th>

@@ -212,3 +212,90 @@ export async function dashboard(profile: Profile) {
   }));
   return { total: rows.length, counts, strip, trend };
 }
+
+// ---------- Institutes, allotments, fees ----------
+
+export type InstituteFilters = { search?: string; state?: string; type?: string; course?: string; sort?: "name" | "beds" | "established" | "allotments" };
+
+export async function listInstitutes(profile: Profile | null, f: InstituteFilters = {}) {
+  const d = await getDecideData();
+  const groups = groupOptions(d);
+  const q = f.search?.trim().toLowerCase();
+  const rows = d.colleges.map((college) => {
+    const options = [...groups].filter(([, l]) => l[0].college === college.key).map(([k, l]) => buildRow(d, k, l, profile, true));
+    const best = options.length ? options.reduce((a, b) => (reachOrder.indexOf(a.reach) <= reachOrder.indexOf(b.reach) ? a : b)).reach : "no-data";
+    return {
+      college,
+      courses: [...new Map(options.map((o) => [o.course.slug, o.course])).values()],
+      quotas: [...new Set(options.map((o) => o.quota))],
+      allotments2025: d.cutoffs.filter((c) => c.college === college.key && c.year === 2025).reduce((s, c) => s + c.n, 0),
+      bestReach: (profile ? best : "no-data") as Reach,
+    };
+  });
+  const filtered = rows
+    .filter((r) => !q || `${r.college.name} ${r.college.state}`.toLowerCase().includes(q))
+    .filter((r) => !f.state || r.college.state === f.state)
+    .filter((r) => !f.type || r.college.type === f.type)
+    .filter((r) => !f.course || r.courses.some((c) => c.slug === f.course));
+  const by = f.sort ?? "name";
+  return filtered.sort((a, b) =>
+    by === "beds" ? (b.college.beds ?? 0) - (a.college.beds ?? 0)
+    : by === "established" ? (a.college.established ?? 9999) - (b.college.established ?? 9999)
+    : by === "allotments" ? b.allotments2025 - a.allotments2025
+    : a.college.name.localeCompare(b.college.name),
+  );
+}
+
+export type AllotmentFilters = { year?: number; round?: Round; course?: string; quota?: string; category?: string; state?: string; from?: number; to?: number };
+
+export async function listAllotments(f: AllotmentFilters, limit: number, collegeKey?: string) {
+  const d = await getDecideData();
+  const course = f.course ? d.courses.find((c) => c.slug === f.course) : undefined;
+  const all = d.allotments
+    .filter((a) => !collegeKey || a.college === collegeKey)
+    .filter((a) => !f.year || a.year === f.year)
+    .filter((a) => !f.round || a.round === f.round)
+    .filter((a) => !course || (a.degree === course.degree && a.specialty === course.specialty))
+    .filter((a) => !f.quota || a.quota === f.quota)
+    .filter((a) => !f.category || a.category === f.category)
+    .filter((a) => !f.from || a.rank >= f.from)
+    .filter((a) => !f.to || a.rank <= f.to)
+    .map((a) => {
+      const college = d.colleges.find((c) => c.key === a.college)!;
+      const t = termsFor(d.terms, a.college, a.degree);
+      return {
+        ...a,
+        college,
+        courseName: `${a.degree} ${d.courses.find((c) => c.degree === a.degree && c.specialty === a.specialty)?.name ?? a.specialty}`,
+        courseSlug: d.courses.find((c) => c.degree === a.degree && c.specialty === a.specialty)?.slug ?? "",
+        feeInr: t.fee?.amountInr ?? null,
+        stipendText: t.stipend?.text ?? null,
+        bondText: t.bond?.text ?? null,
+        penaltyText: t.penalty?.text ?? null,
+      };
+    })
+    .filter((a) => !f.state || a.college.state === f.state)
+    .sort((a, b) => b.year - a.year || rounds.indexOf(a.round) - rounds.indexOf(b.round) || a.rank - b.rank);
+  return { total: all.length, rows: all.slice(0, limit) };
+}
+
+export async function listFees(f: { program?: "MD" | "DNB"; state?: string; maxFeeLakh?: number; sort?: "fee" | "stipend" | "name" }) {
+  const d = await getDecideData();
+  const rows = d.colleges.flatMap((college) =>
+    (["MD", "DNB"] as const).flatMap((program) => {
+      const t = termsFor(d.terms, college.key, program === "MD" ? "MD" : "DNB");
+      if (!t.fee && !t.stipend && !t.bond && !t.penalty) return [];
+      return [{ college, program, fee: t.fee ?? null, stipend: t.stipend ?? null, bond: t.bond ?? null, penalty: t.penalty ?? null, bondYears: bondYears(t.bond?.text) }];
+    }),
+  );
+  const out = rows
+    .filter((r) => !f.program || r.program === f.program)
+    .filter((r) => !f.state || r.college.state === f.state)
+    .filter((r) => f.maxFeeLakh == null || r.fee?.amountInr == null || r.fee.amountInr <= f.maxFeeLakh * 100000);
+  const by = f.sort ?? "fee";
+  return out.sort((a, b) =>
+    by === "stipend" ? (b.stipend?.amountInr ?? -1) - (a.stipend?.amountInr ?? -1)
+    : by === "name" ? a.college.name.localeCompare(b.college.name)
+    : (a.fee?.amountInr ?? Infinity) - (b.fee?.amountInr ?? Infinity),
+  );
+}

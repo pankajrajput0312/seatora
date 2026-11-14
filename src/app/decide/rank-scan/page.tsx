@@ -5,6 +5,7 @@ import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { DemoSource, PageHead } from "@/features/decide/components/bits";
+import { decideLinks } from "@/features/decide/lib/links";
 import { profileFromParams, profileParamKeys, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankScan } from "@/features/decide/service";
 import { roundLabel } from "@/features/decide/types";
@@ -18,6 +19,8 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const year = [2024, 2025, 2026].includes(Number(params.get("year"))) ? Number(params.get("year")) : 2025;
   const window = [250, 500, 1000].includes(Number(params.get("w"))) ? Number(params.get("w")) : 500;
   const [groups, meta] = await Promise.all([rank ? rankScan(rank, year, window) : [], getMeta()]);
+  const L = decideLinks(params);
+  const slugOf = (deg: string, sp: string) => meta.courses.find((c) => c.degree === deg && c.specialty === sp)?.slug ?? "";
   const course = (deg: string, sp: string) => `${deg} ${meta.courses.find((c) => c.degree === deg && c.specialty === sp)?.name ?? sp}`;
 
   return (
@@ -73,8 +76,8 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                       <tr key={i} className={`border-b border-border last:border-0 ${a.rank >= rank && (i === 0 || g.rows[i - 1].rank < rank) ? "border-t-2 border-t-sky" : ""}`}>
                         <td className="numeric px-3 py-2 text-right">{formatRank(a.rank)}</td>
                         <td className="px-3 py-2">{a.category}</td>
-                        <td className="px-3 py-2"><Link href={`/decide/institutes/${a.collegeSlug}`} className="hover:text-sky">{a.collegeName}</Link></td>
-                        <td className="px-3 py-2">{course(a.degree, a.specialty)}<span className="block text-xs text-muted-foreground">{a.quota}</span></td>
+                        <td className="px-3 py-2"><Link href={L.institute(a.collegeSlug)} className="font-medium hover:text-sky hover:underline">{a.collegeName}</Link></td>
+                        <td className="px-3 py-2"><Link href={L.allotments({ course: slugOf(a.degree, a.specialty), inst: a.collegeSlug, year, round: g.round })} className="hover:text-sky hover:underline">{course(a.degree, a.specialty)}</Link><span className="block text-xs text-muted-foreground">{a.quota}</span></td>
                         <td className="px-3 py-2 text-muted-foreground">{a.remark}</td>
                       </tr>
                     ))}

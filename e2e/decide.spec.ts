@@ -7,7 +7,8 @@ test("every Decide route renders with the demo banner", async ({ page }) => {
   for (const [path, h1] of [
     ["/decide", "Overview"], ["/decide/options", "Options"], ["/decide/choices", "Choices"], ["/decide/compare", "Compare"],
     ["/decide/rank-scan", "Rank scan"], ["/decide/last-ranks", "Last ranks"], ["/decide/seats?tab=trends", "Seats"],
-    ["/decide/counselling", "Counselling"], ["/decide/institutes/example-government-medical-college-nagpur-440003", "Example Government Medical College, Nagpur"],
+    ["/decide/counselling", "Counselling"], ["/decide/institutes", "Institutes"], ["/decide/allotments", "Allotments"],
+    ["/decide/fees", "Fees, stipend and bond"], ["/decide/institutes/example-government-medical-college-nagpur-440003?tab=allotments", "Example Government Medical College, Nagpur"], ["/decide/institutes/example-government-medical-college-nagpur-440003", "Example Government Medical College, Nagpur"],
   ]) {
     await page.goto(`${path}${path.includes("?") ? "&" : "?"}${PROFILE}`);
     await expect(page.getByRole("heading", { level: 1 }), path).toHaveText(h1);
@@ -44,4 +45,24 @@ test("set profile, label options, and reorder choices with the keyboard only", a
 
   await page.getByRole("button", { name: new RegExp(`^Move ${before[2]}.* up$`) }).click();
   await expect.poll(names).toEqual([before[1], before[2], before[0]]);
+});
+
+test("related data is linked: institute → course last ranks → allotments → rank scan", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.goto(`/decide/institutes?${PROFILE}`);
+  await page.getByRole("link", { name: "Example Multispeciality Hospital, Navi Mumbai" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Example Multispeciality Hospital, Navi Mumbai");
+  await expect(page).toHaveURL(/rank=42284/);
+
+  await page.locator("section[aria-labelledby=yours]").getByRole("link", { name: "Last ranks" }).first().click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Last ranks");
+  const focused = page.locator("#inst-example-multispeciality-hospital-navi-mumbai-410210");
+  await expect(focused).toBeVisible();
+
+  await focused.getByRole("link", { name: "Allotments" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Allotments");
+  await expect(page.getByText("Showing allotments at")).toBeVisible();
+
+  await page.getByTitle("Scan ranks around this one").first().click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Rank scan");
 });

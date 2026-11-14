@@ -6,6 +6,7 @@ export type ChoiceItem = {
   slug: string;
   state: string | null;
   course: string; // e.g. "DNB Anaesthesiology"
+  courseSlug?: string;
   quota: string;
   reachLabel: string;
   closedEveryRound: boolean;

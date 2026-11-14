@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { DemoSource, PageHead } from "@/features/decide/components/bits";
 import { courseName } from "@/features/decide/components/options-view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
+import { decideLinks } from "@/features/decide/lib/links";
 import { profileFromParams, profileParamKeys, toURLSearchParams } from "@/features/decide/profile";
 import { allotmentTrends } from "@/features/decide/service";
 
@@ -20,6 +22,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
 
   const all = tab === "trends" ? await allotmentTrends({}) : [];
   const rows = all.filter((r) => !profile?.specialties.length || profile.specialties.includes(r.course.specialty));
+  const L = decideLinks(params);
   const max = Math.max(1, ...rows.flatMap((r) => YEARS.map((y) => r.byYear[y])));
 
   return (
@@ -51,7 +54,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
                   const change = r.byYear[2025] - r.byYear[2024];
                   return (
                     <tr key={r.id} className="border-b border-border last:border-0">
-                      <th scope="row" className="px-3 py-2 text-left font-normal">{r.college.name}<span className="block text-xs text-muted-foreground">{courseName(r)} · {r.quota}</span></th>
+                      <th scope="row" className="px-3 py-2 text-left font-normal"><Link href={L.institute(r.college.slug)} className="font-medium hover:text-sky hover:underline">{r.college.name}</Link><Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="block text-xs text-muted-foreground hover:text-sky hover:underline">{courseName(r)}, {r.quota}</Link></th>
                       {YEARS.map((y) => (
                         <td key={y} className="px-3 py-2">
                           <div className="flex items-center gap-2">

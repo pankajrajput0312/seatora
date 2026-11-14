@@ -4,6 +4,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { formatLakh } from "../lib/format";
 import { reachLabel } from "../lib/reach";
 import type { ChoiceItem } from "../lib/choices";
+import type { DecideLinks } from "../lib/links";
 import type { OptionRow } from "../service";
 import { roundLabel, rounds, type Round } from "../types";
 import { Closing, Dash, ReachBadge } from "./bits";
@@ -14,7 +15,7 @@ export const courseName = (r: Pick<OptionRow, "course">) => `${r.course.degree} 
 
 export function toChoiceItem(r: OptionRow): ChoiceItem {
   return {
-    id: r.id, institute: r.college.name, slug: r.college.slug, state: r.college.state, course: courseName(r), quota: r.quota,
+    id: r.id, institute: r.college.name, slug: r.college.slug, state: r.college.state, course: courseName(r), courseSlug: r.course.slug, quota: r.quota,
     reachLabel: reachLabel(r.reach, 2026, [2024, 2025]), closedEveryRound: r.reach === "closed-before",
   };
 }
@@ -62,7 +63,17 @@ function FeeBond({ r }: { r: OptionRow }) {
   );
 }
 
-export function OptionsTable({ rows, caption, start }: { rows: OptionRow[]; caption: string; start: number }) {
+function Related({ r, L }: { r: OptionRow; L: DecideLinks }) {
+  return (
+    <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+      <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="text-sky underline">Last ranks</Link>
+      <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className="text-sky underline">Allotments</Link>
+      <Link href={L.institute(r.college.slug, "fees")} className="text-sky underline">Fees & bond</Link>
+    </span>
+  );
+}
+
+export function OptionsTable({ rows, caption, start, L }: { rows: OptionRow[]; caption: string; start: number; L: DecideLinks }) {
   return (
     <>
       <div role="region" aria-label={caption} tabIndex={0} className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
@@ -86,14 +97,15 @@ export function OptionsTable({ rows, caption, start }: { rows: OptionRow[]; capt
               <tr key={r.id} id={`row-${start + i + 1}`} tabIndex={-1} className="border-b border-border align-top last:border-0 hover:bg-muted/40">
                 <td className="px-2 py-2"><ChoiceStar item={toChoiceItem(r)} /></td>
                 <th scope="row" className="px-3 py-3 text-left font-normal">
-                  <Link href={`/decide/institutes/${r.college.slug}`} className="font-medium hover:text-sky">{r.college.name}</Link>
-                  <span className="block text-xs text-muted-foreground">{r.college.state} · {r.quota}</span>
+                  <Link href={L.institute(r.college.slug)} className="font-medium hover:text-sky hover:underline">{r.college.name}</Link>
+                  <span className="block text-xs text-muted-foreground">{r.college.state}, {r.quota}</span>
+                  <Related r={r} L={L} />
                   <details className="mt-2">
                     <summary className="cursor-pointer text-xs text-sky">Rounds by year</summary>
                     <div className="mt-2"><RoundGrid row={r} caption={`${r.college.name}, ${courseName(r)}: closing ranks by year and round`} /></div>
                   </details>
                 </th>
-                <td className="px-3 py-3">{courseName(r)}</td>
+                <td className="px-3 py-3"><Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link></td>
                 <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional /></td>
                 <td className="px-3 py-3 text-right">
                   {r.latest ? <span className="numeric">{formatRank(r.latest.closing)}<Badge tone="warning" className="mt-1 block w-fit justify-self-end">Provisional</Badge></span> : <Dash />}
@@ -114,7 +126,7 @@ export function OptionsTable({ rows, caption, start }: { rows: OptionRow[]; capt
             <article className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="font-medium"><Link href={`/decide/institutes/${r.college.slug}`} className="hover:text-sky">{r.college.name}</Link></h3>
+                  <h3 className="font-medium"><Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link></h3>
                   <p className="text-xs text-muted-foreground">{courseName(r)} · {r.college.state} · {r.quota}</p>
                 </div>
                 <div className="flex shrink-0">
@@ -129,6 +141,7 @@ export function OptionsTable({ rows, caption, start }: { rows: OptionRow[]; capt
                 <div><dt className="text-xs text-muted-foreground">2024 deepest</dt><dd><Closing d={r.byYear[2024]} /></dd></div>
               </dl>
               <p className="mt-3 text-sm"><FeeBond r={r} /></p>
+              <Related r={r} L={L} />
               <details className="mt-3">
                 <summary className="cursor-pointer text-xs text-sky">Rounds by year</summary>
                 <div className="mt-2"><RoundGrid row={r} caption={`${r.college.name}, ${courseName(r)}: closing ranks by year and round`} /></div>
