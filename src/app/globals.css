@@ -28,6 +28,8 @@
   /* Pale cool tint a portrait fades to on hover, revealing the grayscale image (roook.space portraits) */
   --color-mist: oklch(86% 0.025 225);
   --color-mark: oklch(80% 0.12 222);
+  --color-wash: oklch(25% 0.02 240);
+  --color-wash-line: oklch(30% 0.02 240);
   --color-white: #fff;
   --color-black: #000;
   --color-transparent: transparent;
@@ -69,6 +71,8 @@
     --color-ring: #2a78d6;
     --color-sky: #1c5cab;            /* chart-ink blue (text-safe step) */
     --color-mark: #2a78d6;           /* chart-ink blue for marks */
+    --color-wash: #e8f1fb;           /* soft blue card wash */
+    --color-wash-line: #cfe0f2;      /* hairline on the wash */
     --color-leaf: #0a7a0a;           /* good */
     --color-sun: #8a5a00;            /* warning */
     --color-ember: #c03030;          /* critical */
@@ -131,6 +135,7 @@
 @keyframes bubble-in { from { opacity: 0; transform: translateY(8px); } }
 @keyframes pixel-rise { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-160%); } }
 @keyframes mote { 0%, 100% { opacity: 0; transform: translateY(0); } 30%, 70% { opacity: 1; } 50% { transform: translateY(-14px); } }
+@keyframes ecg-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes field-drift { to { background-position: 48px 24px; } }
 
 @utility marquee { animation: marquee 60s linear infinite; }
@@ -138,6 +143,7 @@
 @utility bob { animation: bob 6s ease-in-out infinite; }
 @utility heartbeat { transform-box: fill-box; transform-origin: center; animation: heartbeat 1.6s ease-out infinite; }
 @utility twinkle { animation: twinkle 3s ease-in-out infinite; }
+@utility ecg-draw { stroke-dasharray: 1; stroke-dashoffset: 0; animation: ecg-draw 2.4s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both; }
 @utility bubble-in { animation: bubble-in 0.45s cubic-bezier(0.4, 0, 0.2, 1) both; }
 @utility pixel-rise { opacity: 0; animation: pixel-rise 0.9s steps(6) both; }
 @utility mote { opacity: 0; animation: mote 6.3s ease-in-out infinite; }
