@@ -14,10 +14,11 @@ export default async function SignupPage({ searchParams }: Props) {
   const to = typeof next === "string" ? next : undefined;
   if (await hasSiteAccess()) redirect(safeNext(to));
   return (
-    <AuthShell eyebrow="Invite only" title="Create your account.">
+    <AuthShell eyebrow="Season Pass" title="Create your account.">
       <p className="mb-6 text-sm text-muted-foreground">
-        Seatora is invite-only for now. If you were invited, sign up with the email address your invite went to and the invite
-        code you were given.
+        Accounts are created when you buy the Seatora NEET PG 2026 Season Pass (₹499) from the{" "}
+        <a href="/pricing" className="text-sky underline">Pricing</a> page; you receive an access code with your purchase. Already have an
+        account? <a href="/login" className="text-sky underline">Sign in</a>.
       </p>
       <AuthForm mode="signup" next={to} />
     </AuthShell>

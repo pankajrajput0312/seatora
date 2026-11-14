@@ -28,7 +28,7 @@ export default function AboutPage() {
               and penalties from official MCC and NBEMS documents, with a link to the source of each figure, so you can build your choice
               list. It also shows the names of residents at each college from MCC&apos;s official admitted-candidates lists.
             </p>
-            <p className="mt-2">The data is historical. It is no guarantee or prediction of admission.</p>
+            <p className="mt-2">The data is historical. It is not a prediction or a promise of admission.</p>
           </section>
           <section>
             <h2>Independent</h2>

@@ -24,7 +24,7 @@ const stages = [
   },
   {
     title: "Round 2, 3 & stray",
-    body: "See what changed between rounds (new seats, upgrades, freed-up seats) before you fill choices again.",
+    body: "See what changed between rounds (new seats, upgrades, vacated seats) before you fill choices again.",
     tools: [{ label: "Seat matrix", href: "#features" }],
   },
 ];

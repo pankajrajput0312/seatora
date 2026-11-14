@@ -36,7 +36,7 @@ export default function PrivacyPage() {
               storage, not in our database. They are also put in page addresses so the server can show your results, so they can appear
               in our hosting provider&apos;s request logs. Clearing this site&apos;s data in your browser removes them.
             </p>
-            <p className="mt-2">If you join early access, we store your email address, the NEET PG year you chose and the time you signed up.</p>
+            <p className="mt-2">If you write to us or leave your email address with us, we store that email address, the NEET PG year you chose and the time.</p>
             <p className="mt-2">To stop abuse, your IP address is held briefly in memory to limit repeated requests, and we don&apos;t store it. Our hosting provider may keep standard server logs.</p>
           </section>
           <section>

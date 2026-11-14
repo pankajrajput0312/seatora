@@ -20,8 +20,8 @@ const faqs = [
     a: "From MCC's official admitted-candidates lists, with the 2025 All India Rank from the NBEMS merit list where it is published. Seatora shows a name, course and year only. It holds no contact details, and hides a name if that person asks.",
   },
   {
-    q: "When can I start using it?",
-    a: "We're opening in stages. Join early access and we'll email you when the planner is ready for your counselling year.",
+    q: "How do I get access?",
+    a: "Buy the Seatora NEET PG 2026 Season Pass (₹499, one payment for the 2026 counselling season) from the Pricing page. Access is switched on immediately after payment.",
   },
 ];
 

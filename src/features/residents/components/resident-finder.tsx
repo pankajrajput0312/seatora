@@ -104,7 +104,7 @@ export function ResidentFinder({ residents }: { residents: Resident[] }) {
       )}
 
       <p className="mt-4 text-xs text-muted-foreground">
-        Their ranks show where people got in before; they don&apos;t predict or guarantee your seat.
+        Their ranks show where people got in before; they are not a prediction or a promise of your seat.
       </p>
     </div>
   );
