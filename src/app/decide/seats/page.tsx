@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { Download, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CSV_MAX_ROWS } from "@/features/decide/api";
 import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -75,9 +76,10 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
       </nav>
       {compare ? (
         <p className="max-w-3xl text-sm text-muted-foreground">
-          One row per institute, course, quota and seat category, with its seats in each {round} list:{" "}
-          {r.lists.map((l, i) => <Fragment key={l.key}>{i > 0 && "; "}<span className="font-semibold text-foreground">{seatKindLabel[l.kind]}</span>, {seatKindNote[l.kind]}</Fragment>)}{" "}
+          One row per institute, course, quota and seat category, with its seats in each {round} list.{" "}
+          {r.lists.map((l) => <Fragment key={l.key}><span className="font-semibold text-foreground">{seatKindLabel[l.kind]}</span>: {seatKindNote[l.kind]}{" "}</Fragment>)}
           The lists overlap (a newly added seat is usually also a clear vacancy, and a virtual vacancy opens only if its holder moves), so the columns are never added together.
+          {" "}The list picked above sets the round compared and the list that &quot;{`Most ${kindSeats(list)} first`}&quot; sorts by.
         </p>
       ) : (
         <p className="max-w-3xl text-sm text-muted-foreground">
@@ -91,6 +93,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         <input type="hidden" name="list" value={list.key} />
         {compare && <input type="hidden" name="view" value="compare" />}
         {f.nohist && <input type="hidden" name="nohist" value="1" />}
+        {(["inst", "course", "squota"] as const).map((k) => f[k] && <input key={k} type="hidden" name={k} value={f[k]} />)}
         <Fragment key={params.toString()}>
           <label className="min-w-56 flex-1">
             <span className="sr-only">Search institute or state</span>
@@ -167,12 +170,18 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             )}
             {r.total > 0 && <> Rows <span className="numeric">{rangeLabel(r)}</span>.</>}
           </p>
-          {r.total > 0 && (
-            <Button asChild variant="secondary">
-              <a href={L.with("/api/v1/seats/export", { tab: null, page: null })} download>
-                <Download className="size-4" aria-hidden />Download CSV<span className="sr-only"> of {compare ? `every ${round} list` : `the ${title} list`}, these filters, every row</span>
-              </a>
-            </Button>
+          {r.total > CSV_MAX_ROWS ? (
+            <p className="text-sm text-muted-foreground">
+              <span className="numeric">{formatRank(r.total)}</span> rows are more than one CSV download holds (<span className="numeric">{formatRank(CSV_MAX_ROWS)}</span>): narrow the filters to download them.
+            </p>
+          ) : (
+            r.total > 0 && (
+              <Button asChild variant="secondary">
+                <a href={L.with("/api/v1/seats/export", { tab: null, page: null })} download>
+                  <Download className="size-4" aria-hidden />Download CSV<span className="sr-only"> of {compare ? `every ${round} list` : `the ${title} list`}, these filters, every row</span>
+                </a>
+              </Button>
+            )
           )}
         </div>
         {noState > 0 && (
@@ -197,7 +206,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category: the deepest of {PAST_ROUNDS.map((p) => `${p.year} ${roundLabel[p.round]}`).join(", ")}
             {" "}in the row, every round behind &quot;Every round&quot;.
             {profile && (
-              <> Reach is Options&apos; label on that one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round); Options labels an option on all your seat categories together, so they can differ by row.</>
+              <> Reach is Options&apos; label on that one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round). Options labels an option on all your seat categories together, and notes when a list&apos;s seats there are all on a seat category with another label: the label these rows show.</>
             )}{" "}
             {HISTORY_CAPTION}
           </p>

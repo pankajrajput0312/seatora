@@ -13,7 +13,7 @@ import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-a
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
 import { allotmentMixAt, optionSeats, roundSeatsAt } from "@/features/decide/components/institute/institute-data";
 import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, RoundSeatsHead, SeatNumber } from "@/features/decide/components/institute/institute-parts";
-import { courseName, RoundGrid, toChoiceItem } from "@/features/decide/components/options-view";
+import { courseName, RoundGrid, SeatsBelowNote, toChoiceItem } from "@/features/decide/components/options-view";
 import { listTitle, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl } from "@/features/decide/components/ui";
@@ -270,7 +270,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       {/* Without a rank the reach is unknown, so nothing would be saved with the choice: star only with a profile. */}
                       <td className="px-2 py-2">{profile && <ChoiceStar item={toChoiceItem(r)} />}</td>
                       <th scope="row" className={`${tbl.td} text-left font-medium`}>{courseName(r)}<span className="block text-xs font-normal text-muted-foreground">{r.quota}</span></th>
-                      <td className={tbl.td}>{profile ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} /> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
+                      <td className={tbl.td}>{profile ? <><ReachBadge reach={r.reach} provisional={r.reachProvisional} /><SeatsBelowNote r={r} /></> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
                       {round.map(({ list, rows }) => (
                         <td key={list.key} className={`${tbl.td} text-right`}>
                           <SeatNumber

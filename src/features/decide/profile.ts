@@ -58,18 +58,22 @@ export const profileCourseFilter = (p: ProfileCourses) =>
 
 /**
  * Courses ticked in the profile dialog (specialty code → its ticked degrees) as profile fields, in the old form when it
- * can say it (every degree of each: specialties only; one set of degrees for all: specialties x degrees), else pairs.
- * Nothing ticked (or no degree of any) = every course of `degrees` (empty = all), as before.
+ * can say it, else pairs: her own `degrees` when they still say it (so an unchanged profile saves unchanged), else
+ * specialties only (every degree of each), else one set of degrees for all. No specialty ticked = every course of
+ * `degrees` (empty = all), as before. Null when specialties are ticked but none has a degree: no course at all, which a
+ * profile can't say (empty = all), so the dialog asks for one.
  */
-export function coursesFromPicks(picked: Record<string, string[]>, degrees: string[], courses: { degree: string; specialty: string }[]): ProfileCourses {
+export function coursesFromPicks(picked: Record<string, string[]>, degrees: string[], courses: { degree: string; specialty: string }[]): ProfileCourses | null {
   const specialties = Object.keys(picked).filter((s) => picked[s].length);
-  if (!specialties.length) return { specialties: [], degrees };
+  if (!specialties.length) return Object.keys(picked).length ? null : { specialties: [], degrees };
   const offered = (s: string) => courses.filter((c) => c.specialty === s).map((c) => c.degree);
   const same = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
-  if (specialties.every((s) => same(picked[s], offered(s)))) return { specialties, degrees: [] };
+  const says = (ds: string[]) => specialties.every((s) => same(picked[s], offered(s).filter((d) => !ds.length || ds.includes(d))));
+  if (says(degrees)) return { specialties, degrees };
+  if (says([])) return { specialties, degrees: [] };
   const ticked = new Set(specialties.flatMap((s) => picked[s]));
   const used = [...new Set([...degrees, ...ticked])].filter((d) => ticked.has(d)); // her old degree order first
-  if (specialties.every((s) => same(picked[s], offered(s).filter((d) => used.includes(d))))) return { specialties, degrees: used };
+  if (says(used)) return { specialties, degrees: used };
   return { specialties, degrees: [], pairs: specialties.flatMap((s) => picked[s].map((degree) => pairKey({ degree, specialty: s }))) };
 }
 

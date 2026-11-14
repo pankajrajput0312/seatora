@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { duplicateList, markTypedUpTo, move, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
-import { LATEST_YEAR, PAST_YEARS, reachWindow, type Reach } from "../lib/reach";
+import { LATEST_YEAR, PAST_YEARS, reachWindow, seatsBelowText, type Reach, type SeatsBelow } from "../lib/reach";
 import { useChoices, useDecideLinks } from "../lib/use-decide-store";
 import { keepProfileParams } from "../profile";
 import type { SeatsBy } from "../service";
@@ -18,7 +18,7 @@ import { CompareToggle } from "./option-actions";
 import { SeatsLink } from "./options-view";
 import { control, EmptyState, smallLink } from "./ui";
 
-type Live = Record<string, { reach: Reach; provisional: boolean; seats: SeatsBy }>;
+type Live = Record<string, { reach: Reach; provisional: boolean; seats: SeatsBy; below: SeatsBelow[] }>;
 /**
  * Reach labels and seats per list (`lists`: the newest round's clear, virtual, new) from the current data for these ids
  * and profile params (a server action); null when unavailable.
@@ -225,7 +225,9 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
               const flags = [
                 (counts.get(dupKey(item)) ?? 0) > 1 && "Same institute and course listed more than once",
                 closed && `Closed before your rank in every round of ${reachWindow(LATEST_YEAR, PAST_YEARS)}${lr ? "" : " (when added)"}`,
-                lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats in the ${round} seat lists in this quota and your seat categories, as MCC published them.`,
+                // Seats are matched to the option by institute and course; say what was found, not what MCC printed.
+                lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
+                ...(lr?.below ?? []).map((b) => seatsBelowText(b, LATEST_YEAR, PAST_YEARS)),
                 fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
                 typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
               ].filter(Boolean) as string[];

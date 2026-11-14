@@ -101,10 +101,18 @@ it("dialog ticks save in the old form when it can say it, else as pairs, and rea
   const picks = picksOf(withPairs, courses);
   expect(picks).toEqual({ ANAESTHESIOLOGY: ["Diploma", "DNB", "MD", "NBEMS Diploma"], FAMILYMEDICINE: ["DNB"] });
   expect(coursesFromPicks(picks, [], courses)).toEqual({ specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: [], pairs });
-  // Nothing ticked (or no degree left): every course of the global degrees.
-  expect(coursesFromPicks({ FAMILYMEDICINE: [] }, ["DNB"], courses)).toEqual({ specialties: [], degrees: ["DNB"] });
-  // An old specialties x degrees profile opens with those degrees ticked and saves back unchanged.
+  // No specialty ticked: every course of the global degrees. Specialties ticked with no degree at all: no course, which
+  // a profile can't say (empty = all), so null and the dialog asks for a degree instead of saving "all courses".
+  expect(coursesFromPicks({}, ["DNB"], courses)).toEqual({ specialties: [], degrees: ["DNB"] });
+  expect(coursesFromPicks({ ANAESTHESIOLOGY: [] }, [], courses)).toBeNull();
+  expect(coursesFromPicks({ ANAESTHESIOLOGY: [], FAMILYMEDICINE: [] }, ["DNB"], courses)).toBeNull();
+  // One specialty with no degree is left out, as its group says.
+  expect(coursesFromPicks({ ANAESTHESIOLOGY: [], FAMILYMEDICINE: ["DNB"] }, [], courses)).toEqual({ specialties: ["FAMILYMEDICINE"], degrees: ["DNB"] });
+  // An old specialties x degrees profile opens with those degrees ticked and saves back unchanged, also when its degrees
+  // are every degree its specialties offer (her old profile).
   const old = { specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: ["MD", "DNB"] };
   expect(coursesFromPicks(picksOf(old, courses), old.degrees, courses)).toEqual(old);
+  const every = { specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: ["MD", "DNB", "NBEMS Diploma", "Diploma"] };
+  expect(coursesFromPicks(picksOf(every, courses), every.degrees, courses)).toEqual(every);
   expect(pairChoices(courses).slice(0, 2)).toEqual([{ value: "Diploma~ANAESTHESIOLOGY", label: "Diploma Anaesthesiology" }, { value: "DNB~ANAESTHESIOLOGY", label: "DNB Anaesthesiology" }]);
 });

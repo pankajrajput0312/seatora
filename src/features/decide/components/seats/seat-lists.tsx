@@ -192,7 +192,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
   const sticky = "sticky left-0 z-[1] w-40 min-w-40 border-r border-border bg-card md:w-72 md:min-w-72";
   const several = lists.length > 1;
   return (
-    <div role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, "scroll-pl-44 md:scroll-pl-76")}>
+    <div role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, "scroll-pl-48 md:scroll-pl-80")}>
       <table className={tbl.table}>
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -230,7 +230,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
                 <td className={td}><PastClosings r={r} name={name} /></td>
                 {ranked && (
                   <td className={td}>
-                    {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} /> : <span className="text-xs text-muted-foreground">Not a seat category you can take</span>}
+                    {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : <span className="text-xs text-muted-foreground">Not a seat category you can take</span>}
                   </td>
                 )}
                 <td className={cn(td, "text-xs")}><Terms t={r.terms} /></td>

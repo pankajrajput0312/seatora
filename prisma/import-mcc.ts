@@ -210,6 +210,8 @@ if (seatSourceOf.size !== seatSources.length) fail("seat_sources.json: duplicate
 const seatCollegeKeys = new Set(seatColleges.map((c) => c.key));
 for (const k of seatCollegeKeys) if (collegeKeys.has(k)) fail(`seat_colleges.ndjson: ${k} is also in colleges.ndjson`);
 const allCollegeKeys = new Set([...collegeKeys, ...seatCollegeKeys]);
+// One institute under a name key and the same key with "#PIN" splits its seat lines from its closing ranks (2026 R2: Karpaga Vinayaga).
+for (const k of allCollegeKeys) if (k.includes("#") && allCollegeKeys.has(k.split("#")[0])) fail(`colleges: both ${k.split("#")[0]} and ${k} are keys; one institute must have one key`);
 const listTotal = new Map(seatSources.map((s) => [s.key, 0]));
 const usedSeatColleges = new Set<string>();
 seats.forEach((s, i) => {

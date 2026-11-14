@@ -257,8 +257,8 @@ const docOf = (s: { name: string; url: string | null } | null | undefined) => s 
 /**
  * The view as CSV (UTF-8, no BOM: the route adds it), in the page's order and filters, every matching row: seats per
  * list (never added), past closings, the reach label (with a rank), and terms each with its own document. After a blank
- * row: `notes` and the sources every column comes from (seat list PDFs with their date and the later MCC seat notices
- * they don't apply; the MCC result PDF of each round). "—" = not available.
+ * row: `notes` and the sources every column comes from (seat list PDFs with their date, the later MCC seat notices they
+ * don't apply and the same-day ones they may already include; the MCC result PDF of each round). "—" = not available.
  */
 export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }, notes: string[] = []) {
   const { r, profile, meta } = v;
@@ -283,15 +283,19 @@ export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }
     ...PAST_ROUNDS.map((p) => at(x, p)?.closing),
     x.deepest?.closing, x.deepest && prov(x.deepest),
     x.rounds.filter((c) => !PAST_ROUNDS.some((p) => p.year === c.year && p.round === c.round)).map((c) => `${prov(c)}: ${c.closing}`).join("; "),
-    ...(profile ? [x.reach ? `${reachLabel(x.reach, LATEST_YEAR, PAST_YEARS)}${x.reachProvisional ? " (provisional)" : ""}` : "Not a seat category you can take"] : []),
+    ...(profile ? [x.reach ? `${reachLabel(x.reach, LATEST_YEAR, PAST_YEARS, true, x.category)}${x.reachProvisional ? " (provisional)" : ""}` : "Not a seat category you can take"] : []),
     ...kinds.flatMap((k) => [x.terms[k]?.text, docOf(x.terms[k]?.source)]),
   ]);
   const used = new Set(r.rows.flatMap((x) => x.rounds.map(label)));
   const sources = [
-    ...r.lists.flatMap((l) => [
-      [l.name, l.url, `${seatsCol(l, r.lists)}: MCC notice dated ${l.publishedAt ?? "—"}; the list as that PDF printed it`],
-      ...seatChanges(l, v.all, notices).later.map((n) => [n.title, n.url, `MCC seat notice dated ${n.date}, after the ${listName(l, r.lists)} list: not applied here`]),
-    ]),
+    ...r.lists.flatMap((l) => {
+      const c = seatChanges(l, v.all, notices);
+      return [
+        [l.name, l.url, `${seatsCol(l, r.lists)}: MCC notice dated ${l.publishedAt ?? "—"}; the list as that PDF printed it`],
+        ...c.later.map((n) => [n.title, n.url, `MCC seat notice dated ${n.date}, after the ${listName(l, r.lists)} list: not applied here`]),
+        ...c.sameDay.map((n) => [n.title, n.url, `MCC seat notice dated ${n.date}, the same day as the ${listName(l, r.lists)} list: it may already include it`]),
+      ];
+    }),
     ...meta.sources.filter((s) => used.has(label(s))).map((s) => [s.name, s.url, `${label(s)} closing ranks${s.provisional ? " (provisional)" : ""}`]),
   ];
   const foot = [

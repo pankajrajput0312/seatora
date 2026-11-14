@@ -111,6 +111,26 @@ describe.skipIf(!process.env.DATABASE_URL)("findSeats on the real import", { tim
     expect(sc.rows.every((r) => r.reach === null)).toBe(true);
   });
 
+  it("two seat categories: each Seats row has Options' label on that category, and Options notes a list whose seats are all on another label", async () => {
+    // Her pairs profile, clear vacancy list: every labelled Seats row = Options' label on the row's seat category alone.
+    const p = new URLSearchParams("rank=42284&cat=OBC&c=MD~ANAESTHESIOLOGY,DNB~ANAESTHESIOLOGY,NBEMS Diploma~ANAESTHESIOLOGY,Diploma~ANAESTHESIOLOGY,DNB~FAMILYMEDICINE");
+    const her = profileFromParams(p)!;
+    const v = await seatsView(parseSeatsParams(p), her);
+    const opts = new Map((await listOptions(her, { showClosed: true })).rows.map((o) => [o.id, o]));
+    const both = v.r!.rows.filter((r) => r.reach && opts.has(optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota! })));
+    expect(both.length).toBeGreaterThan(600);
+    for (const r of both) expect(opts.get(optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota! }))!.reachBy?.[r.category as "Open"]).toBe(r.reach);
+    // GMERS Vadnagar NBEMS Diploma Anaesthesiology, DNB Quota: "Reached in 2026 R1" from OBC seats (2026 R1 44,810), while
+    // the clear vacancy list prints Open (2) and SC seats only: Open closed before her rank, so Options says so.
+    const g = opts.get("GMERSMEDICALCOLLEGEANDGENERALHOSPITALKHA#384355~NBEMS Diploma~ANAESTHESIOLOGY~DNB Quota")!;
+    expect(g).toMatchObject({ reach: "reached-latest", reachBy: { Open: "closed-before", OBC: "reached-latest" }, seatsBy: { clear: 2, virtual: 3 } });
+    expect(g.seatsBelow).toEqual([{ kind: "clear", on: [{ category: "Open", reach: "closed-before" }] }]);
+    // A Seats row with no history on its own seat category says so for that category, not "your categories".
+    const csv = await seatsCsv({ ...v, r: v.r! });
+    expect(csv).toContain("No allotment on OBC seats in 2024, 2025 or 2026 R1");
+    expect(csv).not.toContain("No allotment in your categories");
+  });
+
   it("CSV of her view: every row, page order, sources in columns", async () => {
     const p = new URLSearchParams("rank=42284&cat=OBC&sp=ANAESTHESIOLOGY,FAMILYMEDICINE&view=compare");
     const v = await seatsView(parseSeatsParams(p), profileFromParams(p));
@@ -121,6 +141,9 @@ describe.skipIf(!process.env.DATABASE_URL)("findSeats on the real import", { tim
     expect(lines[0]).toContain("Reach at AIR 42284 (history, not a prediction)");
     expect(lines.some((l) => l.startsWith("MCC PG 2026 Round 2 clear vacancy (list as published),https://"))).toBe(true);
     expect(lines.some((l) => l.startsWith("MCC PG 2025 Round 3 allotment result (final),https://"))).toBe(true);
+    // The MCC seat notice dated the same day as the clear and virtual lists, listed for each (as the page shows it).
+    const sameDay = lines.filter((l) => l.startsWith("NOTICE FOR ADDITION AND REMOVAL OF SEATS FROM ROUND 2 PG 2026,") && l.includes("the same day as the"));
+    expect(sameDay.map((l) => l.match(/the same day as the (.*) list/)?.[1])).toEqual(["2026 R2 clear vacancy", "2026 R2 virtual vacancy"]);
     expect(v.sort).toBe("reach");
   });
 

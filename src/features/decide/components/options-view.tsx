@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { formatLakh } from "../lib/format";
 import type { DecideLinks } from "../lib/links";
-import { LATEST_YEAR, PAST_YEARS, reachLabel, type Deepest } from "../lib/reach";
+import { LATEST_YEAR, PAST_YEARS, reachLabel, seatsBelowText, type Deepest } from "../lib/reach";
 import type { ChoiceItem } from "../lib/choices";
 import type { OptionRow } from "../service";
 import { roundLabel, rounds, seatKindLabel, type Round, type SeatList, type Term } from "../types";
@@ -43,6 +43,11 @@ export function SeatsLink({ n, list, L, at, name, end }: { n: number | null | un
 /** One option's seats in that one list (`n`, default its clear vacancy `seats`), linking to them on Seats; "—" when none. */
 export function SeatsCell({ r, list, L, n = r.seats, end = true }: { r: OptionRow; list: SeatList; L: DecideLinks; n?: number | null; end?: boolean }) {
   return <SeatsLink n={n} list={list} L={L} at={{ inst: r.college.slug, course: r.course.slug, quota: r.quota }} name={`${r.college.name}, ${courseName(r)}, ${r.quota}`} end={end} />;
+}
+
+/** Under an option's label: the lists whose seats here are all on seat categories with another label (OptionRow.seatsBelow). */
+export function SeatsBelowNote({ r, includeLatest = true }: { r: Pick<OptionRow, "seatsBelow">; includeLatest?: boolean }) {
+  return r.seatsBelow?.map((n) => <span key={n.kind} className="mt-1 block max-w-xs text-xs text-sun">{seatsBelowText(n, LATEST_YEAR, PAST_YEARS, includeLatest)}</span>);
 }
 
 /** A closing rank with its round and seat category, marked Provisional when its MCC result is. */

@@ -104,6 +104,17 @@ export const notFound = (message: string) => Response.json({ ok: false, error: {
 
 const noStore = { "Cache-Control": "private, no-store" };
 
+/**
+ * Most rows one CSV export writes (/api/v1/options/export, /api/v1/seats/export; ~2.5 MB at most): more is a 400 that
+ * says to narrow the filters, never a cut file. The pages show that instead of the Download link.
+ */
+export const CSV_MAX_ROWS = 5000;
+export const tooManyRows = (total: number) =>
+  Response.json(
+    { ok: false, error: { code: "too_many_rows", message: `${total} rows match these filters; a CSV download holds at most ${CSV_MAX_ROWS}. Narrow the filters and download again.` } } satisfies ApiResult<never>,
+    { status: 400, headers: noStore },
+  );
+
 /** No database configured, or Postgres unreachable, timed out or out of connections: data unavailable, not a bug. */
 export const isDataUnavailable = (e: unknown) =>
   e instanceof Prisma.PrismaClientInitializationError ||

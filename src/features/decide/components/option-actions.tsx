@@ -13,7 +13,7 @@ import type { OptionRow } from "../service";
 import type { SeatList } from "../types";
 import { ReachBadge, TermText } from "./bits";
 import { FocusItem } from "./focus-item";
-import { ClosingCell, courseName, FeeText, RoundGrid, SeatsCell, SeatsHead, toChoiceItem } from "./options-view";
+import { ClosingCell, courseName, FeeText, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, toChoiceItem } from "./options-view";
 import { smallLink } from "./ui";
 
 export function ChoiceStar({ item }: { item: ChoiceItem }) {
@@ -129,7 +129,7 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeL
                   <Link href={L.institute(r.college.slug)} className="font-semibold hover:text-sky hover:underline">{r.college.name}</Link>
                   <span className="block">{courseName(r)}<span className="text-muted-foreground">, {r.quota}, {r.college.state ?? "state not listed"}</span></span>
                 </th>
-                <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /></td>
+                <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /><SeatsBelowNote r={r} includeLatest={includeLatest} /></td>
                 {seatLists.map((l) => <td key={l.key} className="px-1.5 py-1 text-right"><SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} /></td>)}
                 <td className="px-3 py-3 text-right"><ClosingCell d={r.latest} /></td>
                 <td className="px-3 py-3 text-right"><ClosingCell d={r.byYear[last]} /></td>
@@ -159,7 +159,7 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeL
 
       <ul className="grid gap-3 md:hidden" aria-label={caption}>
         {rows.map((r, i) => (
-          <li key={r.id} data-item={start + i + 1} tabIndex={-1}>
+          <li key={r.id} data-item={start + i + 1} tabIndex={-1} className="min-w-0">
             <article className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -171,7 +171,7 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeL
                   <CompareToggle id={r.id} label={label(r)} />
                 </div>
               </div>
-              <div className="mt-2"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /></div>
+              <div className="mt-2"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /><SeatsBelowNote r={r} includeLatest={includeLatest} /></div>
               {seatLists.length > 0 && (
                 <dl className="mt-2 grid grid-cols-3 gap-2 text-sm">
                   {seatLists.map((l) => (

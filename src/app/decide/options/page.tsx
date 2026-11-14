@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { CSV_MAX_ROWS } from "@/features/decide/api";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { HISTORY_CAPTION, PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
@@ -158,10 +159,16 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       {/* Stays mounted across filter changes (OptionsResults remounts), so the new count is announced. */}
       <p role="status" className="sr-only">{formatRank(r.total)} {r.total === 1 ? "option matches" : "options match"}</p>
 
-      {r.total > 0 && (
-        <Button asChild variant="secondary" className="justify-self-start">
-          <a href={`/api/v1/options/export?${api}`} download>Download these {formatRank(r.total)} options (CSV)</a>
-        </Button>
+      {r.total > CSV_MAX_ROWS ? (
+        <p className="text-sm text-muted-foreground">
+          <span className="numeric">{formatRank(r.total)}</span> options are more than one CSV download holds (<span className="numeric">{formatRank(CSV_MAX_ROWS)}</span>): narrow the filters to download them.
+        </p>
+      ) : (
+        r.total > 0 && (
+          <Button asChild variant="secondary" className="justify-self-start">
+            <a href={`/api/v1/options/export?${api}`} download>Download these {formatRank(r.total)} options (CSV)</a>
+          </Button>
+        )
       )}
       {r.total ? (
         <OptionsResults

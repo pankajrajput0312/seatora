@@ -5,7 +5,9 @@ import { parseOptionsQuery } from "./query";
 /**
  * Options for a profile (rank required), labelled by reach, paginated; counts are per reach label before filtering.
  * Each row's `seats` is in `seatList` (the newest clear vacancy list; null when none), `seatsBy` per list of that round
- * in `seatLists` (clear, virtual, new): one list each, never kinds added. `hasSeats` = 1 or a list kind.
+ * in `seatLists` (clear, virtual, new): one list each, never kinds added. `hasSeats` = 1 or a list kind. `reachBy` is
+ * the label on each of her seat categories alone, `seatsBelow` the lists whose seats there are all on categories whose
+ * own label is not `reach`.
  */
 export async function GET(req: Request) {
   return handle(async () => {

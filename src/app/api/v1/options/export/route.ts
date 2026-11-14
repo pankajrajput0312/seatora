@@ -1,4 +1,4 @@
-import { gridRounds, handle, invalid, sourcesFor } from "@/features/decide/api";
+import { CSV_MAX_ROWS, gridRounds, handle, invalid, sourcesFor, tooManyRows } from "@/features/decide/api";
 import { HISTORY_CAPTION } from "@/features/decide/components/bits";
 import { eligibleCategories } from "@/features/decide/lib/reach";
 import { listNotices } from "@/features/decide/server/notices";
@@ -8,14 +8,16 @@ import { parseOptionsQuery } from "../query";
 import { optionsCsv } from "./csv";
 
 /**
- * The Options view as a CSV download: the same profile and filters as /api/v1/options, every matching row (no paging),
- * behind the login like every /api/v1 route (handle), never cached.
+ * The Options view as a CSV download: the same profile and filters as /api/v1/options, every matching row (`page` and
+ * `pageSize` are ignored; more than CSV_MAX_ROWS is a 400), behind the login like every /api/v1 route (handle), never cached.
  */
 export async function GET(req: Request) {
   return handle(async () => {
     const q = parseOptionsQuery(new URL(req.url).searchParams);
     if (!q.ok) return invalid(...q.errors);
-    const [meta, r] = await Promise.all([getMeta(), listOptions(q.profile, q.filters)]);
+    // One page one row past the cap: every row when they fit, and only that many built when they don't.
+    const [meta, r] = await Promise.all([getMeta(), listOptions(q.profile, q.filters, { page: 1, pageSize: CSV_MAX_ROWS + 1 })]);
+    if (r.total > CSV_MAX_ROWS) return tooManyRows(r.total);
     // The MCC seat notices of the round that may change each list, as SeatSource names them on the page.
     const l0 = r.seatLists[0];
     const [all, notices] = l0 ? await Promise.all([seatLists(), listNotices({ kind: "seat_matrix", year: l0.year, round: l0.round })]) : [[], []];

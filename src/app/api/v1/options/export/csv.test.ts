@@ -14,15 +14,17 @@ const row = {
   byYear: { 2025: null, 2024: null },
   terms: { fee: { text: "=1+1", source: { name: "MCC profile", url: null } } },
   seatsBy: { clear: 3, virtual: null, new: 0 },
+  seatsBelow: [{ kind: "clear", on: [{ category: "OBC", reach: "no-data" }] }],
 } as unknown as OptionRow;
 
-it("one seats column per list (never added), quoted text, formulas defused, — for missing, BOM and sources", () => {
+it("one seats column per list (never added) and the seat category note, quoted text, formulas defused, — for missing, BOM and sources", () => {
   const csv = optionsCsv([row], { lists: [list("clear"), list("virtual"), list("new")], includeLatest: true, notes: ["History, not a prediction."], sources: [{ name: "Result", url: null }] });
   expect(csv.startsWith("\uFEFF")).toBe(true);
   const [head, line, blank, ...rest] = csv.slice(1).split("\r\n");
-  expect(head).toContain('"2026 R2 clear vacancy seats","2026 R2 virtual vacancy seats","2026 R2 newly added seats"');
+  expect(head).toContain('"2026 R2 clear vacancy seats","2026 R2 virtual vacancy seats","2026 R2 newly added seats","Seat category note"');
   expect(line).toBe(
     ['1', '"A ""Quoted"" College"', "—", '"DNB Family Medicine"', '"DNB Quota"', '"Closed before your rank"', "3", "—", "0",
+      '"In the clear vacancy list, your seat categories here have only OBC seats; on OBC seats alone: No allotment on OBC seats in 2024, 2025 or 2026 R1."',
       "20132", '"R1 (provisional)"', '"Open"', "—", "—", "—", "—", "—", "—", `"'=1+1"`, '"MCC profile"', "—", "—"].join(","),
   );
   expect(blank).toBe("");

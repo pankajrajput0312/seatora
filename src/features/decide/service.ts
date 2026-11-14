@@ -1,11 +1,11 @@
 import "server-only";
 import { cache } from "react";
 import { bondYears, firstRupees } from "./lib/format";
-import { buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachOrder, YEARS, type Deepest, type GridCell, type Reach, type ReachInput } from "./lib/reach";
+import { buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Reach, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
-import { hasOption, listSeats, pickLists, seatCountsFor, seatLists, sumSeats } from "./server/seats";
+import { hasOption, listSeats, pickLists, seatCountsFor, seatLists, sumSeats, type SeatCell } from "./server/seats";
 import { optionId, rounds, seatKinds, type Category, type College, type Course, type Cutoff, type Notice, type Round, type SeatKind, type SeatList, type Term } from "./types";
 
 // Data comes from Postgres (MCC import, prisma/import-mcc.ts) through ./server; the small, slow-changing part (colleges,
@@ -47,6 +47,8 @@ export type OptionRow = {
   reach: Reach;
   /** The label rests on the provisional latest-year R1: without that round it would be another label. */
   reachProvisional: boolean;
+  /** With a profile: the label on each of her seat categories alone (`reach` is on all of them together). */
+  reachBy?: Partial<Record<Category, Reach>>;
   latest: Deepest | null; // latest year's R1 (provisional while its source is)
   byYear: Record<number, Deepest | null>;
   /** year → round → deepest closing among eligible categories (with its seat category); n = allotments, all categories */
@@ -66,8 +68,10 @@ export type OptionRow = {
    * the newest clear vacancy list (`seatList` beside the rows), null when that list prints none. One list, never kinds added.
    */
   seats?: number | null;
-  /** Options rows only: the same per list of that round (`seatLists`: clear, virtual, new). Kinds overlap: never add them. */
+  /** Options, Choices and institute rows: the same per list of that round (`seatLists`: clear, virtual, new). Kinds overlap: never add them. */
   seatsBy?: SeatsBy;
+  /** Beside `seatsBy`, with a profile: the lists whose seats here are all on seat categories whose own label is not `reach` (lib/reach.ts). */
+  seatsBelow?: SeatsBelow[];
 };
 
 /** Seats of one option per seat list kind; null = that list prints none; a kind with no list is absent. */
@@ -118,6 +122,8 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], profile: Profile | null,
   const deepest = deepestByYear(mine, provisional);
   const t = termsFor(cat, college.key, course.degree);
   const label = profile ? labelOf(profile.rank, mine, includeProvisional, latestR1Provisional(cat)) : { reach: "no-data" as const, provisional: false };
+  const opt = { latestYear: LATEST_YEAR, pastYears: PAST_YEARS, includeLatest: includeProvisional };
+  const reachBy = profile && !eligibleOverride ? Object.fromEntries([...eligible!].map((c) => [c, classifyReach(profile.rank, mine.filter((x) => x.category === c), opt)])) : undefined;
   return {
     id: o.id,
     college: { key: college.key, slug: college.slug, name: college.name, state: college.state, type: college.type },
@@ -125,6 +131,7 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], profile: Profile | null,
     quota: o.quota,
     reach: label.reach,
     reachProvisional: label.provisional,
+    ...(reachBy && { reachBy }),
     latest: deepestByYear(mine.filter((c) => c.year === LATEST_YEAR && c.round === "R1"), provisional).get(LATEST_YEAR) ?? null,
     byYear: Object.fromEntries(YEARS.map((y) => [y, deepest.get(y) ?? null])),
     grid: buildGrid(list, eligible, provisional),
@@ -204,14 +211,6 @@ async function rankOptions(cat: Catalog, opts: Opt[], profile: Profile | null, i
 const countsOf = (xs: { reach: Reach }[]) => Object.fromEntries(reachOrder.map((r) => [r, xs.filter((x) => x.reach === r).length])) as Record<Reach, number>;
 
 /**
- * The newest clear vacancy list (the R2 seats column), or null: none imported, or the unit-test fixture (no seat lists).
- * `kind` + `of`: that kind of list in the same year and round as `of`.
- */
-async function seatListNow(cat: Catalog, kind: SeatKind = "clear", of?: SeatList): Promise<SeatList | null> {
-  return cat.mem ? null : (pickLists(await seatLists(), { kind, year: of?.year, round: of?.round })[0] ?? null);
-}
-
-/**
  * Seats in `list` that match her courses, quotas, states and seat categories (fee and bond caps aside, as on Seats) but
  * whose course and quota is not an option: no past allotments, so no closing rank to label. All of a college's without
  * a profile. Null when there is no list. Options and institute pages name them and link Seats (`nohist=1`).
@@ -260,17 +259,34 @@ async function seatsOf(list: SeatList | null, opts: Opt[], profile: Profile | nu
   }));
 }
 
-/** Seats per option id in each list (one kind each, never added). */
-async function seatsByKind(lists: SeatList[], opts: Opt[], profile: Profile | null): Promise<Map<string, SeatsBy>> {
-  const per = await Promise.all(lists.map((l) => seatsOf(l, opts, profile)));
-  return new Map(opts.map((o) => [o.id, Object.fromEntries(lists.map((l, i) => [l.kind, per[i].get(o.id) ?? null]))]));
+/** The seat cells of these options' courses in each of `lists` (one read per list), for withSeats. */
+async function cellsIn(lists: SeatList[], opts: Opt[]): Promise<Record<string, SeatCell[]>[]> {
+  const cs = [...new Set(opts.map((o) => o.cs))];
+  return Promise.all(lists.map(async (l) => (cs.length ? (await seatCountsFor(cs, l.key)).seats : {})));
 }
 
-/** Choices: seats of saved options (ids) in each list of the newest round, as on Options. Unknown ids are left out. */
-export async function optionSeats(ids: string[], profile: Profile | null) {
+/**
+ * Rows with their seats in each list (`seatsBy`, one kind each, never added; `seats` = the clear vacancy list's), in the
+ * option's quota and her seat categories (all without a profile), and with a profile `seatsBelow`.
+ */
+function withSeats(cat: Catalog, rows: OptionRow[], lists: SeatList[], cells: Record<string, SeatCell[]>[], profile: Profile | null): OptionRow[] {
+  const categories: string[] | undefined = profile ? eligibleCategories(profile.category, profile.pwd) : undefined;
+  return rows.map((r) => {
+    const cs = cat.optionById.get(r.id)!.cs;
+    const mine = cells.map((x) => (x[cs] ?? []).filter((c) => c.quota === r.quota && (!categories || categories.includes(c.category))));
+    const seatsBy: SeatsBy = Object.fromEntries(lists.map((l, i) => [l.kind, mine[i].length ? mine[i].reduce((a, c) => a + c.seats, 0) : null]));
+    const cats = Object.fromEntries(lists.map((l, i) => [l.kind, mine[i].filter((c) => c.seats > 0).map((c) => c.category)]));
+    return { ...r, seats: seatsBy.clear ?? null, seatsBy, seatsBelow: r.reachBy ? seatsBelow(r.reach, r.reachBy, cats) : [] };
+  });
+}
+
+/** Choices: saved options (ids), labelled, with their seats in each list of the newest round, as on Options. Unknown ids are left out. */
+export async function choiceOptions(ids: string[], profile: Profile | null) {
   const cat = await getCatalog();
+  const opts = ids.flatMap((id) => cat.optionById.get(id) ?? []);
   const lists = await roundLists(cat);
-  return { lists, seats: Object.fromEntries(await seatsByKind(lists, ids.flatMap((id) => cat.optionById.get(id) ?? []), profile)) };
+  const [rows, cells] = await Promise.all([rowsFor(cat, opts, profile, true), cellsIn(lists, opts)]);
+  return { lists, rows: withSeats(cat, rows, lists, cells, profile) };
 }
 
 /**
@@ -307,14 +323,11 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     : 0;
   const page = paged(shown, pg);
   const pageOpts = page.rows.map((x) => x.o);
-  const [built, seats] = await Promise.all([
-    rowsFor(cat, pageOpts, profile, includeProvisional, pageOpts.length < cat.options.length / 2),
-    seatsByKind(lists, pageOpts, profile),
-  ]);
+  const [built, cells] = await Promise.all([rowsFor(cat, pageOpts, profile, includeProvisional, pageOpts.length < cat.options.length / 2), cellsIn(lists, pageOpts)]);
   const hidden = all.filter((r) => !showClosed && r.reach === "closed-before");
   return {
     ...page,
-    rows: built.map((r) => ({ ...r, seats: seats.get(r.id)?.clear ?? null, seatsBy: seats.get(r.id) ?? {} })),
+    rows: withSeats(cat, built, lists, cells, profile),
     hiddenClosed: hidden.length,
     /** Of the hidden ones, those whose label rests on the provisional latest-year R1 alone. */
     hiddenProvisional: hidden.filter((r) => r.provisional).length,
@@ -335,17 +348,18 @@ export async function getOptionsByIds(ids: string[], profile: Profile | null) {
 const sumYear = (opts: Opt[], year: number) => (opts.some((o) => o.byYear[year] != null) ? opts.reduce((s, o) => s + (o.byYear[year] ?? 0), 0) : null);
 
 /**
- * One institute: every option here (`options`, with `seats` in `seatList`), the ones in her profile (`yours`), the
- * seats here in her profile that are no option (`unlisted`), allotments per year, terms per program.
+ * One institute: every option here (`options`, with `seats` in `seatList` and `seatsBy` per list of its round), the ones
+ * in her profile (`yours`), the seats here in her profile that are no option (`unlisted`), allotments per year, terms per program.
  */
 export async function getInstitute(slug: string, profile: Profile | null) {
   const cat = await getCatalog();
   const college = cat.collegeBySlug.get(slug);
   if (!college) return null;
   const opts = cat.options.filter((o) => o.college === college.key);
-  const [built, seatList] = await Promise.all([rowsFor(cat, opts, profile, true), seatListNow(cat)]);
-  const [seats, unlisted] = await Promise.all([seatsOf(seatList, opts, profile), unlistedOf(cat, seatList, profile, college.key)]);
-  const options = built.map((r) => ({ ...r, seats: seats.get(r.id) ?? null }));
+  const [built, lists] = await Promise.all([rowsFor(cat, opts, profile, true), roundLists(cat)]);
+  const seatList = lists[0] ?? null;
+  const [cells, unlisted] = await Promise.all([cellsIn(lists, opts), unlistedOf(cat, seatList, profile, college.key)]);
+  const options = withSeats(cat, built, lists, cells, profile);
   const mine = new Set(opts.filter((o) => optMatches(cat, o, profile)).map((o) => o.id));
   const allotmentsByYear = YEARS.map((year) => ({ year, n: sumYear(opts, year) }));
   const terms = { md: termsFor(cat, college.key, "MD"), dnb: termsFor(cat, college.key, "DNB") };

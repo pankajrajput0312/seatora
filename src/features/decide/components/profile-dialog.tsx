@@ -37,6 +37,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
   const [rankText, setRankText] = useState(profile ? String(profile.rank) : "");
   const [error, setError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [noCourse, setNoCourse] = useState(false);
   // Her courses: specialty code → ticked degrees (exact pairs); saved through coursesFromPicks.
   const [picked, setPicked] = useState(() => picksOf(profile ?? empty, meta.courses));
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setDraft((d) => ({ ...d, [k]: v }));
@@ -48,10 +49,14 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
   };
   const pickSpecialties = (v: string[]) => setPicked((p) => Object.fromEntries(v.map((s) => [s, p[s] ?? fresh(s)])));
   const pickDegrees = (s: string, ds: string[]) => setPicked((p) => ({ ...p, [s]: offered(s).filter((d) => ds.includes(d)) }));
-  const current = () => ({ ...draft, pairs: undefined, ...coursesFromPicks(picked, draft.degrees, meta.courses) });
+  // Null: specialties ticked but no degree in any, so no course; saving would mean every course (empty = all), so ask.
+  const courses = coursesFromPicks(picked, draft.degrees, meta.courses);
+  const current = () => courses && { ...draft, pairs: undefined, ...courses };
 
   const save = () => {
-    const r = profileSchema.safeParse({ ...current(), rank: Number(rankText.replace(/\D/g, "")) });
+    const c = current();
+    if (!c) return setNoCourse(true);
+    const r = profileSchema.safeParse({ ...c, rank: Number(rankText.replace(/\D/g, "")) });
     if (!r.success) return setError("Enter your All India Rank (a number up to 3,00,000).");
     setError(null);
     onSave(r.data);
@@ -59,8 +64,10 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
   };
 
   const exportJson = () => {
+    const c = current();
+    if (!c) return setNoCourse(true);
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(current(), null, 2)], { type: "application/json" }));
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(c, null, 2)], { type: "application/json" }));
     a.download = "seatora-profile.json";
     a.click();
   };
@@ -123,7 +130,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
                   const all = offered(s.code);
                   const ds = picked[s.code];
                   return (
-                    <fieldset key={s.code}>
+                    <fieldset key={s.code} aria-describedby={`deg-note-${s.code}`}>
                       <legend className="text-sm">{s.name}</legend>
                       <div className="mt-1 flex flex-wrap gap-2">
                         {all.length > 1 && (
@@ -139,11 +146,16 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave }: { o
                           </label>
                         ))}
                       </div>
-                      {!ds.length && <p className="mt-1 text-xs text-muted-foreground">No degree ticked: {s.name} is left out.</p>}
+                      <p id={`deg-note-${s.code}`} aria-live="polite" className="mt-1 text-xs text-muted-foreground empty:hidden">
+                        {!ds.length && (courses ? `No degree ticked: ${s.name} is left out.` : `No degree ticked for ${s.name}: tick one, or untick the specialty.`)}
+                      </p>
                     </fieldset>
                   );
                 })}
               </div>
+              {noCourse && !courses && (
+                <p role="alert" className="mt-2 text-sm text-ember">Tick at least one degree, or untick the specialties: with no course ticked, your profile would cover every course.</p>
+              )}
             </fieldset>
           ) : (
             <Checks legend="Degrees" note="None ticked = all. Tick a specialty to choose its degrees." options={meta.degrees.map((d) => ({ value: d, label: d }))} value={draft.degrees} onChange={(v) => set("degrees", v)} />
