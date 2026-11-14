@@ -27,6 +27,31 @@ The page renders without a database; only waitlist submissions need one (they sh
 | `npm run db:migrate` | Create/apply Prisma migrations |
 | `npm run db:studio` | Browse data, including waitlist sign-ups |
 
+## Adding residents
+The landing page's main section lists residents, their NEET PG rank and the college they joined, ordered by closeness to the visitor's rank. Add people to `src/features/residents/data/residents.json` (a JSON array):
+
+```json
+[
+  {
+    "name": "Full name as they agreed to be shown",
+    "rank": 12450,
+    "category": "OBC",
+    "quota": "AIQ",
+    "year": 2025,
+    "round": "R2",
+    "college": "College name",
+    "state": "State",
+    "course": "MD General Medicine",
+    "verified": false,
+    "consent": true
+  }
+]
+```
+- `category`: Open, EWS, OBC, SC, ST, or any of those with " PwD". `quota`: AIQ, State, Deemed, Central institute, Management, NRI. `round` (optional): R1, R2, R3, Stray, Special stray, State round. `state` is optional.
+- `consent` must be `true`. Only list people who agreed to be shown by name.
+- Set `verified` to `true` only after checking their allotment letter.
+- A bad entry fails `npm run build` with a message naming the field. Rebuild after editing.
+
 ## Deploy (Vercel or any Node host)
 1. Provision PostgreSQL (Neon, Supabase, RDS…).
 2. Set `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL` (e.g. `https://medpath.in`) and `NEXT_PUBLIC_CONTACT_EMAIL` (privacy/deletion requests). Production builds fail if either public variable is missing.

@@ -10,9 +10,3 @@ export function rankFit(rank: number, closingRank: number | null, margin = 0.1):
   if (rank <= closingRank * (1 + margin)) return "near";
   return "beyond";
 }
-
-export const rankFitLabel: Record<RankFit, string> = {
-  inside: "Inside last closing rank",
-  near: "Near last closing rank",
-  beyond: "Beyond last closing rank",
-};
