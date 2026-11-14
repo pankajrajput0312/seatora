@@ -1,4 +1,5 @@
 import { Container } from "@/components/layout/container";
+import { PeekingCrew } from "./crew-extras";
 import { WaitlistForm } from "@/features/waitlist/components/waitlist-form";
 import { examYearsFrom } from "@/features/waitlist/validations";
 
@@ -6,7 +7,8 @@ export function Cta() {
   return (
     <section id="waitlist" className="scroll-mt-16">
       <Container className="py-20 md:py-28">
-        <div className="rounded-xl border border-border bg-card p-8 md:p-14">
+        <div className="relative rounded-xl border border-border bg-card p-8 md:p-14">
+          <PeekingCrew />
           <h2 className="max-w-3xl font-pixel text-4xl leading-[0.95] tracking-tight md:text-6xl">
             Make your next career decision with clarity.
           </h2>

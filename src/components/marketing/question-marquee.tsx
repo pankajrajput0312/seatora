@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { WalkingCrew } from "./crew-extras";
 
 // Questions aspirants ask during counselling. Prompts only, not data claims.
 const rows = [
@@ -9,7 +10,7 @@ const rows = [
 
 export function QuestionMarquee() {
   return (
-    <section aria-label="Questions Seatora helps answer" className="mask-x overflow-hidden border-b border-border py-10">
+    <section aria-label="Questions Seatora helps answer" className="mask-x relative overflow-hidden border-b border-border py-10">
       <ul className="sr-only">{rows.flat().map((q) => <li key={q}>{q}</li>)}</ul>
       {rows.map((row, i) => (
         <div
@@ -24,6 +25,7 @@ export function QuestionMarquee() {
           {[...row, ...row, ...row, ...row].map((q, j) => <span key={j} className="pr-16">{q}</span>)}
         </div>
       ))}
+      <WalkingCrew />
     </section>
   );
 }

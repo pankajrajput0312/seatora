@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
-import { HeroScene } from "./hero-scene";
+import { CrewScene } from "./crew-scene";
 
 export function Hero() {
   return (
@@ -26,7 +26,7 @@ export function Hero() {
           </div>
         </div>
 
-        <HeroScene />
+        <CrewScene />
       </Container>
     </section>
   );
