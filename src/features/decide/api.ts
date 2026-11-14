@@ -60,12 +60,6 @@ export const rankScanQuerySchema = z.object({
   year: int.min(2000).max(2100).default(2025),
   window: int.min(1).max(1000).default(500),
 });
-export const feesQuerySchema = pageSchema.extend({
-  program: z.enum(["MD", "DNB"]).optional(),
-  state: z.string().optional(),
-  maxFeeLakh: z.coerce.number().positive().optional(),
-  sort: z.enum(["fee", "stipend", "name"]).default("fee"),
-});
 export const trendsQuerySchema = pageSchema.extend({ specialty: z.string().optional(), degree: z.string().optional() });
 
 type Issue = { path: string; message: string };

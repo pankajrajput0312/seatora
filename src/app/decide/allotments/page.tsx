@@ -110,7 +110,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
               <th scope="col" className={tbl.th}>Round, quota and seat</th>
               <th scope="col" className={tbl.th}>Institute and course</th>
               <th scope="col" className={tbl.th}>Fee and stipend</th>
-              <th scope="col" className={tbl.th}>Bond and seat-leaving penalty</th>
+              <th scope="col" className={tbl.th}>Bond and Round 2 forfeit</th>
             </tr></thead>
             <tbody>
               {rows.map((a, i) => (

@@ -216,6 +216,8 @@
 /* "Rounds by year" opens a full-width row under its option instead of widening the cell. */
 .expand-row { display: none; }
 .expand-host:has(details[open]) + .expand-row { display: table-row; }
+/* Phones: the less-used filters of a filter bar stay folded until its "Show all filters" box (.more-toggle) is ticked. */
+@media (width < 48rem) { form:has(.more-toggle:not(:checked)) .more-filter { display: none; } }
 
 /* Keep focused elements clear of the sticky Astryx header (TopNav, about 4rem; it holds the Compare button, nothing floats
    over the page) and, on phones, the 3.5rem bottom bar. Values sit above the real heights. */

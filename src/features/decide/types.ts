@@ -49,8 +49,8 @@ export type Term = {
   /** The document the text was taken from (an MCC institute profile, an NBEMS notice…). */
   source: { name: string; url: string | null; type: SourceType };
 };
-/** PENALTY is MCC's seat-leaving forfeit (resign / don't join from Round 2), not a bond penalty. */
-export const termLabel: Record<Term["kind"], string> = { FEE: "Fee", STIPEND: "Stipend", BOND: "Service bond", PENALTY: "Seat-leaving penalty (MCC)" };
+/** PENALTY is MCC's forfeit if you resign or don't join from Round 2: not a bond penalty, not the penalty for leaving the course. */
+export const termLabel: Record<Term["kind"], string> = { FEE: "Fee", STIPEND: "Stipend", BOND: "Service bond", PENALTY: "Resign or don't join from Round 2 (MCC)" };
 export type Allotment = {
   rank: number;
   category: Category;

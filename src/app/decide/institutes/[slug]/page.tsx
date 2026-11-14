@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, unstable_rethrow } from "next/navigation";
@@ -8,7 +7,8 @@ import { SourceLabel } from "@/components/ui/source-label";
 import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { Closing, Dash, HISTORY_CAPTION, PageHead, Provisional, ReachBadge, TermText } from "@/features/decide/components/bits";
+import { Closing, Dash, HISTORY_CAPTION, PageHead, Provisional, ReachBadge } from "@/features/decide/components/bits";
+import { FeesSection, programmeTitle, TermsSummary } from "@/features/decide/components/fees";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
 import { allotmentMixAt, optionSeats, roundSeatsAt } from "@/features/decide/components/institute/institute-data";
@@ -21,9 +21,10 @@ import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, PAST_YEARS, programOf, type OptionTerms } from "@/features/decide/service";
+import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, PAST_YEARS } from "@/features/decide/service";
+import { programmes } from "@/features/decide/server/terms";
 import { canSeeResidents, groupResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
-import { roundLabel, seatKindLabel, termLabel } from "@/features/decide/types";
+import { roundLabel, seatKindLabel } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -45,10 +46,6 @@ const schema = z.object({
   course: z.string().max(100).optional(),
   page: pageValue.default(1),
 });
-const kinds = ["FEE", "STIPEND", "BOND", "PENALTY"] as const;
-const termOf = (t: OptionTerms, k: (typeof kinds)[number]) => ({ FEE: t.fee, STIPEND: t.stipend, BOND: t.bond, PENALTY: t.penalty })[k];
-/** The overview's summary; the Fees tab adds the seat-leaving penalty. */
-const summaryKinds = ["FEE", "STIPEND", "BOND"] as const;
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const college = await getCollege((await params).slug).catch((e) => {
@@ -62,30 +59,6 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   return { title: `${tabs.find((t) => t.key === tab)!.label} · ${college?.name ?? "Institute"}`, robots };
 }
 
-/**
- * Fee, stipend, bond and seat-leaving penalty for one programme, each as published with its own source link. `offered`:
- * the MCC results have courses of this programme here.
- */
-function Terms({ title, t, offered, only = kinds, bare }: { title: string; t: OptionTerms; offered: boolean; only?: readonly (typeof kinds)[number][]; bare?: boolean }) {
-  return (
-    <div className={bare ? undefined : "rounded-xl border border-border bg-card p-5"}>
-      <h3 className="text-base font-semibold">{title}</h3>
-      {!only.some((k) => termOf(t, k)) ? (
-        <p className="mt-2 text-sm text-muted-foreground">{offered ? "Offered here, but no fee, stipend or bond is listed for it." : "No courses of this kind here in the MCC results."}</p>
-      ) : (
-        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
-          {only.map((k) => (
-            <Fragment key={k}>
-              <dt className="text-muted-foreground">{termLabel[k]}</dt>
-              <dd className="numeric font-semibold"><TermText term={termOf(t, k)} /></dd>
-            </Fragment>
-          ))}
-        </dl>
-      )}
-    </div>
-  );
-}
-
 export default async function InstitutePage({ params, searchParams }: Props) {
   const sp = toURLSearchParams(await searchParams);
   const profile = profileFromParams(sp);
@@ -94,8 +67,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const f = parseSearchParams(schema, sp);
   const [inst, meta] = await Promise.all([getInstitute(slug, profile), getMeta()]);
   if (!inst) notFound();
-  const { college, options, yours, allotmentsByYear, terms, unlisted } = inst;
-  const offers = (program: "MD" | "DNB") => options.some((o) => programOf(o.course.degree) === program);
+  const { college, options, yours, allotmentsByYear, fees, unlisted } = inst;
   const tab = f.tab;
   const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
   const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n ?? 0));
@@ -116,12 +88,6 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const residentYears = [...new Set(residents?.rows.map((r) => r.year))].sort((a, b) => b - a);
   // Seats here with no past allotments: not options, so not in the lists below; Seats shows them.
   const unlistedNote = unlisted && unlisted.seats > 0 && <UnlistedSeats u={unlisted} profile={!!profile} here href={L.to("/decide/seats", { list: unlisted.list.key, inst: slug, nohist: "1" })} />;
-  const termSources = [...kinds.map((k) => termOf(terms.md, k)?.source), ...kinds.map((k) => termOf(terms.dnb, k)?.source)];
-  const programs = [
-    { title: "Medical college seats (MD, MS, Diploma)", t: terms.md, offered: offers("MD") },
-    { title: "DNB and NBEMS Diploma seats", t: terms.dnb, offered: offers("DNB") },
-  ];
-  const summary = programs.filter((p) => p.offered || summaryKinds.some((k) => termOf(p.t, k)));
   // The newest round's seat lists here (Courses columns, Seats tab), each separate; allotments by quota and seat category (Overview).
   const [round, mix] = await Promise.all([
     tab === "courses" || tab === "seats" ? roundSeatsAt(college.key) : [],
@@ -194,20 +160,23 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <p className="mt-3 text-xs text-muted-foreground">{HISTORY_CAPTION}{!profile && " Closing ranks shown across all seat categories."}</p>
           </section>
 
-          <section aria-labelledby="terms-h" className="grid gap-4 rounded-xl border border-border bg-card p-5">
+          <section aria-labelledby="terms-h" className="grid gap-3 rounded-xl border border-border bg-card p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 id="terms-h" className="text-lg font-semibold">Fees, stipend and bond</h2>
-              <Link href={L.institute(slug, "fees")} className={`${smallLink} text-sm text-sky`}>Fees &amp; bond, with the seat-leaving penalty</Link>
+              <Link href={L.institute(slug, "fees")} className={`${smallLink} text-sm text-sky`}>Year by year, sources</Link>
             </div>
-            {summary.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No fee, stipend or bond is listed for this institute.</p>
+            {fees.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No courses here in the MCC data, so no programme to show fees for.</p>
             ) : (
-              <div className="grid gap-6 md:grid-cols-2">
-                {summary.map((p) => <Terms key={p.title} title={p.title} t={p.t} offered={p.offered} only={summaryKinds} bare />)}
-              </div>
+              <ul className="divide-y divide-border">
+                {fees.map((p) => <li key={p.programme} className="py-2"><TermsSummary t={p} programme /></li>)}
+              </ul>
             )}
-            <p className="text-xs text-muted-foreground">Each value is quoted as published, with a link to its document; a dash when not listed.</p>
-            <DataSource terms={summary.flatMap((p) => summaryKinds.map((k) => termOf(p.t, k)?.source))} results={false} />
+            <p className="text-xs text-muted-foreground">
+              Year 1 figures, from what the college declared to MCC and NBEMS rules. &quot;Not declared&quot; means not in the MCC profile fields Seatora imports, not &quot;none&quot;.
+              Bond and leaving: a range when the amount depends on course type; &quot;computed&quot; marks a per-year amount × the years. Each figure is numbered to its document on the Fees &amp; bond tab.
+            </p>
+            <DataSource terms={fees.flatMap((p) => p.sources.map((s) => ({ name: `${s.label}${s.mccId ? `, MCC profile ${s.mccId}` : ""}`, url: s.url, type: s.type })))} results={false} />
           </section>
 
           <section aria-labelledby="trend" className="rounded-xl border border-border bg-card p-5">
@@ -389,13 +358,24 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       )}
 
       {tab === "fees" && (
-        <section aria-labelledby="fees-h" className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <h2 id="fees-h" className="sr-only">Fees, stipend, bond and seat-leaving penalty</h2>
-          <Terms title="Medical college seats (MD, MS, Diploma)" t={terms.md} offered={offers("MD")} />
-          <Terms title="DNB and NBEMS Diploma seats" t={terms.dnb} offered={offers("DNB")} />
-          <p className="text-xs text-muted-foreground md:col-span-2">Each value is quoted as published, with a link to its document. Missing values show as a dash.</p>
-          {college.state && <p className="text-sm md:col-span-2"><Link href={L.fees({ state: college.state })} className={`${smallLink} text-sky`}>Compare fees with other institutes in {college.state}</Link></p>}
-          <div className="md:col-span-2"><DataSource terms={termSources} results={false} /></div>
+        <section aria-labelledby="fees-h" className="grid grid-cols-1 gap-4">
+          <h2 id="fees-h" className="sr-only">Fees, stipend and bond</h2>
+          {fees.length === 0 ? (
+            <EmptyState title="No courses here in the MCC data" description="There is no programme here to show fees, stipend or bond for." href={L.institute(slug, "courses")} action="See the courses here" />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {fees.map((p) => (
+                <div key={p.programme} className="rounded-xl border border-border bg-card p-5">
+                  <FeesSection t={p} id={`fees-${programmes[p.programme].slug}`} />
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="max-w-3xl text-xs text-muted-foreground">
+            One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}). Fee that year and stipend per month as declared to MCC; a dash means not in Seatora&apos;s MCC data (not declared in the MCC profile fields we import; the profile may say more), never zero.
+            Leaving the course after joining is the college&apos;s or state&apos;s penalty from its bond document; resigning from Round 2 is MCC&apos;s separate forfeit.
+          </p>
+          {college.state && <p className="text-sm"><Link href={L.fees({ state: college.state })} className={`${smallLink} text-sky`}>Compare fees with other institutes in {college.state}</Link></p>}
         </section>
       )}
 

@@ -6,6 +6,7 @@ import { profileCourseFilter, profileHasCourse, profileQuotas, type Profile } fr
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
 import { hasOption, listSeats, pickLists, seatCountsFor, seatLists, sumSeats } from "./server/seats";
+import { collegeTerms, courseTerms, type Programme, type ProgrammeTerms } from "./server/terms";
 import { optionId, rounds, seatKinds, type Category, type College, type Course, type Cutoff, type Notice, type Round, type SeatKind, type SeatList, type Term } from "./types";
 
 // Data comes from Postgres (MCC import, prisma/import-mcc.ts) through ./server; the small, slow-changing part (colleges,
@@ -349,7 +350,9 @@ export async function getInstitute(slug: string, profile: Profile | null) {
   const mine = new Set(opts.filter((o) => optMatches(cat, o, profile)).map((o) => o.id));
   const allotmentsByYear = YEARS.map((year) => ({ year, n: sumYear(opts, year) }));
   const terms = { md: termsFor(cat, college.key, "MD"), dnb: termsFor(cat, college.key, "DNB") };
-  return { college, options, yours: options.filter((o) => mine.has(o.id)), allotmentsByYear, terms, seatList, unlisted };
+  /** Fees, stipend and bond per programme offered here (server/terms.ts). */
+  const fees = collegeTerms(cat, college.key);
+  return { college, options, yours: options.filter((o) => mine.has(o.id)), allotmentsByYear, terms, fees, seatList, unlisted };
 }
 
 export async function rankScan(rank: number, year: number, window = 500) {
@@ -593,25 +596,75 @@ export async function listAllotments(f: AllotmentFilters, pg: PageQuery, college
   };
 }
 
-/** Fee, stipend, bond and seat-leaving penalty per institute and program. Sorts use the first rupee figure (year 1); unknown last. */
-export async function listFees(f: { program?: "MD" | "DNB"; state?: string; maxFeeLakh?: number; sort?: "fee" | "stipend" | "name" }, pg?: PageQuery) {
+/**
+ * Each course's programme terms (fees, stipend, bond), for rows of one institute × course (Options, Seats, Allotments):
+ * render with TermsSummary (components/fees.tsx). Same order as `items`.
+ */
+export async function termsForCourses(items: { college: string; degree: string }[]): Promise<ProgrammeTerms[]> {
   const cat = await getCatalog();
-  const rows = cat.colleges.flatMap((college) =>
-    (["MD", "DNB"] as const).flatMap((program) => {
-      const t = termsFor(cat, college.key, program);
-      if (!t.fee && !t.stipend && !t.bond && !t.penalty) return [];
-      return [{ college, program, fee: t.fee ?? null, stipend: t.stipend ?? null, bond: t.bond ?? null, penalty: t.penalty ?? null, bondYears: bondYears(t.bond?.text) }];
-    }),
-  );
-  const out = rows
-    .filter((r) => !f.program || r.program === f.program)
-    .filter((r) => !f.state || r.college.state === f.state)
-    .filter((r) => f.maxFeeLakh == null || (amountOf(r.fee) ?? 0) <= f.maxFeeLakh * 100000);
-  const by = f.sort ?? "fee";
-  out.sort((a, b) =>
-    by === "stipend" ? (amountOf(b.stipend) ?? -1) - (amountOf(a.stipend) ?? -1)
-    : by === "name" ? a.college.name.localeCompare(b.college.name)
-    : (amountOf(a.fee) ?? Infinity) - (amountOf(b.fee) ?? Infinity),
-  );
-  return paged(out, pg);
+  return items.map((i) => courseTerms(cat, i.college, i.degree));
+}
+
+export const feeSorts = ["fee1", "feetotal", "stip1", "bondyrs", "bond", "leave", "name"] as const;
+export type FeeSort = (typeof feeSorts)[number];
+/**
+ * Caps in ₹ (maxFee: year 1; maxBondInr: the highest bond amount for the programme). A capped value that is not
+ * declared passes unless `hideUnknown`. `maxBondYears` 0 = no declared bond. `bond`: declared or not.
+ */
+export type FeeFilters = {
+  programmes?: Programme[];
+  states?: string[];
+  search?: string;
+  maxFee?: number | null;
+  minStipend?: number | null;
+  maxBondYears?: number | null;
+  maxBondInr?: number | null;
+  bond?: "declared" | "none";
+  hideUnknown?: boolean;
+  sort?: FeeSort;
+  dir?: "asc" | "desc";
+};
+export type FeeRow = { college: Pick<College, "key" | "slug" | "name" | "state">; terms: ProgrammeTerms };
+
+const declaredBond = (t: ProgrammeTerms) => t.bond.status === "declared";
+/** The number each sort and cap uses; null = not declared, or declared in words only. Ranges use the highest (cautious) figure. */
+export const feeValue: Record<Exclude<FeeSort, "name">, (t: ProgrammeTerms) => number | null> = {
+  fee1: (t) => t.years[0]?.fee?.inr ?? null,
+  feetotal: (t) => t.wholeCourseFee,
+  stip1: (t) => t.years[0]?.stipend?.inr ?? null,
+  bondyrs: (t) => (declaredBond(t) ? t.bond.years : null),
+  bond: (t) => (declaredBond(t) ? t.bond.amount.max : null),
+  leave: (t) => (declaredBond(t) ? t.bond.leavingAmount.max : null),
+};
+/** Nothing declared for the programme: no fee, stipend, bond or Round 2 forfeit. */
+export const nothingDeclared = (t: ProgrammeTerms) => !t.years.some((y) => y.fee || y.stipend) && t.bond.status === "not_declared" && !t.resignForfeit && !t.unread.length;
+
+/**
+ * One row per institute × programme it offers (from its courses), declared or not. Sorted by one column (unknown values
+ * last in both directions, then by name); `undeclared` counts the matching rows with nothing declared.
+ */
+export async function listFees(f: FeeFilters, pg?: PageQuery) {
+  const cat = await getCatalog();
+  const q = f.search?.trim().toLowerCase();
+  const pass = (v: number | null, ok: (v: number) => boolean) => (v == null ? !f.hideUnknown : ok(v));
+  const rows: FeeRow[] = cat.colleges
+    .filter((c) => (!f.states?.length || (c.state != null && f.states.includes(c.state))) && (!q || `${c.name} ${c.state ?? ""}`.toLowerCase().includes(q)))
+    .flatMap((c) => collegeTerms(cat, c.key).map((terms) => ({ college: { key: c.key, slug: c.slug, name: c.name, state: c.state }, terms })))
+    .filter(({ terms: t }) =>
+      (!f.programmes?.length || f.programmes.includes(t.programme)) &&
+      (f.maxFee == null || pass(feeValue.fee1(t), (v) => v <= f.maxFee!)) &&
+      (f.minStipend == null || pass(feeValue.stip1(t), (v) => v >= f.minStipend!)) &&
+      (f.maxBondYears == null || (f.maxBondYears === 0 ? !declaredBond(t) : pass(feeValue.bondyrs(t), (v) => v <= f.maxBondYears!))) &&
+      (f.maxBondInr == null || pass(feeValue.bond(t), (v) => v <= f.maxBondInr!)) &&
+      (!f.bond || (f.bond === "declared") === declaredBond(t)),
+    );
+  const by = f.sort ?? "fee1";
+  const sign = (f.dir ?? (by === "stip1" ? "desc" : "asc")) === "asc" ? 1 : -1;
+  const name = (a: FeeRow, b: FeeRow) => a.college.name.localeCompare(b.college.name);
+  rows.sort((a, b) => {
+    if (by === "name") return sign * name(a, b);
+    const [x, y] = [feeValue[by](a.terms), feeValue[by](b.terms)];
+    return x == null || y == null ? (x == null ? 1 : 0) - (y == null ? 1 : 0) || name(a, b) : sign * (x - y) || name(a, b);
+  });
+  return { ...paged(rows, pg), undeclared: rows.filter((r) => nothingDeclared(r.terms)).length };
 }

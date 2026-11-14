@@ -102,7 +102,7 @@ test("options and compare: official closings with their seat category, 2026 R1 f
   // GMC Nagpur 2026 R1 MD Anaesthesiology: OBC closing 17,213 and 12 allotments (all categories).
   await page.goto(`/decide/compare?${new URLSearchParams({ ids: [OPT_KOKILA_ANAES, OPT_GMC_NAGPUR].join(",") })}&${PROFILE}`);
   const table = page.getByRole("table", { name: "Comparison of 2 options" });
-  for (const v of ["20,132", "17,213", "R1, OBC seat", "2026 R1 closing", "Seat-leaving penalty (MCC)"]) await expect(table).toContainText(v);
+  for (const v of ["20,132", "17,213", "R1, OBC seat", "2026 R1 closing", "Resign or don't join from Round 2 (MCC)"]) await expect(table).toContainText(v);
   await expect(table).not.toContainText(/provisional/i);
   await expect(table.getByRole("row", { name: /^Allotments made/ })).toContainText("12");
 
@@ -218,8 +218,12 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
 test("institute page: MCC address, terms with their sources, paginated allotments", async ({ page }) => {
   await page.goto(`/decide/institutes/${KOKILA_NM}?${PROFILE}&tab=fees`);
   await expect(page.getByText(/Navi Mumbai/).first()).toBeVisible();
-  await expect(page.getByText("₹1.25 L/yr + GST to NBEMS", { exact: false })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Source: NBEMS notice/ })).toHaveAttribute("href", /natboard\.edu\.in/);
+  // DNB: the NBEMS fee each year, the declared stipend by year, and no bond term = "not declared" with the NBEMS rule.
+  const dnb = page.getByRole("region", { name: "DNB", exact: true });
+  await expect(dnb.getByRole("table")).toContainText("₹1,25,000");
+  for (const v of ["₹63,000", "₹64,000", "₹65,000", "₹3,75,000"]) await expect(dnb).toContainText(v);
+  await expect(dnb).toContainText("No bond declared to MCC in the profile fields Seatora imports. NBEMS rule");
+  await expect(dnb.getByRole("link", { name: /^Source 1: NBEMS fee notice/ }).first()).toHaveAttribute("href", /natboard\.edu\.in/);
 
   await page.goto(`/decide/institutes/${SETH_GS}?${PROFILE}&tab=allotments`);
   const results = page.locator("#results");

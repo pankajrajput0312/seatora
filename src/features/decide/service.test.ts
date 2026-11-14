@@ -3,6 +3,8 @@ import { reachOrder } from "./lib/reach";
 import type { Profile } from "./profile";
 import { setTestCatalog } from "./server/catalog";
 import { remarkOf } from "./server/queries";
+import { programmeOfDegree } from "./server/terms";
+import type { FeeRow } from "./service";
 import { decideDemoData as fx } from "./test/decide.demo";
 
 // The service code over the in-memory test fixture (no database). Runtime never sees the fixture.
@@ -152,10 +154,20 @@ describe("service on the test fixture", () => {
     expect(r.byYear[2024]).toBe(want || null);
   });
 
-  it("fees: paged, sorted by the first rupee figure, unknown last", async () => {
-    const f = await svc.listFees({ sort: "fee" }, { page: 1, pageSize: 100 });
-    const fees = f.rows.map((r) => r.fee?.amountInr ?? Infinity);
-    expect(fees).toEqual([...fees].sort((a, b) => a - b));
+  it("fees: a row per institute × programme offered; unknown last both ways; caps keep unknown unless hidden", async () => {
+    const all = await svc.listFees({}, { page: 1, pageSize: 1000 });
+    expect(all.total).toBe(new Set(fx.cutoffs.map((c) => `${c.college}|${programmeOfDegree(c.degree)}`)).size);
+    const fee1 = (r: FeeRow) => r.terms.years[0]?.fee?.inr ?? null;
+    for (const dir of ["asc", "desc"] as const) {
+      const xs = (await svc.listFees({ sort: "fee1", dir }, { page: 1, pageSize: 1000 })).rows.map(fee1);
+      const known = xs.filter((x) => x != null);
+      expect(xs.slice(0, known.length)).toEqual([...known].sort((a, b) => (dir === "asc" ? a - b : b - a)));
+    }
+    const capped = await svc.listFees({ maxFee: 100000 });
+    expect(capped.rows.every((r) => fee1(r) == null || fee1(r)! <= 100000)).toBe(true);
+    const hidden = await svc.listFees({ maxFee: 100000, hideUnknown: true });
+    expect(hidden.rows.every((r) => fee1(r) != null)).toBe(true);
+    expect((await svc.listFees({ bond: "none" })).rows.every((r) => r.terms.bond.status !== "declared")).toBe(true);
   });
 
   it("dashboard counts are listOptions' counts; the strip is slim", async () => {
