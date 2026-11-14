@@ -4,13 +4,6 @@ import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { HeroScene } from "./hero-scene";
 
-const quickLinks = [
-  { label: "Residents by hospital", href: "#preview" },
-  { label: "Counselling routes", href: "#coverage" },
-  { label: "Closing ranks & seats", href: "#features" },
-  { label: "Step by step", href: "#how" },
-];
-
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-[radial-gradient(ellipse_at_top,var(--color-muted),transparent_65%)]">
@@ -18,31 +11,19 @@ export function Hero() {
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-sky">NEET PG counselling planner</p>
           <h1 className="glow mt-6 font-pixel text-5xl leading-[0.95] tracking-tight md:text-7xl">
-            Plan your PG seat, not just your rank.
+            Plan your rank. See residents. Connect.
           </h1>
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-            Previous-year closing ranks, seat matrices, fees, stipends and bonds across All India, State, Deemed and DNB
-            counselling, plus residents at each hospital you can contact directly. One planner, every number sourced.
+          <p className="mt-6 max-w-md text-lg leading-relaxed text-muted-foreground">
+            Enter your NEET PG rank, see who&apos;s already at each hospital, and message them directly.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link href="#waitlist">Get early access <ArrowRight className="size-4" /></Link>
+              <Link href="#preview">See residents <ArrowRight className="size-4" /></Link>
             </Button>
             <Button asChild size="lg" variant="ghost">
-              <Link href="#preview">Find residents at a hospital</Link>
+              <Link href="#waitlist">Get early access</Link>
             </Button>
           </div>
-          <nav aria-label="Jump to" className="mt-8 flex flex-wrap gap-2">
-            {quickLinks.map((l) => (
-              <Link
-                key={l.label}
-                href={l.href}
-                className="rounded-full border border-input bg-secondary px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
         </div>
 
         <HeroScene />

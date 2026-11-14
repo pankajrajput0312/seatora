@@ -8,10 +8,9 @@ import { PixelEmblem } from "./pixel-emblem";
 // what MEDPATH is doing, then flips to a bright result while pixels burst from the emblem.
 // Illustrative only: no counts or claims about specific data.
 const scenes = [
-  { ask: "AIQ rank 12,450 · OBC · MD Medicine", work: ["checking last year's rounds", "matching residents near your rank"], done: "found residents you can ask" },
-  { ask: "is the bond worth the stipend in my state?", work: ["reading fee and bond notices"], done: "fees, stipend and bond side by side" },
-  { ask: "who's doing ortho at a GMC near Pune?", work: ["searching hospitals near Pune"], done: "residents there, say hello" },
-  { ask: "what opens up in round 3?", work: ["comparing round 2 and round 3 seats"], done: "new and freed-up seats listed" },
+  { ask: "AIQ rank 12,450 · MD Medicine", work: ["finding hospitals near your rank"], done: "residents you can message" },
+  { ask: "who's doing ortho near Pune?", work: ["finding residents there"], done: "say hello on WhatsApp" },
+  { ask: "AIQ rank 42,284 · Anaesthesia", work: ["finding hospitals near your rank"], done: "residents you can message" },
 ];
 
 const ASK_MS = 900;
