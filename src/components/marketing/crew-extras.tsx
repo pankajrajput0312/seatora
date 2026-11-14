@@ -1,4 +1,3 @@
-import { cn } from "@/lib/cn";
 import { Crew } from "./crew";
 
 /** Among Us-style "total tasks completed" bar: fills as you scroll the page (pure CSS scroll timeline). */
@@ -22,17 +21,8 @@ export function SpaceBand() {
       <div className="drift-across absolute top-[28%] left-0 w-14 md:w-16">
         <Crew className="w-full text-ember" />
       </div>
-      <p className="absolute inset-x-0 bottom-8 text-center font-pixel text-lg text-white/90 md:text-2xl">Rank anxiety was ejected.</p>
+      <p className="absolute inset-x-0 bottom-8 text-center font-pixel text-lg text-white/90 md:text-2xl">Rank anxiety, sorted.</p>
     </section>
-  );
-}
-
-/** A crewmate walking across the bottom of a band. */
-export function WalkingCrew({ className }: { className?: string }) {
-  return (
-    <div aria-hidden className={cn("pointer-events-none absolute bottom-1 left-0 w-8 walk-across", className)}>
-      <Crew className="w-full text-leaf" pack walking />
-    </div>
   );
 }
 

@@ -52,7 +52,7 @@ export default function TermsPage() {
           <section>
             <h2>Acceptable use</h2>
             <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>Don&apos;t scrape, copy or redistribute the data, for free or for money.</li>
+              <li>Don&apos;t copy, download in bulk or redistribute the data in any form.</li>
               <li>Use residents&apos; names only to contact them respectfully about a college. Don&apos;t publish the names.</li>
               <li>No harassment and no spam.</li>
               <li>Don&apos;t try to get around the site&apos;s security or access controls.</li>
@@ -77,7 +77,7 @@ export default function TermsPage() {
             <h2>Disclaimers</h2>
             <p className="mt-2">
               The data is historical. We compile it from official documents, and it can contain errors or omissions. It is not official,
-              and it is no guarantee or prediction of admission. Always check the official MCC, NBEMS and college documents before choice
+              and it is not a prediction or a promise of admission. Always check the official MCC, NBEMS and college documents before choice
               filling. Seatora is provided as it is, without any warranty.
             </p>
           </section>

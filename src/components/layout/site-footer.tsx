@@ -20,7 +20,7 @@ export function SiteFooter() {
       <Container className="flex flex-col gap-6 py-8 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
         <p className="max-w-xl">
           An independent NEET PG planner. Not affiliated with MCC, NBEMS, NMC or any state counselling authority.
-          Previous-year data does not guarantee admission.
+          Previous-year data is not a promise of admission.
         </p>
         <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-6">
           {[...siteConfig.nav, ...legalLinks].map((item) => (

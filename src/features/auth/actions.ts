@@ -65,7 +65,7 @@ export async function signUp(input: SignUpInput, next?: string): Promise<AuthRes
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   // One message for both, so it doesn't reveal which emails are allowlisted.
   if (!isAllowed(parsed.data.email) || !(await inviteMatches(parsed.data.invite))) {
-    return { ok: false, error: "That email and invite code don't match an invite. Seatora is invite-only for now." };
+    return { ok: false, error: "That email and invite code don't match an invite. Buy the Season Pass on the Pricing page to get an access code." };
   }
 
   try {

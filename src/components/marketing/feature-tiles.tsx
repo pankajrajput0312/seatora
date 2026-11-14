@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import { Badge } from "@/components/ui/badge";
 import { formatINR, formatRank } from "@/features/cutoffs/lib/format";
 
-// Every figure in these tiles is demo data for illustration. The section is labelled as such.
+// Sample figures for illustration; the section is labelled "Sample screens".
 
 function Tile({ title, caption, className, children }: { title: string; caption: string; className?: string; children: React.ReactNode }) {
   return (
@@ -146,11 +146,11 @@ function CompareMini() {
 function InstituteMini() {
   return (
     <div>
-      <p className="text-sm font-medium">Example Government Medical College</p>
+      <p className="text-sm font-medium">Sample college profile</p>
       <p className="mt-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">City · State · Est. 1960</p>
       <div className="mt-3 flex flex-wrap gap-1.5">
         <Badge>Government</Badge>
-        <Badge tone="warning">Demo</Badge>
+        <Badge>Sample</Badge>
       </div>
       <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
         {[["Beds", "1,800"], ["PG seats", "142"], ["Specialties", "21"]].map(([k, v]) => (

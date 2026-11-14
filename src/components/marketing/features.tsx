@@ -28,7 +28,7 @@ export function Features() {
           <SectionHeading eyebrow="Everything inside" title="Everything you need for counselling, in one place.">
             Stop switching between forty tabs. Seatora puts the research behind every choice in one place.
           </SectionHeading>
-          <Badge tone="warning" className="mt-6">Previews use demo data · illustrative only</Badge>
+          <Badge className="mt-6">Sample screens</Badge>
           <div className="mt-12">
             <FeatureTiles />
           </div>
