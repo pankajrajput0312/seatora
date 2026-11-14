@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
-import { Container } from "@/components/layout/container";
+import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -28,7 +28,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const course = (deg: string, sp: string) => `${deg} ${meta.courses.find((c) => c.degree === deg && c.specialty === sp)?.name ?? sp}`;
 
   return (
-    <Container className="py-10">
+    <AppPage className="py-6">
       <PageHead title="Rank scan">Seats allotted to ranks near yours, round by round. This shows what happened then, not what will happen now.</PageHead>
 
       <Form action="/decide/rank-scan" role="search" className="mt-8 grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
@@ -66,7 +66,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
             <section key={g.round} aria-labelledby={`r-${g.round}`} className="mt-6">
               <h2 id={`r-${g.round}`} className="text-lg font-medium">{year} {roundLabel[g.round]}</h2>
               <div role="region" aria-label={`${year} ${roundLabel[g.round]} allotments`} tabIndex={0} className="relative mt-3 overflow-x-auto rounded-xl border border-border bg-card">
-                <table className="w-full min-w-[720px] text-sm">
+                <table className="w-full text-sm">
                   <caption className="sr-only">{year} {roundLabel[g.round]}: allotments to ranks near {formatRank(rank)}</caption>
                   <thead>
                     <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
@@ -99,6 +99,6 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         </>
       )}
       <div className="mt-6"><DataSource /></div>
-    </Container>
+    </AppPage>
   );
 }

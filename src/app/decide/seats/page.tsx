@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
-import { Container } from "@/components/layout/container";
+import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { Dash, PageHead } from "@/features/decide/components/bits";
 import { courseName } from "@/features/decide/components/options-view";
@@ -27,7 +27,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
   const max = Math.max(1, ...rows.flatMap((r) => YEARS.map((y) => r.byYear[y] ?? 0)));
 
   return (
-    <Container className="py-10">
+    <AppPage className="py-6">
       <PageHead title="Seats" />
       <SubTabs label="Seats" current={tab} items={[{ key: "matrix", label: "Matrix", href: href("matrix") }, { key: "trends", label: "Trends", href: href("trends") }]} />
 
@@ -41,7 +41,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
         <>
           <p className="mt-6 text-sm text-muted-foreground">Allotments made per year (all rounds), for the courses in your profile. This is not the number of seats.</p>
           <div role="region" aria-label="Allotments made by year" tabIndex={0} className="relative mt-4 overflow-x-auto rounded-xl border border-border bg-card">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full text-sm">
               <caption className="sr-only">Allotments made by year per institute and course</caption>
               <thead>
                 <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
@@ -74,6 +74,6 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
         </>
       )}
       <div className="mt-6"><DataSource /></div>
-    </Container>
+    </AppPage>
   );
 }

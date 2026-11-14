@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Building2 } from "lucide-react";
-import { Container } from "@/components/layout/container";
+import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { PageHead, ReachBadge } from "@/features/decide/components/bits";
@@ -33,7 +33,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const rows = await listInstitutes(profile, f);
 
   return (
-    <Container className="grid gap-6 py-8">
+    <AppPage className="grid gap-6 py-6">
       <PageHead title="Institutes">Every institute in the data: type, beds, courses offered and how many seats were allotted in 2025. Open one for its courses, allotments, fees and bond.</PageHead>
 
       <FilterBar action="/decide/institutes" params={params} cols="md:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
@@ -49,7 +49,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
       {rows.length === 0 ? (
         <Empty title="No institutes match these filters." href={profileOnly("/decide/institutes", params)} />
       ) : (
-        <ul className="grid gap-3 lg:grid-cols-2">
+        <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 min-[1800px]:grid-cols-4">
           {rows.map((r) => (
             <li key={r.college.key}>
               <article className="flex h-full flex-col rounded-xl border border-border bg-card p-5">
@@ -84,6 +84,6 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         </ul>
       )}
       <DataSource />
-    </Container>
+    </AppPage>
   );
 }

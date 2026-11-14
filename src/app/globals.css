@@ -188,6 +188,10 @@
   }
 }
 
+/* "Rounds by year" opens a full-width row under its option instead of widening the cell. */
+.expand-row { display: none; }
+.expand-host:has(details[open]) + .expand-row { display: table-row; }
+
 /* Keep focused elements clear of the sticky header and the mobile bottom bar / floating Compare button. */
 html:has(.app) { scroll-padding-top: 5rem; scroll-padding-bottom: 6rem; }
 

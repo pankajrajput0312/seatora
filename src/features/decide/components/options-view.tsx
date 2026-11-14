@@ -78,45 +78,53 @@ export function OptionsTable({ rows, caption, start, L }: { rows: OptionRow[]; c
   return (
     <>
       <div role="region" aria-label={caption} tabIndex={0} className="relative hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
-        <table className="w-full min-w-[1000px] text-sm">
+        <table className="w-full text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead>
-            <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
-              <th scope="col" className="w-12 px-2 py-3 font-normal"><span className="sr-only">Add to choices</span></th>
-              <th scope="col" className="px-3 py-3 font-normal">Institute</th>
-              <th scope="col" className="px-3 py-3 font-normal">Course</th>
-              <th scope="col" className="px-3 py-3 font-normal">Reach</th>
-              <th scope="col" className="px-3 py-3 text-right font-normal">2026 R1</th>
-              <th scope="col" className="px-3 py-3 text-right font-normal">2025 deepest</th>
-              <th scope="col" className="px-3 py-3 text-right font-normal">2024 deepest</th>
-              <th scope="col" className="px-3 py-3 font-normal">Fee · Bond</th>
-              <th scope="col" className="w-12 px-2 py-3 font-normal"><span className="sr-only">Compare</span></th>
+            <tr className="border-b border-border text-left text-xs font-semibold text-muted-foreground">
+              <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Add to choices</span></th>
+              <th scope="col" className="px-3 py-3">Institute and course</th>
+              <th scope="col" className="px-3 py-3">Reach</th>
+              <th scope="col" className="px-3 py-3 text-right">2026 R1</th>
+              <th scope="col" className="px-3 py-3 text-right">2025 deepest</th>
+              <th scope="col" className="hidden px-3 py-3 text-right xl:table-cell">2024 deepest</th>
+              <th scope="col" className="px-3 py-3">Fee and bond</th>
+              <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Compare</span></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
-              <tr key={r.id} data-item={start + i + 1} tabIndex={-1} className="border-b border-border align-top last:border-0 hover:bg-muted/40">
+            {rows.flatMap((r, i) => [
+              <tr key={r.id} data-item={start + i + 1} tabIndex={-1} className="expand-host border-t border-border align-top hover:bg-muted/40">
                 <td className="px-2 py-2"><ChoiceStar item={toChoiceItem(r)} /></td>
                 <th scope="row" className="px-3 py-3 text-left font-normal">
-                  <Link href={L.institute(r.college.slug)} className="font-medium hover:text-sky hover:underline">{r.college.name}</Link>
-                  <span className="block text-xs text-muted-foreground">{r.college.state}, {r.quota}</span>
-                  <Related r={r} L={L} />
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs text-sky">Rounds by year</summary>
-                    <div className="mt-2"><RoundGrid row={r} caption={`${r.college.name}, ${courseName(r)}: closing ranks by year and round`} /></div>
-                  </details>
+                  <Link href={L.institute(r.college.slug)} className="font-semibold hover:text-sky hover:underline">{r.college.name}</Link>
+                  <span className="block">
+                    <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link>
+                    <span className="text-muted-foreground">, {r.quota}, {r.college.state}</span>
+                  </span>
+                  <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <details className="inline">
+                      <summary className="cursor-pointer text-sky">Rounds by year</summary>
+                    </details>
+                    <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className="text-sky underline">Allotments</Link>
+                    <Link href={L.institute(r.college.slug, "fees")} className="text-sky underline">Fees & bond</Link>
+                  </span>
                 </th>
-                <td className="px-3 py-3"><Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link></td>
                 <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} /></td>
-                <td className="px-3 py-3 text-right">
-                  {r.latest ? <><Closing d={r.latest} />{r.latest.provisional && <Badge tone="warning" className="mt-1">Provisional</Badge>}</> : <Dash />}
-                </td>
+                <td className="px-3 py-3 text-right">{r.latest ? <><Closing d={r.latest} />{r.latest.provisional && <Badge tone="warning" className="mt-1">Provisional</Badge>}</> : <Dash />}</td>
                 <td className="px-3 py-3 text-right"><Closing d={r.byYear[2025]} /></td>
-                <td className="px-3 py-3 text-right"><Closing d={r.byYear[2024]} /></td>
+                <td className="hidden px-3 py-3 text-right xl:table-cell"><Closing d={r.byYear[2024]} /></td>
                 <td className="px-3 py-3"><FeeBond r={r} /></td>
-                <td className="px-2 py-2"><CompareToggle id={r.id} label={`${r.college.name}, ${courseName(r)}`} /></td>
-              </tr>
-            ))}
+                <td className="px-2 py-2"><CompareToggle id={r.id} label={`${r.college.name}, ${courseName(r)}, ${r.quota}`} /></td>
+              </tr>,
+              /* Shown (CSS) when the row's "Rounds by year" is open: full width, so the row stays narrow. */
+              <tr key={`${r.id}-rounds`} className="expand-row bg-muted/30">
+                <td />
+                <td colSpan={7} className="px-3 pb-4">
+                  <RoundGrid row={r} caption={`${r.college.name}, ${courseName(r)}: closing ranks by year and round`} />
+                </td>
+              </tr>,
+            ])}
           </tbody>
         </table>
       </div>

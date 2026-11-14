@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Container } from "@/components/layout/container";
+import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { Badge } from "@/components/ui/badge";
 import { PageHead } from "@/features/decide/components/bits";
@@ -25,7 +25,7 @@ export default async function CounsellingPage({ searchParams }: { searchParams: 
   const href = (key: string) => `/decide/counselling?${new URLSearchParams({ ...Object.fromEntries(keep), tab: key })}`;
 
   return (
-    <Container className="py-10">
+    <AppPage className="py-6">
       <PageHead title="Counselling">MCC All India PG counselling 2026. Always confirm dates on the official site.</PageHead>
       <SubTabs label="Counselling" current={tab.key} items={tabs.map((t) => ({ key: t.key, label: t.label, href: href(t.key) }))} />
 
@@ -46,6 +46,6 @@ export default async function CounsellingPage({ searchParams }: { searchParams: 
         })}
       </ol>
       <div className="mt-6"><DataSource /></div>
-    </Container>
+    </AppPage>
   );
 }

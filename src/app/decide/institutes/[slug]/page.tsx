@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Container } from "@/components/layout/container";
+import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Closing, Dash, HISTORY_CAPTION, ReachBadge } from "@/features/decide/components/bits";
@@ -65,7 +65,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const allot = tab === "allotments" ? await listAllotments({ year, course: courseF }, 200, college.key) : null;
 
   return (
-    <Container className="grid gap-6 py-8">
+    <AppPage className="grid gap-6 py-6">
       <div>
         <p className="text-sm text-muted-foreground"><Link href={L.institutes()} className="underline hover:text-foreground">Institutes</Link> / {college.state}</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-[2.25rem]">{college.name}</h1>
@@ -133,7 +133,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       {tab === "courses" && (
         <section aria-label="Courses">
           <div role="region" aria-label="Courses offered" tabIndex={0} className={tbl.wrap}>
-            <table className={`${tbl.table} min-w-[900px]`}>
+            <table className={tbl.table}>
               <caption className="sr-only">Courses at {college.name}, with past closing ranks</caption>
               <thead>
                 <tr className={tbl.headRow}>
@@ -142,27 +142,30 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   <th scope="col" className={tbl.th}>{profile ? "Your reach" : "Reach"}</th>
                   <th scope="col" className={`${tbl.th} text-right`}>2026 R1</th>
                   <th scope="col" className={`${tbl.th} text-right`}>2025 deepest</th>
-                  <th scope="col" className={tbl.th}>By year and round</th>
                   <th scope="col" className={tbl.th}>Related</th>
                   <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Compare</span></th>
                 </tr>
               </thead>
               <tbody>
-                {options.map((r) => (
-                  <tr key={r.id} className={tbl.row}>
+                {options.flatMap((r) => [
+                  <tr key={r.id} className={`expand-host ${tbl.row}`}>
                     <td className="px-2 py-2"><ChoiceStar item={toChoiceItem(r)} /></td>
                     <th scope="row" className={`${tbl.td} text-left font-medium`}>{courseName(r)}<span className="block text-xs font-normal text-muted-foreground">{r.quota}</span></th>
                     <td className={tbl.td}>{profile ? <ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} /> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
                     <td className={tbl.num}><Closing d={r.latest} />{r.latest?.provisional && <span className="block text-xs font-normal text-sun">Provisional</span>}</td>
                     <td className={tbl.num}><Closing d={r.byYear[2025]} /></td>
-                    <td className={tbl.td}><RoundGrid row={r} caption={`${courseName(r)}, ${r.quota}: closing ranks by year and round`} /></td>
                     <td className={`${tbl.td} whitespace-nowrap`}>
+                      <details className="mb-1"><summary className="cursor-pointer text-sky">Rounds by year</summary></details>
                       <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="block text-sky underline">Last ranks</Link>
                       <Link href={L.institute(slug, "allotments") + `&course=${r.course.slug}`} className="block text-sky underline">Allotments</Link>
                     </td>
                     <td className="px-2 py-2"><CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}`} /></td>
-                  </tr>
-                ))}
+                  </tr>,
+                  <tr key={`${r.id}-rounds`} className="expand-row bg-muted/30">
+                    <td />
+                    <td colSpan={6} className="px-4 pb-4"><RoundGrid row={r} caption={`${courseName(r)}, ${r.quota}: closing ranks by year and round`} /></td>
+                  </tr>,
+                ])}
               </tbody>
             </table>
           </div>
@@ -179,7 +182,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           </FilterBar>
           <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">{allot.total}</span> allotments at this institute. Ranks only, never names.</p>
           <div role="region" aria-label="Allotments at this institute" tabIndex={0} className={tbl.wrap}>
-            <table className={`${tbl.table} min-w-[760px]`}>
+            <table className={tbl.table}>
               <caption className="sr-only">Allotments at {college.name}</caption>
               <thead><tr className={tbl.headRow}>
                 <th scope="col" className={`${tbl.th} text-right`}>Rank</th><th scope="col" className={tbl.th}>Year and round</th><th scope="col" className={tbl.th}>Course</th><th scope="col" className={tbl.th}>Quota</th><th scope="col" className={tbl.th}>Seat category</th><th scope="col" className={tbl.th}>Remark</th>
@@ -222,6 +225,6 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       )}
 
       <DataSource />
-    </Container>
+    </AppPage>
   );
 }

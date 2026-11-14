@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Container } from "@/components/layout/container";
+import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { Closing, Dash, HISTORY_CAPTION, PageHead, ReachBadge } from "@/features/decide/components/bits";
 import { CompareFromDevice, RemoveFromCompare } from "@/features/decide/components/compare-controls";
@@ -48,7 +48,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const L = decideLinks(params);
 
   return (
-    <Container className="py-10">
+    <AppPage className="py-6">
       <CompareFromDevice validIds={options.map((o) => o.id)} requested={ids} />
       <PageHead title="Compare">Up to {MAX_COMPARE} options side by side. Add them with the compare button on Options or an institute page.</PageHead>
 
@@ -59,7 +59,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         </div>
       ) : (
         <div role="region" aria-label="Comparison" tabIndex={0} className="relative mt-8 overflow-x-auto rounded-xl border border-border bg-card [scroll-padding-inline-start:11rem]">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full text-sm">
             <caption className="sr-only">Comparison of {options.length} options</caption>
             <thead>
               <tr className="border-b border-border align-top">
@@ -89,6 +89,6 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         <p>{HISTORY_CAPTION}</p>
         <DataSource />
       </div>
-    </Container>
+    </AppPage>
   );
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
-import { Container } from "@/components/layout/container";
+import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -71,7 +71,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const caption = `Closing ranks for ${course.degree} ${course.name}, ${category} seats${quota ? `, ${quota}` : ""}`;
 
   return (
-    <Container className="py-10">
+    <AppPage className="py-6">
       <PageHead title="Last ranks">Closing rank in each round, with allotments made in brackets. Pick a course and a seat category.</PageHead>
 
       <Form action="/decide/last-ranks" role="search" className="mt-8 grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
@@ -102,7 +102,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       <p aria-live="polite" className="mt-6 text-sm text-muted-foreground"><span className="numeric text-foreground">{rows.length}</span> institutes{emptyCount > 0 && <>; <span className="numeric">{emptyCount}</span> more had no {category}-seat allotments for this course</>}.</p>
 
       <div role="region" aria-label={caption} tabIndex={0} className="relative mt-3 overflow-x-auto rounded-xl border border-border bg-card [scroll-padding-inline-start:16rem]">
-        <table className="w-full min-w-[960px] text-sm">
+        <table className="w-full min-w-[56rem] text-sm">
           <caption className="sr-only">{caption}</caption>
           <colgroup span={2} />
           {cols.map((c) => <colgroup key={c.year} span={c.rounds.length} />)}
@@ -161,6 +161,6 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         <p>{HISTORY_CAPTION}</p>
         <DataSource />
       </div>
-    </Container>
+    </AppPage>
   );
 }

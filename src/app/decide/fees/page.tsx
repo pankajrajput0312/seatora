@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Container } from "@/components/layout/container";
+import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { Dash, PageHead } from "@/features/decide/components/bits";
 import { Empty, Field, FilterBar, profileOnly, Select, tbl } from "@/features/decide/components/ui";
@@ -22,7 +22,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const rows = await listFees({ program, state, maxFeeLakh, sort });
 
   return (
-    <Container className="grid gap-6 py-8">
+    <AppPage className="grid gap-6 py-6">
       <PageHead title="Fees, stipend and bond">What each institute charges and pays, and the service bond you&apos;d sign. Missing values show as a dash, never zero.</PageHead>
 
       <FilterBar action="/decide/fees" params={params} cols="md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
@@ -38,7 +38,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         <Empty title="Nothing matches these filters." href={profileOnly("/decide/fees", params)} />
       ) : (
         <div role="region" aria-label="Fees, stipend and bond" tabIndex={0} className={tbl.wrap}>
-          <table className={`${tbl.table} min-w-[960px]`}>
+          <table className={`${tbl.table}`}>
             <caption className="sr-only">Fees, stipend and bond by institute</caption>
             <thead><tr className={tbl.headRow}>
               <th scope="col" className={tbl.th}>Institute</th>
@@ -69,6 +69,6 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         </div>
       )}
       <DataSource />
-    </Container>
+    </AppPage>
   );
 }

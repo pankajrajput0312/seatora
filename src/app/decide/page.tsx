@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Container } from "@/components/layout/container";
+import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { HISTORY_CAPTION, SetRankPrompt } from "@/features/decide/components/bits";
@@ -16,7 +16,7 @@ const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "n
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const profile = profileFromParams(toURLSearchParams(await searchParams));
-  if (!profile) return <Container className="py-10"><h1 className="text-3xl font-bold tracking-tight">Overview</h1><SetRankPrompt path="/decide" /></Container>;
+  if (!profile) return <AppPage className="py-6"><h1 className="text-3xl font-bold tracking-tight">Overview</h1><SetRankPrompt path="/decide" /></AppPage>;
 
   const [d, notices] = await Promise.all([dashboard(profile), getNotices()]);
   const q = (extra: Record<string, string>) => `?${new URLSearchParams({ ...Object.fromEntries(profileToParams(profile)), ...extra })}`;
@@ -27,7 +27,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const reached = d.counts["reached-latest"] + d.counts["reached-both"] + d.counts["reached-one"];
 
   return (
-    <Container className="grid gap-6 py-8">
+    <AppPage className="grid gap-6 py-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
@@ -143,6 +143,6 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         <p>{HISTORY_CAPTION}</p>
         <DataSource />
       </div>
-    </Container>
+    </AppPage>
   );
 }

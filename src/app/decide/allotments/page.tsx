@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Container } from "@/components/layout/container";
+import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { FocusItem } from "@/features/decide/components/focus-item";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const link = hrefWith("/decide/allotments", params);
 
   return (
-    <Container className="grid gap-6 py-8">
+    <AppPage className="grid gap-6 py-6">
       <PageHead title="Allotments">Every seat allotted in the data: rank, round, quota, seat category, institute, course and its fee, stipend and bond. Ranks only, never names.</PageHead>
 
       {inst && (
@@ -63,29 +63,34 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <Empty title="No allotments match these filters." href={profileOnly("/decide/allotments", params)} />
       ) : (
         <div role="region" aria-label="Allotments" tabIndex={0} className={tbl.wrap}>
-          <table className={`${tbl.table} min-w-[1100px]`}>
+          <table className={tbl.table}>
             <caption className="sr-only">Allotments</caption>
             <thead><tr className={tbl.headRow}>
               <th scope="col" className={`${tbl.th} text-right`}>Rank</th>
-              <th scope="col" className={tbl.th}>Year and round</th>
-              <th scope="col" className={tbl.th}>Quota and seat</th>
-              <th scope="col" className={tbl.th}>Institute</th>
-              <th scope="col" className={tbl.th}>Course</th>
+              <th scope="col" className={tbl.th}>Round, quota and seat</th>
+              <th scope="col" className={tbl.th}>Institute and course</th>
               <th scope="col" className={`${tbl.th} text-right`}>Fee per year</th>
-              <th scope="col" className={tbl.th}>Stipend</th>
-              <th scope="col" className={tbl.th}>Bond</th>
+              <th scope="col" className={tbl.th}>Stipend and bond</th>
             </tr></thead>
             <tbody>
               {rows.map((a, i) => (
                 <tr key={i} data-item={i + 1} tabIndex={-1} className={tbl.row}>
                   <td className={tbl.num}><Link href={L.rankScan(a.rank, a.year)} className="hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link></td>
-                  <td className={tbl.td}>{a.year} {roundLabel[a.round]}{a.provisional && <span className="block text-xs text-sun">Provisional</span>}</td>
-                  <td className={tbl.td}>{a.quota}<span className="block text-xs text-muted-foreground">{a.category} seat</span></td>
-                  <td className={tbl.td}><Link href={L.institute(a.college.slug)} className="font-medium hover:text-sky hover:underline">{a.college.name}</Link><span className="block text-xs text-muted-foreground">{a.college.state}, {a.college.type}</span></td>
-                  <td className={tbl.td}><Link href={L.lastRanks(a.courseSlug, { inst: a.college.slug })} className="hover:text-sky hover:underline">{a.courseName}</Link><span className="block text-xs text-muted-foreground">{a.remark}</span></td>
+                  <td className={tbl.td}>
+                    <span className="font-medium">{a.year} {roundLabel[a.round]}</span>{a.provisional && <span className="ml-1.5 text-xs text-sun">Provisional</span>}
+                    <span className="block text-xs text-muted-foreground">{a.quota}, {a.category} seat, {a.remark.toLowerCase()}</span>
+                  </td>
+                  <td className={tbl.td}>
+                    <Link href={L.institute(a.college.slug)} className="font-medium hover:text-sky hover:underline">{a.college.name}</Link>
+                    <span className="block text-xs text-muted-foreground">
+                      <Link href={L.lastRanks(a.courseSlug, { inst: a.college.slug })} className="hover:text-sky hover:underline">{a.courseName}</Link>, {a.college.state}, {a.college.type}
+                    </span>
+                  </td>
                   <td className={tbl.num}>{a.feeInr != null ? formatLakh(a.feeInr) : <Dash />}</td>
-                  <td className={tbl.td}>{a.stipendText ?? <Dash />}</td>
-                  <td className={tbl.td}>{a.bondText ?? <Dash />}{a.penaltyText && <span className="block text-xs text-muted-foreground">{a.penaltyText}</span>}</td>
+                  <td className={tbl.td}>
+                    <span className="block">{a.stipendText ?? <Dash />}</span>
+                    <span className="block text-xs text-muted-foreground">Bond: {a.bondText ?? <Dash />}{a.penaltyText ? `, ${a.penaltyText}` : ""}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -98,6 +103,6 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       <FocusItem n={Number(params.get("focus")) || null} />
       <p className="text-xs text-muted-foreground">Select a rank to scan seats allotted around it; a course to see its last ranks at that institute.</p>
       <DataSource />
-    </Container>
+    </AppPage>
   );
 }
