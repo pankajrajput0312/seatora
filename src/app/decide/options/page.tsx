@@ -45,11 +45,11 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       <Form action="/decide/options" role="search" className="mt-8 grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
         {profileParamKeys.map((k) => params.get(k) && <input key={k} type="hidden" name={k} value={params.get(k)!} />)}
         <label className="grid gap-1.5 text-sm">
-          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Search</span>
+          <span className="text-xs font-medium text-muted-foreground">Search</span>
           <input name="q" defaultValue={search} placeholder="Institute, state or course" className="h-11 rounded-md border border-input bg-background px-3" />
         </label>
         <label className="grid gap-1.5 text-sm">
-          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Reach</span>
+          <span className="text-xs font-medium text-muted-foreground">Reach</span>
           <select name="reach" defaultValue={reach ?? ""} className="h-11 rounded-md border border-input bg-background px-3">
             <option value="">All labels</option>
             {reachOrder.map((r) => <option key={r} value={r}>{reachLabel(r, 2026, [2024, 2025])}</option>)}
@@ -70,7 +70,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           <span className="numeric text-foreground">{rows.length}</span> options{reach ? ` labelled “${reachLabel(reach, 2026, [2024, 2025])}”` : ""}.
         </p>
         {hiddenClosed > 0 && (
-          <Link href={link({ closed: "1" })} className="rounded-full border border-input bg-secondary px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent">
+          <Link href={link({ closed: "1" })} className="rounded-full border border-input bg-secondary px-3 py-1.5 text-sm text-muted-foreground hover:bg-raised">
             Hiding <span className="numeric">{hiddenClosed}</span> “Closed before your rank” · Show
           </Link>
         )}

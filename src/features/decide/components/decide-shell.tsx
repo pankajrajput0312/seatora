@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { GitCompareArrows, ListOrdered, ScanSearch, SlidersHorizontal } from "lucide-react";
-import { Container } from "@/components/layout/container";
+import { CalendarDays, GitCompareArrows, LayoutDashboard, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, TrendingUp } from "lucide-react";
+import { AppShell } from "@astryxdesign/core/AppShell";
+import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
+import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
+import { LogoMark } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -14,14 +17,14 @@ import { PROFILE_KEY, profileFromParams, profileParamKeys, profileSchema, profil
 import { ProfileDialog, type ProfileMeta } from "./profile-dialog";
 
 const nav = [
-  { href: "/decide", label: "Overview" },
-  { href: "/decide/options", label: "Options" },
-  { href: "/decide/choices", label: "Choices" },
-  { href: "/decide/compare", label: "Compare" },
-  { href: "/decide/rank-scan", label: "Rank scan" },
-  { href: "/decide/last-ranks", label: "Last ranks" },
-  { href: "/decide/seats", label: "Seats" },
-  { href: "/decide/counselling", label: "Counselling" },
+  { href: "/decide", label: "Overview", icon: LayoutDashboard },
+  { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
+  { href: "/decide/choices", label: "Choices", icon: ListOrdered },
+  { href: "/decide/compare", label: "Compare", icon: GitCompareArrows },
+  { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch },
+  { href: "/decide/last-ranks", label: "Last ranks", icon: TrendingUp },
+  { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
+  { href: "/decide/counselling", label: "Counselling", icon: CalendarDays },
 ];
 const bottom = [
   { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
@@ -75,34 +78,47 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
 
   return (
     <>
-      <div className="border-b border-border bg-sun/10">
-        <Container className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-xs text-sun">
-          <strong className="font-medium">Demo data — illustrative only.</strong>
-          <span className="text-muted-foreground">Institutes are examples. Real MCC data will replace it.</span>
-        </Container>
-      </div>
-      <div className="border-b border-border">
-        <Container className="flex flex-wrap items-center justify-between gap-3 py-3">
-          <nav aria-label="Decide" className="-mx-2 flex max-w-full gap-1 overflow-x-auto">
-            {nav.map((n) => (
-              <Link key={n.href} href={withProfile(n.href)} aria-current={isCurrent(n.href) ? "page" : undefined} className={cn("inline-flex min-h-11 items-center rounded-md px-3 text-sm whitespace-nowrap", isCurrent(n.href) ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <Button variant="secondary" size="sm" className="min-h-11" onClick={() => setEditing(true)}>
-            {shown ? (
-              <span className="numeric">
-                AIR {formatRank(shown.rank)} · {shown.category}{shown.pwd ? " PwD" : ""} · {shown.specialties.length || "all"} {shown.specialties.length === 1 ? "course" : "courses"}
-              </span>
-            ) : (
-              "Set your rank"
-            )}
-          </Button>
-        </Container>
-      </div>
-
-      <div className="pb-24 md:pb-0">{children}</div>
+      <AppShell
+        height="auto"
+        variant="section"
+        banner={<p className="bg-sun/10 px-4 py-1.5 text-center text-xs text-sun"><strong className="font-semibold">Demo data — illustrative only.</strong> Institutes are examples; real MCC data will replace them.</p>}
+        topNav={
+          <TopNav
+            label="App"
+            heading={<TopNavHeading logo={<LogoMark className="size-6" />} heading="MEDPATH Decide" headingHref={withProfile("/decide")} />}
+            endContent={<Link href="/" className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground">Back to site</Link>}
+          />
+        }
+        sideNav={
+          <SideNav
+            aria-label="Decide"
+            header={
+              <div className="rounded-lg border border-border bg-card p-3">
+                <p className="text-xs text-muted-foreground">Your rank</p>
+                {shown ? (
+                  <>
+                    <p className="mt-0.5 text-2xl font-bold tracking-tight">{formatRank(shown.rank)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {shown.category}{shown.pwd ? " PwD" : ""}, {shown.specialties.length ? `${shown.specialties.length} ${shown.specialties.length === 1 ? "course" : "courses"}` : "all courses"}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-0.5 text-sm">Not set yet</p>
+                )}
+                <Button variant="secondary" size="sm" className="mt-2 min-h-10 w-full" onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
+              </div>
+            }
+          >
+            <SideNavSection title="Decide">
+              {nav.map(({ href, label, icon }) => (
+                <SideNavItem key={href} label={label} icon={icon} href={withProfile(href)} isSelected={isCurrent(href)} />
+              ))}
+            </SideNavSection>
+          </SideNav>
+        }
+      >
+        <div className="pb-24 md:pb-0">{children}</div>
+      </AppShell>
 
       {compare.length > 0 && (
         <div className="fixed right-4 bottom-20 z-30 md:bottom-6">

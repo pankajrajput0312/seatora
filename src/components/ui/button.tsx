@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 
 const variants = {
   primary: "bg-primary text-primary-foreground hover:bg-primary/90",
-  secondary: "border border-input bg-secondary text-foreground hover:bg-accent",
+  secondary: "border border-input bg-secondary text-foreground hover:bg-raised",
   ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
 } as const;
 

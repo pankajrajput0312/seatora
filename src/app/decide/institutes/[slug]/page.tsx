@@ -41,7 +41,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   return (
     <Container className="grid gap-10 py-10">
       <div>
-        <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{college.type ?? "Institute"}</p>
+        <p className="text-xs font-medium text-muted-foreground">{college.type ?? "Institute"}</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">{college.name}</h1>
       </div>
 
@@ -63,7 +63,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           <table className="w-full min-w-[760px] text-sm">
             <caption className="sr-only">Courses at {college.name}, with past closing ranks</caption>
             <thead>
-              <tr className="border-b border-border text-left font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
                 <th scope="col" className="w-12 px-2 py-3 font-normal"><span className="sr-only">Add to choices</span></th>
                 <th scope="col" className="px-3 py-3 font-normal">Course · quota</th>
                 <th scope="col" className="px-3 py-3 font-normal">{profile ? "Your reach" : "Reach"}</th>

@@ -40,7 +40,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
             <table className="w-full min-w-[720px] text-sm">
               <caption className="sr-only">Allotments made by year per institute and course</caption>
               <thead>
-                <tr className="border-b border-border text-left font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
                   <th scope="col" className="px-3 py-3 font-normal">Institute · course</th>
                   {YEARS.map((y) => <th key={y} scope="col" className="px-3 py-3 font-normal">{y}{y === 2026 && " (R1)"}</th>)}
                   <th scope="col" className="px-3 py-3 text-right font-normal">Change vs 2024</th>

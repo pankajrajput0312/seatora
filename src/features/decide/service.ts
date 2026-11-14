@@ -183,3 +183,32 @@ export async function getNotices() {
   const d = await getDecideData();
   return [...d.notices].sort((a, b) => b.date.localeCompare(a.date));
 }
+
+const median = (xs: number[]) => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
+};
+
+/** Everything the overview dashboard draws, from the same rows Options uses so the numbers always agree. */
+export async function dashboard(profile: Profile) {
+  const { rows } = await listOptions(profile, { showClosed: true });
+  const counts = Object.fromEntries(reachOrder.map((r) => [r, rows.filter((x) => x.reach === r).length])) as Record<Reach, number>;
+  const courses = [...new Map(rows.map((r) => [r.course.slug, r.course])).values()];
+  const strip = courses.map((course) => ({
+    course,
+    points: rows
+      .filter((r) => r.course.slug === course.slug && r.byYear[2025])
+      .map((r) => ({ id: r.id, name: r.college.name, slug: r.college.slug, quota: r.quota, closing: r.byYear[2025]!.closing, round: r.byYear[2025]!.round, category: r.byYear[2025]!.category, reached: r.byYear[2025]!.closing >= profile.rank })),
+  }));
+  const trendRounds: Round[] = ["R1", "R2", "R3", "stray"];
+  const trend = courses.map((course) => ({
+    course,
+    points: trendRounds.map((round) => {
+      const vals = rows.filter((r) => r.course.slug === course.slug).flatMap((r) => (r.grid[2025]?.[round] ? [r.grid[2025]![round]!.closing] : []));
+      return { round, median: median(vals), n: vals.length };
+    }),
+  }));
+  return { total: rows.length, counts, strip, trend };
+}

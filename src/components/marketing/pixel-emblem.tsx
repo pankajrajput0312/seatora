@@ -53,7 +53,7 @@ export function PixelEmblem({ className, animated = false }: { className?: strin
     <svg viewBox={`0 0 ${N} ${N}`} shapeRendering="crispEdges" className={className} aria-hidden>
       <path d={paths.halo} className={cn("fill-sky/40", animated && "twinkle")} />
       <path d={paths.ring} className="fill-sky" />
-      <path d={paths.disc} className="fill-accent" />
+      <path d={paths.disc} className="fill-raised" />
       <path d={paths.shine} className="fill-sky/30" />
       <g className={cn(animated && "heartbeat")}>
         <path d={paths.shadow} className="fill-background/70" />

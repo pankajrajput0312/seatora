@@ -69,7 +69,7 @@ export function OptionsTable({ rows, caption, start }: { rows: OptionRow[]; capt
         <table className="w-full min-w-[1000px] text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead>
-            <tr className="border-b border-border text-left font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
               <th scope="col" className="w-12 px-2 py-3 font-normal"><span className="sr-only">Add to choices</span></th>
               <th scope="col" className="px-3 py-3 font-normal">Institute</th>
               <th scope="col" className="px-3 py-3 font-normal">Course</th>

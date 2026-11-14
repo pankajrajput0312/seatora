@@ -8,7 +8,7 @@ Audience: NEET PG aspirants, doctors preparing for PG admission, AIQ and state c
 Details: [docs/PRODUCT.md](docs/PRODUCT.md) · phases: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 ## Stack
-Next.js 15 (App Router) · TypeScript (strict) · Tailwind CSS v4 · Geist fonts · PostgreSQL + Prisma 6 · Radix UI (`radix-ui`) · Lucide React · React Hook Form + Zod · Recharts · Vitest · Playwright.
+Next.js 15 (App Router) · TypeScript (strict) · Tailwind CSS v4 · Geist fonts · Astryx (`@astryxdesign/core`, inside app only) · PostgreSQL + Prisma 6 · Radix UI (`radix-ui`) · Lucide React · React Hook Form + Zod · Recharts · Vitest · Playwright.
 Do not add a dependency unless the existing stack plus a few lines of code cannot do the job.
 
 ## Architecture
@@ -21,11 +21,12 @@ Modular monolith. `src/app` routes are thin and compose features. Domain logic l
 - Validate every external input (forms, search params, API bodies, imported datasets) with Zod.
 - No speculative abstractions, no empty placeholder files. Build a thing when a feature needs it.
 
-## Design system (enforced)
-[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) is the single source of truth: a dark, cool interface modelled on roook.space, using Geist Sans with Geist Pixel for display. Tokens live in `src/app/globals.css` (`@theme`). The default Tailwind palette is disabled on purpose:
-- Use only token classes (`bg-card`, `text-muted-foreground`, `border-border`, `text-leaf`…). No hex or raw OKLCH values in components.
-- Signal colours (`sky`, `leaf`, `sun`, `ember`) carry meaning only. No gradients, blobs or decorative glow.
-- `font-pixel` is for the wordmark, the hero and big statistics only. Ranks, fees and statistics use `numeric`.
+## Design systems (enforced): two, never mixed on one page
+- **Public site** (`src/app/(site)`: landing, privacy, auth): [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md), a dark, cool interface modelled on roook.space, using Geist Sans with Geist Pixel for display and scanlines.
+- **Inside app** (`src/app/decide`): [docs/APP_DESIGN_SYSTEM.md](docs/APP_DESIGN_SYSTEM.md), the light "case sheet" system on Astryx (Meta's design system), set in Atkinson Hyperlegible Next.
+- Tokens live in `src/app/globals.css`: `@theme` for the site, with the `.app` scope overriding them for the inside app. Use only token classes (`bg-card`, `text-muted-foreground`, `border-border`, `text-leaf`…), never hex or raw OKLCH values in components.
+- Signal colours (`sky`, `leaf`, `sun`, `ember`) carry meaning only. No gradients, blobs or decorative glow (the hero vignette is the documented exception).
+- Ranks, fees and statistics use `numeric` in columns. `font-pixel` is used on the public site only.
 
 ## Component reuse
 Check `src/components/ui` and `src/components/layout` before writing UI. Extend an existing component with a variant rather than duplicating it. Feature-specific components stay inside their feature folder until a second feature needs them.

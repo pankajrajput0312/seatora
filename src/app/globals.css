@@ -1,3 +1,6 @@
+/* Layer order first: Astryx (inside-app components) sits between Tailwind base and utilities, as Astryx's
+   Tailwind guide requires, so Tailwind classes can still override Astryx components. */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
 @import "tailwindcss";
 
 /* MEDPATH tokens (dark, after roook.space). Source of truth: docs/DESIGN_SYSTEM.md */
@@ -10,7 +13,7 @@
   --color-muted: oklch(22% 0.014 250);
   --color-muted-foreground: oklch(70% 0.012 240);
   --color-secondary: oklch(23% 0.016 250);
-  --color-accent: oklch(25% 0.018 250);
+  --color-raised: oklch(25% 0.018 250);
   --color-primary: oklch(96% 0.006 240);
   --color-primary-foreground: oklch(16% 0.016 250);
   --color-border: oklch(100% 0 0 / 0.08);
@@ -24,6 +27,7 @@
   --color-ember: oklch(65% 0.23 27);  /* error, destructive */
   /* Pale cool tint a portrait fades to on hover, revealing the grayscale image (roook.space portraits) */
   --color-mist: oklch(86% 0.025 225);
+  --color-mark: oklch(80% 0.12 222);
   --color-white: #fff;
   --color-black: #000;
   --color-transparent: transparent;
@@ -43,6 +47,48 @@
 
   --container-content: 72rem;
   --container-prose: 42rem;
+}
+
+/* ---------- Inside app: "case sheet" system (docs/APP_DESIGN_SYSTEM.md) ----------
+   Scoped token overrides: shared components use the same token classes and restyle automatically. */
+@layer base {
+  .app {
+    color-scheme: light;
+    --color-background: #f3f6f9;     /* chart paper */
+    --color-card: #ffffff;           /* sheet */
+    --color-popover: #ffffff;
+    --color-secondary: #ffffff;
+    --color-muted: #ecf1f5;
+    --color-raised: #e3eaf1;
+    --color-foreground: #102231;     /* ink */
+    --color-muted-foreground: #53657a;
+    --color-primary: #102231;
+    --color-primary-foreground: #ffffff;
+    --color-border: #d9e1e9;         /* ruled hairline */
+    --color-input: #c3cfdb;
+    --color-ring: #2a78d6;
+    --color-sky: #1c5cab;            /* chart-ink blue (text-safe step) */
+    --color-mark: #2a78d6;           /* chart-ink blue for marks */
+    --color-leaf: #0a7a0a;           /* good */
+    --color-sun: #8a5a00;            /* warning */
+    --color-ember: #c03030;          /* critical */
+    --color-mist: #e3eaf1;
+    --shadow-overlay: 0 12px 32px rgb(16 34 49 / 0.14);
+    --font-sans: var(--font-app), ui-sans-serif, system-ui, sans-serif;
+    --font-pixel: var(--font-app), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-app), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-sans);
+    background: var(--color-background);
+    color: var(--color-foreground);
+  }
+  .app h1, .app h2, .app h3, .app h4 { color: var(--color-foreground); letter-spacing: -0.01em; }
+  /* Faint ECG-style grid paper behind the hero chart */
+  .app .chart-paper {
+    background-image:
+      linear-gradient(var(--color-raised) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-raised) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
 }
 
 @layer base {
@@ -66,8 +112,8 @@
   }
 }
 
-/* Faint CRT scanlines over the whole page, after roook.space */
-body::before {
+/* Faint CRT scanlines over the public site, after roook.space */
+.scanlines::before {
   content: "";
   position: fixed;
   inset: 0;
@@ -145,7 +191,34 @@ body::before {
 @media print {
   header, footer, [data-print-hide], nav[aria-label="Decide"], nav[aria-label="Decide shortcuts"] { display: none !important; }
   html, body { background: white !important; color: black !important; }
-  body::before { display: none; }
+  .scanlines::before { display: none; }
+}
+
+/* Astryx neutral theme, re-tokened to the case-sheet palette (beats @layer astryx-theme). */
+@layer components {
+  .app [data-astryx-theme] {
+    color-scheme: light;
+    --font-family-body: var(--font-app), ui-sans-serif, system-ui, sans-serif;
+    --font-family-heading: var(--font-app), ui-sans-serif, system-ui, sans-serif;
+    --color-background-body: #f3f6f9;
+    --color-background-muted: #ecf1f5;
+    --color-background-surface: #ffffff;
+    --color-background-card: #ffffff;
+    --color-background-popover: #ffffff;
+    --color-text-primary: #102231;
+    --color-text-secondary: #53657a;
+    --color-border: #d9e1e9;
+    --color-border-emphasized: #c3cfdb;
+    --color-accent: #1c5cab;
+    --color-text-accent: #1c5cab;
+    --color-on-accent: #ffffff;
+    --color-accent-muted: #dce8f6;
+    --color-info: #2a78d6;
+    --color-text-info: #1c5cab;
+    --color-text-success: #0a7a0a;
+    --color-text-warning: #8a5a00;
+    --color-text-error: #c03030;
+  }
 }
 
 @utility numeric {

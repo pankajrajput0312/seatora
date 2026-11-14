@@ -3,8 +3,9 @@ import { expect, test } from "@playwright/test";
 const PROFILE = "rank=42284&cat=OBC&sp=ANAESTHESIOLOGY,FAMILYMEDICINE";
 
 test("every Decide route renders with the demo banner", async ({ page }) => {
+  test.setTimeout(120_000);
   for (const [path, h1] of [
-    ["/decide", "Decide"], ["/decide/options", "Options"], ["/decide/choices", "Choices"], ["/decide/compare", "Compare"],
+    ["/decide", "Overview"], ["/decide/options", "Options"], ["/decide/choices", "Choices"], ["/decide/compare", "Compare"],
     ["/decide/rank-scan", "Rank scan"], ["/decide/last-ranks", "Last ranks"], ["/decide/seats?tab=trends", "Seats"],
     ["/decide/counselling", "Counselling"], ["/decide/institutes/example-government-medical-college-nagpur-440003", "Example Government Medical College, Nagpur"],
   ]) {

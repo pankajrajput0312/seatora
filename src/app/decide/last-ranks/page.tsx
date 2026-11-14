@@ -66,19 +66,19 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       <Form action="/decide/last-ranks" role="search" className="mt-8 grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
         {profileParamKeys.map((k) => params.get(k) && <input key={k} type="hidden" name={k} value={params.get(k)!} />)}
         <label className="grid gap-1.5 text-sm">
-          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Course</span>
+          <span className="text-xs font-medium text-muted-foreground">Course</span>
           <select name="course" defaultValue={course.slug} className="h-11 rounded-md border border-input bg-background px-3">
             {meta.courses.map((c) => <option key={c.slug} value={c.slug}>{c.degree} {c.name}</option>)}
           </select>
         </label>
         <label className="grid gap-1.5 text-sm">
-          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Seat category</span>
+          <span className="text-xs font-medium text-muted-foreground">Seat category</span>
           <select name="lcat" defaultValue={category} className="h-11 rounded-md border border-input bg-background px-3">
             {baseCategories.map((c) => <option key={c}>{c}</option>)}
           </select>
         </label>
         <label className="grid gap-1.5 text-sm">
-          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Quota</span>
+          <span className="text-xs font-medium text-muted-foreground">Quota</span>
           <select name="lquota" defaultValue={quota ?? ""} className="h-11 rounded-md border border-input bg-background px-3">
             <option value="">All quotas</option>
             {meta.quotas.map((q) => <option key={q}>{q}</option>)}

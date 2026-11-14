@@ -75,7 +75,7 @@ export function ResidentCard({ r, index }: { r: ResidentMatch; index: number }) 
               target={href.startsWith("http") ? "_blank" : undefined}
               rel="noopener noreferrer"
               aria-label={`${label} ${r.name}`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-secondary px-2.5 text-xs font-medium transition-colors hover:bg-accent"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-secondary px-2.5 text-xs font-medium transition-colors hover:bg-raised"
             >
               <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
               {label}

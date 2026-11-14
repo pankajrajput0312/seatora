@@ -27,17 +27,17 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
       <Form action="/decide/rank-scan" role="search" className="mt-8 grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
         {profileParamKeys.map((k) => params.get(k) && <input key={k} type="hidden" name={k} value={params.get(k)!} />)}
         <label className="grid gap-1.5 text-sm">
-          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">All India Rank</span>
+          <span className="text-xs font-medium text-muted-foreground">All India Rank</span>
           <input name="scan" inputMode="numeric" defaultValue={rank ?? ""} placeholder="e.g. 42284" className="numeric h-11 rounded-md border border-input bg-background px-3" />
         </label>
         <label className="grid gap-1.5 text-sm">
-          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Year</span>
+          <span className="text-xs font-medium text-muted-foreground">Year</span>
           <select name="year" defaultValue={year} className="h-11 rounded-md border border-input bg-background px-3">
             {[2024, 2025, 2026].map((y) => <option key={y} value={y}>{y}{y === 2026 ? " (R1, provisional)" : ""}</option>)}
           </select>
         </label>
         <label className="grid gap-1.5 text-sm">
-          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Range</span>
+          <span className="text-xs font-medium text-muted-foreground">Range</span>
           <select name="w" defaultValue={window} className="h-11 rounded-md border border-input bg-background px-3">
             {[250, 500, 1000].map((w) => <option key={w} value={w}>± {w}</option>)}
           </select>
@@ -60,7 +60,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                 <table className="w-full min-w-[720px] text-sm">
                   <caption className="sr-only">{year} {roundLabel[g.round]}: allotments to ranks near {formatRank(rank)}</caption>
                   <thead>
-                    <tr className="border-b border-border text-left font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                    <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
                       <th scope="col" className="px-3 py-3 text-right font-normal">Rank</th>
                       <th scope="col" className="px-3 py-3 font-normal">Seat category</th>
                       <th scope="col" className="px-3 py-3 font-normal">Institute</th>
