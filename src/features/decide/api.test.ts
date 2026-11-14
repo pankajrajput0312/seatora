@@ -10,7 +10,18 @@ const qs = (s: string) => new URLSearchParams(s);
 describe("query schemas", () => {
   it("applies defaults and reads lists repeated or comma-separated", () => {
     const r = parseQuery(optionsQuerySchema, qs("reach=within-10,reached-one&reach=no-data&showClosed=1"), ["reach"]);
-    expect(r.success && r.data).toEqual({ page: 1, pageSize: 50, reach: ["within-10", "reached-one", "no-data"], showClosed: true, prov: true, hasSeats: false });
+    expect(r.success && r.data).toEqual({ page: 1, pageSize: 50, reach: ["within-10", "reached-one", "no-data"], showClosed: true, prov: true });
+  });
+  it("options: view, seats and closed left to the view unless given; older hasSeats values keep their meaning", () => {
+    const data = (s: string) => {
+      const r = parseQuery(optionsQuerySchema, qs(s));
+      return r.success ? { view: r.data.view, hasSeats: r.data.hasSeats, showClosed: r.data.showClosed } : null;
+    };
+    expect(data("")).toEqual({ view: undefined, hasSeats: undefined, showClosed: undefined });
+    expect(data("view=all&hasSeats=1&showClosed=0")).toEqual({ view: "all", hasSeats: "clear", showClosed: false });
+    expect(["hasSeats=0", "hasSeats=false", "hasSeats=all"].map((s) => data(s)?.hasSeats)).toEqual([false, false, false]);
+    expect(["hasSeats=any", "hasSeats=virtual", "hasSeats=true"].map((s) => data(s)?.hasSeats)).toEqual(["any", "virtual", "clear"]);
+    expect(data("view=r2")).toBeNull();
   });
   it("treats empty values as absent", () => {
     const r = parseQuery(allotmentsQuerySchema, qs("year=&round=&from=30,000&to=50000"));

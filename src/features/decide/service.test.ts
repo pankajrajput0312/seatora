@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { reachOrder } from "./lib/reach";
 import type { Profile } from "./profile";
-import { setTestCatalog } from "./server/catalog";
+import { getCatalog, setTestCatalog } from "./server/catalog";
 import { remarkOf } from "./server/queries";
 import { decideDemoData as fx } from "./test/decide.demo";
+import type { SeatList } from "./types";
 
 // The service code over the in-memory test fixture (no database). Runtime never sees the fixture.
 vi.stubEnv("DATABASE_URL", "");
@@ -167,5 +168,69 @@ describe("service on the test fixture", () => {
 
   it("no notices are made up", async () => {
     expect(await svc.getNotices()).toEqual([]);
+  });
+
+  it("new options: seats with no past allotment in her profile, ids as optionId; known, unknown, empty and out-of-profile ones left out", async () => {
+    const cat = await getCatalog();
+    const known = cat.options[0];
+    const college = fx.colleges.find((c) => c.state)!;
+    const id = (quota: string, k = college.key, specialty = "ANAESTHESIOLOGY") => optionKey({ college: k, degree: "MD", specialty, quota });
+    const cells = (seats: number, category = "OBC") => [[{ quota: "x", category, seats }], [], []];
+    const at = (quota: string, seats = 2, k = college.key, specialty = "ANAESTHESIOLOGY") => [id(quota, k, specialty), { college: k, degree: "MD", specialty, quota, cells: cells(seats) }] as const;
+    const fresh = [...cat.optionById.keys()].includes(id("Deemed/Paid Seats")) ? "All India" : "Deemed/Paid Seats";
+    const seats = new Map([
+      [known.id, { college: known.college, degree: known.degree, specialty: known.specialty, quota: known.quota, cells: cells(3) }],
+      at(fresh), at("Armed Forces Medical"), at(fresh, 0, college.key, "FAMILYMEDICINE"), at(fresh, 1, "NO-SUCH-COLLEGE#000000"), at(fresh, 1, college.key, "NOSUCHCOURSE"),
+    ]);
+    const out = svc.newOptions(cat, new Map(seats), her);
+    expect(out).toEqual([{ cs: "", id: id(fresh), college: college.key, degree: "MD", specialty: "ANAESTHESIOLOGY", quota: fresh, byYear: {}, fresh: true }]);
+    expect(cat.optionById.has(out[0].id)).toBe(false);
+    // No profile (a saved choice): any quota.
+    expect(svc.newOptions(cat, new Map(seats), null).map((o) => o.quota).sort()).toEqual(["Armed Forces Medical", fresh].sort());
+  });
+});
+
+describe("Options' round view (pure parts)", () => {
+  const l = (kind: SeatList["kind"], year = 2026, round: SeatList["round"] = "R2"): SeatList => ({ key: `${year}${round}${kind}`, name: kind, url: null, year, round, kind, publishedAt: null, seats: 1 });
+  const lists = [l("clear"), l("virtual"), l("new")];
+
+  it("is the default while the newest seat lists' round has no allotment result; never without seat lists", () => {
+    const r1 = [{ year: 2026, round: "R1" as const }];
+    expect(svc.optionsView(undefined, lists, r1)).toBe("round");
+    expect(svc.optionsView(undefined, lists, [...r1, { year: 2026, round: "R2" }])).toBe("all"); // R2 result out: its lists are spent
+    expect(svc.optionsView(undefined, [l("clear", 2025, "R3")], r1)).toBe("round"); // whatever round is newest
+    expect(svc.optionsView("all", lists, r1)).toBe("all");
+    expect(svc.optionsView("round", lists, [...r1, { year: 2026, round: "R2" }])).toBe("round"); // asked for
+    expect(svc.optionsView("round", [], r1)).toBe("all");
+  });
+
+  it("seats per list kind in her categories; an option is in when a list has more than 0", () => {
+    const s = { cells: [[{ quota: "All India", category: "Open", seats: 2 }, { quota: "All India", category: "SC", seats: 5 }], [], [{ quota: "All India", category: "OBC", seats: 0 }]] };
+    expect(svc.seatsByKind(lists, s, ["Open", "OBC"]).by).toEqual({ clear: 2, virtual: null, new: 0 });
+    expect(svc.seatsByKind(lists, s).by).toEqual({ clear: 7, virtual: null, new: 0 });
+    expect(svc.seatsByKind(lists, undefined).by).toEqual({ clear: null, virtual: null, new: null });
+    const by = { clear: 0, virtual: 3, new: null };
+    expect([svc.hasSeatsIn(by, "any"), svc.hasSeatsIn(by, "clear"), svc.hasSeatsIn(by, "virtual"), svc.hasSeatsIn(by, "new")]).toEqual([true, false, true, false]);
+    expect(svc.hasSeatsIn({ clear: 0, new: 0 }, "any")).toBe(false);
+  });
+
+  it("summary: clear + virtual only + newly added only = options with seats; newly added and new options counted on the side", () => {
+    const xs = [
+      { by: { clear: 2, virtual: 1, new: 2 } },
+      { by: { clear: 1, virtual: null, new: null }, fresh: true },
+      { by: { clear: null, virtual: 4, new: null } },
+      { by: { clear: null, virtual: null, new: 1 }, fresh: true },
+      { by: { clear: 0, virtual: null, new: null } }, // printed with 0 seats: no seats
+      { by: {}, fresh: true },
+    ];
+    const s = svc.roundSummary(xs);
+    expect(s).toEqual({ options: 4, clear: 2, virtualOnly: 1, newOnly: 1, withNew: 2, fresh: 2 });
+    expect(s.clear + s.virtualOnly + s.newOnly).toBe(s.options);
+  });
+
+  it("no seat lists (this fixture): the all view, no summary, as before", async () => {
+    const r = await svc.listOptions(her);
+    expect([r.view, r.summary, r.seats, r.showClosed]).toEqual(["all", null, null, false]);
+    expect((await svc.listOptions(her, { view: "round" })).view).toBe("all");
   });
 });

@@ -77,7 +77,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                   <td className={`${tbl.td} whitespace-nowrap`}>
                     <span className="flex gap-x-3">
                       <Link href={L.institute(r.college.slug, "courses")} className={`${smallLink} text-sky`}>Courses</Link>
-                      <Link href={L.options({ q: r.college.name, closed: true })} className={`${smallLink} text-sky`}>In my options</Link>
+                      <Link href={L.options({ q: r.college.name, closed: true, all: true })} className={`${smallLink} text-sky`}>In my options</Link>
                     </span>
                   </td>
                 </tr>

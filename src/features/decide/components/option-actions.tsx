@@ -70,13 +70,17 @@ function FeeBond({ r }: { r: OptionRow }) {
   );
 }
 
-/** Cross-links for one option, each a 44px target. */
+/** Cross-links for one option, each a 44px target (a new option has no closing ranks or allotments to link). */
 function Related({ r, L }: { r: OptionRow; L: DecideLinks }) {
   const link = cn(smallLink, "text-sky");
   return (
     <>
-      <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className={link}>Last ranks</Link>
-      <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={link}>Allotments</Link>
+      {r.reach !== "new" && (
+        <>
+          <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className={link}>Last ranks</Link>
+          <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={link}>Allotments</Link>
+        </>
+      )}
       <Link href={L.institute(r.college.slug, "fees")} className={link}>Fees & bond</Link>
     </>
   );

@@ -1,8 +1,18 @@
 import { LATEST_YEAR, PAST_YEARS, reachLabel, seatsBelowText, type Deepest } from "@/features/decide/lib/reach";
-import type { OptionRow } from "@/features/decide/service";
-import { roundLabel, seatKindLabel, type SeatList, type Term } from "@/features/decide/types";
+import type { OptionRow, RoundSummary } from "@/features/decide/service";
+import { roundLabel, seatKindLabel, type SeatKind, type SeatList, type Term } from "@/features/decide/types";
 
 type Src = { name: string; url: string | null; note?: string };
+
+/**
+ * The round view in one line (the page's summary): what the rows are, how they are counted and sorted. `span`: the
+ * results in the data (reach.ts resultsSpan); `noState`: options the state filter drops for an institute with no state.
+ */
+export function roundViewNote(l: Pick<SeatList, "year" | "round">, s: RoundSummary, seats: SeatKind | "any" | null, span: string, noState = 0) {
+  const round = `${l.year} ${roundLabel[l.round]}`;
+  const rows = seats === "any" ? `Options with ${round} seats` : seats ? `Options with ${round} ${seatKindLabel[seats].toLowerCase()}${seats === "new" ? "" : " seats"}` : `Every option, with or without ${round} seats`;
+  return `${rows}, sorted by label (reached, then within 10%, then new and no allotment in your categories, closed before your rank last), then ${round} clear vacancy seats, then deepest closing. In your courses, quotas and seat categories ${s.options} options have ${round} seats: ${s.clear} in the clear vacancy list, ${s.virtualOnly} virtual only${s.newOnly ? `, ${s.newOnly} only newly added` : ""}; ${s.withNew} with newly added seats; ${s.fresh} new (no past allotment: no MCC allotment for that course and quota in any result Seatora has, ${span}, in any round or seat category).${noState ? ` ${noState} more with ${round} seats are at institutes with no state in the data, so the state filter leaves them out.` : ""}`;
+}
 
 /** A CSV cell: numbers as they are, text quoted (formula-looking text gets a leading ' so a spreadsheet never runs it), "—" when missing. */
 const cell = (v: string | number | null | undefined) =>

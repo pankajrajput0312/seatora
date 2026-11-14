@@ -11,14 +11,15 @@ import { DataSource, SeatSource } from "@/features/decide/components/data-source
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm } from "@/features/decide/components/filter-form";
 import { OptionsResults } from "@/features/decide/components/option-actions";
-import { seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
+import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { control, EmptyState, smallLink } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
+import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { eligibleCategories, reachLabel, reachOrder, reachWindow } from "@/features/decide/lib/reach";
+import { eligibleCategories, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
 import { BOND_YEAR_CHOICES, feeChoices, keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
-import { getMeta, LATEST_YEAR, listOptions, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
-import { openQuotas, openQuotasNote, roundLabel, seatKindLabel, seatKinds } from "@/features/decide/types";
+import { getMeta, LATEST_YEAR, listOptions, optionsView, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
+import { openQuotas, openQuotasNote, optionsViews, roundLabel, seatKindLabel, seatKinds } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
@@ -27,10 +28,16 @@ const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 
 const filtersSchema = z.object({
   q: z.string().max(100).optional(),
   reach: z.enum(reachOrder).optional(),
-  closed: z.literal("1").optional(),
+  /** Closed-before options shown ("1") or hidden ("0"); absent = the view's default (round: shown, all: hidden). */
+  closed: z.enum(["0", "1"]).optional(),
   prov: z.literal("0").optional(),
-  /** Only options with seats in one list of the newest round: "1" (older links) = clear vacancy. Lists are never added. */
-  seats: z.enum(["1", ...seatKinds]).optional(),
+  /**
+   * Seats in the newest round's lists: one list ("1", older links, = clear vacancy), "any" list, or "all" = with or
+   * without; absent = the view's default (round: any, all: with or without). Lists are never added.
+   */
+  seats: z.enum(["1", "any", "all", ...seatKinds]).optional(),
+  /** "round" or "all" (types.ts optionsViews); absent = the data's default (service.ts optionsView). */
+  view: z.enum(optionsViews).optional(),
   page: pageValue.default(1),
 });
 
@@ -40,23 +47,32 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   if (!profile) return <AppPage><PageHead title="Options" /><SetRankPrompt path="/decide/options" /></AppPage>;
 
   const f = parseSearchParams(filtersSchema, params);
-  const seatKind = f.seats === "1" ? "clear" : f.seats;
-  const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: !!f.closed, hasSeats: seatKind };
-  const [meta, r, unlisted] = await Promise.all([getMeta(), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }), unlistedSeats(profile, seatKind)]);
+  const hasSeats = f.seats === "1" ? "clear" : f.seats === "all" ? false : f.seats;
+  const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view };
+  const [meta, r] = await Promise.all([getMeta(), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE })]);
+  const lists = r.seatLists;
+  const roundView = r.view === "round";
+  // The round view lists the seats with no past allotment as rows; the other view names them and links Seats.
+  const unlisted = roundView ? null : await unlistedSeats(profile, r.seats === "virtual" || r.seats === "new" ? r.seats : "clear");
   const L = decideLinks(params);
   const here = (changes: Record<string, string | null>) => L.with("/decide/options", { page: null, ...changes });
   // The All chip counts what it lists: closed-before options only while they are shown.
-  const all = reachOrder.reduce((s, x) => s + r.counts[x], 0) - (f.closed ? 0 : r.counts["closed-before"]);
+  const all = reachOrder.reduce((s, x) => s + r.counts[x], 0) - (r.showClosed ? 0 : r.counts["closed-before"]);
   const counted = reachWindow(LATEST_YEAR, PAST_YEARS, !f.prov);
-  const lists = r.seatLists;
   const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
+  const roundWords = lists[0] && roundName[lists[0].round];
+  // Switching views drops the filters whose default differs by view (seats, closed), so each view opens as itself, and
+  // the "new" label, which only the round view has.
+  const other = roundView ? "all" : "round";
+  const otherView = here({ view: optionsView(undefined, lists, meta.sources) === other ? null : other, seats: null, closed: null, ...(f.reach === "new" ? { reach: null } : {}) });
+  const sum = r.summary;
   const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
   // The latest year's R1 is the only round that can be provisional (MCC's provisional result); the toggle exists only then.
   const latestProvisional = !!meta.sources.find((s) => s.year === LATEST_YEAR && s.round === "R1")?.provisional;
   const keep = keepProfileParams(params);
   // Same profile and filters for /api/v1/options, where "Show more" reads the next pages.
   const api = profileToParams(profile);
-  for (const [k, v] of [["q", f.q], ["reach", f.reach], ["showClosed", f.closed], ["prov", f.prov], ["hasSeats", seatKind]] as const) if (v) api.set(k, v);
+  for (const [k, v] of [["q", f.q], ["reach", f.reach], ["prov", f.prov], ["view", r.view], ["showClosed", r.showClosed ? "1" : "0"], ["hasSeats", r.seats ?? "all"]] as const) if (v) api.set(k, v);
   const caption = `Options for AIR ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added` : ""}`;
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
@@ -64,15 +80,63 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   return (
     <AppPage className="grid grid-cols-1 gap-5">
       <PageHead title="Options">
-        Every institute and course in your profile, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats, the seat
+        Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats, the seat
         categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${openQuotas.join(", ")})`}.
       </PageHead>
+
+      {sum && (
+        <section aria-label={`${round} seats in your courses`} className="grid gap-1 rounded-xl border border-border bg-card p-3 text-sm">
+          <p>
+            <span className="numeric font-semibold">{formatRank(sum.options)}</span> {sum.options === 1 ? "option has" : "options have"} {roundWords} seats in your courses:{" "}
+            <span className="numeric font-semibold">{formatRank(sum.clear)}</span> in the clear vacancy list, <span className="numeric font-semibold">{formatRank(sum.virtualOnly)}</span> virtual only
+            {sum.newOnly > 0 && <>, <span className="numeric font-semibold">{formatRank(sum.newOnly)}</span> only newly added</>};{" "}
+            <span className="numeric font-semibold">{formatRank(sum.withNew)}</span> with newly added seats,{" "}
+            {sum.fresh > 0 ? (
+              <Link href={here({ reach: "new", seats: null, q: null })} className="text-sky underline"><span className="numeric font-semibold">{formatRank(sum.fresh)}</span> new: no past allotment</Link>
+            ) : (
+              "none new (every one has a past allotment)"
+            )}
+            .
+          </p>
+          <p className="text-muted-foreground">
+            From MCC&apos;s {round} lists:{" "}
+            {lists.map((l, i) => (
+              <Fragment key={l.key}>
+                {i > 0 && ", "}
+                {l.url ? (
+                  <a href={l.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-sky">
+                    {seatKindLabel[l.kind].toLowerCase()}<span className="sr-only"> PDF (opens in a new tab)</span>
+                  </a>
+                ) : (
+                  seatKindLabel[l.kind].toLowerCase()
+                )}
+                {l.publishedAt && <> (<span className="numeric">{fmtDay(l.publishedAt)}</span>)</>}
+              </Fragment>
+            ))}
+            . Counted in your quotas and seat categories ({seats}); a seat can be in two lists, so they are never added. Virtual only = seats there fall vacant only if their holder upgrades or leaves.
+          </p>
+          <p className="flex flex-wrap gap-x-4">
+            {r.seats ? (
+              <Link href={here({ seats: "all" })} className={`${smallLink} text-sky`}>Also show options without {roundWords} seats</Link>
+            ) : (
+              <Link href={here({ seats: null })} className={`${smallLink} text-sky`}>Only options with {roundWords} seats</Link>
+            )}
+            <Link href={otherView} className={`${smallLink} text-sky`}>Every option with past allotments instead (closed hidden)</Link>
+          </p>
+        </section>
+      )}
+      {!roundView && lists.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          <Link href={otherView} className={`${smallLink} text-sky`}>Show the {round} view</Link>: every option with {roundWords} seats in your courses, new ones included, closed ones shown, most clear vacancy seats first within a label.
+        </p>
+      )}
 
       {/* The profile filters are URL params, so this visit can differ from the saved profile. The form and Apply stay mounted (focus stays on Apply); only the fields remount to show what was applied. */}
       <FilterForm action="/decide/options" scroll={false} role="search" aria-label="Filter options" className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3">
         {(["rank", "cat", "pwd"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         {f.reach && <input type="hidden" name="reach" value={f.reach} />}
-        {f.closed && <input type="hidden" name="closed" value="1" />}
+        {f.closed && <input type="hidden" name="closed" value={f.closed} />}
+        {f.view && <input type="hidden" name="view" value={f.view} />}
         <Fragment key={params.toString()}>
           <label className="min-w-56 flex-1">
             <span className="sr-only">Search institute, state or course</span>
@@ -106,8 +170,9 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           {lists.length > 0 && (
             <label className="w-64">
               <span className="sr-only">Seats in the {round} seat lists</span>
-              <select name="seats" defaultValue={seatKind ?? ""} className={control}>
-                <option value="">With or without {round} seats</option>
+              <select name="seats" defaultValue={r.seats ?? "all"} className={control}>
+                <option value="all">With or without {round} seats</option>
+                <option value="any">Has seats in a {round} list</option>
                 {lists.map((l) => <option key={l.kind} value={l.kind}>Has {round} {seatKindLabel[l.kind].toLowerCase()}{l.kind === "new" ? "" : " seats"}</option>)}
               </select>
             </label>
@@ -133,17 +198,18 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           </Link>
         ))}
       </nav>
-      {(r.hiddenClosed > 0 || (f.closed && !f.reach)) && (
+      {(r.hiddenClosed > 0 || (r.showClosed && !f.reach && r.counts["closed-before"] > 0)) && (
         <p className="text-sm text-muted-foreground">
           {r.hiddenClosed > 0 ? (
             <>
               <span className="numeric">{formatRank(r.hiddenClosed)}</span> that closed before your rank in every round of {counted} are hidden
-              {r.hiddenProvisional > 0 && <> (<span className="numeric">{formatRank(r.hiddenProvisional)}</span> of them only in the provisional {LATEST_YEAR} R1)</>}.{" "}
-              <Link href={here({ closed: "1" })} className={`${smallLink} text-sky`}>Show them</Link>
+              {r.hiddenProvisional > 0 && <> (<span className="numeric">{formatRank(r.hiddenProvisional)}</span> of them only in the provisional {LATEST_YEAR} R1)</>}.
             </>
           ) : (
-            <>Options that closed before your rank are included. <Link href={here({ closed: null })} className={`${smallLink} text-sky`}>Hide them</Link></>
-          )}
+            <><span className="numeric">{formatRank(r.counts["closed-before"])}</span> that closed before your rank in every round of {counted} are included.</>
+          )}{" "}
+          {/* One link in both states, so React keeps the element and focus stays on it after the toggle. */}
+          <Link href={here({ closed: r.hiddenClosed > 0 ? "1" : "0" })} className={`${smallLink} text-sky`}>{r.hiddenClosed > 0 ? "Show them" : "Hide them"}</Link>
         </p>
       )}
 
@@ -156,6 +222,12 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         </p>
       )}
       {unlisted && <UnlistedSeats u={unlisted} profile href={L.to("/decide/seats", { list: unlisted.list.key, nohist: "1" })} />}
+      {r.noState > 0 && (
+        <p className="text-sm text-muted-foreground">
+          <span className="numeric">{formatRank(r.noState)}</span> more {r.noState === 1 ? "option" : "options"} with {round} seats in your courses, quotas and seat categories{" "}
+          {r.noState === 1 ? "is at an institute" : "are at institutes"} with no state in Decide&apos;s data, so the state filter leaves {r.noState === 1 ? "it" : "them"} out.
+        </p>
+      )}
       {/* Stays mounted across filter changes (OptionsResults remounts), so the new count is announced. */}
       <p role="status" className="sr-only">{formatRank(r.total)} {r.total === 1 ? "option matches" : "options match"}</p>
 
@@ -189,7 +261,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         <EmptyState
           title="No options match"
           description="Nothing in your profile matches this search and label. Clear them, or widen the course, quota, state, fee or bond filters above."
-          href={here({ q: null, reach: null, closed: "1", seats: null })}
+          href={here({ q: null, reach: null, closed: "1", seats: roundView ? "all" : null })}
           action="Clear search, seats and labels"
         />
       )}
@@ -207,6 +279,13 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           <p>
             {round} seats: {lists.map((l) => seatKindLabel[l.kind].toLowerCase()).join(", ")}, each its own MCC list, counted in this option&apos;s quota and your seat categories ({seats}); &quot;—&quot; when that
             list has none. The lists overlap, so they are never added: {lists.map((l) => `${l.kind[0].toUpperCase()}${l.kind.slice(1)}: ${seatKindNote[l.kind]}`).join(" ")} Select a number to see those seats.
+          </p>
+        )}
+        {roundView && (
+          <p>
+            {round} view: options with seats in a {round} list in your courses (or every option, when you ask for those without), sorted by label (reached, then within 10%, then new and
+            no allotment in your categories, closed before your rank last), then {round} clear vacancy seats, then the deepest {PAST_YEARS[1]} closing. New: no past allotment = MCC allotted
+            nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years)}), in any round or seat category, so there is no closing rank to compare.
           </p>
         )}
         <p>

@@ -275,7 +275,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
                         ))}
                       </p>
                     )}
-                    {item.courseSlug && (
+                    {item.courseSlug && lr?.reach !== "new" && (
                       <p className="flex flex-wrap gap-x-4 text-xs" data-print-hide>
                         <Link href={L.lastRanks(item.courseSlug, { inst: item.slug })} className={cn(smallLink, "text-sky")}>Last ranks</Link>
                         <Link href={L.allotments({ course: item.courseSlug, inst: item.slug })} className={cn(smallLink, "text-sky")}>Allotments</Link>

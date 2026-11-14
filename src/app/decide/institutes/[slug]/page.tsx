@@ -21,7 +21,7 @@ import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, PAST_YEARS, programOf, type OptionTerms } from "@/features/decide/service";
+import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, optionsView, PAST_YEARS, programOf, type OptionTerms } from "@/features/decide/service";
 import { canSeeResidents, groupResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
 import { roundLabel, seatKindLabel, termLabel } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
@@ -114,8 +114,10 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
   const residentGroups = residents ? groupResidents(residents.rows, profile) : [];
   const residentYears = [...new Set(residents?.rows.map((r) => r.year))].sort((a, b) => b - a);
-  // Seats here with no past allotments: not options, so not in the lists below; Seats shows them.
-  const unlistedNote = unlisted && unlisted.seats > 0 && <UnlistedSeats u={unlisted} profile={!!profile} here href={L.to("/decide/seats", { list: unlisted.list.key, inst: slug, nohist: "1" })} />;
+  // Seats here with no past allotments: not in the lists below; Seats shows them, and while Options opens in the round
+  // view, Options lists those in her profile as new options (search: this institute's name, within its 100 characters).
+  const newOnOptions = profile && optionsView(undefined, inst.seatList ? [inst.seatList] : [], meta.sources) === "round" ? L.options({ reach: "new", q: college.name.slice(0, 100) }) : undefined;
+  const unlistedNote = unlisted && unlisted.seats > 0 && <UnlistedSeats u={unlisted} profile={!!profile} here href={L.to("/decide/seats", { list: unlisted.list.key, inst: slug, nohist: "1" })} options={newOnOptions} />;
   const termSources = [...kinds.map((k) => termOf(terms.md, k)?.source), ...kinds.map((k) => termOf(terms.dnb, k)?.source)];
   const programs = [
     { title: "Medical college seats (MD, MS, Diploma)", t: terms.md, offered: offers("MD") },

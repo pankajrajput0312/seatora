@@ -66,10 +66,15 @@ describe.skipIf(!process.env.DATABASE_URL)("findSeats on the real import", { tim
     expect(u.options).toBe(new Set(no.rows.map((r) => `${r.college.key}~${r.degree}~${r.specialty}~${r.quota}`)).size);
     // Sri Venkateswaraa MD Anaesthesiology, Deemed/Paid, Open 17: added by MCC's 13 Nov notice, no allotment history.
     expect(no.rows.some((r) => /VENKATESWARAA/i.test(r.college.name) && r.degree === "MD" && r.specialty === "ANAESTHESIOLOGY" && r.seats === 17)).toBe(true);
-    // Options' clear-seat total + these = the list's total for her filters.
+    // Options' clear-seat total + these = the list's total for her filters (the all view: options with past allotments).
     const all = await findSeats(mine, { page: 1, pageSize: 1 });
-    const opts = await listOptions(profile, { hasSeats: true, showClosed: true });
+    const opts = await listOptions(profile, { view: "all", hasSeats: true, showClosed: true });
     expect(opts.rows.reduce((a, r) => a + (r.seats ?? 0), 0) + u.seats).toBe(all.seats[mine.list]);
+    // The round view lists those seats as new options, so its clear-seat total is the list's total alone.
+    const round = await listOptions(profile, { hasSeats: "clear" });
+    expect(round.view).toBe("round");
+    expect(round.rows.reduce((a, r) => a + (r.seats ?? 0), 0)).toBe(all.seats[mine.list]);
+    expect(round.rows.filter((r) => r.reach === "new").reduce((a, r) => a + (r.seats ?? 0), 0)).toBe(u.seats);
   });
 
   it("hasSeats counts the options it hides that have seats only in the virtual vacancy list", async () => {
@@ -116,7 +121,7 @@ describe.skipIf(!process.env.DATABASE_URL)("findSeats on the real import", { tim
     const p = new URLSearchParams("rank=42284&cat=OBC&c=MD~ANAESTHESIOLOGY,DNB~ANAESTHESIOLOGY,NBEMS Diploma~ANAESTHESIOLOGY,Diploma~ANAESTHESIOLOGY,DNB~FAMILYMEDICINE");
     const her = profileFromParams(p)!;
     const v = await seatsView(parseSeatsParams(p), her);
-    const opts = new Map((await listOptions(her, { showClosed: true })).rows.map((o) => [o.id, o]));
+    const opts = new Map((await listOptions(her, { view: "all", showClosed: true })).rows.map((o) => [o.id, o]));
     const both = v.r!.rows.filter((r) => r.reach && opts.has(optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota! })));
     expect(both.length).toBeGreaterThan(600);
     for (const r of both) expect(opts.get(optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota! }))!.reachBy?.[r.category as "Open"]).toBe(r.reach);

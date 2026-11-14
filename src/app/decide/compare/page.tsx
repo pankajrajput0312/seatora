@@ -93,10 +93,12 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                       <span>
                         <Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link>
                         <span className="block text-xs font-normal text-muted-foreground">{courseName(r)}, {r.quota}</span>
-                        <span className="flex flex-wrap gap-x-4 text-xs font-normal">
-                          <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className={`${smallLink} text-sky`}>Last ranks</Link>
-                          <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={`${smallLink} text-sky`}>Allotments</Link>
-                        </span>
+                        {r.reach !== "new" && (
+                          <span className="flex flex-wrap gap-x-4 text-xs font-normal">
+                            <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className={`${smallLink} text-sky`}>Last ranks</Link>
+                            <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={`${smallLink} text-sky`}>Allotments</Link>
+                          </span>
+                        )}
                       </span>
                       <RemoveFromCompare id={r.id} label={`${r.college.name}, ${courseName(r)}, ${r.quota}`} nextFocus={options[i + 1]?.id ?? options[i - 1]?.id ?? null} />
                     </div>

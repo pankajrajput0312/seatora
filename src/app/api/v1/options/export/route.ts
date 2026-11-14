@@ -1,11 +1,11 @@
 import { CSV_MAX_ROWS, gridRounds, handle, invalid, sourcesFor, tooManyRows } from "@/features/decide/api";
 import { HISTORY_CAPTION } from "@/features/decide/components/bits";
-import { eligibleCategories } from "@/features/decide/lib/reach";
+import { eligibleCategories, resultsSpan } from "@/features/decide/lib/reach";
 import { listNotices } from "@/features/decide/server/notices";
 import { seatChanges, seatLists } from "@/features/decide/server/seats";
 import { getMeta, LATEST_YEAR, listOptions } from "@/features/decide/service";
 import { parseOptionsQuery } from "../query";
-import { optionsCsv } from "./csv";
+import { optionsCsv, roundViewNote } from "./csv";
 
 /**
  * The Options view as a CSV download: the same profile and filters as /api/v1/options, every matching row (`page` and
@@ -39,6 +39,7 @@ export async function GET(req: Request) {
       ...(r.seatLists.length
         ? ["Seat columns: separate MCC lists of one round, each in the option's quota and your seat categories. They overlap (a newly added seat is usually in the clear vacancy list too), so never add them. Each list is as its PDF printed it: later MCC seat notices are not applied (see Counselling, announcements)."]
         : []),
+      ...(r.summary && l0 ? [roundViewNote(l0, r.summary, r.seats, resultsSpan(meta.years), r.noState)] : []),
     ];
     const csv = optionsCsv(r.rows, { lists: r.seatLists, includeLatest: q.filters.includeProvisional !== false, notes, sources });
     return new Response(csv, {

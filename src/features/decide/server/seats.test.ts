@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SeatList } from "../types";
+import { optionId, type SeatList } from "../types";
 import { DataUnavailableError } from "./catalog";
-import { listSeats, pickLists, seatChanges, seatCountsFor, seatLists, sumSeats } from "./seats";
+import { listSeats, optionSeats, pickLists, seatChanges, seatLists, sumSeats } from "./seats";
 
 const list = (key: string, year: number, round: SeatList["round"], kind: SeatList["kind"]): SeatList => ({ key, name: key, url: null, year, round, kind, publishedAt: null, seats: 1 });
 // seatLists() order: newest year, round, then kind
@@ -50,7 +50,6 @@ describe("without a database", () => {
   it("throws DataUnavailableError, never stand-in data", async () => {
     vi.stubEnv("DATABASE_URL", "");
     await expect(listSeats()).rejects.toThrow(DataUnavailableError);
-    await expect(seatCountsFor(["x"], "mcc/2026/R2_clear_vacancy.pdf")).rejects.toThrow(DataUnavailableError);
   });
 });
 
@@ -85,11 +84,20 @@ describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "seats.ndjson
     const p2 = await listSeats(f, { page: 2, pageSize: 25 });
     expect([p2.page, p2.total]).toEqual([2, want.length]);
     expect(p2.rows.map((r) => [r.college.key, r.degree, r.specialty, r.quota, r.category, r.seats])).toEqual(res.rows.slice(25, 50).map((r) => [r.college.key, r.degree, r.specialty, r.quota, r.category, r.seats]));
-    // seatCountsFor agrees with the rows, per course at a college
-    const cs = [...new Set(res.rows.flatMap((r) => r.cs ?? []))];
-    const counts = await seatCountsFor(cs, key);
-    expect(counts.list?.key).toBe(key);
-    for (const id of cs) expect(sumSeats(counts.seats[id], { categories: f.categories })).toBe(res.rows.filter((r) => r.cs === id).reduce((a, r) => a + r.seats, 0));
+    // optionSeats agrees with the rows, per option (course at a college under one quota), past allotments or not
+    const byOption = new Map<string, number>();
+    for (const r of res.rows) {
+      const id = r.quota && optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota });
+      if (id) byOption.set(id, (byOption.get(id) ?? 0) + r.seats);
+    }
+    const per = await optionSeats(res.lists, { specialties: f.specialties, categories: f.categories });
+    expect(new Map([...per].map(([id, o]) => [id, sumSeats(o.cells[0])]))).toEqual(byOption);
+    // …and narrowed to colleges and exact courses, as Choices and institute pages read it
+    const [id] = byOption.keys();
+    const one = per.get(id)!;
+    const narrow = await optionSeats(res.lists, { colleges: [one.college], pairs: [`${one.degree}~${one.specialty}`], categories: f.categories });
+    expect(narrow.get(id)).toEqual(one);
+    expect([...narrow.values()].every((o) => o.college === one.college && o.degree === one.degree && o.specialty === one.specialty)).toBe(true);
   });
 
   it("one kind at a time: two newly-added lists of 2025 R2 stay separate", async () => {

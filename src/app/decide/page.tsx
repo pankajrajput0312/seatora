@@ -17,6 +17,8 @@ import { roundLabel } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Overview" };
 const label = (r: (typeof reachOrder)[number]) => reachLabel(r, LATEST_YEAR, PAST_YEARS);
+// The Overview counts options with past allotments; "new" ones (no history) are Options' round view only.
+const labelled = reachOrder.filter((r) => r !== "new");
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 
 /** A summary closing with the option it comes from: a closing is never shown without its seat category. */
@@ -70,12 +72,12 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
               value: formatRank(reached),
               note: (
                 <span className="inline-flex flex-wrap items-center gap-x-1.5">
-                  <Link href={L.options({ reach: "reached-latest" })} className={smallLink}>{formatRank(d.counts["reached-latest"])} of them in {LATEST_YEAR} R1</Link>
+                  <Link href={L.options({ reach: "reached-latest", all: true })} className={smallLink}>{formatRank(d.counts["reached-latest"])} of them in {LATEST_YEAR} R1</Link>
                   <Provisional when={latestR1?.provisional} />
                 </span>
               ),
             },
-            { label: "Within 10% in a past round", value: formatRank(d.counts["within-10"]), note: <Link href={L.options({ reach: "within-10" })} className={smallLink}>Closed just before your rank: see them</Link> },
+            { label: "Within 10% in a past round", value: formatRank(d.counts["within-10"]), note: <Link href={L.options({ reach: "within-10", all: true })} className={smallLink}>Closed just before your rank: see them</Link> },
           ]}
         >
           <ChoicesStat />
@@ -128,7 +130,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         <RankStrip rank={profile.rank} rows={d.strip.map((r) => ({ course: `${r.course.degree} ${r.course.name}`, points: r.points }))} />
         <p className="mt-2 text-xs text-muted-foreground">
           {d.strip.length < d.summary.length && "Tick courses in your profile to choose which are drawn. "}
-          Every option, with its round and seat category, is on <Link href={L.options({ closed: true })} className={`${smallLink} text-sky`}>Options</Link>.
+          Every option, with its round and seat category, is on <Link href={L.options({ closed: true, all: true })} className={`${smallLink} text-sky`}>Options</Link>.
         </p>
       </ChartCard>
 
@@ -140,11 +142,11 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
           table={
             <table className="w-full text-sm">
               <caption className="sr-only">Options by label</caption>
-              <tbody>{reachOrder.map((r) => <tr key={r} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{label(r)}</th><td className="numeric text-right">{formatRank(d.counts[r])}</td></tr>)}</tbody>
+              <tbody>{labelled.map((r) => <tr key={r} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{label(r)}</th><td className="numeric text-right">{formatRank(d.counts[r])}</td></tr>)}</tbody>
             </table>
           }
         >
-          <LabelBars rows={reachOrder.filter((r) => r !== "no-data" || d.counts[r] > 0).map((r) => ({ label: label(r), count: d.counts[r], href: L.options({ reach: r, closed: true }), accent: r.startsWith("reached") }))} />
+          <LabelBars rows={labelled.filter((r) => r !== "no-data" || d.counts[r] > 0).map((r) => ({ label: label(r), count: d.counts[r], href: L.options({ reach: r, closed: true, all: true }), accent: r.startsWith("reached") }))} />
         </ChartCard>
 
         <ChartCard

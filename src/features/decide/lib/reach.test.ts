@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cutoff, Round } from "../types";
-import { buildGrid, classifyReach, deepestByYear, eligibleCategories, reachLabel, seatsBelow, seatsBelowText } from "./reach";
+import { buildGrid, classifyReach, deepestByYear, eligibleCategories, reachLabel, resultsSpan, seatsBelow, seatsBelowText } from "./reach";
 
 const c = (year: number, round: Round, closing: number, category: Cutoff["category"] = "Open"): Cutoff => ({
   college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY", year, round, quota: "All India", category,
@@ -76,5 +76,13 @@ describe("labels on one seat category", () => {
     expect(seatsBelow("reached-latest", by, { clear: ["OBC"], virtual: [] })).toEqual([]);
     // One seat category: its label is the option's.
     expect(seatsBelow("within-10", { Open: "within-10" }, { clear: ["Open"] })).toEqual([]);
+  });
+});
+
+describe("resultsSpan", () => {
+  it("names the oldest year to the newest year's last round", () => {
+    expect(resultsSpan([{ year: 2026, rounds: ["R1"] }, { year: 2025, rounds: ["R1", "R2", "R3", "stray"] }, { year: 2023, rounds: ["R1"] }])).toBe("2023 to 2026 R1");
+    expect(resultsSpan([{ year: 2025, rounds: ["R1", "stray"] }])).toBe("2025 Stray");
+    expect(resultsSpan([])).toBe("");
   });
 });

@@ -4,7 +4,7 @@ import { canUseDecide } from "@/features/auth/lib/session";
 import { rankValue, readParams } from "./lib/params";
 import { reachOrder } from "./lib/reach";
 import { profileInput, profileSchema } from "./profile";
-import { baseCategories, rounds, type SeatList, type Source } from "./types";
+import { baseCategories, optionsViews, rounds, seatKinds, type SeatList, type Source } from "./types";
 
 // Query schemas and response helpers for the /api/v1 route handlers (thin wrappers over service.ts).
 // Lists accept repeated or comma-separated params: ?sp=A&sp=B or ?sp=A,B. Profile params use the URL keys of
@@ -19,11 +19,20 @@ export const pageSchema = z.object({ page: int.min(1).default(1), pageSize: int.
 export const optionsQuerySchema = pageSchema.extend({
   q: z.string().trim().max(100).optional(),
   reach: z.array(z.enum(reachOrder)).default([]),
-  showClosed: bool.default(false),
+  /** Options that closed before her rank: shown (1) or hidden (0); absent = the view's default (round: shown, all: hidden). */
+  showClosed: bool.optional(),
   /** "0" leaves the provisional 2026 R1 out of the reach labels. */
   prov: bool.default(true),
-  /** Only options with seats in the newest clear vacancy list. */
-  hasSeats: bool.default(false),
+  /**
+   * Seats in the newest round's lists: 1/true (the clear vacancy list) or one kind (clear, virtual, new), "any" list, or
+   * 0/false/"all" = with or without; absent = the view's default (round: any, all: with or without).
+   */
+  hasSeats: z
+    .enum(["0", "1", "true", "false", "any", "all", ...seatKinds])
+    .transform((v) => (v === "1" || v === "true" ? "clear" : v === "0" || v === "false" || v === "all" ? false : v))
+    .optional(),
+  /** "round" or "all" (types.ts optionsViews); absent = the data's default (service.ts optionsView). */
+  view: z.enum(optionsViews).optional(),
 });
 /** Repeated ids count once (deduped before the limit of 4). */
 export const compareQuerySchema = z.object({

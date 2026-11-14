@@ -68,9 +68,57 @@ const OPT_KOKILA_ANAES = "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8#400710~DNB~AN
 const OPT_KOKILA_FM = "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8#400710~DNB~FAMILYMEDICINE~DNB Quota";
 const OPT_GMC_NAGPUR = "GOVERNMENTMEDICALCOLLEGENAGPURGOVERNMENT#440003~MD~ANAESTHESIOLOGY~All India";
 
-test("options: her 680 options in the open quotas (25 at a time), Show more focuses the first new row, two ticked states both apply", async ({ page }) => {
+test("options, the round view by default: her options with 2026 R2 seats, new ones included, closed ones shown; toggles widen and switch", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto(`/decide/options?${PROFILE}`);
+  // Her courses in MCC's 2026 R2 lists (seats.ndjson): 1,065 options, 708 clear vacancy, 357 virtual only, 103 with newly added seats.
+  const summary = page.getByRole("region", { name: "2026 R2 seats in your courses" });
+  await expect(summary).toContainText(/^1,065 options have Round 2 seats in your courses: 708 in the clear vacancy list, 357 virtual only; 103 with newly added seats, \d+ new: no past allotment\./);
+  await expect(page.getByRole("link", { name: "All 1,065 options" })).toBeVisible();
+  const count = page.locator("#options-count");
+  await expect(count).toContainText("Showing 1–25 of 1,065 options");
+  await expect(page.getByText(/that closed before your rank in every round of .* are included/)).toBeVisible();
+
+  // New options: their own chip; a real row whose star saves it under its option id.
+  const fresh = Number((await summary.getByRole("link", { name: /new: no past allotment/ }).textContent())!.match(/[\d,]+/)![0].replace(",", ""));
+  await page.getByRole("link", { name: new RegExp(`^New: no past allotment ${fresh} options$`) }).click();
+  await expect(count).toContainText(`of ${fresh} options`);
+  const row = page.locator("[data-item]").filter({ visible: true }).first();
+  await expect(row).toContainText("New: no past allotment");
+  await row.getByRole("button", { name: /^In Round 2/ }).click();
+  await page.goto(`/decide/choices?${PROFILE}`);
+  await expect(page.getByRole("list", { name: /choice list, 1 item/ })).toContainText("New: no past allotment");
+
+  // Also options without R2 seats; then the view of every option with past allotments, closed hidden.
+  await page.goto(`/decide/options?${PROFILE}`);
+  await page.getByRole("link", { name: "Also show options without Round 2 seats" }).click();
+  await expect(count).toContainText(`of ${formatN(1329 + fresh)} options`);
+  await page.getByRole("link", { name: "Every option with past allotments instead (closed hidden)" }).click();
+  await expect(page).toHaveURL(/view=all/);
+  await expect(count).toContainText("of 680 options");
+
+  // From the New chip, the other view drops that label (it has no new options) instead of opening empty.
+  await page.goto(`/decide/options?${PROFILE}&reach=new`);
+  await page.getByRole("link", { name: "Every option with past allotments instead (closed hidden)" }).click();
+  await expect(page).toHaveURL(/view=all/);
+  await expect(page).not.toHaveURL(/reach=/);
+  await expect(count).toContainText("of 680 options");
+  // The summary's new link opens every new option, whatever the seats filter.
+  await page.goto(`/decide/options?${PROFILE}&seats=virtual`);
+  await page.getByRole("region", { name: "2026 R2 seats in your courses" }).getByRole("link", { name: /new: no past allotment/ }).click();
+  await expect(count).toContainText(`of ${fresh} options`);
+  // Hide them by keyboard: the same link, now "Show them", keeps focus.
+  await page.goto(`/decide/options?${PROFILE}`);
+  await page.getByRole("link", { name: "Hide them" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/closed=0/);
+  await expect(page.getByRole("link", { name: "Show them" })).toBeFocused();
+});
+const formatN = (n: number) => n.toLocaleString("en-IN");
+
+test("options, the view of every option with past allotments: her 680 options in the open quotas (25 at a time), Show more focuses the first new row, two ticked states both apply", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.goto(`/decide/options?${PROFILE}&view=all`);
   await expect(page.getByRole("link", { name: "All 680 options" })).toBeVisible();
   const count = page.locator("#options-count");
   await expect(count).toContainText("Showing 1–25 of 680 options");

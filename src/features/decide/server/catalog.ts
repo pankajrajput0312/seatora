@@ -6,8 +6,12 @@ import { optionId, roundLabel, rounds, type Allotment, type College, type Course
 
 /** A course at a college (CollegeSpecialty). `cs` is its id: the DB id, or "college~degree~specialty" in memory (tests). */
 export type Pair = { cs: string; college: string; degree: string; specialty: string };
-/** A choosable option (course at a college under one quota) with allotments made (Σ cutoff n) per year. */
-export type Opt = Pair & { id: string; quota: string; byYear: Record<number, number> };
+/**
+ * A choosable option (course at a college under one quota) with allotments made (Σ cutoff n) per year. `fresh`: no past
+ * allotment at all, an option only because the newest round's seat lists print seats for it (service.ts newOptions;
+ * `cs` "" and `byYear` empty); never in Catalog.options.
+ */
+export type Opt = Pair & { id: string; quota: string; byYear: Record<number, number>; fresh?: true };
 
 /**
  * Everything small enough to keep in memory: colleges, courses, sources, terms and the option list. Cutoffs and
@@ -23,7 +27,7 @@ export type Catalog = {
   terms: Term[];
   collegeByKey: Map<string, College>;
   collegeBySlug: Map<string, College>;
-  courseOf: Map<string, Course>; // "degree|specialty"
+  courseOf: Map<string, Course>; // "degree|specialty", every course (`courses`: those with options)
   termOf: Map<string, Term>; // "college|program|kind"
   optionById: Map<string, Opt>;
   pairs: Map<string, Pair>; // cs → pair
@@ -88,7 +92,8 @@ export function indexCatalog(p: {
     terms: p.terms,
     collegeByKey: new Map(p.colleges.map((c) => [c.key, c])),
     collegeBySlug: new Map(p.colleges.map((c) => [c.slug, c])),
-    courseOf: new Map(courses.map((c) => [`${c.degree}|${c.specialty}`, c])),
+    // Every MCC course, with data or not: a course first seen in a seat list (a new option) still has its name.
+    courseOf: new Map(p.courses.map((c) => [`${c.degree}|${c.specialty}`, c])),
     termOf: new Map(p.terms.map((t) => [`${t.college}|${t.program}|${t.kind}`, t])),
     optionById,
     pairs,

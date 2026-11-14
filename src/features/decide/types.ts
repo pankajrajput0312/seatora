@@ -83,6 +83,15 @@ export const openQuotas = ["All India", "DNB Quota", "Deemed/Paid Seats"];
 /** The Quota filter's note when her profile ticks none (Options, Seats). */
 export const openQuotasNote = `None ticked means ${openQuotas.join(", ")}: the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible.`;
 
+/**
+ * Options' two views. "round": the newest round's seat lists first: every option with seats in them (in her courses,
+ * quotas and seat categories), new options with no past allotment included, closed-before options shown, sorted by
+ * label (reach.ts roundReachOrder: new and no-data before closed-before), then clear vacancy seats, then deepest closing. "all": every option with past allotments, closed-before hidden,
+ * by label, then deepest closing. The default comes from the data (service.ts optionsView).
+ */
+export const optionsViews = ["round", "all"] as const;
+export type OptionsView = (typeof optionsViews)[number];
+
 /** One choosable option: an institute's course under one quota. */
 export const optionId = (c: { college: string; degree: string; specialty: string; quota: string }) =>
   [c.college, c.degree, c.specialty, c.quota].join("~");

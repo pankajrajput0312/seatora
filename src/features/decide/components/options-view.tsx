@@ -69,7 +69,12 @@ export function FeeText({ t }: { t: Term | undefined }) {
 export function RoundGrid({ row, caption }: { row: OptionRow; caption: string }) {
   const years = Object.keys(row.grid).map(Number).sort();
   const used = rounds.filter((r) => years.some((y) => row.grid[y]?.[r]));
-  if (!years.length) return <p className="text-xs text-muted-foreground">No closing rank on these seat categories in any round.</p>;
+  if (!years.length)
+    return (
+      <p className="text-xs text-muted-foreground">
+        {row.reach === "new" ? "No past allotment: MCC allotted nobody to this course and quota here in any result Seatora has, in any round or seat category." : "No closing rank on these seat categories in any round."}
+      </p>
+    );
   return (
     <div role="region" aria-label={caption} tabIndex={0} className="relative overflow-x-auto">
       <table className="text-xs">

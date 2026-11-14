@@ -1,4 +1,4 @@
-import { seatKindLabel, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind } from "../types";
+import { roundLabel, seatKindLabel, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind } from "../types";
 
 /** The years the labels compare (client-safe; service.ts re-exports them). They match the imported MCC results. */
 export const LATEST_YEAR = 2026;
@@ -49,8 +49,23 @@ export function buildGrid(all: Cutoff[], eligible: Set<string> | null, provision
 /** What a reach label reads from a cutoff (a raw cutoff, or a per-year deepest closing whose round may be unknown). */
 export type ReachInput = Pick<Cutoff, "year" | "closing"> & { round?: Round; category?: Category };
 
-export const reachOrder = ["reached-latest", "reached-both", "reached-one", "within-10", "closed-before", "no-data"] as const;
+/**
+ * "new": an option with no past allotment at all (no row in any MCC result in the data, any year, round or seat
+ * category), listed only because the newest round's seat lists print seats for it (Options' round view). classifyReach
+ * never returns it. The chips' order; the round view sorts by roundReachOrder.
+ */
+export const reachOrder = ["reached-latest", "reached-both", "reached-one", "within-10", "closed-before", "no-data", "new"] as const;
 export type Reach = (typeof reachOrder)[number];
+/** Options' round view sort: what she can realistically get first; unknown (new, no allotment on her seats) before closed before her rank. */
+export const roundReachOrder: readonly Reach[] = ["reached-latest", "reached-both", "reached-one", "within-10", "new", "no-data", "closed-before"];
+
+/** The MCC results in the data, e.g. "2023 to 2026 R1": oldest year to the newest year's last round (`years` newest first, as meta.years). */
+export function resultsSpan(years: { year: number; rounds: readonly Round[] }[]) {
+  if (!years.length) return "";
+  const [last, first] = [years[0], years.at(-1)!];
+  const end = `${last.year}${last.rounds.length ? ` ${roundLabel[last.rounds.at(-1)!]}` : ""}`;
+  return first.year === last.year ? end : `${first.year} to ${end}`;
+}
 
 /**
  * History-only label for how a rank compares with past closing ranks. "Reached" means the rank was within the
@@ -90,6 +105,7 @@ export function reachLabel(reach: Reach, latestYear: number, pastYears: [number,
     "within-10": "Within 10% in a past round",
     "closed-before": "Closed before your rank",
     "no-data": `No allotment ${on ? `on ${on} seats` : "in your categories"} in ${reachWindow(latestYear, pastYears, includeLatest, true)}`,
+    new: "New: no past allotment",
   }[reach];
 }
 
@@ -122,4 +138,5 @@ export const reachTone: Record<Reach, "info" | "neutral" | "warning"> = {
   "within-10": "warning",
   "closed-before": "neutral",
   "no-data": "neutral",
+  new: "neutral",
 };

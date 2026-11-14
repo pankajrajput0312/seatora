@@ -140,22 +140,41 @@ export const hasOption = (cat: Catalog, r: Pick<SeatRow, "college" | "degree" | 
 
 /** Seats of one list in one quota × category of a course at a college (PDF lines printed twice are summed). */
 export type SeatCell = { quota: string | null; category: string; seats: number };
+/** One option's seats (a course at a college under one quota): `cells[i]` = its seats per seat category in the i-th list asked for. */
+export type OptionSeats = { college: string; degree: string; specialty: string; quota: string; cells: SeatCell[][] };
 
 /**
- * Seats per CollegeSpecialty id (Opt.cs) in ONE list (SeatList key), for Options and institute columns. Ids with no row
- * are absent (the list has no seat there). `list` null when no list has that key.
+ * Seats per option id (types.ts optionId) in each of `lists` (one kind each, never added), with or without past
+ * allotments, from one read. Rows of a PDF with no quota column belong to no option and are left out. `f` narrows in
+ * SQL: courses (profile pairs, or specialties x degrees), quotas, seat categories, colleges (College.key).
  */
-export async function seatCountsFor(cs: string[], list: string): Promise<{ list: SeatList | null; seats: Record<string, SeatCell[]> }> {
-  const meta = (await seatLists()).find((l) => l.key === list) ?? null;
-  if (!meta || !cs.length) return { list: meta, seats: {} };
-  const rows = await db.$queryRaw<{ cs: string; q: string | null; c: string; n: number }[]>`
-    SELECT x."collegeSpecialtyId" AS cs, x.quota AS q, x.category AS c, SUM(x.seats)::int AS n
-    FROM "SeatCount" x JOIN "DataSource" d ON d.id = x."seatSourceId"
-    WHERE d.key = ${list} AND x."collegeSpecialtyId" = ANY(${cs})
-    GROUP BY 1, 2, 3 ORDER BY 2 NULLS FIRST, array_position(${categoryOrder}::text[], x.category)`;
-  const seats: Record<string, SeatCell[]> = {};
-  for (const r of rows) (seats[r.cs] ??= []).push({ quota: r.q, category: r.c, seats: r.n });
-  return { list: meta, seats };
+export async function optionSeats(
+  lists: SeatList[],
+  f: { pairs?: string[]; specialties?: string[]; degrees?: string[]; quotas?: string[]; categories?: string[]; colleges?: string[] } = {},
+): Promise<Map<string, OptionSeats>> {
+  const out = new Map<string, OptionSeats>();
+  if (!lists.length) return out;
+  const where = [
+    Prisma.sql`d.key = ANY(${lists.map((l) => l.key)})`,
+    Prisma.sql`x.quota IS NOT NULL`,
+    f.pairs && Prisma.sql`(x.degree || '~' || x.code) = ANY(${f.pairs})`,
+    f.specialties && Prisma.sql`x.code = ANY(${f.specialties})`,
+    f.degrees && Prisma.sql`x.degree = ANY(${f.degrees})`,
+    f.quotas && Prisma.sql`x.quota = ANY(${f.quotas})`,
+    f.categories && Prisma.sql`x.category = ANY(${f.categories})`,
+    f.colleges && Prisma.sql`c.key = ANY(${f.colleges})`,
+  ].filter((x): x is Prisma.Sql => !!x);
+  const rows = await db.$queryRaw<{ l: string; k: string; dg: string; sc: string; q: string; c: string; n: number }[]>`
+    SELECT d.key AS l, c.key AS k, x.degree AS dg, x.code AS sc, x.quota AS q, x.category AS c, SUM(x.seats)::int AS n
+    FROM "SeatCount" x JOIN "DataSource" d ON d.id = x."seatSourceId" JOIN "College" c ON c.id = x."collegeId"
+    WHERE ${Prisma.join(where, " AND ")}
+    GROUP BY 1, 2, 3, 4, 5, 6 ORDER BY array_position(${categoryOrder}::text[], x.category)`;
+  for (const r of rows) {
+    const id = optionId({ college: r.k, degree: r.dg, specialty: r.sc, quota: r.q });
+    const o = out.get(id) ?? out.set(id, { college: r.k, degree: r.dg, specialty: r.sc, quota: r.q, cells: lists.map(() => []) }).get(id)!;
+    o.cells[lists.findIndex((l) => l.key === r.l)].push({ quota: r.q, category: r.c, seats: r.n });
+  }
+  return out;
 }
 
 /**
