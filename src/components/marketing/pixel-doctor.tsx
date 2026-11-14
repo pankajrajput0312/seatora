@@ -1,16 +1,14 @@
 import { cn } from "@/lib/cn";
 
-// Pixel-art doctor bust on a 24×24 grid (cropped to 3:4 to fill a portrait card), drawn in grayscale so a multiply tint above it turns it duotone
-// (the same trick roook.space uses on its portraits). Hair, glasses and pen vary deterministically by seed.
+// Seatora's pixel mascot: an original bean-shaped "crew doctor" with a crewmate-style feel (rounded body, stubby
+// legs, big glossy visor) but its own identity: a first-aid pack with a cross, a stethoscope, and a surgical cap or
+// ENT head mirror. 18×24 grid (3:4, fills a portrait card), drawn in grayscale so the card's multiply tint colours the
+// body (red, blue, yellow, green), as on roook.space's portraits. Accessories vary deterministically by seed.
 
-type Cells = Array<[number, number]>;
-const rect = (x: number, y: number, w: number, h: number): Cells => {
-  const out: Cells = [];
-  for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) out.push([x + i, y + j]);
-  return out;
-};
-const without = (cells: Cells, drop: Cells) => cells.filter(([x, y]) => !drop.some(([a, b]) => a === x && b === y));
-const path = (cells: Cells) => cells.map(([x, y]) => `M${x} ${y}h1v1h-1z`).join("");
+const W = 18;
+const H = 24;
+type Cell = `${number},${number}`;
+const key = (x: number, y: number): Cell => `${x},${y}`;
 
 function hash(s: string) {
   let h = 2166136261;
@@ -18,37 +16,89 @@ function hash(s: string) {
   return h >>> 0;
 }
 
-const hairStyles: Record<string, Cells> = {
-  short: [...without(rect(7, 4, 10, 3), [[7, 4], [16, 4]]), ...rect(7, 7, 1, 3), ...rect(16, 7, 1, 3)],
-  long: [...without(rect(7, 4, 10, 3), [[7, 4], [16, 4]]), ...rect(6, 7, 2, 9), ...rect(16, 7, 2, 9)],
-  bun: [...without(rect(10, 1, 4, 3), [[10, 1], [13, 1]]), ...without(rect(7, 4, 10, 3), [[7, 4], [16, 4]]), ...rect(7, 7, 1, 2), ...rect(16, 7, 1, 2)],
-  cap: [...without(rect(7, 3, 10, 4), [[7, 3], [16, 3]]), ...rect(17, 6, 1, 2)],
+function build(seed: string) {
+  const h = hash(seed);
+  const hat = (["cap", "mirror", "none"] as const)[h % 3];
+  const layers: Record<string, Set<Cell>> = {
+    body: new Set(), shade: new Set(), visor: new Set(), visorShade: new Set(), glint: new Set(), pack: new Set(), cross: new Set(), steth: new Set(), cap: new Set(), band: new Set(),
+  };
+  const add = (layer: string, x: number, y: number) => layers[layer].add(key(x, y));
+
+  // Bean body: domed head, straight sides, two stubby legs.
+  for (let y = 4; y <= 21; y++) {
+    const [x0, x1] = y === 4 ? [7, 12] : y === 5 ? [6, 13] : [5, 14];
+    for (let x = x0; x <= x1; x++) {
+      if (y >= 19 && (x === 9 || x === 10)) continue; // gap between the legs
+      add(x === x1 && y > 5 ? "shade" : "body", x, y);
+    }
+  }
+  // Big rounded visor sticking out past the body on the right, like a crewmate's; lower row shaded, glint top-left.
+  for (let y = 7; y <= 11; y++)
+    for (let x = 8; x <= 16; x++) {
+      if ((x === 8 || x === 16) && (y === 7 || y === 11)) continue;
+      add(y === 11 || (y === 10 && x === 16) ? "visorShade" : "visor", x, y);
+    }
+  [[10, 8], [11, 8], [10, 9]].forEach(([x, y]) => add("glint", x, y));
+  // First-aid pack on the back, with a cross.
+  for (let y = 10; y <= 17; y++) for (let x = 2; x <= 4; x++) add("pack", x, y);
+  [[3, 12], [3, 13], [3, 14], [2, 13], [4, 13]].forEach(([x, y]) => add("cross", x, y));
+  // Headwear.
+  // Surgical cap: a domed cap sitting on the head, with a tie at the back.
+  if (hat === "cap") {
+    for (let y = 1; y <= 5; y++) {
+      const [x0, x1] = y === 1 ? [8, 11] : y === 2 ? [7, 12] : [6, 13];
+      for (let x = x0; x <= x1; x++) add("cap", x, y);
+    }
+    [[5, 5], [4, 6]].forEach(([x, y]) => add("cap", x, y));
+  }
+  if (hat === "mirror") {
+    for (let x = 6; x <= 13; x++) add("band", x, 6);
+    [[8, 4], [9, 4], [8, 5], [9, 5]].forEach(([x, y]) => add("glint", x, y));
+  }
+
+  // Outline: every empty cell touching the character.
+  const filled = new Set<Cell>(Object.entries(layers).filter(([k]) => k !== "glint" && k !== "cross" && k !== "band").flatMap(([, s]) => [...s]));
+  const outline = new Set<Cell>();
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (filled.has(key(x, y))) continue;
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => filled.has(key(x + dx, y + dy)))) outline.add(key(x, y));
+    }
+  // Paint order: later layers win where cells overlap.
+  const order = ["body", "shade", "pack", "visor", "visorShade", "cap", "band", "cross"];
+  const final = new Map<Cell, string>();
+  for (const name of order) for (const c of layers[name]) final.set(c, name);
+  for (const c of layers.glint) final.set(c, "glint");
+  for (const c of outline) final.set(c, "outline");
+  const paths: Record<string, string> = {};
+  for (const [c, name] of final) {
+    const [x, y] = c.split(",").map(Number);
+    paths[name] = (paths[name] ?? "") + `M${x} ${y}h1v1h-1z`;
+  }
+  return { paths, delay: (h % 7) * 0.7 };
+}
+
+// Tones under the card's multiply tint: white = full card colour. The visor is the brightest part, like a crewmate's.
+const fills: Record<string, string> = {
+  outline: "fill-black",
+  body: "fill-white/60",
+  shade: "fill-white/40",
+  pack: "fill-white/45",
+  cross: "fill-white",
+  visor: "fill-white/95",
+  visorShade: "fill-white/70",
+  cap: "fill-white/80",
+  band: "fill-black/50",
 };
 
 export function PixelDoctor({ seed, className }: { seed: string; className?: string }) {
-  const h = hash(seed);
-  const hair = hairStyles[Object.keys(hairStyles)[h % 4]];
-  const glasses = (h >> 3) % 2 === 0;
-  const pen = (h >> 5) % 2 === 0;
-
-  const face = [...without(rect(8, 7, 8, 8), [[8, 7], [15, 7], [8, 14], [15, 14]]), ...rect(10, 15, 4, 2)];
-  const shade = [...rect(15, 9, 1, 5), [11, 12], [12, 12]] as Cells; // cheek shadow + mouth
-  const coat = [...rect(5, 17, 14, 1), ...rect(3, 18, 18, 6)];
-  const scrubs: Cells = [...rect(10, 17, 4, 1), ...rect(10, 18, 4, 1), ...rect(11, 19, 2, 1)];
-  const lapels: Cells = [[9, 17], [9, 18], [10, 19], [11, 20], [14, 17], [14, 18], [13, 19], [12, 20]];
-  const stethoscope: Cells = [...rect(8, 18, 1, 3), ...rect(15, 18, 1, 3), ...rect(9, 21, 6, 1), ...rect(11, 22, 2, 2)];
-  const frames: Cells = glasses ? [...without(rect(9, 9, 3, 3), [[10, 10]]), ...without(rect(12, 9, 3, 3), [[13, 10]])] : [];
-  const penCells: Cells = pen ? rect(17, 19, 1, 3) : [];
-
+  const { paths, delay } = build(seed);
   return (
-    <svg viewBox="3 1 18 24" shapeRendering="crispEdges" preserveAspectRatio="xMidYMax slice" className={className} aria-hidden>
-      <path d={path(face)} className="fill-white" />
-      <path d={path(shade)} className="fill-black/25" />
-      <path d={path(without(without(coat, scrubs), lapels))} className="fill-white" />
-      <path d={path(scrubs)} className="fill-black/55" />
-      <path d={path([...hair, ...lapels, ...stethoscope, ...penCells])} className="fill-black" />
-      <path d={path(frames)} className="fill-black/45" />
-      <path d={path([[10, 10], [13, 10]])} className={cn("fill-black", "blink")} style={{ animationDelay: `${(h % 7) * 0.7}s` }} />
+    <svg viewBox={`0 -1 ${W} ${H}`} shapeRendering="crispEdges" preserveAspectRatio="xMidYMax meet" className={className} aria-hidden>
+      <g className="bob" style={{ animationDelay: `${delay}s` }}>
+        {Object.entries(fills).map(([name, cls]) => (paths[name] ? <path key={name} d={paths[name]} className={cls} /> : null))}
+        {paths.glint && <path d={paths.glint} className={cn("fill-white", "blink")} style={{ animationDelay: `${delay}s` }} />}
+      </g>
     </svg>
   );
 }
