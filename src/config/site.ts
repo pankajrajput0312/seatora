@@ -10,7 +10,6 @@ export const siteConfig = {
   nav: [
     { label: "Residents", href: "/#preview" },
     { label: "Decide", href: "/decide" },
-    { label: "Coverage", href: "/#coverage" },
     { label: "FAQ", href: "/#faq" },
   ],
 } as const;
