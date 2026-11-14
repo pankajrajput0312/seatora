@@ -1,5 +1,10 @@
 import type { BaseCategory, Category, Cutoff, Round } from "../types";
 
+/** The years the labels compare (client-safe; service.ts re-exports them). They match the imported MCC results. */
+export const LATEST_YEAR = 2026;
+export const PAST_YEARS: [number, number] = [2024, 2025];
+export const YEARS = [2024, 2025, 2026];
+
 /** Seat categories a candidate can be allotted: Open always, their own category, and PwD seats if PwD. */
 export function eligibleCategories(category: BaseCategory, pwd: boolean): Category[] {
   const base: Category[] = category === "Open" ? ["Open"] : ["Open", category];
@@ -41,6 +46,9 @@ export function buildGrid(all: Cutoff[], eligible: Set<string> | null, provision
   return grid;
 }
 
+/** What a reach label reads from a cutoff (a raw cutoff, or a per-year deepest closing whose round is unknown). */
+export type ReachInput = Pick<Cutoff, "year" | "closing"> & { round?: Round };
+
 export const reachOrder = ["reached-latest", "reached-both", "reached-one", "within-10", "closed-before", "no-data"] as const;
 export type Reach = (typeof reachOrder)[number];
 
@@ -50,7 +58,7 @@ export type Reach = (typeof reachOrder)[number];
  */
 export function classifyReach(
   rank: number,
-  cutoffs: Cutoff[],
+  cutoffs: ReachInput[],
   { latestYear, pastYears, includeLatest }: { latestYear: number; pastYears: [number, number]; includeLatest: boolean },
 ): Reach {
   // Only the years and rounds the labels talk about: the two past years, plus the latest year's R1.

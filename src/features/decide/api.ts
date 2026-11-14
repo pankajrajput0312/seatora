@@ -1,0 +1,119 @@
+import { z } from "zod";
+import { rankValue, readParams } from "./lib/params";
+import { reachOrder } from "./lib/reach";
+import { profileInput, profileSchema } from "./profile";
+import { baseCategories, rounds, type Source } from "./types";
+
+// Query schemas and response helpers for the /api/v1 route handlers (thin wrappers over service.ts).
+// Lists accept repeated or comma-separated params: ?sp=A&sp=B or ?sp=A,B. Profile params use the URL keys of
+// profile.ts (rank, cat, pwd, sp, deg, quota, st, fee, bond).
+
+const int = z.coerce.number().int();
+const bool = z.enum(["0", "1", "true", "false"]).transform((v) => v === "1" || v === "true");
+const categories = [...baseCategories, ...baseCategories.map((c) => `${c} PwD` as const)] as const;
+
+export const pageSchema = z.object({ page: int.min(1).default(1), pageSize: int.min(1).max(200).default(50) });
+
+export const optionsQuerySchema = pageSchema.extend({
+  q: z.string().trim().max(100).optional(),
+  reach: z.array(z.enum(reachOrder)).default([]),
+  showClosed: bool.default(false),
+  /** "0" leaves the provisional 2026 R1 out of the reach labels. */
+  prov: bool.default(true),
+});
+export const compareQuerySchema = z.object({ ids: z.array(z.string().min(1).max(200)).min(1).max(4) });
+export const collegesQuerySchema = pageSchema.extend({
+  q: z.string().trim().max(100).optional(),
+  state: z.string().optional(),
+  course: z.string().optional(),
+  sort: z.enum(["name", "allotments"]).default("name"),
+});
+export const cutoffsQuerySchema = pageSchema.extend({
+  specialty: z.string().regex(/^[A-Z0-9]+$/, "Specialty code, e.g. ANAESTHESIOLOGY"),
+  degree: z.string().optional(),
+  quota: z.string().optional(),
+  category: z.enum(categories).optional(),
+  years: z.array(int.min(2000).max(2100)).default([]),
+});
+export const allotmentsQuerySchema = pageSchema
+  .extend({
+    year: int.min(2000).max(2100).optional(),
+    round: z.enum(rounds).optional(),
+    course: z.string().optional(),
+    quota: z.string().optional(),
+    category: z.enum(categories).optional(),
+    state: z.string().optional(),
+    from: rankValue.optional(),
+    to: rankValue.optional(),
+    college: z.string().optional(),
+  })
+  .refine((q) => !q.from || !q.to || q.from <= q.to, { message: "from must be ≤ to", path: ["from"] });
+export const rankScanQuerySchema = z.object({
+  rank: int.min(1).max(300000),
+  year: int.min(2000).max(2100).default(2025),
+  window: int.min(1).max(1000).default(500),
+});
+export const feesQuerySchema = pageSchema.extend({
+  program: z.enum(["MD", "DNB"]).optional(),
+  state: z.string().optional(),
+  maxFeeLakh: z.coerce.number().positive().optional(),
+  sort: z.enum(["fee", "stipend", "name"]).default("fee"),
+});
+export const trendsQuerySchema = pageSchema.extend({ specialty: z.string().optional(), degree: z.string().optional() });
+export const noticesQuerySchema = z.object({ kind: z.enum(["schedule", "announcement", "merit"]).optional() });
+
+type Issue = { path: string; message: string };
+export type ApiResult<T> =
+  | { ok: true; data: T; page?: { page: number; pageSize: number; total: number }; sources: Provenance[] }
+  | { ok: false; error: { code: string; message: string; issues?: Issue[] } };
+/** Where a block's numbers come from: the MCC result PDFs (with provisional flag) or a fee/stipend document. */
+export type Provenance = Pick<Source, "name" | "url"> & Partial<Pick<Source, "key" | "year" | "round" | "provisional">>;
+/** The page block of a paginated response (`total` = every matching row). */
+export const pageOf = (r: { page: number; pageSize: number; total: number }) => ({ page: r.page, pageSize: r.pageSize, total: r.total });
+
+const issues = (e: z.ZodError): Issue[] => e.issues.map((i) => ({ path: i.path.join("."), message: i.message }));
+
+/** Parses params strictly (bad input is a 400); `lists` are read as repeated/comma-separated values; empty values count as absent. */
+export function parseQuery<S extends z.ZodType>(schema: S, p: URLSearchParams, lists: string[] = []) {
+  return schema.safeParse(readParams(p, lists)) as z.ZodSafeParseResult<z.infer<S>>;
+}
+
+/** Strict profile from the profile URL params (rank required); invalid values are errors, not defaults. */
+export const parseProfile = (p: URLSearchParams) => profileSchema.safeParse(profileInput(p));
+/** Same, but no rank means no profile. */
+export const parseOptionalProfile = (p: URLSearchParams) => (p.get("rank")?.trim() ? parseProfile(p) : ({ success: true, data: null, error: undefined } as const));
+
+const headers = { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=86400" };
+
+export function ok<T>(data: T, extra: { sources: Provenance[]; page?: { page: number; pageSize: number; total: number } }) {
+  return Response.json({ ok: true, ...extra, data } satisfies ApiResult<T>, { headers });
+}
+
+export function invalid(...errors: (z.ZodError | undefined)[]) {
+  const all = errors.flatMap((e) => (e ? issues(e) : []));
+  return Response.json({ ok: false, error: { code: "invalid_query", message: "Invalid query parameters", issues: all } } satisfies ApiResult<never>, { status: 400 });
+}
+
+export const notFound = (message: string) => Response.json({ ok: false, error: { code: "not_found", message } } satisfies ApiResult<never>, { status: 404 });
+
+/** Runs a handler; errors are logged on the server and answered without details (503 when there is no database). */
+export async function handle(fn: () => Promise<Response>) {
+  try {
+    return await fn();
+  } catch (e) {
+    console.error("[api/v1]", e);
+    if (e instanceof Error && e.name === "DataUnavailableError")
+      return Response.json({ ok: false, error: { code: "data_unavailable", message: "The MCC data is not available right now" } } satisfies ApiResult<never>, { status: 503 });
+    return Response.json({ ok: false, error: { code: "internal_error", message: "Something went wrong" } } satisfies ApiResult<never>, { status: 500 });
+  }
+}
+
+/** The result PDFs behind the given year/round pairs (all when `used` is omitted). */
+export function sourcesFor(sources: Source[], used?: Iterable<{ year: number; round: string }>): Provenance[] {
+  const keys = used && new Set([...used].map((u) => `${u.year}|${u.round}`));
+  return sources.filter((s) => !keys || keys.has(`${s.year}|${s.round}`)).map((s) => ({ key: s.key, name: s.name, url: s.url, year: s.year, round: s.round, provisional: s.provisional }));
+}
+
+/** Year/round pairs present in option rows' grids. */
+export const gridRounds = (rows: { grid: Record<number, Partial<Record<string, unknown>>> }[]) =>
+  rows.flatMap((r) => Object.entries(r.grid).flatMap(([year, g]) => Object.keys(g).map((round) => ({ year: Number(year), round }))));

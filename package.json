@@ -13,7 +13,8 @@
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:import": "node --experimental-strip-types prisma/import-mcc.ts"
   },
   "dependencies": {
     "@astryxdesign/core": "^0.7.16",

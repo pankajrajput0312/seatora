@@ -1,19 +1,21 @@
+import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { Closing, Dash, HISTORY_CAPTION, ReachBadge } from "@/features/decide/components/bits";
+import { Closing, Dash, HISTORY_CAPTION, PageHead, Provisional, ReachBadge, TermText } from "@/features/decide/components/bits";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { courseName, RoundGrid, toChoiceItem } from "@/features/decide/components/options-view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
-import { Field, FilterBar, Select, tbl } from "@/features/decide/components/ui";
-import { formatLakh } from "@/features/decide/lib/format";
+import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
+import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { getInstitute, listAllotments } from "@/features/decide/service";
-import { roundLabel, type Round } from "@/features/decide/types";
+import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, PAST_YEARS, type OptionTerms } from "@/features/decide/service";
+import { roundLabel, termLabel } from "@/features/decide/types";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 const tabs = [
@@ -23,25 +25,36 @@ const tabs = [
   { key: "fees", label: "Fees & bond" },
   { key: "clinical", label: "Clinical data" },
 ] as const;
+const PAGE_SIZE = 50;
+const schema = z.object({
+  tab: z.enum(["overview", "courses", "allotments", "fees", "clinical"]).default("overview"),
+  year: z.coerce.number().int().optional(),
+  course: z.string().max(100).optional(),
+  page: pageValue.default(1),
+});
+const kinds = ["FEE", "STIPEND", "BOND", "PENALTY"] as const;
+const termOf = (t: OptionTerms, k: (typeof kinds)[number]) => ({ FEE: t.fee, STIPEND: t.stipend, BOND: t.bond, PENALTY: t.penalty })[k];
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const inst = await getInstitute((await params).slug, null);
-  return { title: inst?.college.name ?? "Institute" };
+  const college = await getCollege((await params).slug).catch(() => null);
+  return { title: college?.name ?? "Institute" };
 }
 
-type T = { fee?: { text: string; amountInr: number | null }; stipend?: { text: string }; bond?: { text: string }; penalty?: { text: string } };
-function Terms({ title, t }: { title: string; t: T }) {
+/** Fee, stipend, bond and seat-leaving penalty for one programme, each as published with its own source link. */
+function Terms({ title, t }: { title: string; t: OptionTerms }) {
   return (
     <div className="rounded-xl border border-border bg-card p-5">
       <h3 className="text-base font-semibold">{title}</h3>
-      {!t.fee && !t.stipend && !t.bond && !t.penalty ? (
+      {!kinds.some((k) => termOf(t, k)) ? (
         <p className="mt-2 text-sm text-muted-foreground">Not offered here, or not listed.</p>
       ) : (
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
-          <dt className="text-muted-foreground">Fee</dt><dd className="font-semibold">{t.fee?.amountInr != null ? `${formatLakh(t.fee.amountInr)} per year` : t.fee?.text ?? <Dash />}{t.fee?.amountInr != null && <span className="block text-xs font-normal text-muted-foreground">{t.fee.text}</span>}</dd>
-          <dt className="text-muted-foreground">Stipend</dt><dd className="font-semibold">{t.stipend?.text ?? <Dash />}</dd>
-          <dt className="text-muted-foreground">Bond</dt><dd className="font-semibold">{t.bond?.text ?? <Dash />}</dd>
-          <dt className="text-muted-foreground">Bond penalty</dt><dd className="font-semibold">{t.penalty?.text ?? <Dash />}</dd>
+          {kinds.map((k) => (
+            <Fragment key={k}>
+              <dt className="text-muted-foreground">{termLabel[k]}</dt>
+              <dd className="numeric font-semibold"><TermText term={termOf(t, k)} /></dd>
+            </Fragment>
+          ))}
         </dl>
       )}
     </div>
@@ -53,85 +66,113 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const profile = profileFromParams(sp);
   const L = decideLinks(sp);
   const slug = (await params).slug;
-  const inst = await getInstitute(slug, profile);
+  const f = parseSearchParams(schema, sp);
+  const [inst, meta] = await Promise.all([getInstitute(slug, profile), getMeta()]);
   if (!inst) notFound();
-  const { college, options, allotmentsByYear, terms } = inst;
-  const tab = tabs.find((t) => t.key === sp.get("tab"))?.key ?? "overview";
+  const { college, options, yours, allotmentsByYear, terms } = inst;
+  const tab = f.tab;
+  const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
   const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n ?? 0));
   const courses = [...new Map(options.map((o) => [o.course.slug, o.course])).values()];
+  const listed = profile ? yours : options;
+  const allotYear = yearInfo(f.year ?? 0)?.year;
+  const allotCourse = courses.find((c) => c.slug === f.course)?.slug;
 
-  const year = Number(sp.get("year")) || undefined;
-  const courseF = sp.get("course") || undefined;
-  const allot = tab === "allotments" ? await listAllotments({ year, course: courseF }, 200, college.key) : null;
+  const n2025 = allotmentsByYear.find((a) => a.year === PAST_YEARS[1])?.n ?? null;
+  const nLatest = allotmentsByYear.find((a) => a.year === LATEST_YEAR)?.n ?? null;
+
+  // Allotments tab: one page from SQL; a page past the end shows the last page.
+  const allotQ = { year: allotYear, course: allotCourse };
+  let allot = null;
+  let allotPage = 1;
+  if (tab === "allotments") {
+    allot = await listAllotments(allotQ, PAGE_SIZE, college.key, (f.page - 1) * PAGE_SIZE);
+    allotPage = Math.min(f.page, Math.max(1, Math.ceil(allot.total / PAGE_SIZE)));
+    if (allotPage < f.page) allot = await listAllotments(allotQ, PAGE_SIZE, college.key, (allotPage - 1) * PAGE_SIZE);
+  }
+  const termSources = [...kinds.map((k) => termOf(terms.md, k)?.source), ...kinds.map((k) => termOf(terms.dnb, k)?.source)];
 
   return (
-    <AppPage className="grid gap-6 py-6">
+    <AppPage className="grid grid-cols-1 gap-6">
       <div>
-        <p className="text-sm text-muted-foreground"><Link href={L.institutes()} className="underline hover:text-foreground">Institutes</Link> / {college.state}</p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-[2.25rem]">{college.name}</h1>
-        <p className="mt-1 text-muted-foreground">{college.type ?? "Type not listed"}, {college.state ?? "state not listed"}{college.pincode ? `, PIN ${college.pincode}` : ""}</p>
+        <p className="text-sm text-muted-foreground">
+          <Link href={L.institutes()} className={smallLink}>Institutes</Link>
+          {college.state && <> / <Link href={L.institutes({ state: college.state })} className={smallLink}>{college.state}</Link></>}
+        </p>
+        <PageHead title={college.name} />
+        <p className="mt-2 max-w-3xl text-muted-foreground">
+          <span className="text-sm">Address as printed by MCC: </span>{college.address ?? <Dash />}
+        </p>
       </div>
 
       <SubTabs label="Institute sections" current={tab} items={tabs.map((t) => ({ key: t.key, label: t.label, href: L.institute(slug, t.key) }))} />
 
       {tab === "overview" && (
         <>
-          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
-            {[
-              ["Courses here", String(courses.length)],
-              ["Allotments in 2025", allotmentsByYear.find((a) => a.year === 2025)?.n != null ? String(allotmentsByYear.find((a) => a.year === 2025)!.n) : "—"],
-              ["Beds", college.beds != null ? formatRank(college.beds) : "—"],
-              ["Established", college.established ? String(college.established) : "—"],
-            ].map(([k, v]) => (
-              <div key={k} className="bg-card p-5"><dt className="text-sm text-muted-foreground">{k}</dt><dd className="mt-1 text-3xl font-bold">{v}</dd></div>
-            ))}
-          </dl>
+          <StatStrip
+            items={[
+              { label: "Courses here", value: formatRank(courses.length) },
+              { label: "Course and quota options", value: formatRank(options.length) },
+              { label: `Allotments in ${PAST_YEARS[1]}`, value: n2025 != null ? formatRank(n2025) : <Dash />, note: "All rounds and seat categories; not seats" },
+              // Four cells fill the strip: hers when she has a profile, else the latest year's allotments.
+              profile
+                ? { label: "In your profile", value: formatRank(yours.length), note: "Your courses, quotas, states and caps" }
+                : { label: `Allotments in ${yearInfo(LATEST_YEAR)?.label ?? LATEST_YEAR}`, value: nLatest != null ? formatRank(nLatest) : <Dash />, note: "All seat categories; not seats" },
+            ]}
+          />
 
           <section aria-labelledby="yours" className="rounded-xl border border-border bg-card p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 id="yours" className="text-lg font-semibold">{profile ? "Your options here" : "Courses and quotas here"}</h2>
-              <Link href={L.institute(slug, "courses")} className="text-sm text-sky underline">All course details</Link>
+              <Link href={L.institute(slug, "courses")} className={`${smallLink} text-sm text-sky`}>All course details</Link>
             </div>
-            <ul className="mt-3 divide-y divide-border">
-              {options.map((o) => (
-                <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <span>
-                    <span className="font-medium">{courseName(o)}</span> <span className="text-sm text-muted-foreground">{o.quota}</span>
-                    <span className="mt-1 flex gap-3 text-sm">
-                      <Link href={L.lastRanks(o.course.slug, { inst: slug })} className="text-sky underline">Last ranks</Link>
-                      <Link href={L.institute(slug, "allotments") + `&course=${o.course.slug}`} className="text-sky underline">Allotments</Link>
+            {listed.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">None of the courses and quotas here match your profile. <Link href={L.institute(slug, "courses")} className={`${smallLink} text-sky`}>See every course here</Link></p>
+            ) : (
+              <ul className="mt-3 divide-y divide-border">
+                {listed.map((o) => (
+                  <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <span>
+                      <span className="font-medium">{courseName(o)}</span> <span className="text-sm text-muted-foreground">{o.quota}</span>
+                      <span className="flex gap-4 text-sm">
+                        <Link href={L.lastRanks(o.course.slug, { inst: slug })} className={`${smallLink} text-sky`}>Last ranks</Link>
+                        <Link href={L.institute(slug, "allotments", { course: o.course.slug })} className={`${smallLink} text-sky`}>Allotments</Link>
+                      </span>
                     </span>
-                  </span>
-                  <span className="flex items-center gap-4">
-                    {profile && <ReachBadge reach={o.reach} provisional={!!o.latest?.provisional} />}
-                    <span className="text-right"><span className="block text-xs text-muted-foreground">2025 deepest</span><Closing d={o.byYear[2025]} /></span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+                    <span className="flex items-center gap-4">
+                      {profile && <ReachBadge reach={o.reach} provisional={!!o.latest?.provisional} />}
+                      <span className="text-right"><span className="block text-xs text-muted-foreground">{PAST_YEARS[1]} deepest</span><Closing d={o.byYear[PAST_YEARS[1]]} /></span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">{HISTORY_CAPTION}{!profile && " Closing ranks shown across all seat categories."}</p>
           </section>
 
           <section aria-labelledby="trend" className="rounded-xl border border-border bg-card p-5">
             <h2 id="trend" className="text-lg font-semibold">Allotments made by year</h2>
-            <p className="mt-1 text-sm text-muted-foreground">All courses and rounds here. This counts allotments, not seats.</p>
+            <p className="mt-1 text-sm text-muted-foreground">All courses, rounds and seat categories here. This counts allotments, not seats.</p>
             <table className="mt-4 w-full max-w-xl text-sm">
               <caption className="sr-only">Allotments made by year at {college.name}</caption>
               <tbody>
                 {allotmentsByYear.map((a) => (
                   <tr key={a.year}>
-                    <th scope="row" className="w-28 py-1.5 text-left font-normal text-muted-foreground">{a.year}{a.year === 2026 && " (R1)"}</th>
-                    <td className="py-1.5">{a.n != null && <div className="h-3 rounded-r-[4px] bg-sky" style={{ width: `${(a.n / maxN) * 100}%` }} aria-hidden />}</td>
-                    <td className="w-12 py-1.5 text-right font-semibold">{a.n ?? <Dash />}</td>
+                    <th scope="row" className="w-48 py-1.5 text-left font-normal text-muted-foreground">{yearInfo(a.year)?.label ?? a.year}</th>
+                    <td className="py-1.5">{a.n != null && <div className="h-3 rounded-r-[4px] bg-mark" style={{ width: `${(a.n / maxN) * 100}%` }} aria-hidden />}</td>
+                    <td className="numeric w-16 py-1.5 text-right font-semibold">{a.n != null ? formatRank(a.n) : <Dash />}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </section>
+          <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: LATEST_YEAR }]} />
         </>
       )}
 
       {tab === "courses" && (
-        <section aria-label="Courses">
+        <section aria-labelledby="courses-h" className="grid grid-cols-1 gap-3">
+          <h2 id="courses-h" className="sr-only">Courses</h2>
           <div role="region" aria-label="Courses offered" tabIndex={0} className={tbl.wrap}>
             <table className={tbl.table}>
               <caption className="sr-only">Courses at {college.name}, with past closing ranks</caption>
@@ -140,8 +181,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Add to choices</span></th>
                   <th scope="col" className={tbl.th}>Course and quota</th>
                   <th scope="col" className={tbl.th}>{profile ? "Your reach" : "Reach"}</th>
-                  <th scope="col" className={`${tbl.th} text-right`}>2026 R1</th>
-                  <th scope="col" className={`${tbl.th} text-right`}>2025 deepest</th>
+                  <th scope="col" className={`${tbl.th} text-right`}>{LATEST_YEAR} R1</th>
+                  <th scope="col" className={`${tbl.th} text-right`}>{PAST_YEARS[1]} deepest</th>
                   <th scope="col" className={tbl.th}>Related</th>
                   <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Compare</span></th>
                 </tr>
@@ -149,17 +190,24 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               <tbody>
                 {options.flatMap((r) => [
                   <tr key={r.id} className={`expand-host ${tbl.row}`}>
-                    <td className="px-2 py-2"><ChoiceStar item={toChoiceItem(r)} /></td>
+                    {/* Without a rank the reach is unknown, so nothing would be saved with the choice: star only with a profile. */}
+                    <td className="px-2 py-2">{profile && <ChoiceStar item={toChoiceItem(r)} />}</td>
                     <th scope="row" className={`${tbl.td} text-left font-medium`}>{courseName(r)}<span className="block text-xs font-normal text-muted-foreground">{r.quota}</span></th>
                     <td className={tbl.td}>{profile ? <ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} /> : <span className="text-xs text-muted-foreground">Set your rank to see</span>}</td>
-                    <td className={tbl.num}><Closing d={r.latest} />{r.latest?.provisional && <span className="block text-xs font-normal text-sun">Provisional</span>}</td>
-                    <td className={tbl.num}><Closing d={r.byYear[2025]} /></td>
-                    <td className={`${tbl.td} whitespace-nowrap`}>
-                      <details className="mb-1"><summary className="cursor-pointer text-sky">Rounds by year</summary></details>
-                      <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="block text-sky underline">Last ranks</Link>
-                      <Link href={L.institute(slug, "allotments") + `&course=${r.course.slug}`} className="block text-sky underline">Allotments</Link>
+                    <td className={tbl.num}>
+                      <Closing d={r.latest} />
+                      {/* ReachBadge already carries the marker for "Reached in R1". */}
+                      <Provisional when={r.latest?.provisional && !(profile && r.reach === "reached-latest")} />
                     </td>
-                    <td className="px-2 py-2"><CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}`} /></td>
+                    <td className={tbl.num}><Closing d={r.byYear[PAST_YEARS[1]]} /></td>
+                    <td className={`${tbl.td} whitespace-nowrap`}>
+                      <details><summary className="cursor-pointer py-3 text-sky">Rounds by year</summary></details>
+                      <span className="flex gap-x-3">
+                        <Link href={L.lastRanks(r.course.slug, { inst: slug })} className={`${smallLink} text-sky`}>Last ranks</Link>
+                        <Link href={L.institute(slug, "allotments", { course: r.course.slug })} className={`${smallLink} text-sky`}>Allotments</Link>
+                      </span>
+                    </td>
+                    <td className="px-2 py-2"><CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}, ${r.quota}`} /></td>
                   </tr>,
                   <tr key={`${r.id}-rounds`} className="expand-row bg-muted/30">
                     <td />
@@ -169,62 +217,72 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">{HISTORY_CAPTION}{!profile && " Closing ranks shown across all seat categories."}</p>
+          <p className="text-xs text-muted-foreground">{HISTORY_CAPTION}{profile ? " Closing ranks are on the seat categories you can take." : " Closing ranks shown across all seat categories."}</p>
+          <DataSource />
         </section>
       )}
 
       {tab === "allotments" && allot && (
-        <section aria-label="Allotments" className="grid gap-4">
+        <section aria-labelledby="allot-h" className="grid grid-cols-1 gap-4">
+          <h2 id="allot-h" className="sr-only">Allotments</h2>
           <FilterBar action={`/decide/institutes/${slug}`} params={sp} cols="md:grid-cols-[1fr_1fr_auto]">
             <input type="hidden" name="tab" value="allotments" />
-            <Field label="Year"><Select name="year" value={year ? String(year) : undefined} all="All years" options={[2026, 2025, 2024].map((y) => ({ value: String(y), label: y === 2026 ? "2026 (R1, provisional)" : String(y) }))} /></Field>
-            <Field label="Course"><Select name="course" value={courseF} all="All courses" options={courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
+            <Field label="Year"><Select name="year" value={allotYear ? String(allotYear) : undefined} all="All years" options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
+            <Field label="Course"><Select name="course" value={allotCourse} all="All courses" options={courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
           </FilterBar>
-          <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">{allot.total}</span> allotments at this institute. Ranks only, never names.</p>
-          <div role="region" aria-label="Allotments at this institute" tabIndex={0} className={tbl.wrap}>
-            <table className={tbl.table}>
-              <caption className="sr-only">Allotments at {college.name}</caption>
-              <thead><tr className={tbl.headRow}>
-                <th scope="col" className={`${tbl.th} text-right`}>Rank</th><th scope="col" className={tbl.th}>Year and round</th><th scope="col" className={tbl.th}>Course</th><th scope="col" className={tbl.th}>Quota</th><th scope="col" className={tbl.th}>Seat category</th><th scope="col" className={tbl.th}>Remark</th>
-              </tr></thead>
-              <tbody>
-                {allot.rows.map((a, i) => (
-                  <tr key={i} className={tbl.row}>
-                    <td className={tbl.num}><Link href={L.rankScan(a.rank, a.year)} className="hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link></td>
-                    <td className={tbl.td}>{a.year} {roundLabel[a.round as Round]}</td>
-                    <td className={tbl.td}><Link href={L.lastRanks(a.courseSlug, { inst: slug })} className="hover:text-sky hover:underline">{a.courseName}</Link></td>
-                    <td className={tbl.td}>{a.quota}</td>
-                    <td className={tbl.td}>{a.category}</td>
-                    <td className={`${tbl.td} text-muted-foreground`}>{a.remark}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-xs text-muted-foreground">Select a rank to scan the seats allotted around it that year.</p>
+          <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
+            <span className="numeric font-semibold text-foreground">{rangeLabel({ ...allot, page: allotPage, pageSize: PAGE_SIZE })}</span> allotments at this institute, newest first. Ranks only, never names.{" "}
+            <Link href={L.allotments({ inst: slug, course: allotCourse, year: allotYear })} className={`${smallLink} text-sky`}>Open in Allotments, with fees and more filters</Link>
+          </p>
+          {allot.total === 0 ? (
+            <EmptyState title="No allotments match these filters." href={L.institute(slug, "allotments")} />
+          ) : (
+            <div role="region" aria-label="Allotments at this institute" tabIndex={0} className={tbl.wrap}>
+              <table className={tbl.table}>
+                <caption className="sr-only">Allotments at {college.name}</caption>
+                <thead><tr className={tbl.headRow}>
+                  <th scope="col" className={`${tbl.th} text-right`}>Rank</th><th scope="col" className={tbl.th}>Year and round</th><th scope="col" className={tbl.th}>Course</th><th scope="col" className={tbl.th}>Quota</th><th scope="col" className={tbl.th}>Seat category</th><th scope="col" className={tbl.th}>Remark</th>
+                </tr></thead>
+                <tbody>
+                  {allot.rows.map((a, i) => (
+                    <tr key={i} className={tbl.row}>
+                      <td className={tbl.num}><Link href={L.rankScan(a.rank, a.year)} className="hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link></td>
+                      <td className={`${tbl.td} whitespace-nowrap`}><span className="numeric">{a.year}</span> {roundLabel[a.round]} <Provisional when={a.provisional} /></td>
+                      <td className={tbl.td}><Link href={L.lastRanks(a.courseSlug, { inst: slug })} className="hover:text-sky hover:underline">{a.courseName}</Link></td>
+                      <td className={tbl.td}>{a.quota}</td>
+                      <td className={tbl.td}>{a.category}</td>
+                      <td className={`${tbl.td} text-muted-foreground`}>{a.remark}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <Pager page={allotPage} pageSize={PAGE_SIZE} total={allot.total} href={(n) => L.page(`/decide/institutes/${slug}`, n)} focusId="results" label="Allotments" />
+          <p className="text-xs text-muted-foreground">Select a rank to scan the allotments around it that year.</p>
+          <DataSource used={[...new Map(allot.rows.map((a) => [`${a.year}|${a.round}`, { year: a.year, round: a.round }])).values()]} />
         </section>
       )}
 
       {tab === "fees" && (
-        <section aria-label="Fees, stipend and bond" className="grid gap-4 md:grid-cols-2">
-          <Terms title="MD" t={terms.md} />
-          <Terms title="DNB and NBEMS Diploma" t={terms.dnb} />
-          <p className="text-sm md:col-span-2"><Link href={L.fees({ state: college.state ?? undefined })} className="text-sky underline">Compare fees with other institutes in {college.state}</Link></p>
+        <section aria-labelledby="fees-h" className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <h2 id="fees-h" className="sr-only">Fees, stipend, bond and seat-leaving penalty</h2>
+          <Terms title="Medical college seats (MD, MS, Diploma)" t={terms.md} />
+          <Terms title="DNB and NBEMS Diploma seats" t={terms.dnb} />
+          <p className="text-xs text-muted-foreground md:col-span-2">Each value is quoted as published, with a link to its document. Missing values show as a dash.</p>
+          {college.state && <p className="text-sm md:col-span-2"><Link href={L.fees({ state: college.state })} className={`${smallLink} text-sky`}>Compare fees with other institutes in {college.state}</Link></p>}
+          <div className="md:col-span-2"><DataSource terms={termSources} results={false} /></div>
         </section>
       )}
 
       {tab === "clinical" && (
-        <section aria-label="Clinical data" className="rounded-xl border border-border bg-card p-5">
-          <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
-            {["OPD per year", "IPD per year", "Bed occupancy", "Major OT", "Minor OT", "Emergency OT"].map((k) => (
-              <div key={k}><dt className="text-xs text-muted-foreground">{k}</dt><dd className="mt-1 text-2xl font-bold"><Dash /></dd></div>
-            ))}
-          </dl>
-          <p className="mt-4 text-sm text-muted-foreground">Not yet collected. For DNB hospitals this will come from their NBEMS mandatory disclosures.</p>
-        </section>
+        <EmptyState
+          title="Clinical data not collected yet"
+          description="Outpatient and inpatient numbers, bed occupancy and operating theatres aren't in the data yet. For DNB hospitals they will come from their NBEMS mandatory disclosures."
+          href={L.institute(slug, "courses")}
+          action="See the courses here"
+        />
       )}
-
-      <DataSource />
     </AppPage>
   );
 }

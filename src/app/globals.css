@@ -217,8 +217,10 @@
 .expand-row { display: none; }
 .expand-host:has(details[open]) + .expand-row { display: table-row; }
 
-/* Keep focused elements clear of the sticky header and the mobile bottom bar / floating Compare button. */
-html:has(.app) { scroll-padding-top: 5rem; scroll-padding-bottom: 6rem; }
+/* Keep focused elements clear of the sticky Astryx header (TopNav, about 4rem; it holds the Compare button, nothing floats
+   over the page) and, on phones, the 3.5rem bottom bar. Values sit above the real heights. */
+html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
+@media (min-width: 48rem) { html:has(.app) { scroll-padding-bottom: 1rem; } }
 
 @media print {
   header, footer, [data-print-hide], nav[aria-label="Decide"], nav[aria-label="Decide shortcuts"] { display: none !important; }
@@ -228,6 +230,11 @@ html:has(.app) { scroll-padding-top: 5rem; scroll-padding-bottom: 6rem; }
 
 /* Astryx neutral theme, re-tokened to the case-sheet palette (beats @layer astryx-theme). */
 @layer components {
+  /* Astryx's CSS declares :root tokens (border, color-scheme) and stays loaded after a client navigation back to the
+     site, so restate the site's own here (this layer sorts after Astryx's). Inside the app, html is chart paper. */
+  :root { color-scheme: dark; --color-border: oklch(100% 0 0 / 0.08); }
+  html:has(.app) { color-scheme: light; background: #f3f6f9; }
+
   .app [data-astryx-theme] {
     color-scheme: light;
     --font-family-body: var(--font-app), ui-sans-serif, system-ui, sans-serif;
@@ -262,3 +269,6 @@ html:has(.app) { scroll-padding-top: 5rem; scroll-padding-bottom: 6rem; }
 @utility numeric {
   font-variant-numeric: tabular-nums;
 }
+
+/* Astryx's phone menu button is 32px; the house touch target is 44px (its own rules carry high specificity). */
+.app [data-testid="mobile-nav-toggle"] { min-width: 2.75rem !important; min-height: 2.75rem !important; }

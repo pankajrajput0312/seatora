@@ -1,5 +1,6 @@
-// Shapes mirror the MCC export the real importer reads (prisma/import-mcc.ts, src/features/cutoffs/lib/import-schema.ts),
-// so the service layer can switch from demo data to Prisma without touching components. No person-level data: no names.
+// Shapes mirror the MCC export the importer reads (prisma/import-mcc.ts, src/features/cutoffs/lib/import-schema.ts).
+// No person-level data: no names.
+import type { SourceType } from "@/types/provenance";
 
 export const rounds = ["R1", "R2", "R3", "stray", "special_stray"] as const;
 export type Round = (typeof rounds)[number];
@@ -15,6 +16,8 @@ export type College = {
   name: string;
   state: string | null;
   pincode: string | null;
+  /** As printed by MCC; null when only a short name was printed. */
+  address: string | null;
   type: "Government" | "Deemed" | "Private" | "DNB hospital" | null;
   beds: number | null;
   established: number | null;
@@ -36,7 +39,18 @@ export type Cutoff = {
   n: number;
   src: string; // Source.key
 };
-export type Term = { college: string; program: "MD" | "DNB"; kind: "FEE" | "STIPEND" | "BOND" | "PENALTY"; text: string; amountInr: number | null };
+/** program "MD" = medical-college seats (MD, MS, Diploma, MCh…), "DNB" = DNB and NBEMS Diploma seats. */
+export type Term = {
+  college: string;
+  program: "MD" | "DNB";
+  kind: "FEE" | "STIPEND" | "BOND" | "PENALTY";
+  text: string;
+  amountInr: number | null;
+  /** The document the text was taken from (an MCC institute profile, an NBEMS notice…). */
+  source: { name: string; url: string | null; type: SourceType };
+};
+/** PENALTY is MCC's seat-leaving forfeit (resign / don't join from Round 2), not a bond penalty. */
+export const termLabel: Record<Term["kind"], string> = { FEE: "Fee", STIPEND: "Stipend", BOND: "Service bond", PENALTY: "Seat-leaving penalty (MCC)" };
 export type Allotment = {
   rank: number;
   category: Category;
@@ -50,6 +64,7 @@ export type Allotment = {
 };
 export type Notice = { date: string; title: string; authority: string; url: string; kind: "schedule" | "announcement" | "merit"; status?: "done" | "open" | "upcoming" };
 
+/** A whole dataset in memory: the shape of the unit-test fixture (test/decide.demo.ts). Runtime reads Postgres. */
 export type DecideData = {
   colleges: College[];
   courses: Course[];
@@ -57,8 +72,6 @@ export type DecideData = {
   cutoffs: Cutoff[];
   terms: Term[];
   allotments: Allotment[];
-  notices: Notice[];
-  isDemo: boolean;
 };
 
 /** One choosable option: an institute's course under one quota. */

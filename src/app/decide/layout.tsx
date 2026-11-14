@@ -1,29 +1,53 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Atkinson_Hyperlegible_Next } from "next/font/google";
-import { Suspense } from "react";
+import { DatabaseZap } from "lucide-react";
 import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
 import "@astryxdesign/theme-neutral/theme.css";
+import { AppPage } from "@/features/decide/components/app-page";
 import { AstryxProvider } from "@/features/decide/components/astryx-provider";
 import { DecideShell } from "@/features/decide/components/decide-shell";
+import type { ProfileMeta } from "@/features/decide/components/profile-dialog";
+import { EmptyState } from "@/features/decide/components/ui";
 import { getMeta } from "@/features/decide/service";
 
 // Inside app uses its own "case sheet" system (docs/APP_DESIGN_SYSTEM.md): light, hyperlegible numerals.
 const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
 
-// Every Decide page reads profile params, so render on request (no client-only bailout behind Suspense).
+// Every Decide page reads profile params, so render on request. No Suspense around the shell: nothing useful streams
+// before the data, and a blocking render lets notFound() answer 404 instead of a streamed 200.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: { default: "Decide", template: "%s · Decide · MEDPATH" } };
+export const viewport: Viewport = { themeColor: "#f3f6f9" }; // chart paper (--color-background inside .app)
 
 export default async function DecideLayout({ children }: { children: React.ReactNode }) {
-  const meta = await getMeta();
+  // No database (or it is down): an honest "Data unavailable" inside the app shell, never stand-in data.
+  let meta: ProfileMeta | null = null;
+  try {
+    const m = await getMeta();
+    meta = { specialties: m.specialties, degrees: m.degrees, quotas: m.quotas, states: m.states };
+  } catch (e) {
+    console.error("[decide] data unavailable", e);
+  }
   return (
     <div className={`app ${app.variable} min-h-screen`}>
       <AstryxProvider>
-        <Suspense>
-          <DecideShell meta={meta}>{children}</DecideShell>
-        </Suspense>
+        <DecideShell meta={meta ?? { specialties: [], degrees: [], quotas: [], states: [] }}>
+          {meta ? (
+            children
+          ) : (
+            <AppPage>
+              <EmptyState
+                headingLevel={1}
+                icon={DatabaseZap}
+                title="Data unavailable"
+                description="The MCC allotment data could not be loaded, so nothing is shown rather than numbers that might be wrong. Reload the page in a few minutes."
+                className="mt-6"
+              />
+            </AppPage>
+          )}
+        </DecideShell>
       </AstryxProvider>
     </div>
   );

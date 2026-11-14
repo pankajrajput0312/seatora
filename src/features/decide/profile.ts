@@ -20,31 +20,56 @@ export type Profile = z.infer<typeof profileSchema>;
 
 export const PROFILE_KEY = "medpath.profile";
 export const profileParamKeys = ["rank", "cat", "pwd", "sp", "deg", "quota", "st", "fee", "bond"] as const;
+/** Profile params that hold several values: repeated (sp=A&sp=B, what GET forms send) or comma-joined (sp=A,B). */
+const listKeys = new Set<string>(["sp", "deg", "quota", "st"]);
+
+/** Choices offered for the fee and bond caps, shared by the profile dialog and page filters. */
+export const FEE_LAKH_CHOICES = [2, 5, 10, 20, 30, 50];
+export const BOND_YEAR_CHOICES = [0, 1, 2, 3];
+/** The fee choices plus her current cap when it isn't one of them (an imported profile), so a select never drops it. */
+export const feeChoices = (current: number | null | undefined) =>
+  current != null && !FEE_LAKH_CHOICES.includes(current) ? [...FEE_LAKH_CHOICES, current].sort((a, b) => a - b) : FEE_LAKH_CHOICES;
 
 const list = (p: URLSearchParams, k: string) => p.getAll(k).flatMap((v) => v.split(",")).map((v) => v.trim()).filter(Boolean);
-const num = (v: string | null) => (v && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : null);
+const num = (v: string | null | undefined) => (v != null && v.trim() !== "" ? Number(v) : null);
+
+/** Profile params as typed values with no fallbacks (NaN for a malformed number), for strict validation (HTTP API). */
+export function profileInput(p: URLSearchParams) {
+  return {
+    rank: num(p.get("rank")?.replace(/[,\s]/g, "")),
+    category: p.get("cat") ?? "Open",
+    pwd: p.get("pwd") === "1",
+    specialties: list(p, "sp"),
+    degrees: list(p, "deg"),
+    quotas: list(p, "quota"),
+    states: list(p, "st"),
+    maxFeeLakh: num(p.get("fee")),
+    maxBondYears: num(p.get("bond")),
+  };
+}
 
 /**
  * Reads a profile from URL params; null when there's no valid rank. Each optional field is validated on its own,
  * so one bad optional value falls back to its default instead of discarding the whole profile.
  */
 export function profileFromParams(p: URLSearchParams): Profile | null {
-  const rank = profileSchema.shape.rank.safeParse(num(p.get("rank")?.replace(/[,\s]/g, "") ?? null));
+  const raw = profileInput(p);
+  const rank = profileSchema.shape.rank.safeParse(raw.rank);
   if (!rank.success) return null;
-  const field = <K extends keyof Profile>(k: K, v: unknown, fallback: Profile[K]): Profile[K] => {
-    const r = profileSchema.shape[k].safeParse(v);
+  const field = <K extends keyof Profile>(k: K, fallback: Profile[K]): Profile[K] => {
+    const r = profileSchema.shape[k].safeParse(raw[k]);
     return r.success ? (r.data as Profile[K]) : fallback;
   };
   return {
     rank: rank.data,
-    category: field("category", p.get("cat"), "Open"),
-    pwd: p.get("pwd") === "1",
-    specialties: field("specialties", list(p, "sp"), []),
-    degrees: field("degrees", list(p, "deg"), []),
-    quotas: field("quotas", list(p, "quota"), []),
-    states: field("states", list(p, "st"), []),
-    maxFeeLakh: field("maxFeeLakh", num(p.get("fee")), null),
-    maxBondYears: field("maxBondYears", num(p.get("bond")), null),
+    category: field("category", "Open"),
+    pwd: raw.pwd,
+    specialties: field("specialties", []),
+    degrees: field("degrees", []),
+    quotas: field("quotas", []),
+    states: field("states", []),
+    maxFeeLakh: field("maxFeeLakh", null),
+    maxBondYears: field("maxBondYears", null),
   };
 }
 
@@ -63,9 +88,22 @@ export function profileToParams(profile: Profile, base = new URLSearchParams()):
   return p;
 }
 
-/** Next.js searchParams object → URLSearchParams. */
+/** Next.js searchParams object → URLSearchParams. Repeated keys arrive as arrays and are kept, every value. */
 export function toURLSearchParams(sp: Record<string, string | string[] | undefined>): URLSearchParams {
   const p = new URLSearchParams();
-  for (const [k, v] of Object.entries(sp)) if (typeof v === "string") p.set(k, v);
+  for (const [k, v] of Object.entries(sp)) for (const x of [v ?? []].flat()) p.append(k, x);
+  return p;
+}
+
+/**
+ * Only the profile params, in canonical form: list params comma-joined (every repeated value kept), others first value.
+ * The one place links, hidden form fields and the shell copy the profile from the current URL.
+ */
+export function keepProfileParams(src: URLSearchParams): URLSearchParams {
+  const p = new URLSearchParams();
+  for (const k of profileParamKeys) {
+    const vs = src.getAll(k).filter((v) => v.trim() !== "");
+    if (vs.length) p.set(k, listKeys.has(k) ? vs.join(",") : vs[0]);
+  }
   return p;
 }

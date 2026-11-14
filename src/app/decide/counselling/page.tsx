@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
+import { Megaphone } from "lucide-react";
+import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
-import { DataSource } from "@/features/decide/components/data-source";
 import { Badge } from "@/components/ui/badge";
 import { PageHead } from "@/features/decide/components/bits";
+import { MccLink } from "@/features/decide/components/pages/mcc-link";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
-import { profileParamKeys, toURLSearchParams } from "@/features/decide/profile";
+import { EmptyState, smallLink } from "@/features/decide/components/ui";
+import { decideLinks } from "@/features/decide/lib/links";
+import { parseSearchParams } from "@/features/decide/lib/params";
+import { toURLSearchParams } from "@/features/decide/profile";
 import { getNotices } from "@/features/decide/service";
 
 export const metadata: Metadata = { title: "Counselling" };
@@ -13,39 +18,45 @@ const tabs = [
   { key: "announcements", label: "Announcements", kind: "announcement" },
   { key: "merit", label: "Merit lists", kind: "merit" },
 ] as const;
+const schema = z.object({ tab: z.enum(["schedule", "announcements", "merit"]).default("schedule") });
 
 const fmt = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
 export default async function CounsellingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
-  const tab = tabs.find((t) => t.key === params.get("tab")) ?? tabs[0];
+  const L = decideLinks(params);
+  const tab = tabs.find((t) => t.key === parseSearchParams(schema, params).tab)!;
+  // Only notices imported from MCC with their official link; none are loaded yet, and none are ever made up.
   const notices = (await getNotices()).filter((n) => n.kind === tab.kind);
-  const keep = new URLSearchParams();
-  for (const k of profileParamKeys) if (params.get(k)) keep.set(k, params.get(k)!);
-  const href = (key: string) => `/decide/counselling?${new URLSearchParams({ ...Object.fromEntries(keep), tab: key })}`;
 
   return (
-    <AppPage className="py-6">
-      <PageHead title="Counselling">MCC All India PG counselling 2026. Always confirm dates on the official site.</PageHead>
-      <SubTabs label="Counselling" current={tab.key} items={tabs.map((t) => ({ key: t.key, label: t.label, href: href(t.key) }))} />
+    <AppPage className="grid grid-cols-1 gap-6">
+      <PageHead title="Counselling">MCC All India PG counselling: schedule, announcements and merit lists. Always confirm dates on the official MCC site.</PageHead>
+      <SubTabs label="Counselling" current={tab.key} items={tabs.map((t) => ({ key: t.key, label: t.label, href: L.to("/decide/counselling", { tab: t.key }) }))} />
 
-      <ol className="mt-6 grid gap-2">
-        {notices.map((n) => {
-          const open = n.status === "open";
-          return (
-            <li key={n.title} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
+      {notices.length === 0 ? (
+        <EmptyState
+          icon={Megaphone}
+          title={tab.key === "announcements" ? "No announcements loaded" : `No ${tab.label.toLowerCase()} loaded`}
+          description="Decide has no feed of MCC notices yet, and it never shows made-up dates. The official MCC PG counselling site has the current schedule, announcements and results."
+        >
+          <MccLink />
+        </EmptyState>
+      ) : (
+        <ol className="grid gap-2">
+          {notices.map((n) => (
+            <li key={n.url + n.title} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
               <div>
-                <p className="font-mono text-xs text-muted-foreground"><time dateTime={n.date} className="numeric">{fmt(n.date)}</time> · {n.authority}</p>
-                <p className="mt-1">{n.title} {open && <Badge tone="info" className="ml-1 align-middle">Open now</Badge>}</p>
+                <p className="text-xs text-muted-foreground"><time dateTime={n.date} className="numeric">{fmt(n.date)}</time> · {n.authority}</p>
+                <p className="mt-1">{n.title} {n.status === "open" && <Badge tone="info" className="ml-1 align-middle">Open now</Badge>}</p>
               </div>
-              <a href={n.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-sky underline">
-                Official page<span className="sr-only"> on the {n.authority} site (opens in a new tab)</span>
+              <a href={n.url} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sm text-sky`}>
+                Official notice<span className="sr-only"> on the {n.authority} site (opens in a new tab)</span>
               </a>
             </li>
-          );
-        })}
-      </ol>
-      <div className="mt-6"><DataSource /></div>
+          ))}
+        </ol>
+      )}
     </AppPage>
   );
 }

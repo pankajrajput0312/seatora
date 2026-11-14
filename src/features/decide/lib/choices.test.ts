@@ -45,4 +45,18 @@ describe("typed into MCC follows items, not positions", () => {
     expect(parseChoices({ lists: "nope" })).toEqual(defaultChoices);
     expect(parseChoices(null)).toEqual(defaultChoices);
   });
+  it("a swap inside the typed block breaks the match (portal order differs)", () => {
+    let s = defaultChoices;
+    for (const id of ["a", "b", "c"]) s = toggleItem(s, item(id));
+    const l = markTypedUpTo(s.lists[0], 2);
+    expect(typedPrefix(l)).toBe(2);
+    expect(typedPrefix({ ...l, items: move(l.items, 1, 0) })).toBe(0); // b, a, c while the portal has a, b
+  });
+  it("keeps the good items and lists when one stored entry is bad", () => {
+    const bad = { ...item("z"), state: undefined };
+    const raw = { lists: [{ id: "x", name: "R2", items: [item("a"), bad, item("b")] }, { id: "y", name: 3 }, { id: "w", name: "R3", items: [] }], activeId: "w" };
+    const p = parseChoices(raw);
+    expect(p.lists.map((l) => [l.id, l.items.map((i) => i.id)])).toEqual([["x", ["a", "b"]], ["w", []]]);
+    expect(p.activeId).toBe("w");
+  });
 });

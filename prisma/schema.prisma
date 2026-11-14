@@ -32,39 +32,52 @@ enum CollegeType {
   CENTRAL
 }
 
-enum Quota {
-  AIQ
-  STATE
-  DEEMED
-  CENTRAL_INSTITUTE
-  MANAGEMENT
-  NRI
+enum TermKind {
+  FEE
+  STIPEND
+  BOND
+  PENALTY
 }
 
 model DataSource {
-  id            String         @id @default(cuid())
-  name          String
-  url           String?
-  type          SourceType
-  publishedAt   DateTime?
-  createdAt     DateTime       @default(now())
-  cutoffs       Cutoff[]
-  announcements Announcement[]
-  colleges      College[]
+  id              String         @id @default(cuid())
+  /// Stable import key, e.g. "mcc/2025/R1_final.pdf".
+  key             String         @unique
+  name            String
+  url             String?
+  type            SourceType
+  counsellingYear Int?
+  round           String?
+  /// Provisional result; replaced by the final one for the same year and round.
+  provisional     Boolean        @default(false)
+  publishedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  cutoffs         Cutoff[]
+  announcements   Announcement[]
+  colleges        College[]
+  terms           CollegeTerm[]
+  allotments      Allotment[]
 }
 
 model College {
   id                 String             @id @default(cuid())
   slug               String             @unique
+  /// Stable import key from the MCC dataset: 40 name letters + "#" + PIN.
+  key                String             @unique
   name               String
-  city               String
-  state              String
-  type               CollegeType
+  /// Null when the source does not state it. Never guessed.
+  city               String?
+  state              String?
+  pincode            String?
+  /// Address as printed in the MCC allotment PDFs. Null when MCC printed only a short name.
+  address            String?
+  type               CollegeType?
   sourceId           String
   source             DataSource         @relation(fields: [sourceId], references: [id])
   lastVerifiedAt     DateTime?
   verificationStatus VerificationStatus @default(PENDING)
   specialties        CollegeSpecialty[]
+  terms              CollegeTerm[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -76,6 +89,8 @@ model Specialty {
   slug     String             @unique
   name     String
   degree   String // MD, MS, DNB, Diploma
+  /// Canonical specialty code shared across degrees, e.g. "ANAESTHESIOLOGY" (MD and DNB Anaesthesiology). Set by the importer.
+  code     String?
   colleges CollegeSpecialty[]
 }
 
@@ -86,8 +101,10 @@ model CollegeSpecialty {
   college     College   @relation(fields: [collegeId], references: [id])
   specialty   Specialty @relation(fields: [specialtyId], references: [id])
   cutoffs     Cutoff[]
+  allotments  Allotment[]
 
   @@unique([collegeId, specialtyId])
+  @@index([specialtyId])
 }
 
 /// Historical rank data. Never a prediction.
@@ -96,17 +113,57 @@ model Cutoff {
   collegeSpecialtyId String
   collegeSpecialty   CollegeSpecialty   @relation(fields: [collegeSpecialtyId], references: [id])
   counsellingYear    Int
-  round              String // e.g. "R1", "R2", "Mop-up", "Stray"
-  quota              Quota
-  category           String // e.g. "GEN", "OBC", "SC", "ST", "EWS", "PwD"
+  round              String // MCC: "R1", "R2", "R3", "stray", "special_stray"
+  quota              String // MCC label verbatim, e.g. "All India", "DNB Quota", "Deemed/Paid Seats"
+  category           String // seat category: "Open", "OBC", "SC", "ST", "EWS", "<X> PwD"
   openingRank        Int?
   closingRank        Int?
+  /// Allotments made in this round (R2/R3/stray: new or upgraded only). Not the seat matrix.
+  n                  Int
   sourceId           String
   source             DataSource         @relation(fields: [sourceId], references: [id])
   lastVerifiedAt     DateTime?
   verificationStatus VerificationStatus @default(PENDING)
 
   @@unique([collegeSpecialtyId, counsellingYear, round, quota, category])
+  @@index([counsellingYear, category, closingRank])
+  @@index([sourceId])
+}
+
+/// One seat allotment as printed in an MCC result PDF: rank and seat only, never a name or roll number.
+model Allotment {
+  id                 String           @id @default(cuid())
+  collegeSpecialtyId String
+  collegeSpecialty   CollegeSpecialty @relation(fields: [collegeSpecialtyId], references: [id])
+  counsellingYear    Int
+  round              String // as Cutoff.round
+  /// NEET PG All India Rank.
+  rank               Int
+  quota              String // as Cutoff.quota
+  category           String // seat category, as Cutoff.category
+  status             String // "allotted" (R1, stray) | "fresh" | "upgraded" (R2, R3)
+  sourceId           String
+  source             DataSource       @relation(fields: [sourceId], references: [id])
+
+  @@index([counsellingYear, rank])
+  @@index([collegeSpecialtyId, counsellingYear, round])
+  @@index([sourceId])
+}
+
+/// Fee, stipend, bond or penalty text exactly as published, per college and program (MD or DNB).
+model CollegeTerm {
+  id        String     @id @default(cuid())
+  collegeId String
+  college   College    @relation(fields: [collegeId], references: [id])
+  program   String // "MD" | "DNB"
+  kind      TermKind
+  text      String
+  /// Set only when the text contains exactly one rupee figure.
+  amountInr Int?
+  sourceId  String
+  source    DataSource @relation(fields: [sourceId], references: [id])
+
+  @@unique([collegeId, program, kind])
 }
 
 model Announcement {

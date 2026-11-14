@@ -1,84 +1,113 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { z } from "zod";
+import { formatRank } from "@/features/cutoffs/lib/format";
+import { gridRounds } from "@/features/decide/api";
 import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
-import { Closing, Dash, HISTORY_CAPTION, PageHead, ReachBadge } from "@/features/decide/components/bits";
+import { Dash, HISTORY_CAPTION, PageHead, ReachBadge, TermText } from "@/features/decide/components/bits";
 import { CompareFromDevice, RemoveFromCompare } from "@/features/decide/components/compare-controls";
-import { courseName, RoundGrid } from "@/features/decide/components/options-view";
-import { formatLakh } from "@/features/decide/lib/format";
+import { ClosingCell, courseName, FeeText, RoundGrid } from "@/features/decide/components/options-view";
+import { EmptyState, smallLink } from "@/features/decide/components/ui";
 import { MAX_COMPARE } from "@/features/decide/lib/choices";
 import { decideLinks } from "@/features/decide/lib/links";
+import { parseSearchParams } from "@/features/decide/lib/params";
+import { eligibleCategories } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { getOptionsByIds, type OptionRow } from "@/features/decide/service";
+import { getMeta, getOptionsByIds, LATEST_YEAR, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
+import { termLabel } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Compare" };
 
-const rowsSpec: { label: string; cell: (r: OptionRow) => React.ReactNode }[] = [
-  { label: "Course", cell: (r) => courseName(r) },
-  { label: "Closing by year and round", cell: (r) => <RoundGrid row={r} caption={`${r.college.name}, ${courseName(r)}: closing ranks by year and round`} /> },
-  { label: "Quota", cell: (r) => r.quota },
-  { label: "State · type", cell: (r) => `${r.college.state ?? "—"} · ${r.college.type ?? "—"}` },
-  { label: "Your reach", cell: (r) => (r.reach === "no-data" && !r.byYear[2025] && !r.latest ? <Dash /> : <ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} />) },
-  { label: "2026 R1", cell: (r) => <>{<Closing d={r.latest} />}{r.latest?.provisional && <span className="block text-xs text-sun">Provisional</span>}</> },
-  { label: "2025 deepest closing", cell: (r) => <Closing d={r.byYear[2025]} /> },
-  { label: "2024 deepest closing", cell: (r) => <Closing d={r.byYear[2024]} /> },
-  {
-    label: "Allotments made (all rounds, all categories)",
-    cell: (r) => (
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 text-sm">
-        {[2024, 2025, 2026].map((y) => {
-          const cells = Object.values(r.grid[y] ?? {});
-          return [<dt key={`t${y}`} className="text-muted-foreground">{y}</dt>, <dd key={`d${y}`} className="font-semibold">{cells.length ? cells.reduce((s, c) => s + (c?.n ?? 0), 0) : <Dash />}</dd>];
-        })}
-      </dl>
-    ),
-  },
-  { label: "Fee", cell: (r) => (r.feeInr != null ? <span className="numeric">{formatLakh(r.feeInr)}/yr</span> : r.feeText ?? <Dash />) },
-  { label: "Stipend", cell: (r) => r.stipendText ?? <Dash /> },
-  { label: "Bond", cell: (r) => r.bondText ?? <Dash /> },
-  { label: "Bond penalty", cell: (r) => r.penaltyText ?? <Dash /> },
-  { label: "Clinical load", cell: () => <span className="text-muted-foreground">— Not yet collected</span> },
-];
+/** ids: repeated or comma-joined option ids; duplicates and anything past the 4th are dropped. */
+const paramsSchema = z.object({ ids: z.array(z.string().min(1).max(300)).default([]) });
 
 export default async function ComparePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
-  const ids = [...new Set((params.get("ids") ?? "").split(",").filter(Boolean))].slice(0, MAX_COMPARE);
-  const options = await getOptionsByIds(ids, profile);
+  const ids = [...new Set(parseSearchParams(paramsSchema, params, ["ids"]).ids)].slice(0, MAX_COMPARE);
+  const [options, meta] = await Promise.all([getOptionsByIds(ids, profile), getMeta()]);
   const L = decideLinks(params);
+  const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
+  const [older, last] = PAST_YEARS;
+
+  const rows: { label: string; cell: (r: OptionRow) => React.ReactNode }[] = [
+    { label: "Course", cell: (r) => courseName(r) },
+    { label: "Quota", cell: (r) => r.quota },
+    { label: "State", cell: (r) => r.college.state ?? <Dash /> },
+    {
+      label: "Your reach",
+      cell: (r) =>
+        profile ? (
+          <ReachBadge reach={r.reach} provisional={!!r.latest?.provisional} />
+        ) : (
+          <Link href={L.with("/decide/compare", { editProfile: "1" })} className={`${smallLink} text-sky`}>Set your rank to see</Link>
+        ),
+    },
+    { label: `${LATEST_YEAR} R1 closing`, cell: (r) => <ClosingCell d={r.latest} /> },
+    { label: `${last} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[last]} /> },
+    { label: `${older} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[older]} /> },
+    { label: "Closing by year and round", cell: (r) => <RoundGrid row={r} caption={`${r.college.name}, ${courseName(r)}, ${r.quota}: closing ranks by year and round`} /> },
+    {
+      label: "Allotments made (all rounds, all categories)",
+      cell: (r) => (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 text-sm">
+          {YEARS.flatMap((y) => [
+            <dt key={`t${y}`} className="text-muted-foreground">{yearLabel(y)}</dt>,
+            <dd key={`d${y}`} className="numeric text-right font-semibold">{r.allotmentsByYear[y] != null ? formatRank(r.allotmentsByYear[y]) : <Dash />}</dd>,
+          ])}
+        </dl>
+      ),
+    },
+    { label: termLabel.FEE, cell: (r) => <FeeText t={r.terms.fee} /> },
+    { label: termLabel.STIPEND, cell: (r) => <TermText term={r.terms.stipend} /> },
+    { label: termLabel.BOND, cell: (r) => <TermText term={r.terms.bond} /> },
+    { label: termLabel.PENALTY, cell: (r) => <TermText term={r.terms.penalty} /> },
+    { label: "Clinical load", cell: () => <span className="text-muted-foreground">Not collected yet</span> },
+  ];
 
   return (
     <AppPage className="py-6">
       <CompareFromDevice validIds={options.map((o) => o.id)} requested={ids} />
-      <PageHead title="Compare">Up to {MAX_COMPARE} options side by side. Add them with the compare button on Options or an institute page.</PageHead>
+      <PageHead title="Compare">Up to {MAX_COMPARE} options side by side. Add them with the compare button on Options, Choices or an institute page.</PageHead>
 
       {options.length === 0 ? (
-        <div className="mt-8 grid place-items-center gap-3 rounded-xl border border-dashed border-border px-6 py-16 text-center">
-          <p className="font-medium">Nothing to compare yet.</p>
-          <Link href="/decide/options" className="text-sm text-sky underline">Pick options to compare</Link>
-        </div>
+        <EmptyState
+          className="mt-8"
+          title="Nothing to compare yet"
+          description={`Pick up to ${MAX_COMPARE} options with the compare button, then open Compare again.`}
+          href={L.options()}
+          action="Pick options to compare"
+        />
       ) : (
         <div role="region" aria-label="Comparison" tabIndex={0} className="relative mt-8 overflow-x-auto rounded-xl border border-border bg-card [scroll-padding-inline-start:11rem]">
           <table className="w-full text-sm">
-            <caption className="sr-only">Comparison of {options.length} options</caption>
+            <caption className="sr-only">Comparison of {options.length} {options.length === 1 ? "option" : "options"}</caption>
             <thead>
               <tr className="border-b border-border align-top">
                 <td className="sticky left-0 z-10 w-44 bg-card p-3" />
-                {options.map((r) => (
+                {options.map((r, i) => (
                   <th key={r.id} id={`col-${r.id}`} tabIndex={-1} scope="col" className="p-3 text-left font-medium">
                     <div className="flex items-start justify-between gap-2">
-                      <span><Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link><span className="block text-xs font-normal text-muted-foreground">{courseName(r)}, {r.quota}</span><span className="mt-1 flex gap-3 text-xs font-normal"><Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="text-sky underline">Last ranks</Link><Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className="text-sky underline">Allotments</Link></span></span>
-                      <RemoveFromCompare id={r.id} label={`${r.college.name}, ${courseName(r)}, ${r.quota}`} nextFocus={options[options.indexOf(r) + 1]?.id ?? options[options.indexOf(r) - 1]?.id ?? null} />
+                      <span>
+                        <Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link>
+                        <span className="block text-xs font-normal text-muted-foreground">{courseName(r)}, {r.quota}</span>
+                        <span className="flex flex-wrap gap-x-4 text-xs font-normal">
+                          <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className={`${smallLink} text-sky`}>Last ranks</Link>
+                          <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={`${smallLink} text-sky`}>Allotments</Link>
+                        </span>
+                      </span>
+                      <RemoveFromCompare id={r.id} label={`${r.college.name}, ${courseName(r)}, ${r.quota}`} nextFocus={options[i + 1]?.id ?? options[i - 1]?.id ?? null} />
                     </div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rowsSpec.map((s) => (
+              {rows.map((s) => (
                 <tr key={s.label} className="border-b border-border align-top last:border-0">
                   <th scope="row" className="sticky left-0 z-10 bg-card p-3 text-left text-xs font-normal text-muted-foreground">{s.label}</th>
-                  {options.map((r) => <td key={r.id} className="p-3">{s.cell(r)}</td>)}
+                  {options.map((r) => <td key={r.id} className="numeric p-3">{s.cell(r)}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -87,7 +116,15 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       )}
       <div className="mt-6 grid gap-2 text-xs text-muted-foreground">
         <p>{HISTORY_CAPTION}</p>
-        <DataSource />
+        {options.length > 0 && (
+          <p>
+            {profile
+              ? `Closing ranks are on ${eligibleCategories(profile.category, profile.pwd).join(" or ")} seats, the seat categories you can take; each says which.`
+              : "No rank set, so closing ranks are the deepest on any seat category; each says which."}{" "}
+            Allotments count every category and round, not the seat matrix.
+          </p>
+        )}
+        <DataSource used={gridRounds(options)} terms={options.flatMap((o) => [o.terms.fee, o.terms.stipend, o.terms.bond, o.terms.penalty].map((t) => t?.source))} />
       </div>
     </AppPage>
   );

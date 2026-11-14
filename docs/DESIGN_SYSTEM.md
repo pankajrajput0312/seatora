@@ -92,7 +92,7 @@ Adapted from roook.space. Utilities are defined in `globals.css`. Use these on m
 ## Components (`src/components/ui`, built on Radix)
 Icons are Lucide, `size-4` in UI, with `strokeWidth={1.75}` and `currentColor`.
 
-- **Button.** `primary`: light fill (`bg-primary text-primary-foreground`), 90% on hover, at most one per region. `secondary`: `bg-secondary border-input`, accent on hover. `ghost`: muted text, muted fill on hover. Sizes are sm 32px, md 40px and lg 48px. Disabled is 50% opacity.
+- **Button.** `primary`: light fill (`bg-primary text-primary-foreground`), 90% on hover, at most one per region. `secondary`: `bg-secondary border-input`, `raised` on hover. `ghost`: muted text, muted fill on hover. `danger`: ember text, `ember/10` on hover, destructive actions only. Sizes are sm 36px (dense desktop-only rows), md 44px, lg 48px and icon 44px square, so md and icon meet the 44px touch target. Disabled is 50% opacity. The inside app uses the same Button ([APP_DESIGN_SYSTEM.md](APP_DESIGN_SYSTEM.md)).
 - **Input.** `bg-card border-input rounded-md h-10`. Focus sets a sky border plus the ring. Invalid sets `aria-invalid` (ember border) and shows a `text-xs text-ember` message below. Labels are visible, above the field.
 - **Card.** `rounded-lg border border-border bg-card p-6`. On hover, interactive cards get `bg-muted`. Content order: title, mono meta line, numeric data rows, then the source label.
 - **Navigation.** Sticky, 64px, translucent with blur, bottom hairline. Pixel wordmark on the left, at most 4 links in `muted-foreground` (the active one in `foreground`), with actions on the right. On mobile it becomes a Radix Dialog sheet.

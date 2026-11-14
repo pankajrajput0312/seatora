@@ -3,12 +3,22 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 // Tiny localStorage store shared by every component on the page (same key → same value, updates broadcast).
+// Values are untrusted: callers validate them with Zod (useChoices, useCompare, the shell's profile).
 const EVENT = "medpath-local";
 const cache = new Map<string, { raw: string | null; value: unknown }>();
 
+/** localStorage can throw (Safari with storage blocked, quota): treat that as "nothing saved". */
+function getRaw(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
-  const raw = localStorage.getItem(key);
+  const raw = getRaw(key);
   const hit = cache.get(key);
   if (hit && hit.raw === raw) return hit.value as T;
   let value: T = fallback;
@@ -20,7 +30,11 @@ function read<T>(key: string, fallback: T): T {
 }
 
 export function writeLocal<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    return; // not saved; the page keeps working for this visit
+  }
   window.dispatchEvent(new CustomEvent(EVENT, { detail: key }));
 }
 

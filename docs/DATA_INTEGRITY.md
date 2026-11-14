@@ -4,7 +4,7 @@ Seatora informs decisions that shape doctors' careers. Wrong data is worse than 
 
 ## Absolute rules
 1. **Never fabricate** college data, cutoffs, seats, fees, stipends, bonds, rankings, reviews, testimonials, user identities or announcements.
-2. **Demo data must be labelled** visibly in the UI as "Demo data — illustrative only", and it lives in clearly named files (`*.demo.ts`).
+2. **Demo data must be labelled** visibly in the UI as "Demo data — illustrative only", and it lives in clearly named files (`*.demo.ts`). Decide has none at runtime: its fixture (`features/decide/test/decide.demo.ts`) is imported by tests only, and with no database Decide shows "Data unavailable", never stand-in numbers.
 3. **Historical is not predictive.** Cutoffs and rank-based results always say they come from previous years and do not guarantee admission. Do not use words like "guaranteed", "you will get" or "chance %" unless a validated statistical method is documented.
 4. **Missing data is shown as missing** ("—" or "Not available"), never as 0 and never estimated silently.
 5. **No invented scores.** Do not create composite "college scores" or rankings unless the method is documented and sourced.

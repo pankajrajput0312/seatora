@@ -1,142 +1,179 @@
 import type { Metadata } from "next";
-import { AppPage } from "@/features/decide/components/app-page";
-import { DataSource } from "@/features/decide/components/data-source";
+import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { HISTORY_CAPTION, SetRankPrompt } from "@/features/decide/components/bits";
+import { AppPage } from "@/features/decide/components/app-page";
+import { HISTORY_CAPTION, PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
 import { ChartCard, LabelBars, RankStrip, RoundTrend } from "@/features/decide/components/charts";
-import { StatStrip, TopChoices } from "@/features/decide/components/dashboard-parts";
-import { reachLabel, reachOrder } from "@/features/decide/lib/reach";
-import { profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
-import { dashboard, getNotices, isDemoData } from "@/features/decide/service";
-import { roundLabel } from "@/features/decide/types";
+import { ChoicesStat, TopChoices } from "@/features/decide/components/dashboard-parts";
+import { DataSource } from "@/features/decide/components/data-source";
+import { MCC_PG } from "@/features/decide/components/pages/mcc-link";
+import { smallLink, StatStrip } from "@/features/decide/components/ui";
+import { decideLinks } from "@/features/decide/lib/links";
+import { eligibleCategories, reachLabel, reachOrder } from "@/features/decide/lib/reach";
+import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
+import { dashboard, getMeta, getNotices, LATEST_YEAR, PAST_YEARS } from "@/features/decide/service";
 
 export const metadata: Metadata = { title: "Overview" };
-const label = (r: (typeof reachOrder)[number]) => reachLabel(r, 2026, [2024, 2025]);
+const label = (r: (typeof reachOrder)[number]) => reachLabel(r, LATEST_YEAR, PAST_YEARS);
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const profile = profileFromParams(toURLSearchParams(await searchParams));
-  if (!profile) return <AppPage className="py-6"><h1 className="text-3xl font-bold tracking-tight">Overview</h1><SetRankPrompt path="/decide" /></AppPage>;
+  const params = toURLSearchParams(await searchParams);
+  const profile = profileFromParams(params);
+  if (!profile) return <AppPage><PageHead title="Overview" /><SetRankPrompt path="/decide" /></AppPage>;
 
-  const [d, notices] = await Promise.all([dashboard(profile), getNotices()]);
-  const q = (extra: Record<string, string>) => `?${new URLSearchParams({ ...Object.fromEntries(profileToParams(profile)), ...extra })}`;
+  const [d, notices, meta] = await Promise.all([dashboard(profile), getNotices(), getMeta()]);
+  const L = decideLinks(params);
   const schedule = notices.filter((n) => n.kind === "schedule").sort((a, b) => a.date.localeCompare(b.date));
-  // Round status comes from announcements only (brief); hidden when there is none.
+  // Round status only from a real MCC announcement; none loaded → nothing shown.
   const open = notices.find((n) => n.kind === "announcement" && n.status === "open");
-  const demo = await isDemoData();
   const reached = d.counts["reached-latest"] + d.counts["reached-both"] + d.counts["reached-one"];
+  const latestR1 = meta.sources.find((s) => s.year === LATEST_YEAR && s.round === "R1");
+  const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
 
   return (
-    <AppPage className="grid gap-6 py-6">
+    <AppPage className="grid grid-cols-1 gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
-          <p className="mt-1 text-muted-foreground">AIR {formatRank(profile.rank)}, {profile.category}{profile.pwd ? " PwD" : ""}. MCC All India counselling 2026.</p>
+          <PageHead title="Overview" />
+          <p className="mt-1 text-muted-foreground">AIR <span className="numeric">{formatRank(profile.rank)}</span>, {profile.category}{profile.pwd ? " PwD" : ""}. Closing ranks below are on {seats} seats, the seat categories you can take.</p>
         </div>
         {open && (
-          <p className="flex items-center gap-2 rounded-lg border border-sky/30 bg-sky/10 px-3 py-2 text-sm">
+          <p className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm">
             <span className="size-2 rounded-full bg-leaf" aria-hidden />
-            <strong className="font-semibold">{open.title.replace(/^Demo notice:\s*/, "")}</strong>
-            {demo && <span className="rounded-sm bg-sun/15 px-1.5 text-xs text-sun">Demo</span>}
-            <a href={open.url} target="_blank" rel="noopener noreferrer" className="text-sky underline">MCC site<span className="sr-only"> (opens in a new tab)</span></a>
+            <strong className="font-semibold">{open.title}</strong>
+            <a href={open.url} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>MCC notice<span className="sr-only"> (opens in a new tab)</span></a>
           </p>
         )}
       </div>
 
-      <StatStrip
-        items={[
-          { label: "Options in your profile", value: String(d.total), note: `${d.strip.length} courses, ${d.counts["closed-before"]} closed before your rank` },
-          { label: "Reached your rank in some round", value: String(reached), note: `${d.counts["reached-latest"]} of them in 2026 R1 (provisional)`, href: `/decide/options${q({})}` },
-          { label: "Within 10% in a past round", value: String(d.counts["within-10"]), note: "Worth a look in later rounds", href: `/decide/options${q({ reach: "within-10" })}` },
-        ]}
-      />
+      <section aria-label="Your options in numbers" className="grid gap-2">
+        <StatStrip
+          items={[
+            { label: "Options in your profile", value: formatRank(d.total), note: `${formatRank(d.strip.length)} ${d.strip.length === 1 ? "course" : "courses"}, ${formatRank(d.counts["closed-before"])} closed before your rank` },
+            {
+              label: "Reached your rank in a past round",
+              value: formatRank(reached),
+              note: (
+                <span className="inline-flex flex-wrap items-center gap-x-1.5">
+                  <Link href={L.options()} className={smallLink}>{formatRank(d.counts["reached-latest"])} of them in {LATEST_YEAR} R1</Link>
+                  <Provisional when={latestR1?.provisional} />
+                </span>
+              ),
+            },
+            { label: "Within 10% in a past round", value: formatRank(d.counts["within-10"]), note: <Link href={L.options({ reach: "within-10" })} className={smallLink}>Closed just before your rank: see them</Link> },
+          ]}
+        >
+          <ChoicesStat />
+        </StatStrip>
+        <DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR, round: "R1" }]} />
+      </section>
 
       <ChartCard
-        source={<DataSource />}
+        source={<DataSource used={[{ year: 2025 }]} />}
         className="chart-paper"
         title="Where your rank sits"
-        subtitle="Each dot is one option's deepest closing rank in 2025, in seat categories you can take. Dots right of your line closed after your rank."
+        subtitle={`Each dot is one option's deepest closing rank in 2025, on ${seats} seats. Dots at or right of your line closed at or after your rank.`}
         legend={
           <>
-            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-sky" />Reached your rank in 2025</span>
+            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-mark" />Closed at or after your rank in 2025</span>
             <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-muted-foreground/60" />Closed before your rank</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-3 w-0.5 bg-foreground" />Your rank</span>
           </>
         }
         table={
           <table className="w-full text-sm">
-            <caption className="sr-only">2025 deepest closing rank per option</caption>
-            <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th scope="col" className="py-2">Course</th><th scope="col">Institute</th><th scope="col">Quota</th><th scope="col" className="text-right">2025 closing</th><th scope="col" className="pl-3">vs your rank</th></tr></thead>
+            <caption className="sr-only">2025 deepest closing ranks of your options, on {seats} seats, by course</caption>
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th scope="col" className="py-2">Course</th>
+                <th scope="col" className="text-right">Options</th>
+                <th scope="col" className="text-right">At or after your rank</th>
+                <th scope="col" className="text-right">Before your rank</th>
+                <th scope="col" className="text-right">Deepest closing</th>
+                <th scope="col" className="text-right">Median</th>
+                <th scope="col" className="text-right">Shallowest</th>
+              </tr>
+            </thead>
             <tbody>
-              {d.strip.flatMap((r) => r.points.map((p) => (
-                <tr key={p.id} className="border-b border-border">
-                  <td className="py-1.5">{r.course.degree} {r.course.name}</td><th scope="row" className="text-left font-normal">{p.name}</th><td>{p.quota}</td>
-                  <td className="numeric text-right">{formatRank(p.closing)} <span className="text-xs text-muted-foreground">{roundLabel[p.round]}</span></td>
-                  <td className="pl-3">{p.reached ? "Reached" : "Closed before"}</td>
+              {d.summary.map((s) => (
+                <tr key={s.course.slug} className="border-b border-border">
+                  <th scope="row" className="py-1.5 text-left font-normal">{s.course.degree} {s.course.name}</th>
+                  <td className="numeric text-right">{formatRank(s.options)}</td>
+                  <td className="numeric text-right">{formatRank(s.reached)}</td>
+                  <td className="numeric text-right">{formatRank(s.closedBefore)}</td>
+                  <td className="numeric text-right">{formatRank(s.deepest)}</td>
+                  <td className="numeric text-right">{formatRank(s.median)}</td>
+                  <td className="numeric text-right">{formatRank(s.shallowest)}</td>
                 </tr>
-              )))}
+              ))}
             </tbody>
           </table>
         }
       >
-        <RankStrip rank={profile.rank} rows={d.strip.map((r) => ({ course: `${r.course.degree} ${r.course.name}`, points: r.points }))} query={q({})} />
+        <RankStrip rank={profile.rank} rows={d.strip.map((r) => ({ course: `${r.course.degree} ${r.course.name}`, points: r.points }))} />
+        <p className="mt-2 text-xs text-muted-foreground">Every option, with its round and seat category, is on <Link href={L.options({ closed: true })} className={`${smallLink} text-sky`}>Options</Link>.</p>
       </ChartCard>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.4fr]">
         <ChartCard
-          source={<DataSource />}
+          source={<DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR, round: "R1" }]} />}
           title="Options by label"
           subtitle="From past closing ranks only. Select a label to see those options."
           table={
             <table className="w-full text-sm">
               <caption className="sr-only">Options by label</caption>
-              <tbody>{reachOrder.map((r) => <tr key={r} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{label(r)}</th><td className="numeric text-right">{d.counts[r]}</td></tr>)}</tbody>
+              <tbody>{reachOrder.map((r) => <tr key={r} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{label(r)}</th><td className="numeric text-right">{formatRank(d.counts[r])}</td></tr>)}</tbody>
             </table>
           }
         >
-          <LabelBars rows={reachOrder.filter((r) => r !== "no-data" || d.counts[r] > 0).map((r) => ({ label: label(r), count: d.counts[r], href: `/decide/options${q({ reach: r, closed: "1" })}`, accent: r.startsWith("reached") }))} />
+          <LabelBars rows={reachOrder.filter((r) => r !== "no-data" || d.counts[r] > 0).map((r) => ({ label: label(r), count: d.counts[r], href: L.options({ reach: r, closed: true }), accent: r.startsWith("reached") }))} />
         </ChartCard>
 
         <ChartCard
-          source={<DataSource />}
+          source={<DataSource used={[{ year: 2025 }]} />}
           title="How closing ranks moved through 2025"
-          subtitle="Median closing rank per round for each course. Later rounds usually close deeper."
+          subtitle={`Median closing rank per round across your options, on ${seats} seats, in 2025.`}
           table={
             <table className="w-full text-sm">
-              <caption className="sr-only">Median 2025 closing rank by round</caption>
+              <caption className="sr-only">Median 2025 closing rank by round, on {seats} seats</caption>
               <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th scope="col" className="py-2">Course</th>{["R1", "R2", "R3", "Stray"].map((r) => <th key={r} scope="col" className="text-right">{r}</th>)}</tr></thead>
-              <tbody>{d.trend.map((t) => <tr key={t.course.slug} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{t.course.degree} {t.course.name}</th>{t.points.map((p) => <td key={p.round} className="numeric text-right">{p.median ? formatRank(p.median) : "—"}</td>)}</tr>)}</tbody>
+              <tbody>{d.trend.map((t) => <tr key={t.course.slug} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{t.course.degree} {t.course.name}</th>{t.points.map((p) => <td key={p.round} className="numeric text-right">{formatRank(p.median)}</td>)}</tr>)}</tbody>
             </table>
           }
         >
           <div className="grid gap-3 sm:grid-cols-2">
-            {d.trend.map((t) => <RoundTrend key={t.course.slug} title={`${t.course.degree} ${t.course.name}`} href={`/decide/last-ranks${q({ course: t.course.slug })}`} rank={profile.rank} points={t.points} />)}
+            {d.trend.map((t) => <RoundTrend key={t.course.slug} title={`${t.course.degree} ${t.course.name}`} href={L.lastRanks(t.course.slug)} rank={profile.rank} points={t.points} />)}
           </div>
         </ChartCard>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section aria-labelledby="timeline" className="rounded-xl border border-border bg-card p-5">
-          <h2 id="timeline" className="text-base font-semibold">Counselling timeline</h2>
-          <ol className="mt-4 grid gap-0">
-            {schedule.map((n, i) => {
-              const done = n.status === "done", now = n.status === "open";
-              return (
+          <h2 id="timeline" className="text-base font-semibold">Counselling dates</h2>
+          {schedule.length ? (
+            <ol className="mt-4 grid gap-0">
+              {schedule.map((n, i) => (
                 <li key={n.title} className="grid grid-cols-[1.25rem_1fr] gap-3">
                   <span className="flex flex-col items-center" aria-hidden>
-                    <span className={`mt-1.5 size-3 rounded-full border-2 ${now ? "border-sky bg-sky" : done ? "border-foreground bg-foreground" : "border-input bg-card"}`} />
+                    <span className="mt-1.5 size-3 rounded-full border-2 border-input bg-card" />
                     {i < schedule.length - 1 && <span className="w-px flex-1 bg-border" />}
                   </span>
                   <span className="pb-4">
                     <span className="block text-sm font-medium">{n.title}</span>
-                    <span className="block text-xs text-muted-foreground">{fmtDate(n.date)}{now ? ", open now" : done ? ", done" : ""}</span>
+                    <span className="numeric block text-xs text-muted-foreground">{fmtDate(n.date)}</span>
                   </span>
                 </li>
-              );
-            })}
-          </ol>
+              ))}
+            </ol>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              No MCC schedule is loaded here yet, so no dates are shown. Check them on the{" "}
+              <a href={MCC_PG} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>MCC PG counselling site<span className="sr-only"> (opens in a new tab)</span></a>.
+            </p>
+          )}
         </section>
-        <TopChoices href={`/decide/choices${q({})}`} />
+        <TopChoices />
       </div>
 
       <div className="grid gap-2 text-xs text-muted-foreground">

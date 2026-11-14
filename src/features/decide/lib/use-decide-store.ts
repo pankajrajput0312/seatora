@@ -2,8 +2,9 @@
 
 import { useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { profileParamKeys } from "../profile";
+import { PROFILE_KEY, profileSchema, type Profile } from "../profile";
 import { CHOICES_KEY, compareSchema, COMPARE_KEY, defaultChoices, parseChoices, type ChoicesState } from "./choices";
+import { decideLinks } from "./links";
 import { useLocal } from "./local-store";
 
 /** Choice lists from localStorage, Zod-validated (a malformed value falls back instead of crashing). */
@@ -28,14 +29,18 @@ export function useCompare(): [string[], (fn: (ids: string[]) => string[]) => vo
   return [ids, update];
 }
 
-/** Adds the current profile params to an in-app href (client side). */
-export function useProfileHref() {
+/** decideLinks for client components, from the current URL (keeps every repeated profile value). */
+export function useDecideLinks() {
   const sp = useSearchParams();
-  return (path: string, extra: Record<string, string> = {}, hash = "") => {
-    const p = new URLSearchParams();
-    for (const k of profileParamKeys) if (sp.get(k)) p.set(k, sp.get(k)!);
-    for (const [k, v] of Object.entries(extra)) p.set(k, v);
-    const qs = p.toString();
-    return `${path}${qs ? `?${qs}` : ""}${hash}`;
-  };
+  return useMemo(() => decideLinks(sp.toString()), [sp]);
+}
+
+/** The saved profile, Zod-validated (null when missing or malformed). */
+export function useSavedProfile(): [Profile | null, (p: Profile) => void, boolean] {
+  const [raw, setRaw, hydrated] = useLocal<unknown>(PROFILE_KEY, null);
+  const profile = useMemo(() => {
+    const r = profileSchema.safeParse(raw);
+    return r.success ? r.data : null;
+  }, [raw]);
+  return [profile, setRaw, hydrated];
 }

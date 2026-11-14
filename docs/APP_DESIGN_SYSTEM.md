@@ -22,16 +22,26 @@ Scoped by the `.app` wrapper and by `.app [data-astryx-theme]`, both in `src/app
 Fonts: `--font-app`, which is Atkinson Hyperlegible Next, used for body, headings and numbers alike. There's no pixel or monospace face inside the app.
 
 ## Layout
-- Astryx `AppShell` (`height="auto"`, `variant="section"`): the banner slot holds the demo notice, `TopNav` carries the brand and "Back to site", and `SideNav` holds the rank "patient band" card plus the 8 section tabs (Lucide icons). Astryx provides the skip link, the main landmark and the mobile drawer. On phones there's also a bottom bar with Options, Choices and Rank scan.
+- Astryx `AppShell` (`height="auto"`, `variant="section"`): the sticky `TopNav` carries the brand, the Compare tray button ("2/4", only when the tray has items; on phones it is a fourth item in the bottom bar) and "Back to site"; `SideNav` holds the rank "patient band" card plus 11 items in Plan, Research and Counselling groups (Lucide icons). Astryx provides the skip link, the main landmark and the mobile drawer. On phones there's also a bottom bar with Options, Choices and Rank scan. Nothing floats over the page, and `scroll-padding` (globals.css) sits above the header and bottom-bar heights, so a focused control is never hidden.
+- The profile dialog renders inside `.app` (no portal), so it uses these tokens. 404 (`decide/not-found.tsx`), errors (`decide/error.tsx`) and "Data unavailable" (no database) render in the shell as an `EmptyState`.
 - Content is left-aligned and divided by ruled hairlines and sheets, never floating shadowed cards. Headline numbers sit in one ruled **stat strip** (`StatStrip`), not as separate cards.
 - Labels are sentence case. There are no all-caps eyebrows and no monospace labels.
 
 ## Charts (dataviz skill)
 - Use the emphasis form: one accent (chart-ink blue) plus grey context. There are no categorical multi-hue series, because the palette validator failed our 4-hue set for colour-blind readers.
-- Marks: 2px lines, ≥8px markers with a 2px ring in the surface colour, bars at most 24px thick with a 4px rounded end. Grid lines are solid hairlines.
-- Every chart has a legend when there are 2 or more series, selective direct labels, hover and focus tooltips (value first, then label), and a "Show as table" view (`ChartCard`).
+- Marks use `--color-mark` (`fill-mark`, `stroke-mark`, `bg-mark`); `sky` is for text and links. 2px lines, ≥8px markers with a 2px ring in the surface colour, bars at most 24px thick with a 4px rounded end. Grid lines are solid hairlines.
+- Every chart has a legend when there are 2 or more series, selective direct labels, hover tooltips (value first, then label), and a "Show as table" view (`ChartCard`). A chart is one `role="img"` with a summary label; its marks are not tab stops (the strip has hundreds), the table view carries the numbers. Table views summarise (per course: count, deepest, median, shallowest) rather than list every option; the full list is the Options page.
 - The memorable element is the **"Where your rank sits"** strip chart on faint ECG-style grid paper (`.chart-paper`), with the doctor's rank as the cursor line. Everything else stays quiet.
 - Big standalone numbers use proportional figures. Table columns use `numeric` (tabular).
 
+## Inside-app primitives (`src/features/decide/components`)
+- `AppPage`: page frame (`min-w-0`; for grid pages use `grid grid-cols-1 gap-6`). `PageHead`: the h1 (`#main-h1`, focusable) and intro.
+- `FilterBar` + `Field` + `Select` + `control` (ui.tsx): GET filter forms that keep the profile; Apply keeps focus. `FilterDropdown`: multi-select pill (one open at a time, closes on Escape and focus-out).
+- `tbl` (ui.tsx): table classes; numbers right-aligned in `numeric`. `Pager` + `rangeLabel`: server-side pages, focus moves to the results heading. `StatStrip` / `StatCell`: headline numbers.
+- `EmptyState` (ui.tsx, Astryx EmptyState on a dashed sheet): the one empty, no-results, not-found and unavailable state, with a heading and an action. `SetRankPrompt` uses it.
+- `DataSource`: provenance under every data block, from the data (MCC result PDFs per year and round, term documents). `TermText`: a fee, stipend, bond or seat-leaving penalty exactly as published, with its source link. `termLabel` (types.ts) names them; PENALTY is MCC's seat-leaving forfeit, never "bond penalty".
+- `Provisional` (bits.tsx): the one warning marker, shown only when the data's source is provisional (`Source.provisional`, `GridCell.provisional`, `Deepest.provisional`); never tied to a year. `ReachBadge`, `Closing` (closing rank with its round and seat category), `Dash` ("—" with sr-only "not available").
+- `SubTabs`: link sub-navigation. `smallLink`: a 44px-tall link for notes and cross-links. Counts and ranks go through `formatRank` (Indian grouping).
+
 ## Adding inside-app UI
-Prefer Astryx components (`npx @astryxdesign/cli component <Name>` for docs). Where an existing Seatora component already fits, reuse it; the scoped tokens restyle it. Don't import Astryx CSS outside `src/app/decide/layout.tsx`.
+Prefer Astryx components (`npx @astryxdesign/cli component <Name>` for docs): Decide uses AppShell, SideNav, TopNav and EmptyState; tables, selects and filter bars are the Seatora primitives above. Where an existing Seatora component already fits, reuse it; the scoped tokens restyle it. Astryx CSS is imported only in `src/app/decide/layout.tsx`, but it stays loaded after a client navigation back to the site, so `globals.css` restates the site's `:root` border and colour scheme after the Astryx layers. Buttons: see [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) (md and icon are 44px).
