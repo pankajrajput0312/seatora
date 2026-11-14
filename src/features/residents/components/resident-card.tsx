@@ -94,8 +94,12 @@ export function PortraitPreview() {
     <ul className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="What each resident card shows">
       {labels.map((label, i) => (
         <li key={label} className="group/portrait rise-in" style={{ "--i": i } as React.CSSProperties}>
-          <Portrait seed={label} tint={tints[i]} />
-          <p className={cn("mt-3 font-pixel text-lg", tints[i].text)}>{label}</p>
+          <Portrait seed={label} tint={tints[i]}>
+            {/* Among Us-style name label: white pixel text with a black outline, floating above the head. */}
+            <span className="absolute inset-x-0 top-[5%] z-10 text-center font-pixel text-lg leading-none text-white [text-shadow:2px_0_0_var(--color-black),-2px_0_0_var(--color-black),0_2px_0_var(--color-black),0_-2px_0_var(--color-black),2px_2px_0_var(--color-black),-2px_-2px_0_var(--color-black),2px_-2px_0_var(--color-black),-2px_2px_0_var(--color-black)] sm:text-xl md:text-2xl">
+              {label}
+            </span>
+          </Portrait>
         </li>
       ))}
     </ul>
