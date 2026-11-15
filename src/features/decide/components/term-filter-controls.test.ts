@@ -23,12 +23,11 @@ describe("TermFilterControls", () => {
     expect(html).toContain('aria-label="About not declared"');
   });
 
-  it("nothing applied: any, include-not-declared unticked; the less-used fields fold on phones", () => {
+  it("nothing applied: any, include-not-declared unticked", () => {
     const html = render("");
     expect(selected(html, "maxfee")).toBe("");
     expect(checked(html, "nd", "keep")).toBe(false);
-    expect(html).toMatch(/<label class="[^"]*more-filter[^"]*"><span class="sr-only">Stipend/);
-    expect(html).not.toMatch(/<label class="[^"]*more-filter[^"]*"><span class="sr-only">Fee/);
+    expect(html).toContain('<span class="sr-only">Stipend per month, at least</span>');
   });
 
   it("her profile's caps are the default, and Any clears them; a value off the list is kept", () => {

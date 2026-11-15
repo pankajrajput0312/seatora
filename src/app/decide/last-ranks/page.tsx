@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ColourLegend } from "@/features/decide/components/colour-legend";
 import Link from "next/link";
 import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
@@ -19,7 +20,7 @@ import { chosenView } from "@/features/decide/server/view";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { statKeys } from "@/features/decide/lib/stat-format";
-import { anyTermFilter, readTermFilters, splitByTerms, termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
+import { anyTermFilter, readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
 import { baseCategories, roundLabel, rounds, type Round } from "@/features/decide/types";
@@ -128,13 +129,14 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const sort = f.sort ? { year: Number(sortYear), round: sortRound as Round, dir: f.dir } : undefined;
   const filtered = anyTermFilter(tp.filters);
   const base = { specialty: course.specialty, degree: course.degree, category, quota, sort };
-  const [lr, all, inst, info] = await Promise.all([
+  const [lr, all, inst, info, view] = await Promise.all([
     lastRanks({ ...base, terms: tp.filters }),
     // A term filter set: every row as well, to count those left out only for a value not declared (as Rank scan), and
     // to tell an institute the filters hide from one with no closing.
     filtered ? lastRanks(base) : null,
     f.inst ? getCollege(f.inst) : null,
     hospitalInfo(),
+    chosenView(params, VIEW),
   ]);
 
   // The service builds every row for the course anyway (one SQL read); only this page's rows are rendered. A link
@@ -237,12 +239,12 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
     <AppPage className="grid grid-cols-1 gap-6">
       <PageHead title="Last ranks" about={about}>Newest year first.</PageHead>
 
-      <FilterBar action="/decide/last-ranks" params={params} cols="md:grid-cols-4 [&>label]:min-w-0" more={!!quota || !!f.since || termMoreOpen(tp.params)}>
+      <FilterBar action="/decide/last-ranks" params={params} cols="md:grid-cols-4 [&>label]:min-w-0" active={chips.length} clear={clear}>
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         <Field label="Course"><Select name="course" value={course.slug} options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
         <Field label="Seat category"><Select name="lcat" value={category} options={categories.map((c) => ({ value: c, label: c }))} /></Field>
-        <Field label="Quota" className="more-filter"><Select name="lquota" value={quota} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
-        <Field label="From year" className="more-filter"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
+        <Field label="Quota"><Select name="lquota" value={quota} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
+        <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
         <TermFilterControls f={tp.params} caps={profile} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
@@ -278,10 +280,10 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                 Include <span className="numeric mx-1">{formatRank(unknown)}</span> not declared
               </Link>
             )}
-          </p>
+           <ColourLegend className="ml-1 align-middle" /></p>
           <DataSource used={years.map((year) => ({ year }))} />
         </div>
-        {lr.total > 0 && <ViewToggle page={VIEW} />}
+        {lr.total > 0 && <ViewToggle page={VIEW} view={view} />}
       </div>
 
       {/* Her institute (a link from it, #inst-…) in view in either view: its card above the list. */}
@@ -296,7 +298,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       ) : (
         <ViewPanes
           page={VIEW}
-          view={await chosenView(params, VIEW)}
+          view={view}
           cards={
             <ResultCards title={caption} hideTitle>
               {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} course={courseRef} mine={inst?.slug === r.college.slug} />)}

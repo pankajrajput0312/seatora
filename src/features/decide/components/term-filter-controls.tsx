@@ -8,8 +8,7 @@ import { control } from "./ui";
 
 // The term filters' controls (lib/term-filters.ts params) for a GET filter form: FilterBar (grid) or a flex bar
 // (Options, Seats). Native selects, checkboxes and <details>: they work without JS. Each select names itself in its
-// options ("Fee up to ₹5 L/yr"), so it needs no visible label; the less-used ones carry `more` (MoreFilters folds them
-// on phones; open it with termMoreOpen).
+// options ("Fee up to ₹5 L/yr"), so it needs no visible label. List pages put them in their Filters panel.
 
 const box = "w-full min-w-0 sm:w-auto sm:min-w-52";
 
@@ -36,11 +35,11 @@ const num = (v: unknown) => (typeof v === "number" ? v : null);
 const choices = (k: keyof typeof termChoices, v: number | null) => withCurrent(termChoices[k], v).map((n) => ({ value: String(n), label: termValueLabel[k](n) }));
 
 /**
- * College type, fee/yr, bond years (incl. No bond), then (folded on phones by `more`) stipend, bond ₹, leaving ₹ and
+ * College type, fee/yr, bond years (incl. No bond), then stipend, bond ₹, leaving ₹ and
  * "Include not declared". `f`: the parsed params (readTermFilters(...).params). `caps`: her profile's fee and bond caps
  * where the page applies them (Options, Fees): "Your cap: …" is the default and "Any" clears it.
  */
-export function TermFilterControls({ f, caps, more = "more-filter" }: { f: TermParams; caps?: Pick<Profile, "maxFeeLakh" | "maxBondYears"> | null; more?: string }) {
+export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Profile, "maxFeeLakh" | "maxBondYears"> | null }) {
   const fee = caps?.maxFeeLakh ?? null;
   const yrs = caps?.maxBondYears ?? null;
   return (
@@ -67,10 +66,10 @@ export function TermFilterControls({ f, caps, more = "more-filter" }: { f: TermP
         any={yrs != null ? `Your cap: ${termValueLabel.bondyrs(yrs)}` : "Any bond"}
         options={[...(yrs != null ? [{ value: "any", label: "Any bond" }] : []), ...choices("bondyrs", num(f.bondyrs))]}
       />
-      <TermSelect name="minstip" label="Stipend per month, at least" value={f.minstip} any="Any stipend" options={choices("minstip", f.minstip ?? null)} className={more} />
-      <TermSelect name="maxbond" label="Bond amount, at most" value={f.maxbond} any="Any bond ₹" options={choices("maxbond", f.maxbond ?? null)} className={more} />
-      <TermSelect name="maxleave" label="Leaving penalty, at most" value={f.maxleave} any="Any leaving ₹" options={choices("maxleave", f.maxleave ?? null)} className={more} />
-      <span className={cn("flex min-h-11 items-center gap-1 text-sm", more)}>
+      <TermSelect name="minstip" label="Stipend per month, at least" value={f.minstip} any="Any stipend" options={choices("minstip", f.minstip ?? null)} />
+      <TermSelect name="maxbond" label="Bond amount, at most" value={f.maxbond} any="Any bond ₹" options={choices("maxbond", f.maxbond ?? null)} />
+      <TermSelect name="maxleave" label="Leaving penalty, at most" value={f.maxleave} any="Any leaving ₹" options={choices("maxleave", f.maxleave ?? null)} />
+      <span className="flex min-h-11 items-center gap-1 text-sm">
         <label className="flex min-h-11 cursor-pointer items-center gap-2">
           <input type="checkbox" name="nd" value="keep" defaultChecked={f.nd === "keep"} className="size-5 accent-sky" />
           Include not declared

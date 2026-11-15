@@ -47,7 +47,27 @@ export type StatCell = {
   /** "—": not in the data (screen readers hear it). */
   missing?: true;
   tip: TipLine[];
+  /** Display colour only (docs/APP_DESIGN_SYSTEM.md "Colour key"), never a new reading; `levelWord` says it in words. */
+  level?: Level;
+  levelWord?: string;
 };
+
+/**
+ * The colour of a value: good (green: no bond, a low fee), caution (amber: a bond of 1-2 years or years not stated, a
+ * stipend below the NBEMS minimum), strong (orange: a bond of 3 years or more), heavy (red: ₹25 L or more to pay for
+ * not serving or for leaving, a high fee). No level: plain ink. Unknown and "—" stay grey (tone "muted").
+ */
+export type Level = "good" | "caution" | "strong" | "heavy";
+/** ₹25 L: from here a bond or leaving amount is "high" (red). */
+export const HIGH_PENALTY = 25e5;
+/**
+ * Fee bands a year, by course type: MD/MS and Diploma low under ₹1 L, high from ₹5 L; DNB and NBEMS Diploma (NBEMS lets a
+ * hospital charge at most ₹1.25 L) low under ₹1.25 L, high above it. Between: no colour. An NBEMS maximum (no figure
+ * of the college's own) and a sum paid at admission get no band.
+ */
+const FEE_BANDS = { "MD/MS": [1e5, 5e5], Diploma: [1e5, 5e5], DNB: [125000, 125001], "NBEMS Diploma": [125000, 125001] } as const;
+export const feeBandText = "MD/MS and Diploma: low under ₹1 L a year, high from ₹5 L. DNB and NBEMS Diploma: low under the NBEMS maximum of ₹1.25 L, high above it.";
+const levelOf = (c: StatCell, level: Level | undefined, word: string | undefined): StatCell => (level ? { ...c, level, levelWord: word } : c);
 
 export const NOT_IN_DATA = "Not in Seatora's MCC data yet.";
 const NOT_CHECKED = "Not checked yet: Seatora has no bond record for this programme.";
@@ -107,7 +127,13 @@ function feeCell(t: ProgrammeTerms): StatCell {
   const own = [f.atAdmission && "at admission", f.declared != null && "GST removed"].filter(Boolean).join(" · ") || null;
   const marker = f.above ? "above NBEMS max" : f.kind === "maximum" ? "max" : own;
   const warn = f.above || f.declared != null;
-  return { ...c, short: inrRange(f.min, f.inr), full: inrRange(f.min, f.inr, false), marker, ...(warn && { markerWarn: true as const }), tone: null, tip };
+  const cell: StatCell = { ...c, short: inrRange(f.min, f.inr), full: inrRange(f.min, f.inr, false), marker, ...(warn && { markerWarn: true as const }), tone: null, tip };
+  const [low, high] = FEE_BANDS[t.programme as keyof typeof FEE_BANDS] ?? [];
+  if (f.kind === "maximum" || f.atAdmission || low == null) return cell;
+  const band = f.above || f.inr >= high ? "high" : f.inr < low ? "low" : null;
+  if (!band) return cell;
+  const word = `${band === "high" ? "High" : "Low"} fee for ${t.programme}`;
+  return { ...levelOf(cell, band === "high" ? "heavy" : "good", word), tip: [...tip, { text: `${word} (${feeBandText})` }] };
 }
 
 function stipendCell(t: ProgrammeTerms): StatCell {
@@ -126,7 +152,7 @@ function stipendCell(t: ProgrammeTerms): StatCell {
     ...(s.kind === "minimum" ? [{ text: NBEMS_MIN }] : s.kind === "nmc" ? [{ text: NMC }] : []),
   ];
   const marker = s.below ? "below NBEMS min" : s.kind === "minimum" ? "min" : s.kind === "nmc" ? "NMC list" : s.plusDa ? "+ DA" : null;
-  return { ...c, short: inrShort(s.inr), full: inrFull(s.inr), marker, ...(s.below && { markerWarn: true as const }), tone: null, tip };
+  return levelOf({ ...c, short: inrShort(s.inr), full: inrFull(s.inr), marker, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
 }
 
 /** A bond that is not declared: why ("Unknown": the record's words; "—": no record, or a record for other courses). */
@@ -165,14 +191,17 @@ function bondCell(t: ProgrammeTerms): StatCell {
   if (b.status === "none") {
     const caveat = !!(b.caveat || b.stateRule);
     const marker = caveat ? "caveat" : b.basis === "nbems_rule" ? "NBEMS rule" : null;
-    return { ...c, short: "No bond", full: "No bond", marker, ...(caveat && { markerWarn: true as const }), tone: null, tip: noBondTip(t) };
+    return levelOf({ ...c, short: "No bond", full: "No bond", marker, ...(caveat && { markerWarn: true as const }), tone: null, tip: noBondTip(t) }, caveat ? undefined : "good", undefined);
   }
   if (b.status !== "declared") return bondMissing(t, c);
   const full = b.years == null ? "Years not stated" : b.yearsSum ? `${b.yearsSum} = ${yrs(b.years)}` : yrs(b.years);
   // A document's summary marking its years as the state's rule, with no rule record behind them (Rajasthan).
   const summaryYears = b.basis !== "state_rule" && !b.yearsFrom && !b.stateRule && STATE_YEARS.test(b.text ?? "");
+  const long = b.years != null && b.years >= 3;
   return {
     ...c,
+    level: long ? "strong" : "caution",
+    levelWord: long ? "a bond of 3 years or more" : b.years == null ? "a bond, years not stated" : "a bond of 1 to 2 years",
     short: b.years == null ? "Yes" : `${b.years}Y`,
     full,
     marker: b.basis === "state_rule" || b.yearsFrom || summaryYears ? "state rule" : b.stateRule ? "+ state rule" : null,
@@ -206,7 +235,7 @@ const partLines = (parts: TermPart[], src: number | null): TipLine[] => parts.ma
 function bondInrCell(t: ProgrammeTerms): StatCell {
   const c = { key: "bondInr", label: statLabel.bondInr, about: "bond amount" } as const;
   const b = t.bond;
-  if (b.status === "none") return { ...c, short: "None", full: "None", marker: null, tone: "muted", tip: [{ text: "No bond, so no bond amount." }, ...noBondTip(t)] };
+  if (b.status === "none") return levelOf({ ...c, short: "None", full: "None", marker: null, tone: "muted", tip: [{ text: "No bond, so no bond amount." }, ...noBondTip(t)] }, b.caveat || b.stateRule ? undefined : "good", undefined);
   if (b.status !== "declared") return bondMissing(t, c);
   const a = b.amount;
   const head: TipLine = { text: "What you pay if you do not serve the bond (bond penalty)." };
@@ -216,8 +245,10 @@ function bondInrCell(t: ProgrammeTerms): StatCell {
   const rule = b.amounts.find((p) => p.rule);
   const ruleLine: TipLine[] = rule ? [{ text: "From the state's rule, as the bond years are, not the college's own bond document.", src: rule.src, warn: true }] : [];
   if (a.state === "figure" && a.max != null) {
+    const high = a.max >= HIGH_PENALTY;
     return {
       ...c, short: amountValue(a, true), full: amountValue(a, false), marker: amountMarker(a) ?? (rule ? "state rule" : null), tone: "bond",
+      level: high ? "heavy" : "caution", levelWord: high ? "₹25 L or more" : "a bond amount",
       tip: [head, { text: `${amountValue(a, false)} for this course.`, src: rule?.src ?? b.src }, ...ruleLine, ...amountLines(a, b.years), ...parts, ...other],
     };
   }
@@ -245,7 +276,7 @@ function leavingCell(t: ProgrammeTerms): StatCell {
   }
   const tip = [head, ...partLines(b.leaving, b.src), ...amountLines(a, null), ...other, ...forfeit];
   if (a.state !== "figure" || a.max == null) return words(c, tip);
-  return { ...c, short: amountValue(a, true), full: amountValue(a, false), marker: amountMarker(a), tone: null, tip };
+  return levelOf({ ...c, short: amountValue(a, true), full: amountValue(a, false), marker: amountMarker(a), tone: null, tip }, a.max >= HIGH_PENALTY ? "heavy" : undefined, "₹25 L or more");
 }
 
 /** The five cells of one course's terms, in order: Fee, Stipend, Bond, Bond ₹, Leaving. */

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ColourLegend } from "@/features/decide/components/colour-legend";
 import Link from "next/link";
 import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
@@ -18,7 +19,7 @@ import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle"
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { readTermFilters, termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
+import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, LATEST_YEAR, listInstitutes, PAST_YEARS } from "@/features/decide/service";
 
@@ -47,7 +48,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const { params: tp, filters: tf } = readTermFilters(params, profile);
   const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort === "beds" ? ("name" as const) : f.sort };
   const pg = { page: f.page, pageSize: PAGE_SIZE };
-  const [meta, info, byTerms] = await Promise.all([getMeta(), hospitalInfo(), institutesByTerms(tf, f.course)]);
+  const [meta, info, byTerms, view] = await Promise.all([getMeta(), hospitalInfo(), institutesByTerms(tf, f.course), chosenView(params, "institutes")]);
   // Term filters and the beds sort need the whole list here: then this page pages it.
   // ponytail: whole list, then a page (≈2,000 institutes, reach for her options only); move into listInstitutes if slow.
   const local = !!byTerms || f.sort === "beds";
@@ -177,8 +178,19 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         about={<>Every institute in the MCC results: where it is, its type and beds, the courses it offers and how many allotments were made there in {PAST_YEARS[1]} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments, fees and bond.</>}
       />
 
-      <FilterBar action={PATH} params={params} cols="md:grid-cols-3 xl:grid-cols-4" more={termMoreOpen(tp)}>
-        <Field label="Search"><input name="q" defaultValue={f.q} placeholder="Name or state" className={control} /></Field>
+      <FilterBar
+        action={PATH}
+        params={params}
+        cols="md:grid-cols-3 xl:grid-cols-4"
+        active={chips.length}
+        clear={clear}
+        search={
+          <label className="min-w-56 flex-1">
+            <span className="sr-only">Search institutes by name or state</span>
+            <input type="search" name="q" defaultValue={f.q} placeholder="Search name or state" className={control} />
+          </label>
+        }
+      >
         <Field label="State"><Select name="state" value={f.state} all="All states" options={meta.states.map((s) => ({ value: s, label: s }))} /></Field>
         <Field label="Course"><Select name="course" value={f.course} all="Any course" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
         <Field label="Sort"><Select name="sort" value={f.sort} options={[...sorts]} /></Field>
@@ -195,11 +207,11 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
               <Link href={L.with(PATH, { nd: "keep", page: null })} className={`${smallLink} text-sky`}>Include them</Link>
             </>
           )}
-        </p>
-        {res.total > 0 && <ViewToggle page="institutes" />}
+         <ColourLegend className="ml-1 align-middle" /></p>
+        {res.total > 0 && <ViewToggle page="institutes" view={view} />}
       </div>
 
-      {res.total === 0 ? <EmptyState title="No institutes match these filters." href={L.to(PATH, { maxfee: "any", bondyrs: "any" })} /> : <ViewPanes page="institutes" view={await chosenView(params, "institutes")} cards={cards} table={table} />}
+      {res.total === 0 ? <EmptyState title="No institutes match these filters." href={L.to(PATH, { maxfee: "any", bondyrs: "any" })} /> : <ViewPanes page="institutes" view={view} cards={cards} table={table} />}
 
       <Pager page={res.page} pageSize={res.pageSize} total={res.total} href={(n) => L.page(PATH, n)} focusId="results" label="Institutes" />
 

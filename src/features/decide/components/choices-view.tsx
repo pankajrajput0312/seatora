@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowDown, ArrowUp, Check, Download, GripVertical, Trash2 } from "lucide-react";
@@ -25,7 +25,7 @@ import { ResultCard } from "./result-card";
 import { TermStatCells } from "./stat-cells";
 import { TypeBadge } from "./type-badge";
 import { control, EmptyState, smallLink, tbl } from "./ui";
-import { useView, ViewToggle } from "./view-toggle";
+import { ViewToggle, type View } from "./view-toggle";
 
 /** `reach` null: no rank in the address (terms and hospital only; the stored label stays). */
 type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; fees: ProgrammeTerms; hospital: RowHospital }>;
@@ -36,19 +36,14 @@ const StatCellsM = memo(TermStatCells);
 const TypeBadgeM = memo(TypeBadge);
 const BedsM = memo(Beds);
 
-const WIDE = "(min-width: 48rem)"; // Tailwind md: ViewToggle's default (cards below it, the table from it up)
-const onWide = (cb: () => void) => {
-  const m = window.matchMedia(WIDE);
-  m.addEventListener("change", cb);
-  return () => m.removeEventListener("change", cb);
-};
 /**
  * Reach labels and seats per list (`lists`: the newest round's clear, virtual, new) from the current data for these ids
  * and profile params (a server action); with no rank only the terms and hospital. null when unavailable.
  */
 type ReachFor = (ids: string[], profile: string) => Promise<{ lists: SeatList[]; options: Live } | null>;
 
-export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
+/** `view`: Cards or table on show (chosenView "choices"). Only that one is rendered: its controls carry the ids focus moves to. */
+export function ChoicesView({ reachFor, view }: { reachFor?: ReachFor; view: View }) {
   const [state, setState, hydrated] = useChoices();
   const L = useDecideLinks();
   const sp = useSearchParams();
@@ -59,10 +54,6 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
   const [removed, setRemoved] = useState<{ listId: string; listName: string; item: ChoiceItem; index: number } | null>(null);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const dragFrom = useRef<number | null>(null);
-  // Cards or table (ViewToggle "choices"). Only the one shown is rendered: its controls carry the ids focus moves to.
-  const chosen = useView("choices");
-  const wide = useSyncExternalStore(onWide, () => window.matchMedia(WIDE).matches, () => false);
-  const view = chosen ?? (wide ? "table" : "cards");
 
   const items = list.items;
   const n = items.length;
@@ -401,7 +392,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
 
       {/* As on every results page: Cards | Table, then the CSV. */}
       <div className="flex flex-wrap items-center gap-2" data-print-hide>
-        <ViewToggle page="choices" />
+        <ViewToggle page="choices" view={view} />
         <Button variant="secondary" disabled={!n} onClick={download} aria-label={`Download CSV of ${list.name}`}><Download className="size-4" aria-hidden />CSV</Button>
         <Button variant="secondary" disabled={!n} onClick={copy}>Copy in MCC order</Button>
         <Button variant="secondary" disabled={!n} onClick={() => window.print()}>Print</Button>

@@ -3,10 +3,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { FilterBar } from "./ui";
-import { paneClass, parseView, VIEW_PARAM, viewHref, ViewField, ViewPanes, ViewToggle } from "./view-toggle";
+import { deviceView, parseView, VIEW_PARAM, viewHref, ViewField, ViewPanes, ViewToggle } from "./view-toggle";
 
 let query = "";
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(query), useRouter: () => ({ refresh() {}, replace() {} }) }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(query) }));
 vi.mock("next/form", () => ({ default: (p: React.ComponentProps<"form">) => createElement("form", p) }));
 
 describe("view toggle", () => {
@@ -22,27 +22,29 @@ describe("view toggle", () => {
     expect(viewHref(null, "table")).toBe("?layout=table");
   });
 
-  it("shows the chosen pane, else cards below md and the table from md", () => {
-    expect([paneClass("cards", "cards"), paneClass("cards", "table")]).toEqual([undefined, "hidden"]);
-    expect([paneClass("table", "cards"), paneClass("table", "table")]).toEqual(["hidden", undefined]);
-    expect([paneClass(null, "cards"), paneClass(null, "table")]).toEqual(["md:hidden", "max-md:hidden"]);
+  it("nothing chosen: cards on a phone, the table elsewhere", () => {
+    const iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Safari/604.1";
+    const androidPhone = "Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile Safari/537.36";
+    const androidTablet = "Mozilla/5.0 (Linux; Android 14) Chrome/130 Safari/537.36";
+    expect([deviceView(iphone, null), deviceView(androidPhone, null), deviceView(androidTablet, null), deviceView(null, null)]).toEqual(["cards", "cards", "table", "table"]);
+    expect([deviceView(androidTablet, "?1"), deviceView(androidPhone, "?0")]).toEqual(["cards", "table"]);
   });
 
-  it("renders links that work without JS, the address's choice marked current", () => {
+  it("renders links that work without JS, the view on show marked current", () => {
     query = "rank=42284&cat=OBC&view=all&layout=table";
-    const html = renderToStaticMarkup(createElement(ViewToggle, { page: "test" }));
+    const html = renderToStaticMarkup(createElement(ViewToggle, { page: "test", view: "table" }));
     expect(html).toContain('role="group" aria-label="View as"');
     expect(html).toContain('href="?rank=42284&amp;cat=OBC&amp;view=all&amp;layout=cards"');
     expect(html).toMatch(/<a href="\?rank=42284&amp;cat=OBC&amp;view=all&amp;layout=table" aria-current="true"[^>]*>.*Table<\/a>/);
     expect(html.match(/aria-current/g)).toHaveLength(1);
+    expect(html).not.toContain("<button");
   });
 
-  it("with nothing chosen, marks neither current (CSS shows the breakpoint's)", () => {
+  it("the view the server picked (her cookie, the device) is marked even with no `layout` in the address", () => {
     query = "rank=1";
-    const html = renderToStaticMarkup(createElement(ViewToggle, { page: "test" }));
-    expect(html).not.toContain("aria-current");
-    expect(html).toContain("max-md:text-sky");
-    expect(html).toContain("md:text-sky");
+    const html = renderToStaticMarkup(createElement(ViewToggle, { page: "test", view: "cards" }));
+    expect(html).toMatch(/<a href="\?rank=1&amp;layout=cards" aria-current="true"/);
+    expect(html.match(/aria-current/g)).toHaveLength(1);
   });
 
   it("the server can read the param: view-toggle.tsx is not a client module (its exports would be references there)", () => {
@@ -50,10 +52,9 @@ describe("view toggle", () => {
     expect(VIEW_PARAM).toBe("layout");
   });
 
-  it("panes: the page's known choice renders that pane alone (the other is fetched when she picks it)", () => {
-    query = "layout=table";
+  it("panes: only the view on show is rendered", () => {
     expect(renderToStaticMarkup(createElement(ViewPanes, { page: "test", view: "table", cards: "C", table: "T" }))).toBe('<div data-view-pane="table">T</div>');
-    expect(renderToStaticMarkup(createElement(ViewPanes, { page: "test", view: null, cards: "C", table: "T" }))).toContain("C</div>");
+    expect(renderToStaticMarkup(createElement(ViewPanes, { page: "test", view: "cards", cards: "C", table: "T" }))).toBe('<div data-view-pane="cards">C</div>');
   });
 
   it("Apply keeps the address's choice, without JS too: FilterBar carries it, nothing else does", () => {
@@ -63,15 +64,5 @@ describe("view toggle", () => {
     expect(form.match(/type="hidden" name="[^"]+" value="[^"]*"/g)).toEqual(['type="hidden" name="rank" value="1"', 'type="hidden" name="layout" value="cards"']);
     query = "layout=list";
     expect(renderToStaticMarkup(createElement(ViewField))).toBe("");
-  });
-
-  it("panes: both rendered, the address picks one", () => {
-    query = "view=all&layout=cards";
-    const html = renderToStaticMarkup(createElement(ViewPanes, { page: "test", cards: "C", table: "T" }));
-    expect(html).toBe('<div data-view-pane="cards">C</div><div data-view-pane="table" class="hidden">T</div>');
-    query = "view=nope";
-    expect(renderToStaticMarkup(createElement(ViewPanes, { page: "test", cards: "C", table: "T" }))).toBe(
-      '<div data-view-pane="cards" class="md:hidden">C</div><div data-view-pane="table" class="max-md:hidden">T</div>',
-    );
   });
 });

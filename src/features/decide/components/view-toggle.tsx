@@ -1,24 +1,26 @@
-import { ViewPanesClient } from "./view-toggle-client";
-
-// Cards | Table for a results page. The choice is `layout=cards|table` in the address (works without JS: two links;
-// `layout`, not `view`: Options' and Seats' `view` is their own list view), and
-// with JS it is saved per page on the device (and in a cookie the server reads: server/view.ts), so it survives Apply,
-// paging and the nav links. Nothing chosen: cards below md, the table
-// from md up (CSS only, so the first paint is right on every screen).
-// No "use client" here: the server reads VIEW_PARAM and parseView too (a client module's exports are only references
-// there), and ViewPanes drops the pane not shown before it reaches the client. The hooks and buttons are in
-// view-toggle-client.tsx.
+// Cards | Table for a results page. The server renders only the view on show (half the HTML or less): the choice is
+// `layout=cards|table` in the address (`layout`, not `view`: Options' and Seats' `view` is their own list view), else
+// the one she picked last on this device (a cookie the toggle sets, server/view.ts chosenView), else cards on a phone
+// and the table elsewhere (deviceView). Switching is a navigation to `?layout=…` (links: works without JS).
+// No "use client" here: the server reads VIEW_PARAM, parseView and ViewPanes; the toggle is in view-toggle-client.tsx.
 
 export type View = "cards" | "table";
 
 /** The address param of the choice. */
 export const VIEW_PARAM = "layout";
 
-/** A `layout` value from the address or the device (untrusted): only the two views, else null. */
+/** A `layout` value from the address or the cookie (untrusted): only the two views, else null. */
 export const parseView = (v: unknown): View | null => (v === "cards" || v === "table" ? v : null);
 
-/** The cookie that tells the server the choice saved on the device (chosenView), so a return visit gets one pane. */
+/** The cookie that tells the server the choice she made on this device, per page. */
 export const viewCookie = (page: string) => `medpath.view.${page}`;
+
+/**
+ * Nothing chosen: cards on a phone, the table elsewhere. `mobileHint`: the Sec-CH-UA-Mobile header (Chromium sends it
+ * by default), else the user agent's "Mobi" (phones; Android tablets leave it out), iPhone or iPod.
+ */
+export const deviceView = (ua: string | null, mobileHint: string | null): View =>
+  mobileHint === "?1" || (mobileHint !== "?0" && /Mobi|iPhone|iPod/i.test(ua ?? "")) ? "cards" : "table";
 
 /** This page's address with `layout` set, every other param kept (relative: "?…"). */
 export const viewHref = (params: URLSearchParams | null, v: View) => {
@@ -27,19 +29,12 @@ export const viewHref = (params: URLSearchParams | null, v: View) => {
   return `?${p}`;
 };
 
-/** A pane's classes: the chosen view shows, the other is hidden; nothing chosen, the breakpoint decides. */
-export const paneClass = (chosen: View | null, pane: View) =>
-  chosen ? (chosen === pane ? undefined : "hidden") : pane === "cards" ? "md:hidden" : "max-md:hidden";
-
-export { useView, ViewField, ViewToggle } from "./view-toggle-client";
+export { ViewField, ViewToggle } from "./view-toggle-client";
 
 /**
- * Both views of the same results, one shown (`paneClass`): pages render `cards` and `table` from the same rows, so the
- * toggle switches without a round trip. Give ids (a Pager focus target) to elements outside the panes, never inside.
- * `view`: the choice the address names, when the page knows it (`parseView(params.get(VIEW_PARAM))`): only that pane
- * is rendered (half the HTML: every row's (i) tips once, not twice), and the toggle fetches the page again for the
- * other. Only the pane on show cites its documents in the page's Sources.
+ * The view on show of the same results (`view`: chosenView on the server, or passed down to a client list). Only that
+ * one is rendered, so only it cites its documents in the page's Sources. `page`: the toggle's key, for the reader.
  */
-export function ViewPanes({ page, view, cards, table }: { page: string; view?: View | null; cards: React.ReactNode; table: React.ReactNode }) {
-  return view ? <ViewPanesClient page={page} only={view}>{view === "cards" ? cards : table}</ViewPanesClient> : <ViewPanesClient page={page} cards={cards} table={table} />;
+export function ViewPanes({ view, cards, table }: { page: string; view: View; cards: React.ReactNode; table: React.ReactNode }) {
+  return <div data-view-pane={view}>{view === "cards" ? cards : table}</div>;
 }

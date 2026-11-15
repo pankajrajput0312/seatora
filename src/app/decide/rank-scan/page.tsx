@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ColourLegend } from "@/features/decide/components/colour-legend";
 import Link from "next/link";
 import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
@@ -17,7 +18,7 @@ import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle"
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankValue } from "@/features/decide/lib/params";
-import { readTermFilters, splitByTerms, termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
+import { readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankScan } from "@/features/decide/service";
 import { statKeys } from "@/features/decide/lib/stat-format";
@@ -80,13 +81,21 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         about="Allotments to ranks near yours, round by round, in one year's MCC results: every course and seat category. In R2 and later only new or upgraded allotments are listed."
       />
 
-      <FilterBar action="/decide/rank-scan" params={params} cols="md:grid-cols-4 [&>label]:min-w-0" more={!!round || termMoreOpen(tp.params)}>
-        <Field label="Rank">
-          <input name="scan" inputMode="numeric" defaultValue={typed ?? rank ?? ""} placeholder="e.g. 42,284" aria-invalid={invalid || undefined} aria-describedby={invalid ? "scan-error" : undefined} className={`${control} numeric`} />
-        </Field>
+      <FilterBar
+        action="/decide/rank-scan"
+        params={params}
+        cols="md:grid-cols-4 [&>label]:min-w-0"
+        active={chips.length}
+        clear={clear}
+        search={
+          <Field label="Rank" className="w-48">
+            <input name="scan" inputMode="numeric" defaultValue={typed ?? rank ?? ""} placeholder="e.g. 42,284" aria-invalid={invalid || undefined} aria-describedby={invalid ? "scan-error" : undefined} className={`${control} numeric`} />
+          </Field>
+        }
+      >
         <Field label="Year"><Select name="year" value={year ? String(year.year) : undefined} options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
         <Field label="Range"><Select name="w" value={f.w} options={windows.map((w) => ({ value: w, label: `± ${formatRank(Number(w))}` }))} /></Field>
-        <Field label="Round" className="more-filter"><Select name="round" value={round} all="All rounds" options={(year?.rounds ?? []).map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
+        <Field label="Round"><Select name="round" value={round} all="All rounds" options={(year?.rounds ?? []).map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
         <TermFilterControls f={tp.params} caps={profile} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
@@ -111,10 +120,10 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                     Include <span className="numeric mx-1">{formatRank(unknown.length)}</span> not declared
                   </Link>
                 )}
-              </p>
+               <ColourLegend className="ml-1 align-middle" /></p>
               <DataSource used={[{ year: year.year }]} />
             </div>
-            {groups.length > 0 && <ViewToggle page={VIEW} />}
+            {groups.length > 0 && <ViewToggle page={VIEW} view={view} />}
           </div>
           {groups.length === 0 && <EmptyState title="No allotments in this range" description="No seat was allotted to these ranks that year, or none passed the filters. Try a wider range, another year or fewer filters." />}
           {groups.map((g) => {

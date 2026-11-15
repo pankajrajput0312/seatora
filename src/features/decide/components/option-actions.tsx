@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ColourLegend } from "./colour-legend";
 import Link from "next/link";
 import { GitCompareArrows, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ import { ResultCard, ResultCards } from "./result-card";
 import { TermStatCells } from "./stat-cells";
 import { TypeBadge } from "./type-badge";
 import { smallLink, tbl } from "./ui";
-import { ViewPanes, ViewToggle } from "./view-toggle";
+import { ViewPanes, ViewToggle, type View } from "./view-toggle";
 
 export function ChoiceStar({ item }: { item: ChoiceItem }) {
   const [state, setState] = useChoices();
@@ -179,11 +180,11 @@ function OptionCard({ r, L, n, latestYear, pastYears, includeLatest, seatLists, 
 }
 
 /**
- * Options as cards and as a table (ViewPanes: cards below md, the table from md up, unless she picks one). A row's
+ * Options as cards or as a table (ViewPanes `view`). A row's
  * "Rounds by year" grid is rendered only once she opens it (it is most of a row's markup). `start` = rows before these,
  * for data-item numbering (focus after Show more: FocusItem picks the visible pane's).
  */
-function OptionsList({ rows, caption, start, L, latestYear, pastYears, includeLatest, seatLists }: { rows: ListRow[]; caption: string; start: number; L: DecideLinks } & Years) {
+function OptionsList({ rows, caption, start, L, view, latestYear, pastYears, includeLatest, seatLists }: { rows: ListRow[]; caption: string; start: number; L: DecideLinks; view: View } & Years) {
   const [older, last] = pastYears;
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string, on: boolean) =>
@@ -258,7 +259,7 @@ function OptionsList({ rows, caption, start, L, latestYear, pastYears, includeLa
       {rows.map((r, i) => <OptionCard key={r.id} r={r} L={L} n={start + i + 1} {...years} open={open} toggle={toggle} />)}
     </ResultCards>
   );
-  return <ViewPanes page="options" cards={cards} table={table} />;
+  return <ViewPanes page="options" view={view} cards={cards} table={table} />;
 }
 
 /**
@@ -267,7 +268,7 @@ function OptionsList({ rows, caption, start, L, latestYear, pastYears, includeLa
  * `tools`: after the Cards | Table toggle beside the count (the CSV download). `historyMore`: what the closing
  * ranks count, behind the history note's (i).
  */
-export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, tools, historyMore, latestYear, pastYears, includeLatest, seatLists }: {
+export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, tools, historyMore, view, latestYear, pastYears, includeLatest, seatLists }: {
   initial: ListRow[];
   page: number;
   pageSize: number;
@@ -277,6 +278,8 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
   firstPageHref?: string;
   tools?: React.ReactNode;
   historyMore?: React.ReactNode;
+  /** Cards or table on show (chosenView "options"). */
+  view: View;
 } & Years) {
   const L = useDecideLinks();
   const [rows, setRows] = useState(initial);
@@ -310,15 +313,15 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
           <p id="options-count" aria-live="polite" className="text-sm text-muted-foreground">
             Showing <span className="numeric font-semibold text-foreground">{formatRank(start + 1)}–{formatRank(shown)}</span> of <span className="numeric">{formatRank(total)}</span> options
             {firstPageHref && <> · <Link href={firstPageHref} className={`${smallLink} text-sky`}>Back to the first</Link></>}
-          </p>
+           <ColourLegend className="ml-1 align-middle" /></p>
           <HistoryNote more={historyMore} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ViewToggle page="options" />
+          <ViewToggle page="options" view={view} />
           {tools}
         </div>
       </div>
-      <OptionsList rows={rows} caption={caption} start={start} L={L} latestYear={latestYear} pastYears={pastYears} includeLatest={includeLatest} seatLists={seatLists} />
+      <OptionsList rows={rows} caption={caption} start={start} L={L} view={view} latestYear={latestYear} pastYears={pastYears} includeLatest={includeLatest} seatLists={seatLists} />
       {shown < total && (
         <div className="grid justify-items-center gap-2">
           {/* aria-disabled, not disabled: the button keeps focus while the next page loads. */}

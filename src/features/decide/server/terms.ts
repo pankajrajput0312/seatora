@@ -558,6 +558,10 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     // An item with neither figure nor quote says only who and when: the profile's own words say what is forfeited.
     else if (w) resignForfeitText = p.bare && read?.forfeitText ? { text: `${w.text}: "${read.forfeitText.text}"`, src: read.forfeitText.src } : { text: w.text, src: src(w.url) };
   } else if (penT) unread.push({ kind: "PENALTY", text: penT.text, src: srcOf(penT, null) });
+  // A state rule's own seat-leaving penalty (its record's words; the college has no PENALTY record of its own here):
+  // the Leaving cell shows "See text" with them, never a figure read out of the words.
+  const rulePenalty = bond.basis === "state_rule" && bondT?.details && "status" in bondT.details ? bondT.details.penalty : null;
+  if (rulePenalty && !bond.leaving.length) bond = { ...bond, leaving: [{ text: `State rule${bondT!.details && "state" in bondT!.details && bondT!.details.state ? ` (${bondT!.details.state})` : ""}: ${rulePenalty}`, inr: null, group: "all", src: bond.src ?? undefined }], leavingAmount: { ...NONE, state: "words" } };
   resignForfeit ??= read?.forfeit ?? null;
   if (!resignForfeit && !resignForfeitText && read?.forfeitText) resignForfeitText = read.forfeitText;
 

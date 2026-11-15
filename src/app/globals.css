@@ -336,3 +336,26 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; background: var(--color-raised, var(--color-muted)); }
 }
+
+/* Colour key (docs/APP_DESIGN_SYSTEM.md "Colour key"; components/colour-legend.tsx): college type badges and the orange of a
+   long bond. Light values here (they are only used inside the app), dark ones on .app.dark (the .app.mono.dark theme).
+   Every one is ≥4.5:1 as text on its own 10% tint, on the sheet and on chart paper, in both. Never colour alone: each
+   value or badge says it in words too. */
+@theme {
+  --color-flame: #a84300;          /* a bond of 3 years or more */
+  --color-type-govt: #0a6b2e;      /* state government, municipal */
+  --color-type-central: #00646c;   /* central government: AIIMS-type, armed forces, railway, PSU */
+  --color-type-esic: #5b3db5;      /* ESIC */
+  --color-type-deemed: #1c5cab;    /* deemed university */
+  --color-type-trust: #8e2a68;     /* trust hospital */
+}
+@layer base {
+  .app.dark {
+    --color-flame: #ff9a4d;
+    --color-type-govt: #5cd28a;
+    --color-type-central: #4fd1d9;
+    --color-type-esic: #b4a2ff;
+    --color-type-deemed: #7ab2ff;
+    --color-type-trust: #f08ac8;
+  }
+}

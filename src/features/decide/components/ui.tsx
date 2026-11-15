@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { keepProfileParams } from "../profile";
-import { FilterForm } from "./filter-form";
+import { FilterForm, FiltersPanel, SearchSubmit } from "./filter-form";
 import { FocusOnChange } from "./focus-item";
 import { InfoTip } from "./info-tip";
 import { ViewField } from "./view-toggle";
@@ -35,41 +35,51 @@ export const tbl = {
 /**
  * GET filter form that keeps the profile params (every repeated value, comma-joined). The form and its Apply button
  * stay mounted across navigations so focus stays on Apply (Enter in a field moves it there); only the fields remount
- * to show the applied values. `more`: a MoreFilters box with that `open`, kept mounted too.
+ * to show the applied values.
  * Submitting drops `page`, so results start at page 1, and keeps the address's Cards | Table choice (ViewField).
+ * `active` (a list page: the number of its active-filter chips): only `search` (the search box, if any) shows, the
+ * fields (`children`, laid out by `cols`) open from a Filters button with that count (FiltersPanel; `clear` its Clear all).
  */
-export function FilterBar({ action, params, children, cols = "md:grid-cols-4", more }: { action: string; params: URLSearchParams; children: React.ReactNode; cols?: string; more?: boolean }) {
+export function FilterBar({ action, params, children, cols = "md:grid-cols-4", search, active, clear }: {
+  action: string;
+  params: URLSearchParams;
+  children: React.ReactNode;
+  cols?: string;
+  search?: React.ReactNode;
+  active?: number;
+  clear?: string;
+}) {
+  if (active != null)
+    return (
+      <FilterForm action={action} role="search" className="relative flex flex-wrap items-end gap-2">
+        {[...keepProfileParams(params)].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+        <ViewField />
+        {search && (
+          <>
+            <Fragment key={`q${params}`}>{search}</Fragment>
+            <SearchSubmit />
+          </>
+        )}
+        <FiltersPanel count={active} clear={clear}>
+          <div className={cn("grid gap-3 sm:grid-cols-2", cols, "md:items-end")}><Fragment key={params.toString()}>{children}</Fragment></div>
+        </FiltersPanel>
+      </FilterForm>
+    );
   return (
-    <FilterForm action={action} scroll={false} role="search" className={cn("grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2", cols, "md:items-end")}>
+    <FilterForm action={action} role="search" className={cn("grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2", cols, "md:items-end")}>
       {[...keepProfileParams(params)].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       <ViewField />
       <Fragment key={params.toString()}>{children}</Fragment>
-      {more != null && <MoreFilters open={more} />}
       <Button type="submit">Apply</Button>
     </FilterForm>
   );
 }
 
-/** `className`: e.g. "more-filter", folded on phones until "Show all filters" (MoreFilters) is ticked. */
 export function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <label className={cn("grid gap-1.5 text-sm", className)}>
       <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       {children}
-    </label>
-  );
-}
-
-/**
- * Phones: the filters marked `more-filter` stay folded until this unnamed box is ticked (globals.css `.more-toggle`);
- * `open` when one of them is set, so an applied filter is never hidden. Render it outside the fields' keyed Fragment
- * (FilterBar `more`) so her tick survives Apply; React still moves an untouched box to a new `open`.
- */
-export function MoreFilters({ open }: { open: boolean }) {
-  return (
-    <label className="flex min-h-11 items-center gap-2 text-sm md:hidden">
-      <input type="checkbox" className="more-toggle size-5 accent-sky" defaultChecked={open} />
-      Show all filters
     </label>
   );
 }

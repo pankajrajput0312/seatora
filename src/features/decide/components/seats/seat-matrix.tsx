@@ -22,7 +22,7 @@ import { reportedCount, SELF_REPORTED, ValueSource } from "../institute/hospital
 import { TermStatCells } from "../stat-cells";
 import { TypeBadge as TypeChip } from "../type-badge";
 import { smallLink, tbl } from "../ui";
-import { paneClass, useView, ViewPanes } from "../view-toggle";
+import { ViewPanes, type View } from "../view-toggle";
 import type { PastClosing, SeatLine, SeatSort } from "./find-seats";
 import { SeatCards, seatCourse as courseOf, seatRowKey as rowKey } from "./seat-cards";
 
@@ -130,7 +130,7 @@ export function DisplayMenu({ cols, hidden, setHidden, always = "The institute c
  * PDFs behind them; `ranked`: she has a rank (the "Your chances" column). `list` / `lists`: the picked list and every list
  * shown (its round's, or all with All rounds: the cards' numbers). Rows are one page, in the server's order.
  */
-export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption, list, lists }: {
+export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption, list, lists, view }: {
   rows: MatrixRow[];
   groups: SeatGroup[];
   years: ClosingYear[];
@@ -140,9 +140,10 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   caption: string;
   list: SeatList;
   lists: SeatList[];
+  /** The view on show (chosenView "seats"). */
+  view: View;
 }) {
   const L = useDecideLinks();
-  const view = useView("seats");
   const cols = useMemo(
     () => [
       { key: "course", label: "Course" },
@@ -178,13 +179,16 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   return (
     // grid-cols-1, not a bare grid: an auto track would grow to the table's width and the table box would not scroll.
     <div data-seat-rows className="grid grid-cols-1 gap-2">
-      <div className={cn("justify-self-end", paneClass(view, "table"))}>
-        <DisplayMenu cols={cols} hidden={hidden} setHidden={save} />
-      </div>
+      {view === "table" && (
+        <div className="justify-self-end">
+          <DisplayMenu cols={cols} hidden={hidden} setHidden={save} />
+        </div>
+      )}
       {/* Hiding is CSS on data-col, so a header group and its cells go together (keys are the known columns only). */}
       <style>{[...hidden].map((k) => `#seat-matrix [data-col="${k}"]{display:none}`).join("")}</style>
       <ViewPanes
         page="seats"
+        view={view}
         cards={<SeatCards rows={rows} list={list} lists={lists} ranked={ranked} L={L} title={caption} onDetails={show} />}
         table={
           <div id="seat-matrix" role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, tbl.scroll, "scroll-pl-44 md:scroll-pl-68")}>
@@ -261,10 +265,10 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                       {groups.map((g) => (
                         <Fragment key={g.key}>
                           <td data-col={g.key} className={cn(num, "border-l border-border")}>
-                            {g.clear && r.byList[g.clear.key] != null ? <span className="font-semibold">{formatRank(r.byList[g.clear.key])}</span> : <Dash />}
+                            {g.clear && r.byList[g.clear.key] != null ? <span className="font-semibold text-leaf">{formatRank(r.byList[g.clear.key])}</span> : <Dash />}
                             <AddedBadges r={r} added={g.added} />
                           </td>
-                          <td data-col={g.key} className={num}>{g.virtual && r.byList[g.virtual.key] != null ? <span className="font-semibold">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>
+                          <td data-col={g.key} className={num}>{g.virtual && r.byList[g.virtual.key] != null ? <span className="font-semibold text-sun">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>
                         </Fragment>
                       ))}
                       <td data-col="beds" className={num}>

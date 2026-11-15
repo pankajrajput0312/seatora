@@ -19,20 +19,31 @@ export const collegeTypeLabel: Record<CollegeType["value"], string> = {
 };
 
 /**
- * The badge colour (Badge tone): green for a government-run hospital of any kind (state, central, ESIC, municipal,
- * armed forces, railway, PSU), blue for a deemed university, neutral for private and trust hospitals.
+ * The badge's colour group (docs/APP_DESIGN_SYSTEM.md "Colour key"): state government (and municipal) green, central
+ * government (AIIMS-type, armed forces, railway, PSU) teal, ESIC violet, deemed blue, trust plum, private neutral grey.
+ * Each badge says its type in words too.
  */
-export const collegeTypeTone: Record<CollegeType["value"], "success" | "info" | "neutral"> = {
-  govt: "success",
-  central: "success",
-  esic: "success",
-  municipal: "success",
-  armed_forces: "success",
-  psu: "success",
-  railway: "success",
-  deemed: "info",
-  private: "neutral",
-  trust: "neutral",
+export const collegeTypeGroup: Record<CollegeType["value"], "govt" | "central" | "esic" | "deemed" | "trust" | "private"> = {
+  govt: "govt",
+  municipal: "govt",
+  central: "central",
+  armed_forces: "central",
+  psu: "central",
+  railway: "central",
+  esic: "esic",
+  deemed: "deemed",
+  trust: "trust",
+  private: "private",
+};
+
+/** Badge classes per group: the colour as text on a 10% tint of itself, with a hairline of it (globals.css --color-type-*). */
+export const collegeTypeClass: Record<(typeof collegeTypeGroup)[CollegeType["value"]], string> = {
+  govt: "bg-type-govt/10 text-type-govt ring-1 ring-inset ring-type-govt/30",
+  central: "bg-type-central/10 text-type-central ring-1 ring-inset ring-type-central/30",
+  esic: "bg-type-esic/10 text-type-esic ring-1 ring-inset ring-type-esic/30",
+  deemed: "bg-type-deemed/10 text-type-deemed ring-1 ring-inset ring-type-deemed/30",
+  trust: "bg-type-trust/10 text-type-trust ring-1 ring-inset ring-type-trust/30",
+  private: "bg-muted text-muted-foreground ring-1 ring-inset ring-border",
 };
 
 /** Whether the type was inferred from the name and quota (else Seatora's research on the hospital named it). */

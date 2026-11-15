@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
@@ -7,25 +6,26 @@ import { PageHead } from "@/features/decide/components/bits";
 import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
 import { SourceRefs } from "@/features/decide/components/page-sources";
 import { residentDocs, residentsFilters, ResidentsAbout, ResidentsCards, ResidentsTable, type ResidentTypes } from "@/features/decide/components/residents-results";
-import { control, EmptyState, Field, FilterBar, Pager, Select, smallLink } from "@/features/decide/components/ui";
+import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
+import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, Select } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { decideLinks } from "@/features/decide/lib/links";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import type { ResidentsQuery } from "@/features/decide/residents-search";
 import { canSeeResidents } from "@/features/decide/server/residents";
-import { listResidentsAll, RESIDENTS_MAX_PAGE, residentQuota, residentYears, ResidentsDenied } from "@/features/decide/server/residents-all";
+import { listResidentsAll, RESIDENTS_MAX_PAGE, residentColleges, residentQuota, residentYears, ResidentsDenied } from "@/features/decide/server/residents-all";
+import { chosenView } from "@/features/decide/server/view";
 import { getDecideData, getMeta } from "@/features/decide/service";
-import { cn } from "@/lib/cn";
 import { hideResidentAction } from "../institutes/[slug]/actions";
+import { findResidentColleges } from "./actions";
 
 // People's names: never indexed.
 export const metadata: Metadata = { title: "Residents", robots: { index: false, follow: false } };
 
 const sorts = [
-  { value: "rank", label: "Rank" },
-  { value: "name", label: "Name" },
-  { value: "year", label: "Year" },
+  { value: "year", label: "Year, newest first" },
   { value: "college", label: "College" },
+  { value: "name", label: "Name" },
 ] satisfies { value: ResidentsQuery["sort"]; label: string }[];
 
 export default async function ResidentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -49,108 +49,93 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   if (!(await canSeeResidents())) return denied("locked");
 
   const profile = profileFromParams(params);
-  const [meta, { colleges }, years, info] = await Promise.all([getMeta(), getDecideData(), residentYears(), hospitalInfo()]);
-  const { query, yours, courseValue, around } = residentsFilters(params, profile, meta.courses);
-  const college = colleges.find((c) => c.slug === query.college);
-  // A college outside the state picked after it: the state wins (Apply keeps the old college field).
-  if (college && query.state && college.state !== query.state) query.college = undefined;
-  const state = query.state ?? (query.college ? college?.state ?? undefined : undefined);
-  const inState = state ? colleges.filter((c) => c.state === state).sort((a, b) => a.name.localeCompare(b.name)) : [];
+  const [meta, { colleges }, years, info, view] = await Promise.all([getMeta(), getDecideData(), residentYears(), hospitalInfo(), chosenView(params, "residents")]);
+  const { query, yours, allCourses } = residentsFilters(params, profile, meta.courses);
+  const picked = query.college ?? [];
+  const pickedColleges = picked.length ? await residentColleges({ slugs: picked }) : [];
   // The search checks access again and spends one read of the budget.
   const res = await listResidentsAll(query).catch((e) => {
     if (e instanceof ResidentsDenied) return e.code;
     throw e;
   });
   if (typeof res === "string") return denied(res);
-  const { rows, total, withRank } = res;
+  const { rows, total } = res;
   // Past the last page (a stale link, a hide) or the deepest one served: the last page there is.
   const pages = Math.min(Math.ceil(total / res.pageSize), RESIDENTS_MAX_PAGE);
   if (!rows.length && total) redirect(L.page("/decide/residents", pages));
   const keyOf = new Map(colleges.map((c) => [c.slug, c.key]));
   const types: ResidentTypes = new Map(rows.map((r) => [r.college.slug, info.get(keyOf.get(r.college.slug) ?? "")?.type ?? null]));
-  // Her default range stays a default: empty fields (it shows as their placeholders) and no `ranks=all`, so Apply keeps it.
-  const rankInput = (name: "rankFrom" | "rankTo", example: string) => ({
-    name,
-    inputMode: "numeric" as const,
-    defaultValue: around ? "" : query[name] ?? "",
-    placeholder: around ? formatRank(around[name]) : example,
-    className: `${control} numeric`,
-  });
-  const { rankFrom: from, rankTo: to } = query;
-  const ranks = from != null && to != null ? `${formatRank(from)}–${formatRank(to)}` : from != null ? `from ${formatRank(from)}` : to != null ? `up to ${formatRank(to)}` : null;
   const quotas = [...new Set(meta.quotas.map(residentQuota))];
+  const courseName = (slug: string) => {
+    const c = meta.courses.find((x) => x.slug === slug);
+    return c ? `${c.degree} ${c.name}` : slug;
+  };
+  const collegeName = (slug: string) => pickedColleges.find((c) => c.slug === slug)?.name ?? slug;
+  const typedCourses = !allCourses && params.has("course") ? query.course ?? [] : [];
+  const listed = (what: string, names: string[]) => (names.length > 2 ? `${what}: ${names.length} selected` : names.join(", "));
+  const chips = [
+    query.q && { label: `Name: “${query.q}”`, href: here({ q: null }) },
+    picked.length > 0 && { label: listed("Colleges", picked.map(collegeName)), href: here({ college: null }) },
+    query.cq && { label: `College: “${query.cq}”`, href: here({ cq: null }) },
+    // Her courses are the default: a chip for them too, "All courses" lifts it.
+    allCourses ? { label: "All courses", href: here({ course: null }) } : typedCourses.length ? { label: listed("Courses", typedCourses.map(courseName)), href: here({ course: null }) } : yours && { label: `Your courses (${yours.length})`, href: here({ course: "all" }) },
+    query.state && { label: query.state, href: here({ state: null }) },
+    query.year && { label: String(query.year), href: here({ year: null }) },
+    query.quota && { label: residentQuota(query.quota), href: here({ rq: null }) },
+    query.sort !== "year" && { label: `Sorted by ${sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`, href: here({ sort: null }) },
+  ].filter((x) => !!x);
+  const clear = L.to("/decide/residents", { course: "all" });
+  const courseChoices = [
+    ...(yours ? [{ value: "all", label: "All courses" }] : []),
+    ...meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` })),
+  ];
   return (
     <AppPage className="grid grid-cols-1 gap-6">
-      {head(<ResidentsAbout rows={rows} />)}
+      {head(<ResidentsAbout />)}
 
-      <FilterBar action="/decide/residents" params={params} cols="grid-cols-2 md:grid-cols-4 xl:grid-cols-6" more={!!(query.college || query.year || query.quota || query.hasRank || query.sort !== "rank")}>
-        {/* Apply states the rank range (both fields empty then means all ranks), except from her default, which it keeps. */}
-        {!around && <input type="hidden" name="ranks" value="all" />}
-        <Field label="Name" className="col-span-2"><input type="search" name="q" defaultValue={query.q} maxLength={60} placeholder="Part of a name" className={control} /></Field>
-        <Field label="Course" className="col-span-2">
-          <Select
-            name="course"
-            value={courseValue}
-            options={[
-              ...(yours ? [{ value: "", label: `Your courses (${yours.length})` }, { value: "all", label: "All courses" }] : [{ value: "", label: "All courses" }]),
-              ...meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` })),
-            ]}
-          />
-        </Field>
+      <FilterBar
+        action="/decide/residents"
+        params={params}
+        cols="md:grid-cols-3"
+        active={chips.length}
+        clear={clear}
+        search={
+          <label className="min-w-56 flex-1">
+            <span className="sr-only">Name</span>
+            <input type="search" name="q" defaultValue={query.q} maxLength={60} placeholder="Search a name" className={control} />
+          </label>
+        }
+      >
+        <FilterDropdown label="College (hospital)" name="college" find={findResidentColleges} findName="cq" options={pickedColleges.map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name }))} selected={picked} none="All colleges" noneNote="None ticked means every college. Type 2 or more letters of a name to find one; tick one or more." />
+        <FilterDropdown label="Course (branch)" name="course" search options={courseChoices} selected={allCourses ? ["all"] : typedCourses} none={yours ? `Your courses (${yours.length})` : "All courses"} noneNote={yours ? "None ticked means your courses. Tick All courses for every one." : "None ticked means every course."} />
         <Field label="State"><Select name="state" value={query.state} all="All states" options={meta.states.map((s) => ({ value: s, label: s }))} /></Field>
-        <Field label="College" className="more-filter">
-          {inState.length ? (
-            <Select name="college" value={query.college} all="All colleges" options={inState.map((c) => ({ value: c.slug, label: c.name }))} />
-          ) : (
-            <select disabled className={control}><option>Pick a state first</option></select>
-          )}
-        </Field>
-        <Field label="Rank from"><input {...rankInput("rankFrom", "e.g. 30,000")} /></Field>
-        <Field label="Rank to"><input {...rankInput("rankTo", "e.g. 50,000")} /></Field>
-        <Field label="Year" className="more-filter"><Select name="year" value={query.year ? String(query.year) : undefined} all="All years" options={years.map((y) => ({ value: String(y), label: String(y) }))} /></Field>
-        <Field label="Quota" className="more-filter"><Select name="rq" value={query.quota && residentQuota(query.quota)} all="All quotas" options={quotas.map((q) => ({ value: q, label: q }))} /></Field>
-        <Field label="Sort by" className="more-filter"><Select name="sort" value={query.sort} options={sorts} /></Field>
-        <label className="more-filter flex min-h-11 items-center gap-2 text-sm md:self-end">
-          <input type="checkbox" name="hasRank" value="1" defaultChecked={query.hasRank} className="size-5 accent-sky" />
-          Only with a known rank
-        </label>
+        <Field label="Year"><Select name="year" value={query.year ? String(query.year) : undefined} all="All years" options={years.map((y) => ({ value: String(y), label: String(y) }))} /></Field>
+        <Field label="Quota"><Select name="rq" value={query.quota && residentQuota(query.quota)} all="All quotas" options={quotas.map((q) => ({ value: q, label: q }))} /></Field>
+        <Field label="Sort by"><Select name="sort" value={query.sort} options={sorts} /></Field>
       </FilterBar>
-
-      {(ranks || college) && (
-        <p className="flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
-          {college && query.college && (
-            <span>At <Link href={L.to(`/decide/institutes/${college.slug}`, { tab: "residents" })} className={cn(smallLink, "font-semibold text-sky")}>{college.name}</Link></span>
-          )}
-          {ranks && <span>Ranks <span className="numeric font-semibold text-foreground">{ranks}</span>{around && ", around your rank (±20%)"}</span>}
-          {ranks && <Link href={here({ rankFrom: null, rankTo: null, ranks: "all" })} scroll={false} className={cn(smallLink, "text-sky")}>All ranks</Link>}
-        </p>
-      )}
+      <ActiveFilters items={chips} clear={clear} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
-          <span className="numeric font-semibold text-foreground">{formatRank(total)}</span> residents · rank known for <span className="numeric font-semibold text-foreground">{formatRank(withRank)}</span>
+          <span className="numeric font-semibold text-foreground">{formatRank(total)}</span> residents
         </p>
-        {total > 0 && <ViewToggle page="residents" />}
+        {total > 0 && <ViewToggle page="residents" view={view} />}
       </div>
 
       {total === 0 ? (
-        <EmptyState
-          title="No residents match these filters"
-          description={ranks ? "A rank range leaves out everyone without a known rank: try All ranks." : "MCC's admitted-candidates lists have no such names, or they were hidden."}
-          href={ranks ? here({ rankFrom: null, rankTo: null, ranks: "all" }) : L.to("/decide/residents", { course: "all", ranks: "all" })}
-          action={ranks ? "All ranks" : "Clear filters"}
-        />
+        <EmptyState title="No residents match these filters" description="MCC's admitted-candidates lists have no such names, or they were hidden." href={clear} action="Clear filters" />
       ) : (
         <ViewPanes
           page="residents"
+          view={view}
           cards={<ResidentsCards rows={rows} L={L} hide={hideResidentAction} types={types} />}
-          table={<ResidentsTable rows={rows} L={L} hide={hideResidentAction} types={types} caption={`Residents, page ${res.page}, sorted by ${query.sort === "rank" ? "rank, unknown last" : sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`} />}
+          table={<ResidentsTable rows={rows} L={L} hide={hideResidentAction} types={types} caption={`Residents, page ${res.page}, sorted by ${sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`} />}
         />
       )}
       <Pager page={res.page} pageSize={res.pageSize} total={Math.min(total, pages * res.pageSize)} href={(n) => L.page("/decide/residents", n)} focusId="results" label="Residents" />
       {total > pages * res.pageSize && (
         <p className="-mt-3 text-center text-sm text-muted-foreground">
-          Only the first <span className="numeric">{formatRank(pages * res.pageSize)}</span> ({pages} pages) are shown: narrow the filters (name, course, state, year or rank) to see the others.
+          Only the first <span className="numeric">{formatRank(pages * res.pageSize)}</span> ({pages} pages) are shown: narrow the filters (name, college, course, state or year) to see the others.
         </p>
       )}
       <SourceRefs docs={residentDocs(rows, res.sources)} />

@@ -432,3 +432,11 @@ it("an unknown record names the college's MCC profile and links its bond documen
   const esic = bond("DNB", "Not checked yet — see the institute's MCC bond page (other ESIC colleges declare a 1–2 yr, ₹7.5–10 L bond)", null, { status: "unknown", reason: "central_institution_not_checked" }, { name: "Seatora bond check (no document yet)", url: null, type: "THIRD_PARTY_RESEARCH" });
   expect(normalizeProgramme("NBEMS Diploma", [esic]).bond).toMatchObject({ status: "not_declared", text: expect.stringMatching(/other ESIC colleges/) });
 });
+
+it("a state rule's own seat-leaving penalty: the Leaving cell's words, never a figure read from them; a college PENALTY record wins", () => {
+  const odisha = bond("MD", "State bond: 2 years (state rule)", null, { status: "state_rule", years: "2 years", state: "Odisha", penalty: "Leaving before completion so that the seat lapses: ₹10 lakh plus all stipend." });
+  const b = normalizeProgramme("MD/MS", [odisha]).bond;
+  expect([b.leaving.map((p) => p.text), b.leavingAmount.state]).toEqual([["State rule (Odisha): Leaving before completion so that the seat lapses: ₹10 lakh plus all stipend."], "words"]);
+  // Not from a documented (non-rule) bond's record.
+  expect(normalizeProgramme("MD/MS", [bond("MD", "Service bond: 1 year · ₹50 L", 5000000, { status: "documented", years: "1", penalty: "x" })]).bond.leaving).toEqual([]);
+});

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ColourLegend } from "@/features/decide/components/colour-legend";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -19,7 +20,7 @@ import { VIEW_PARAM, ViewPanes, ViewToggle } from "@/features/decide/components/
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
-import { termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
+import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { roundLabel, rounds } from "@/features/decide/types";
 
@@ -56,7 +57,7 @@ const about = (
 export default async function AllotmentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
-  const v = await allotmentsView(params, PAGE_SIZE);
+  const [v, view] = await Promise.all([allotmentsView(params, PAGE_SIZE), chosenView(params, "allotments")]);
   if (!v) notFound();
   const { f, meta, inst, typed, rankError, latest, filters } = v;
   const { rows, total, page, unknownTerms } = v.r;
@@ -218,16 +219,15 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         </p>
       )}
 
-      <FilterBar action="/decide/allotments" params={params} cols="grid-cols-2 md:grid-cols-4 xl:grid-cols-6 [&>label]:min-w-0" more={!!(f.round || f.aq || f.acat) || termMoreOpen(f)}>
+      <FilterBar action="/decide/allotments" params={params} cols="grid-cols-2 md:grid-cols-4 xl:grid-cols-6 [&>label]:min-w-0" active={active.length} clear={L.to("/decide/allotments", { inst: inst?.slug })}>
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
-        <Field label="Round" className="more-filter"><Select name="round" value={filters.round} all="All rounds" options={rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
+        <Field label="Round"><Select name="round" value={filters.round} all="All rounds" options={rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
         <Field label="Course" className="col-span-2 md:col-span-1"><Select name="course" value={f.course} all="All courses" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
-        <Field label="Quota" className="more-filter"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
-        <Field label="Seat category" className="more-filter"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>
+        <Field label="Quota"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
+        <Field label="Seat category"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>
         <Field label="Rank from"><input {...rankInput("from")} /></Field>
         <Field label="Rank to"><input {...rankInput("to")} /></Field>
-        {/* Type, fee and bond years always; stipend, bond ₹, leaving and "Include not declared" fold on phones (MoreFilters), as on every filter bar. */}
         <TermFilterControls f={f} caps={caps} />
       </FilterBar>
       <ActiveFilters items={active} clear={L.to("/decide/allotments", { inst: inst?.slug })} />
@@ -238,12 +238,12 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
           <span className="numeric font-semibold text-foreground">{rangeLabel({ rows, total, page, pageSize: PAGE_SIZE })}</span> allotments
           {/* The default view (no filter: the latest round) is what Year and Round show; say it for screen readers. */}
           {latest && <span className="sr-only">, the latest round, {latest.year} {roundLabel[latest.rounds.at(-1)!]}</span>}
-        </p>
+         <ColourLegend className="ml-1 align-middle" /></p>
         {total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <ViewToggle page="allotments" />
+            <ViewToggle page="allotments" view={view} />
             <CsvLink href={L.with("/api/v1/allotments/export", { page: null, [VIEW_PARAM]: null })} what={`these ${formatRank(total)} allotments`} total={total} />
-            <AllotmentsDisplay cols={cols} />
+            {view === "table" && <AllotmentsDisplay cols={cols} />}
           </div>
         )}
       </div>
@@ -257,7 +257,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       {total === 0 ? (
         <EmptyState title="No allotments match these filters." href={L.to("/decide/allotments", { inst: inst?.slug, maxfee: "any", bondyrs: "any" })} />
       ) : (
-        <ViewPanes page="allotments" view={await chosenView(params, "allotments")} cards={cards} table={table} />
+        <ViewPanes page="allotments" view={view} cards={cards} table={table} />
       )}
       <Pager page={page} pageSize={PAGE_SIZE} total={total} href={(n) => L.page("/decide/allotments", n)} focusId="results" label="Allotments" />
       <DataSource

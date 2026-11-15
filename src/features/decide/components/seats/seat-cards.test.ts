@@ -68,11 +68,9 @@ it("beds: the one Beds, self-reported said behind its (i) (not a hover title)", 
 
 it("the Cards | Table toggle works without JS: links under `layout` (Seats' `view` is its list view), the panes follow it", () => {
   query = "rank=42284&view=list&layout=table";
-  const html = renderToStaticMarkup(h(ViewToggle, { page: "seats" }));
+  const html = renderToStaticMarkup(h(ViewToggle, { page: "seats", view: "table" }));
   expect(html).toContain('href="?rank=42284&amp;view=list&amp;layout=cards"');
   expect(html).toMatch(/<a href="\?rank=42284&amp;view=list&amp;layout=table" aria-current="true"[^>]*>.*Table<\/a>/);
   expect(html).not.toContain("<button");
-  expect(renderToStaticMarkup(h(ViewPanes, { page: "seats", cards: "C", table: "T" }))).toBe('<div data-view-pane="cards" class="hidden">C</div><div data-view-pane="table">T</div>');
-  query = "view=list";
-  expect(renderToStaticMarkup(h(ViewPanes, { page: "seats", cards: "C", table: "T" }))).toBe('<div data-view-pane="cards" class="md:hidden">C</div><div data-view-pane="table" class="max-md:hidden">T</div>');
+  expect(renderToStaticMarkup(h(ViewPanes, { page: "seats", view: "table", cards: "C", table: "T" }))).toBe('<div data-view-pane="table">T</div>');
 });

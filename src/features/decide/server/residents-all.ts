@@ -16,9 +16,8 @@ export class ResidentsDenied extends Error {
 }
 
 const orderBy = {
-  rank: [{ rank: { sort: "asc", nulls: "last" } }, { name: "asc" }],
+  year: [{ year: "desc" }, { college: { name: "asc" } }, { collegeId: "asc" }, { name: "asc" }],
   name: [{ name: "asc" }, { year: "desc" }],
-  year: [{ year: "desc" }, { name: "asc" }],
   college: [{ college: { name: "asc" } }, { collegeId: "asc" }, { year: "desc" }, { name: "asc" }],
 } satisfies Record<ResidentsQuery["sort"], Prisma.ResidentOrderByWithRelationInput[]>;
 
@@ -32,19 +31,19 @@ const MINORITY = "Minority";
 /** A quota as the Residents views show it. */
 export const residentQuota = (quota: string) => (RELIGIOUS.includes(quota) ? MINORITY : quota);
 
+/** Each token (any case and spacing) must occur in the field; a typed % or _ is literal (Prisma passes `contains` to ILIKE unescaped). */
+const tokens = (q: string | undefined) => (q?.split(/\s+/).filter(Boolean) ?? []).map((t) => ({ contains: t.replace(/[\\%_]/g, "\\$&"), mode: "insensitive" as const }));
+
 /** The WHERE for a query: name tokens (any case and spacing) must all occur in the name; never hidden rows. */
 function residentsWhere(q: ResidentsQuery): Prisma.ResidentWhereInput {
-  const rank: Prisma.IntNullableFilter = { gte: q.rankFrom, lte: q.rankTo };
-  if (q.hasRank !== undefined) rank[q.hasRank ? "not" : "equals"] = null;
+  const cq = tokens(q.cq);
   return {
     hidden: false,
     year: q.year,
     quota: q.quota && (q.quota === MINORITY || RELIGIOUS.includes(q.quota)) ? { in: RELIGIOUS } : q.quota,
-    rank,
-    college: q.college || q.state ? { slug: q.college, state: q.state } : undefined,
+    college: q.college?.length || q.state || cq.length ? { slug: q.college?.length ? { in: q.college } : undefined, state: q.state, AND: cq.length ? cq.map((name) => ({ name })) : undefined } : undefined,
     specialty: q.course?.length ? { slug: { in: q.course } } : undefined,
-    // Prisma passes `contains` to ILIKE unescaped: a typed % or _ would match anything.
-    AND: (q.q?.split(/\s+/).filter(Boolean) ?? []).map((t) => ({ name: { contains: t.replace(/[\\%_]/g, "\\$&"), mode: "insensitive" as const } })),
+    AND: tokens(q.q).map((name) => ({ name })),
   };
 }
 
@@ -52,18 +51,26 @@ function residentsWhere(q: ResidentsQuery): Prisma.ResidentWhereInput {
 export const residentYears = async () =>
   (await db.resident.groupBy({ by: ["year"], where: { hidden: false }, orderBy: { year: "desc" } })).map((g) => g.year);
 
+/** Colleges with residents (not hidden) whose name has every token of `q` (or, by `slugs`, those colleges), by name: the College filter's choices. Names of colleges only. */
+export const residentColleges = (by: { q: string } | { slugs: string[] }, take = 20) =>
+  db.college.findMany({
+    where: "q" in by ? { residents: { some: { hidden: false } }, AND: tokens(by.q).map((name) => ({ name })) } : { slug: { in: by.slugs } },
+    select: { slug: true, name: true, state: true },
+    orderBy: { name: "asc" },
+    take,
+  });
+
 /**
- * One page (RESIDENTS_PAGE_SIZE rows; none past RESIDENTS_MAX_PAGE) of residents matching the query, with the total, how
- * many of those have a rank, and the list PDFs and NBEMS results behind the page. Throws ResidentsDenied before reading anything when names may not be
- * seen or the read budget is spent (each call spends one read).
+ * One page (RESIDENTS_PAGE_SIZE rows; none past RESIDENTS_MAX_PAGE) of residents matching the query, with the total and
+ * the admitted-list PDFs behind the page. Never a rank. Throws ResidentsDenied before reading anything when names may
+ * not be seen or the read budget is spent (each call spends one read).
  */
 export async function listResidentsAll(q: ResidentsQuery): Promise<ResidentsPage & { sources: ResidentSource[] }> {
   if (!(await canSeeResidents())) throw new ResidentsDenied("locked");
   if (!(await residentsBudget("read"))) throw new ResidentsDenied("rate_limited");
   const where = residentsWhere(q);
-  const [total, withRank, found] = await Promise.all([
+  const [total, found] = await Promise.all([
     db.resident.count({ where }),
-    db.resident.count({ where: { AND: [where, { rank: { not: null } }] } }),
     q.page > RESIDENTS_MAX_PAGE ? [] : db.resident.findMany({
       where,
       select: {
@@ -72,8 +79,6 @@ export async function listResidentsAll(q: ResidentsQuery): Promise<ResidentsPage
         year: true,
         list: true,
         sourceKey: true,
-        rank: true,
-        rankBasis: true,
         quota: true,
         round: true,
         specialty: { select: { degree: true, code: true, name: true, slug: true } },
@@ -89,14 +94,13 @@ export async function listResidentsAll(q: ResidentsQuery): Promise<ResidentsPage
     quota: r.quota && residentQuota(r.quota),
     course: { degree: s.degree, specialty: s.code ?? "", name: s.name, slug: s.slug },
   }));
-  const keys = [...new Set(rows.flatMap((r) => (r.rankBasis ? [r.sourceKey, r.rankBasis] : [r.sourceKey])))];
+  const keys = [...new Set(rows.map((r) => r.sourceKey))];
   const sources = keys.length
     ? await db.dataSource.findMany({ where: { key: { in: keys } }, select: { key: true, name: true, url: true, counsellingYear: true }, orderBy: { key: "desc" } })
     : [];
   return {
     rows,
     total,
-    withRank,
     page: q.page,
     pageSize: RESIDENTS_PAGE_SIZE,
     sources: sources.map((s): ResidentSource => ({ key: s.key, name: s.name, url: s.url, year: s.counsellingYear })),

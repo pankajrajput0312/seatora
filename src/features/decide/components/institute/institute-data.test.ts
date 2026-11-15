@@ -6,6 +6,8 @@ import { decideDemoData as fx } from "../../test/decide.demo";
 import type { Source } from "../../types";
 import { reportedCount } from "./hospital-bits";
 import { allotmentMix, institutesByTerms, optionSeats, websiteUrl } from "./institute-data";
+import { KEY_ROWS, keyRows, newestClosing } from "./key-facts-data";
+import type { OptionRow } from "../../service";
 
 const src = (year: number, round: Source["round"], provisional = false): Source => ({ key: `${year}${round}`, url: null, year, round, provisional, name: "" });
 
@@ -112,5 +114,21 @@ describe.skipIf(!process.env.DATABASE_URL)("countAllotments on real data", () =>
     const { total } = await findAllotments(cat, { cs }, { limit: 1, count: true });
     expect(counts.reduce((a, r) => a + r.n, 0)).toBe(total);
     expect(total).toBeGreaterThan(0);
+  });
+});
+
+describe("key facts rows", () => {
+  const row = (id: string, quota: string, clear: number | null, n: Record<number, number | null>, grid: OptionRow["grid"] = {}) => ({ id, quota, seatsBy: clear == null ? {} : { clear }, allotmentsByYear: n, grid }) as unknown as OptionRow;
+  it("hers with a profile; else open quotas first, then clear seats, then the newest year's allotments; at most KEY_ROWS", () => {
+    const a = row("a", "NRI", 9, { 2025: 9 }), b = row("b", "All India", 1, { 2025: 1 }), c = row("c", "DNB Quota", 3, { 2025: 1 }), d = row("d", "All India", null, { 2025: 5, 2026: null });
+    expect(keyRows([a, b, c, d], [a]).map((r) => r.id)).toEqual(["a"]);
+    expect(keyRows([a, b, c, d], []).map((r) => r.id)).toEqual(["c", "b", "d", "a"]);
+    expect(keyRows(Array.from({ length: 9 }, (_, i) => row(String(i), "All India", i, {})), null)).toHaveLength(KEY_ROWS);
+  });
+  it("the newest closing: newest year, its last round", () => {
+    const cell = (closing: number) => ({ closing, category: "Open" as const, n: 1, provisional: false });
+    expect(newestClosing({ 2025: { R1: cell(1), stray: cell(3) }, 2026: { R1: cell(2) } })).toMatchObject({ closing: 2, year: 2026, round: "R1" });
+    expect(newestClosing({ 2025: { R1: cell(1), R3: cell(3) } })).toMatchObject({ closing: 3, round: "R3" });
+    expect(newestClosing({})).toBeNull();
   });
 });

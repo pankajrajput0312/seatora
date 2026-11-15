@@ -49,12 +49,12 @@ it("compact: short values, no (i) per cell; StatHead puts one (i) on the column;
 
 it("type badge: coloured by kind, an (i) by tap or keyboard for inferred and researched types, named by its row", () => {
   const inferred = renderToStaticMarkup(h(TypeBadge, { type: { value: "govt", basis: "inferred from name and quota" } }));
-  expect(inferred).toContain("bg-leaf/10");
+  expect(inferred).toContain("bg-type-govt/10");
   expect(inferred).toContain('aria-label="About college type"');
   expect(renderToStaticMarkup(h(TypeBadge, { type: { value: "govt", basis: "inferred from name and quota" }, of: "AIIMS Delhi" }))).toContain('aria-label="About college type, AIIMS Delhi"');
   expect(text(inferred)).toContain("Inferred from name and quota. Not an official field.");
   const researched = renderToStaticMarkup(h(TypeBadge, { type: { value: "trust", basis: "data/curated/clinical_facts.json (kind trust_dnb)" } }));
   expect(researched).toContain('aria-label="About college type"');
   expect(text(researched)).toContain("Trust : From Seatora&#x27;s research on this hospital. Not an official field.");
-  expect(renderToStaticMarkup(h(TypeBadge, { type: { value: "deemed", basis: "inferred from name and quota" } }))).toContain("bg-sky/10");
+  expect(renderToStaticMarkup(h(TypeBadge, { type: { value: "deemed", basis: "inferred from name and quota" } }))).toContain("bg-type-deemed/10");
 });

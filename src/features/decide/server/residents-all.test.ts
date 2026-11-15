@@ -24,8 +24,6 @@ const row = {
   year: 2025,
   list: "up to Round 3",
   sourceKey: "mcc/2025/admitted_upto_R3.pdf",
-  rank: 1234,
-  rankBasis: "nbems/2025/merit_list_AIQ50.pdf",
   quota: "All India",
   round: "R2",
   specialty: { degree: "MD", code: "PAEDIATRICS", name: "Paediatrics", slug: "md-paediatrics" },
@@ -75,30 +73,25 @@ describe("gates and budget", () => {
 });
 
 describe("query", () => {
-  it("filters: name tokens, college, state, courses, year, rank range, quota, hasRank; never hidden", async () => {
-    await list({ q: " aB  cD ", college: "x-college", state: "Kerala", course: ["md-paediatrics", "ms-obg"], year: 2025, rankFrom: 10, rankTo: 20, quota: "All India", hasRank: "1" });
+  it("filters: name tokens, colleges, state, courses, year, quota; never hidden, never by rank", async () => {
+    await list({ q: " aB  cD ", college: ["x-college", "y-college"], state: "Kerala", course: ["md-paediatrics", "ms-obg"], year: 2025, quota: "All India", rankFrom: 10, hasRank: "1" });
     expect(where()).toEqual({
       hidden: false,
       year: 2025,
       quota: "All India",
-      rank: { gte: 10, lte: 20, not: null },
-      college: { slug: "x-college", state: "Kerala" },
+      college: { slug: { in: ["x-college", "y-college"] }, state: "Kerala" },
       specialty: { slug: { in: ["md-paediatrics", "ms-obg"] } },
       AND: [{ name: { contains: "aB", mode: "insensitive" } }, { name: { contains: "cD", mode: "insensitive" } }],
     });
-    // withRank: the same filters plus a rank
-    expect(m.count.mock.calls.map((c) => c[0].where)).toEqual([where(), { AND: [where(), { rank: { not: null } }] }]);
+    expect(m.count.mock.calls.map((c) => c[0].where)).toEqual([where()]);
+    expect(m.findMany.mock.lastCall![0].select).not.toHaveProperty("rank");
+    expect(m.findMany.mock.lastCall![0].select).not.toHaveProperty("rankBasis");
     await list({ q: "50%_a\\" }); // LIKE wildcards are matched literally
     expect(where().AND).toEqual([{ name: { contains: "50\\%\\_a\\\\", mode: "insensitive" } }]);
-  });
-
-  it("hasRank 0/false = without a rank, 1/true = with one, absent = both", async () => {
-    for (const [v, rank] of [["0", { equals: null }], ["false", { equals: null }], ["1", { not: null }], ["true", { not: null }]] as const) {
-      await list({ hasRank: v });
-      expect(where().rank, v).toEqual(rank);
-    }
     await list();
-    expect([where().rank, where().college, where().specialty, where().AND]).toEqual([{}, undefined, undefined, []]);
+    expect([where().college, where().specialty, where().AND]).toEqual([undefined, undefined, []]);
+    await list({ state: "Kerala" });
+    expect(where().college).toEqual({ slug: undefined, state: "Kerala" });
   });
 
   it("the minority quotas: shown as one Minority; either label (or Minority) filters both", async () => {
@@ -110,20 +103,20 @@ describe("query", () => {
     }
   });
 
-  it("sorts by rank (nulls last) by default, else name, year newest first or college; id last", async () => {
+  it("sorts by year newest first, then college and name, by default; else name or college; never rank; id last", async () => {
     const order = async (sort?: string) => (await list({ sort }), m.findMany.mock.lastCall![0].orderBy);
-    expect(await order()).toEqual([{ rank: { sort: "asc", nulls: "last" } }, { name: "asc" }, { id: "asc" }]);
+    expect(await order()).toEqual([{ year: "desc" }, { college: { name: "asc" } }, { collegeId: "asc" }, { name: "asc" }, { id: "asc" }]);
     expect((await order("name"))[0]).toEqual({ name: "asc" });
-    expect((await order("year"))[0]).toEqual({ year: "desc" });
     expect((await order("college"))[0]).toEqual({ college: { name: "asc" } });
   });
 
   it(`pages of ${RESIDENTS_PAGE_SIZE}; none read past page ${RESIDENTS_MAX_PAGE}`, async () => {
     const r = await list({ page: 3 });
     expect(m.findMany.mock.lastCall![0]).toMatchObject({ skip: 2 * RESIDENTS_PAGE_SIZE, take: RESIDENTS_PAGE_SIZE });
-    expect(r).toMatchObject({ total: 120, withRank: 120, page: 3, pageSize: RESIDENTS_PAGE_SIZE });
+    expect(r).toMatchObject({ total: 120, page: 3, pageSize: RESIDENTS_PAGE_SIZE });
+    expect(r).not.toHaveProperty("withRank");
     expect(r.rows[0]).toEqual({ ...row, specialty: undefined, course: { degree: "MD", specialty: "PAEDIATRICS", name: "Paediatrics", slug: "md-paediatrics" } });
-    expect(m.sources.mock.lastCall![0].where).toEqual({ key: { in: [row.sourceKey, row.rankBasis] } });
+    expect(m.sources.mock.lastCall![0].where).toEqual({ key: { in: [row.sourceKey] } });
     expect(r.sources).toEqual([{ key: row.sourceKey, name: "MCC admitted candidates list (up to Round 3)", url: null, year: 2025 }]);
     m.findMany.mockClear();
     const deep = await list({ page: RESIDENTS_MAX_PAGE + 1 });

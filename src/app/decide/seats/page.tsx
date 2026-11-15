@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import { ColourLegend } from "@/features/decide/components/colour-legend";
 import Link from "next/link";
 import { Fragment } from "react";
 import { LayoutGrid } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { AppPage } from "@/features/decide/components/app-page";
 import { CsvLink, toolbarRow } from "@/features/decide/components/csv-link";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
@@ -10,7 +10,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HistoryNote, PageHead } from "@/features/decide/components/bits";
 import { termDocs } from "@/features/decide/components/fees";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
-import { FilterForm } from "@/features/decide/components/filter-form";
+import { FilterForm, FiltersPanel, SearchSubmit } from "@/features/decide/components/filter-form";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { courseName } from "@/features/decide/components/options-view";
 import { MccLink } from "@/features/decide/components/pages/mcc-link";
@@ -22,10 +22,10 @@ import { ViewField, ViewPanes, ViewToggle } from "@/features/decide/components/v
 import { chosenView } from "@/features/decide/server/view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
-import { ActiveFilters, control, EmptyState, MoreFilters, Pager, rangeLabel, smallLink, tbl } from "@/features/decide/components/ui";
+import { ActiveFilters, control, EmptyState, Pager, rangeLabel, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { reachWindow } from "@/features/decide/lib/reach";
-import { termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
+import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, type Profile } from "@/features/decide/profile";
 import { allotmentTrends, getMeta, LATEST_YEAR, PAST_YEARS, YEARS } from "@/features/decide/service";
 import { fmtDay, listDay } from "@/features/decide/lib/format";
@@ -77,7 +77,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
 }
 
 async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: Profile | null; params: URLSearchParams; L: DecideLinks }) {
-  const { all, meta, inst, course, list, mine, sort, r } = await seatsView(f, profile, SEATS_PAGE_SIZE);
+  const [{ all, meta, inst, course, list, mine, sort, r }, view] = await Promise.all([seatsView(f, profile, SEATS_PAGE_SIZE), chosenView(params, "seats")]);
   const one = !!(inst || course || f.squota);
   if (!list || !r)
     return (
@@ -118,6 +118,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
     profile?.maxBondYears != null && f.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: here({ bondyrs: "any" }) },
     ...termChips(f).map((c) => ({ label: c.label, href: here({ [c.key]: null }) })),
   ].filter((x) => !!x);
+  const clearAll = here({ list: list.key, q: null, quota: null, st: null, has: null, scat: null, ...noTerms });
   const strong = (t: string) => <span className="font-semibold">{t}</span>;
   const about = matrix ? (
     <>
@@ -172,8 +173,8 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         <InfoTip label={matrix ? "the seat matrix" : compare ? `the ${round} lists side by side` : `the ${title} list`}>{about}</InfoTip>
       </div>
 
-      {/* As on Options: the form and Apply stay mounted (focus stays on Apply); the fields remount to show what was applied. */}
-      <FilterForm action="/decide/seats" scroll={false} role="search" aria-label="Filter seats" className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3">
+      {/* As on Options: the search box shows, the rest open from Filters; the form, its buttons and the panel stay mounted, the fields remount to show what was applied. */}
+      <FilterForm action="/decide/seats" role="search" aria-label="Filter seats" className="relative flex flex-wrap items-end gap-2">
         {(["rank", "cat", "pwd", "fee", "bond"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         <input type="hidden" name="list" value={list.key} />
         {!matrix && <input type="hidden" name="view" value={f.view} />}
@@ -186,6 +187,11 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             <span className="sr-only">Search institute or state</span>
             <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Search institute or state" className={control} />
           </label>
+        </Fragment>
+        <SearchSubmit />
+        <FiltersPanel count={active.length} clear={clearAll}>
+        <div className="flex flex-wrap items-end gap-2">
+        <Fragment key={params.toString()}>
           {f.c.length ? (
             <FilterDropdown label="Course" name="c" options={pairChoices(meta.courses)} selected={f.c} />
           ) : (
@@ -214,7 +220,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             />
           )}
           <TermFilterControls f={f} caps={profile} />
-          <label className="more-filter w-72 max-w-full">
+          <label className="w-72 max-w-full">
             <span className="sr-only">Seat category</span>
             <select name="scat" defaultValue={f.scat ?? ""} className={control}>
               <option value="">{mine ? `Your categories: ${mine.join(", ")}` : "All seat categories"}</option>
@@ -222,17 +228,17 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
               {seatCategories.map((c) => <option key={c} value={c}>{c} seats</option>)}
             </select>
           </label>
-          <label className="more-filter w-72 max-w-full">
+          <label className="w-72 max-w-full">
             <span className="sr-only">Sort</span>
             <select name="sort" defaultValue={sort} className={control}>
               {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && several ? `Most ${kindSeats(list)} first` : s === "reach" && matrix ? "Your chances: beyond your rank first" : sortLabels[s]}</option>)}
             </select>
           </label>
         </Fragment>
-        <MoreFilters open={!!f.scat || !!f.sort || termMoreOpen(f)} />
-        <Button type="submit">Apply</Button>
+        </div>
+        </FiltersPanel>
       </FilterForm>
-      <ActiveFilters items={active} clear={here({ list: list.key, q: null, quota: null, st: null, has: null, scat: null, ...noTerms })} />
+      <ActiveFilters items={active} clear={clearAll} />
 
       {one && (
         <p className="flex flex-wrap items-center gap-x-3 rounded-lg border border-border bg-card px-4 py-1 text-sm">
@@ -267,10 +273,10 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
               </>
             )}
             {r.total > 0 && <> · rows <span className="numeric">{rangeLabel(r)}</span></>}
-          </p>
+           <ColourLegend className="ml-1 align-middle" /></p>
           {r.total > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              <ViewToggle page="seats" />
+              <ViewToggle page="seats" view={view} />
               <CsvLink href={L.with("/api/v1/seats/export", { tab: null, page: null })} what={`${matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row`} total={r.total} />
             </div>
           )}
@@ -302,7 +308,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
       ) : matrix ? (
         <>
           <HistoryNote more={closingNote} />
-          <SeatMatrix rows={r.rows.map(matrixRow)} groups={seatGroups(r.lists)} years={years} results={meta.sources} ranked={!!profile} sort={sort} caption={caption} list={list} lists={r.lists} />
+          <SeatMatrix rows={r.rows.map(matrixRow)} groups={seatGroups(r.lists)} years={years} results={meta.sources} ranked={!!profile} sort={sort} caption={caption} list={list} lists={r.lists} view={view} />
           <DataSource terms={termDocs(r.rows.map((x) => x.fees))} />
         </>
       ) : (
@@ -310,7 +316,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
           <HistoryNote more={closingNote} />
           <ViewPanes
             page="seats"
-            view={await chosenView(params, "seats")}
+            view={view}
             cards={<SeatCards rows={r.rows} list={list} lists={several ? roundLists : [list]} ranked={!!profile} L={L} title={caption} />}
             table={<SeatTable rows={r.rows} lists={r.lists} current={list.key} sort={sort} ranked={!!profile} L={L} caption={caption} />}
           />

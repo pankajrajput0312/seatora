@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Fragment } from "react";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
@@ -10,19 +9,20 @@ import { CsvLink } from "@/features/decide/components/csv-link";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { termDocs } from "@/features/decide/components/fees";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
-import { FilterForm } from "@/features/decide/components/filter-form";
+import { FilterForm, FiltersPanel, SearchSubmit } from "@/features/decide/components/filter-form";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { OptionsResults } from "@/features/decide/components/option-actions";
 import { ViewField } from "@/features/decide/components/view-toggle";
+import { chosenView } from "@/features/decide/server/view";
 import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
-import { ActiveFilters, control, EmptyState, MoreFilters, smallLink } from "@/features/decide/components/ui";
+import { ActiveFilters, control, EmptyState, smallLink } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
-import { readTermFilters, termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
+import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, LATEST_YEAR, listOptions, optionsView, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
 import { openQuotas, openQuotasNote, optionsViews, roundLabel, seatKindLabel, seatKinds, type SeatKind } from "@/features/decide/types";
@@ -57,7 +57,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const { params: tp, filters: terms } = readTermFilters(params, profile);
   const hasSeats = f.seats === "1" ? "clear" : f.seats === "all" ? false : f.seats;
   const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms };
-  const [meta, r] = await Promise.all([getMeta(), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE })]);
+  const [meta, r, view] = await Promise.all([getMeta(), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }), chosenView(params, "options")]);
   const lists = r.seatLists;
   const roundView = r.view === "round";
   // The round view lists the seats with no past allotment as rows; the other view names them and links Seats.
@@ -100,6 +100,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: here({ bond: null }) },
     ...termChips(tp).map((c) => ({ label: c.label, href: here({ [c.key]: null }) })),
   ].filter((x) => !!x);
+  const clearAll = here({ q: null, reach: null, seats: null, closed: null, prov: null, quota: null, st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const n = (x: number) => <span className="numeric font-semibold">{formatRank(x)}</span>;
@@ -118,7 +119,6 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       {lists.map((l) => `${seatKindLabel[l.kind]}: ${seatKindNote[l.kind]}`).join(" ")} &quot;—&quot; when a list has none; select a number to see those seats.
     </>
   );
-  const moreOpen = termMoreOpen(tp) || !!f.seats || !!f.prov;
 
   return (
     <AppPage className="grid grid-cols-1 gap-4">
@@ -170,13 +170,13 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         </p>
       )}
 
-      {/* The profile filters are URL params, so this visit can differ from the saved profile. The form, Apply and the "Show all filters" box stay mounted (focus stays on Apply, her tick survives); only the fields remount to show what was applied. On phones the box folds the less-used fields (.more-filter), as on every filter bar. */}
+      {/* The profile filters are URL params, so this visit can differ from the saved profile. The search box shows; the rest open from Filters (FiltersPanel). The form, its buttons and the panel stay mounted (focus stays on them); only the fields remount to show what was applied. */}
       <FilterForm
         action="/decide/options"
-        scroll={false}
+       
         role="search"
         aria-label="Filter options"
-        className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3"
+        className="relative flex flex-wrap items-end gap-2"
       >
         {(["rank", "cat", "pwd", "fee", "bond"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         {f.reach && <input type="hidden" name="reach" value={f.reach} />}
@@ -188,6 +188,11 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <span className="sr-only">Search institute, state or course</span>
             <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Search" className={control} />
           </label>
+        </Fragment>
+        <SearchSubmit />
+        <FiltersPanel count={active.length} clear={clearAll}>
+        <div className="flex flex-wrap items-end gap-2">
+        <Fragment key={params.toString()}>
           {/* Exact courses in her profile (pairs) replace course x degree, so they get one exact-course filter. */}
           {profile.pairs?.length ? (
             <FilterDropdown label="Course" name="c" options={pairChoices(meta.courses)} selected={profile.pairs} />
@@ -201,7 +206,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} />
           <TermFilterControls f={tp} caps={profile} />
           {lists.length > 0 && (
-            <label className="more-filter w-64 max-w-full">
+            <label className="w-64 max-w-full">
               <span className="sr-only">Seats in the {round} seat lists</span>
               <select name="seats" defaultValue={r.seats ?? "all"} className={control}>
                 <option value="all">With or without {round} seats</option>
@@ -211,20 +216,16 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             </label>
           )}
           {latestProvisional && (
-            <label className="more-filter inline-flex min-h-11 items-center gap-2 px-1 text-sm">
+            <label className="inline-flex min-h-11 items-center gap-2 px-1 text-sm">
               <input type="checkbox" name="prov" value="0" defaultChecked={!!f.prov} className="size-5 accent-sky" />
               Leave out {LATEST_YEAR} R1 (provisional) from the labels
             </label>
           )}
         </Fragment>
-        {/* Remounts only when a folded filter is newly set or cleared (e.g. "Include them"), so it opens to show it; otherwise her tick survives. */}
-        <MoreFilters key={`more-${moreOpen}`} open={moreOpen} />
-        <Button type="submit">Apply</Button>
+        </div>
+        </FiltersPanel>
       </FilterForm>
-      <ActiveFilters
-        items={active}
-        clear={here({ q: null, reach: null, seats: null, closed: null, prov: null, quota: null, st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) })}
-      />
+      <ActiveFilters items={active} clear={clearAll} />
 
       <nav aria-label="Filter by reach" className="flex flex-wrap gap-2">
         <Link href={here({ reach: null })} aria-current={!f.reach ? "true" : undefined} className={chip(!f.reach)}>
@@ -285,6 +286,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           pastYears={PAST_YEARS}
           includeLatest={!f.prov}
           seatLists={lists}
+          view={view}
           historyMore={
             <>
               Closing = the highest All India Rank allotted in that round on a seat of that category; here {seats} seats, the ones you can take. {LATEST_YEAR} R1 is that round alone. Labels

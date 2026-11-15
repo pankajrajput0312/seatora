@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { siteConfig } from "@/config/site";
-import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import type { DecideLinks } from "../lib/links";
 import { parseSearchParams } from "../lib/params";
@@ -18,57 +17,35 @@ import { TypeBadge } from "./type-badge";
 import { tbl } from "./ui";
 
 // The Residents tab across colleges (/decide/residents): its URL params, table, cards, (i) and sources.
-// Never shows a reservation category (seat or candidate): ResidentRow carries none.
+// Never shows a reservation category (seat or candidate) or a rank: ResidentRow carries neither.
 
 type Hide = React.ComponentProps<typeof SyncedHideableRow>["hide"];
 /** College type by College.slug (hospitalInfo); a college missing here shows none. */
 export type ResidentTypes = Map<string, CollegeType | null>;
 
-/** Around her rank: ±20%. */
-export const rankAround = (rank: number) => ({ rankFrom: Math.max(1, Math.round(rank * 0.8)), rankTo: Math.round(rank * 1.2) });
-
 /**
  * The page's URL → the search query, with her profile's defaults. URL keys are residentsQuery's, except the quota filter,
- * `rq` (`quota` is her profile's). `course=all` = every course; no `course` = her courses (when they are 1 to 20, the
- * query's cap; otherwise all). No `rankFrom`/`rankTo` = her rank ±20%, unless `ranks=all` (the "All ranks" link, and every
- * Apply but one from her default range, so clearing both fields means all ranks). Invalid values are dropped, as on
- * every Decide page.
+ * `rq` (`quota` is her profile's). `course` and `college` repeat (pick one or more). `course=all` = every course; no
+ * `course` = her courses (when they are 1 to 20, the query's cap; otherwise all). Invalid values are dropped, as on every
+ * Decide page.
  */
 export function residentsFilters(params: URLSearchParams, profile: Profile | null, courses: Course[]) {
   const raw = new URLSearchParams();
-  for (const [k, v] of params) if (k !== "quota") raw.append(k, k === "rankFrom" || k === "rankTo" ? v.replace(/[,\s]/g, "") : v);
+  for (const [k, v] of params) if (k !== "quota") raw.append(k, v);
   if (params.get("rq")) raw.set("quota", params.get("rq")!);
-  const f = parseSearchParams(residentsQuery, raw, ["course"]);
+  const f = parseSearchParams(residentsQuery, raw, ["course", "college"]);
   const mine = profile && (profile.pairs?.length || profile.specialties.length || profile.degrees.length) ? courses.filter((c) => profileHasCourse(profile, c)) : [];
   const yours = mine.length > 0 && mine.length <= 20;
   const allCourses = !!f.course?.includes("all");
   const course = allCourses ? undefined : f.course?.length ? f.course : yours ? mine.map((c) => c.slug) : undefined;
-  const typed = f.rankFrom != null || f.rankTo != null;
-  const around = profile && !typed && params.get("ranks") !== "all" ? rankAround(profile.rank) : null;
-  let { rankFrom, rankTo } = around ?? f;
-  if (rankFrom != null && rankTo != null && rankFrom > rankTo) [rankFrom, rankTo] = [rankTo, rankFrom];
-  const query: ResidentsQuery = { ...f, course, rankFrom, rankTo };
-  return { query, yours: yours ? mine : null, courseValue: allCourses ? "all" : f.course?.[0], around };
+  const query: ResidentsQuery = { ...f, course };
+  return { query, yours: yours ? mine : null, allCourses };
 }
 
 const roundName = (r: string) => roundLabel[r as Round] ?? r;
 const courseName = (r: ResidentRow) => `${r.course.degree} ${r.course.name}`;
 const tabHref = (L: DecideLinks, r: ResidentRow) => L.to(`/decide/institutes/${r.college.slug}`, { tab: "residents" });
 const collegeLink = "inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline";
-
-/**
- * A rank as "AIR 12,345 · 2024": All India Rank from that year's NBEMS NEET PG result. The year is the resident's: the
- * import only takes a rank from the same year's result. A dash when unknown.
- */
-export function Rank({ rank, year }: { rank: number | null; year: number }) {
-  if (rank == null) return <Dash />;
-  return (
-    <span className="numeric whitespace-nowrap">
-      <span className="font-semibold">AIR {formatRank(rank)}</span>
-      <span className="text-muted-foreground"> · {year}</span>
-    </span>
-  );
-}
 
 const th = `${tbl.th} px-3`;
 const td = "px-3 py-2 align-top";
@@ -81,7 +58,6 @@ export function ResidentsTable({ rows, L, hide, caption, types }: { rows: Reside
         <caption className="sr-only">{caption}</caption>
         <thead className={tbl.head}><tr className="text-left">
           <th scope="col" className={th}>Name</th>
-          <th scope="col" className={`${th} text-right`}>Rank</th>
           <th scope="col" className={th}>College</th>
           <th scope="col" className={th}>Course</th>
           <th scope="col" className={th}>Year</th>
@@ -93,9 +69,8 @@ export function ResidentsTable({ rows, L, hide, caption, types }: { rows: Reside
           {rows.map((r) => {
             const type = types?.get(r.college.slug);
             return (
-              <SyncedHideableRow key={r.id} id={r.id} name={r.name} hide={hide} colSpan={9} className={tbl.row}>
+              <SyncedHideableRow key={r.id} id={r.id} name={r.name} hide={hide} colSpan={8} className={tbl.row}>
                 <th scope="row" className={`${td} min-w-36 text-left font-medium`}>{r.name}</th>
-                <td className={`${td} text-right`}><Rank rank={r.rank} year={r.year} /></td>
                 <td className={`${td} min-w-48`}>
                   <Link href={tabHref(L, r)} className={collegeLink}>{r.college.name}<span className="sr-only">: its residents</span></Link>
                   <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
@@ -119,8 +94,8 @@ export function ResidentsTable({ rows, L, hide, caption, types }: { rows: Reside
 }
 
 /**
- * The same page as ResultCards: the rank big on the left, the college (its Residents tab) and course, state and type;
- * the name, year and round, MCC list and quota in the header row, with Hide.
+ * The same page as ResultCards: the year (and round) big on the left, the college (its Residents tab) and course, state
+ * and type; the name, MCC list and quota in the header row.
  */
 export function ResidentsCards({ rows, L, hide, types }: { rows: ResidentRow[]; L: DecideLinks; hide: Hide; types?: ResidentTypes }) {
   return (
@@ -135,24 +110,11 @@ export function ResidentsCards({ rows, L, hide, types }: { rows: ResidentRow[]; 
             hide={hide}
             chips={[
               <span key="n" className="text-sm font-semibold text-foreground">{r.name}</span>,
-              // Year and round as Allotments' cards show them ("2025 · R2"): the round is that year's matched allotment.
-              <span key="y" className="numeric">{r.year}{r.round && ` · ${roundName(r.round)}`}</span>,
               `MCC list: ${r.list}`,
               r.quota,
             ]}
-            stat={{
-              label: "Rank",
-              value:
-                r.rank == null ? (
-                  <Dash />
-                ) : (
-                  <span className="numeric whitespace-nowrap">
-                    AIR {formatRank(r.rank)}
-                    {/* Under the number, so the college keeps its width at 390px. */}
-                    <span className="block text-xs font-normal tracking-normal text-muted-foreground"><span className="sr-only"> · </span>NEET PG {r.year}</span>
-                  </span>
-                ),
-            }}
+            // Year and round as Allotments' cards show them ("2025 · R2"): the round is that year's matched allotment.
+            stat={{ label: "Year", value: <span className="numeric whitespace-nowrap">{r.year}{r.round && <span className="block text-xs font-normal tracking-normal text-muted-foreground"><span className="sr-only"> · </span>{roundName(r.round)}</span>}</span> }}
             title={r.college.name}
             href={tabHref(L, r)}
             subtitle={courseName(r)}
@@ -168,34 +130,32 @@ const ext = (href: string, text: string) => (
   <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky underline">{text}<span className="sr-only"> (opens in a new tab)</span></a>
 );
 
-/** The page's (i) (PageHead `about`): where names, ranks, quota and round come from, and how to have a name hidden. */
-export function ResidentsAbout({ rows }: { rows: ResidentRow[] }) {
-  const years = [...new Set(rows.filter((r) => r.rank != null).map((r) => r.year))].sort();
+/** The page's (i) (PageHead `about`): where names, quota and round come from, and how to have a name hidden. */
+export function ResidentsAbout() {
   const email = siteConfig.contactEmail;
   return (
     <>
       <strong>Names</strong> are as printed in MCC&apos;s official admitted-candidates lists (each row names its list), which MCC publishes. Any signed-in member can see them; visitors who are not signed in and search engines cannot. No contact details are held.
       <br /><br />
-      <strong>Ranks</strong> are All India Ranks from that year&apos;s NBEMS NEET PG result
-      {years.length ? ` (on this page: ${years.join(", ")})` : " (none on this page has one)"}, where one could be matched; a dash where none is known. A rank is where one person got in, not a closing rank or a prediction.
+      <strong>Quota and round</strong> come from the matching MCC allotment of that year, shown only where exactly one matched the resident&apos;s college and course; otherwise a dash. Minority quotas show as &ldquo;Minority&rdquo;.
       <br /><br />
-      <strong>Quota and round</strong> come from the matching MCC allotment of that year, shown only where exactly one matched the resident&apos;s rank, college and course; otherwise a dash. Minority quotas show as &ldquo;Minority&rdquo;.
+      No rank, seat category or candidate category is shown here.
       <br /><br />
-      Seat and candidate category are not held or shown here. But a rank shown here can be looked up in MCC&apos;s public allotment results, which Allotments shows: they list each rank&apos;s seat and candidate category, PwD included.
+      Filter by <strong>college</strong> (the hospital) or by <strong>course</strong> (the branch), or both: type in either list to find one, and tick one or more.
       <br /><br />
       To have a name hidden, write to us{email ? <> at <a href={`mailto:${email}`} className="text-sky underline">{email}</a></> : null}: it is hidden for every year and course at that college and stays hidden after updates.
       <br /><br />
-      MCC publishes the admitted lists on its {ext(MCC_PG, "PG counselling site")}, NBEMS the NEET PG results on {ext("https://natboard.edu.in", "natboard.edu.in")}: the documents behind this page are in its Sources.
+      MCC publishes the admitted lists on its {ext(MCC_PG, "PG counselling site")}: the documents behind this page are in its Sources.
     </>
   );
 }
 
 /**
- * The documents behind these rows, for the page's Sources footer: the MCC admitted lists, then the NBEMS NEET PG results
- * the ranks come from. `sources` as the search returns them (names and links); a row's document missing there is named
+ * The documents behind these rows, for the page's Sources footer: the MCC admitted lists, then (rows with `rankBasis`,
+ * the institute's tab) the NBEMS NEET PG results the ranks come from. `sources` as the search returns them (names and links); a row's document missing there is named
  * from the row, without a link. Keys as the institute's Residents tab gives them, so each document is one entry.
  */
-export function residentDocs(rows: Pick<ResidentRow, "sourceKey" | "list" | "year" | "rankBasis">[], sources: ResidentSource[]): SourceDoc[] {
+export function residentDocs(rows: (Pick<ResidentRow, "sourceKey" | "list" | "year"> & { rankBasis?: string | null })[], sources: ResidentSource[]): SourceDoc[] {
   const docs = new Map(sources.map((s) => [s.key, s]));
   for (const r of rows) {
     if (!docs.has(r.sourceKey)) docs.set(r.sourceKey, { key: r.sourceKey, name: `MCC admitted candidates list (${r.list})`, url: null, year: r.year });

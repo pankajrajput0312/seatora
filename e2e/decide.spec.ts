@@ -23,7 +23,7 @@ test("every route: skip link is the first tab stop, no sideways scroll at 390 px
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
   for (const path of ["/decide", "/decide/options", "/decide/choices", "/decide/compare", "/decide/institutes", "/decide/institutes/government-medical-college-nagpur-440003?tab=courses",
-    "/decide/last-ranks", "/decide/allotments", "/decide/rank-scan", "/decide/rank-journey", "/decide/fees", "/decide/seats", "/decide/seats?tab=trends", "/decide/counselling",
+    "/decide/last-ranks", "/decide/allotments", "/decide/rank-scan", "/decide/fees", "/decide/seats", "/decide/seats?tab=trends", "/decide/counselling",
     "/decide/institutes/ssb-heart-and-multispeciality-hospital-121001?tab=clinical"]) {
     await page.goto(`${path}${path.includes("?") ? "&" : "?"}${PROFILE}`);
     await page.keyboard.press("Tab");
@@ -144,25 +144,52 @@ test("options, the round view by default: her options with 2026 R2 seats, new on
 });
 const formatN = (n: number) => n.toLocaleString("en-IN");
 
-test("Cards | Table writes `layout`, keeps the page's own `view`, and the choice survives a reload", async ({ page }) => {
+test("Cards | Table writes `layout`, keeps the page's own `view`, renders only the view on show, and the choice survives a visit without `layout`", async ({ page }) => {
   // Options' view=all and Seats' view=list are their own list views: the toggle must never overwrite them.
-  for (const [path, view] of [[`/decide/options?${PROFILE}&view=all`, "all"], [`/decide/seats?${PROFILE}&view=list`, "list"]]) {
+  for (const [path, view, page_] of [[`/decide/options?${PROFILE}&view=all`, "all", "options"], [`/decide/seats?${PROFILE}&view=list`, "list", "seats"]]) {
     await page.goto(path);
     const toggle = page.getByRole("group", { name: "View as" });
     for (const v of ["Cards", "Table"]) {
-      await toggle.getByRole("button", { name: v, exact: true }).click(); // a button once hydrated (a link before)
-      await expect(toggle.getByRole("button", { name: v, exact: true }), path).toHaveAttribute("aria-pressed", "true");
+      await toggle.getByRole("link", { name: v, exact: true }).click(); // a navigation: the page comes back in that view
       await expect.poll(() => new URL(page.url()).searchParams.get("layout"), path).toBe(v.toLowerCase());
+      await expect(toggle.getByRole("link", { name: v, exact: true }), path).toHaveAttribute("aria-current", "true");
       expect(new URL(page.url()).searchParams.get("view"), path).toBe(view);
+      await expect(page.locator(`[data-view-pane="${v.toLowerCase()}"]`).first(), path).toBeVisible();
+      await expect(page.locator(`[data-view-pane="${v === "Cards" ? "table" : "cards"}"]`), path).toHaveCount(0); // never both in the page
     }
-    await page.reload();
-    expect(new URL(page.url()).searchParams.get("view"), path).toBe(view);
+    // The cookie the toggle set: the same page without `layout` opens on the table.
+    expect((await page.context().cookies()).find((c) => c.name === `medpath.view.${page_}`)?.value, path).toBe("table");
+    await page.goto(path);
     await expect(page.locator('[data-view-pane="table"]').first(), path).toBeVisible();
-    await expect(page.locator('[data-view-pane="cards"]').first(), path).toBeHidden();
+    await expect(page.locator('[data-view-pane="cards"]'), path).toHaveCount(0);
   }
   await expect(page.getByRole("link", { name: "One list" })).toHaveAttribute("aria-current", "true");
   await page.goto(`/decide/options?${PROFILE}&view=all&layout=cards`);
   await expect(page.locator("#options-count")).toContainText("of 641 options");
+});
+
+/** Opens the page's Filters panel (list pages keep their filters behind it). */
+const openFilters = async (page: import("@playwright/test").Page) => {
+  const filters = page.locator("details[data-filters]");
+  if ((await filters.getAttribute("open")) == null) await filters.locator("> summary").click();
+};
+
+test("filters sit behind a Filters button: its count, Escape closes it with focus back on it, Apply keeps them", async ({ page }) => {
+  await page.goto(`/decide/fees?${PROFILE}&maxleave=5`);
+  const summary = page.locator("details[data-filters] > summary");
+  await expect(page.getByRole("searchbox")).toBeVisible(); // the search box stays out
+  await expect(page.getByRole("group", { name: "Filters", exact: true })).toBeHidden();
+  await expect(summary).toContainText(/Filters\s*\d+ applied/);
+  await summary.click();
+  await expect(page.getByRole("group", { name: "Filters", exact: true })).toBeVisible();
+  await page.getByRole("group", { name: "Filters", exact: true }).getByRole("combobox").first().focus();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("group", { name: "Filters", exact: true })).toBeHidden();
+  await expect(summary).toBeFocused();
+  await summary.click();
+  await page.getByRole("button", { name: "Apply" }).click(); // a plain GET form: the page loads again, the panel closed
+  await expect(page.getByRole("group", { name: "Filters", exact: true })).toBeHidden();
+  await expect(page).toHaveURL(/maxleave=5/);
 });
 
 test("options, the view of every option with past allotments: her 641 options in the open quotas (25 at a time), Show more focuses the first new row, two ticked states both apply", async ({ page }) => {
@@ -177,6 +204,7 @@ test("options, the view of every option with past allotments: her 641 options in
   await expect(page.locator('[data-item="26"]').filter({ visible: true })).toBeFocused();
 
   // Multi-select: both ticked states apply (repeated st params), and stay ticked.
+  await openFilters(page);
   await page.locator("summary", { hasText: "State" }).click();
   await page.getByRole("checkbox", { name: "Maharashtra" }).check();
   await page.getByRole("checkbox", { name: "Karnataka" }).check();
@@ -317,6 +345,7 @@ test("last ranks show the official closings: closing on one seat category, allot
   // Seth GS MD Anaesthesiology, All India, 2026 R1: OBC 11,842 and Open 8,502, both with 20 allotments (all categories).
   await page.goto(`/decide/last-ranks?${PROFILE}&course=md-anaesthesiology&lcat=OBC&lquota=All+India&inst=${SETH_GS}`);
   await expect(page.locator(`#inst-${SETH_GS}`)).toContainText("11,842 (20)");
+  await openFilters(page);
   await page.getByLabel("Seat category").selectOption("Open");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/lcat=Open/);
@@ -330,6 +359,7 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
   const table = page.getByRole("region", { name: "Allotments", exact: true });
   await expect(table.getByText("Provisional")).toHaveCount(0); // 2026 R1 is final
   // Comboboxes: the Display menu has checkboxes with the same names.
+  await openFilters(page);
   await page.getByRole("combobox", { name: "Seat category" }).selectOption("OBC");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/acat=OBC/);
@@ -339,15 +369,7 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
   await page.goto(`/decide/allotments?${PROFILE}&from=30,000&to=50,000`);
   await expect(page.getByLabel("Rank from")).toHaveValue("30,000");
   await expect(page.locator("#results")).not.toContainText("2,09,566");
-  // Phones fold Round, Quota and Seat category behind "Show all filters"; her tick survives an Apply that sets none of them.
-  const more = page.getByLabel("Show all filters");
-  if (await more.isVisible()) {
-    await more.check();
-    await page.getByLabel("Rank from").fill("31000");
-    await page.getByRole("button", { name: "Apply" }).click();
-    await expect(page).toHaveURL(/from=31000/);
-    await expect(more).toBeChecked();
-  }
+  await openFilters(page);
   await page.getByRole("combobox", { name: "Quota" }).selectOption("All India");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/aq=All\+India/);
@@ -356,18 +378,7 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
   await expect(page.getByText("That range was not applied.")).toBeVisible(); // (Next's route announcer is also role=alert)
 });
 
-test("rank journey: 2023 rank 23 in R1 at LTMMC, upgraded in R2 to Seth GS on choice 1; Allotments' new columns, CSV and links", async ({ page }) => {
-  await page.goto(`/decide/rank-journey?${PROFILE}`);
-  await expect(page.getByLabel("All India Rank")).toHaveValue("42284"); // her rank, the newest year
-  await expect(page.locator('select[name="year"]')).toHaveValue("2026"); // (getByLabel("Year") would also find a "… per year" filter)
-
-  await page.goto(`/decide/rank-journey?${PROFILE}&air=23&year=2023&layout=table`); // phones open on cards
-  const journey = page.getByRole("region", { name: "Rank 23, 2023" });
-  await expect(journey.getByRole("row", { name: /^2023 R1/ })).toContainText("Allotted");
-  const r2 = journey.getByRole("row", { name: /^2023 R2/ });
-  for (const v of ["Seth Gordhandas Sunderdas Medical College", "Upgraded", "General", "LOKMANYA TILAK MEDICAL COLLEGE MUMBAI", "MD General Medicine · All India · reported"]) await expect(r2).toContainText(v);
-  await expect(page.getByText(/^Seat in 2 of \d+ rounds; none in R3\b/)).toBeVisible(); // the rounds with no row, named
-
+test("Allotments' R2 columns, Display and CSV: 2023 rank 23 upgraded in R2 to Seth GS on choice 1", async ({ page }) => {
   // Allotments: candidate category, choice no., status and previous seat; a column hidden under Display; the CSV.
   await page.goto(`/decide/allotments?${PROFILE}&year=2023&round=R2&from=23&to=23&layout=table`); // Allotments opens on cards
   const table = page.getByRole("region", { name: "Allotments", exact: true });
@@ -381,12 +392,7 @@ test("rank journey: 2023 rank 23 in R1 at LTMMC, upgraded in R2 to Seth GS on ch
   const csv = await (await page.request.get(await page.getByRole("link", { name: /Download CSV/ }).getAttribute("href") ?? "")).text();
   expect(csv).toContain(",Candidate category,Choice no.,Status,");
   expect(csv).toContain(",All India,Open,General,1,Upgraded,Seth Gordhandas Sunderdas Medical College,");
-  await table.getByRole("link", { name: /^Journey/ }).click();
-  await expect(page).toHaveURL(/air=23&year=2023/);
-
-  await page.goto(`/decide/rank-scan?${PROFILE}&scan=23&year=2023&w=100&round=R2&layout=table`); // 50 a page: the round's own; the table (phones open on cards)
-  await page.getByRole("region", { name: "2023 R2 allotments" }).getByRole("link", { name: "23", exact: true }).click();
-  await expect(h1(page)).toHaveText("Rank journey");
+  await expect(table.getByRole("link", { name: /^Journey/ })).toHaveCount(0); // Rank journey is gone (its page is a 404)
 });
 
 test("print: every table box lets all its rows onto paper", async ({ page }) => {

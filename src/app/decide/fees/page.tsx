@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ColourLegend } from "@/features/decide/components/colour-legend";
 import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
@@ -19,7 +20,7 @@ import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { statKeys, statLabel, type StatKey } from "@/features/decide/lib/stat-format";
-import { termChips, termFilterLists, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
+import { termChips, termFilterLists, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getDecideData, getMeta, listFees, type FeeSort } from "@/features/decide/service";
 import { programmeNames, programmes } from "@/features/decide/server/terms";
@@ -33,8 +34,6 @@ const sortLabel: Record<FeeSort, string> = { fee1: "fee, year 1", stip1: "stipen
 /** Stipend sorts highest first by default, the rest lowest first. */
 const natural = (k: FeeSort) => (k === "stip1" ? "desc" : "asc");
 const arrow = (on: boolean, dir: string) => (on ? <span aria-hidden="true">{dir === "asc" ? " ↑" : " ↓"}</span> : null);
-/** Folded on phones behind "Show all filters" (globals.css `.more-filter`). */
-const more = "more-filter";
 const bare = "grid min-w-0 text-sm";
 
 export default async function FeesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -44,7 +43,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const profile = profileFromParams(params);
   const [meta, { courses }, info] = await Promise.all([getMeta(), getDecideData(), hospitalInfo()]);
   const d = feeDefaults(profile, courses);
-  const res = await listFees(feesFilters(f, d), { page: f.page, pageSize: PAGE_SIZE });
+  const [res, view] = await Promise.all([listFees(feesFilters(f, d), { page: f.page, pageSize: PAGE_SIZE }), chosenView(params, "fees")]);
   const { rows } = res;
   const dir = f.dir ?? natural(f.sort);
   const byName = f.sort === "name";
@@ -61,7 +60,6 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
     ...(f.q ? [{ label: `“${f.q}”`, href: without("q") }] : []),
     ...(f.bdecl ? [{ label: f.bdecl === "declared" ? "Bond declared" : "No bond on record", href: without("bdecl") }] : []),
   ];
-  const moreSet = termMoreOpen(f) || f.dir != null || !!f.q || params.has("sort");
 
   const sortTh = (k: FeeSort, label: string, cls = "text-right") => {
     const on = f.sort === k;
@@ -155,7 +153,19 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       </PageHead>
 
       {/* min-w-0: TermFilterControls' selects are sized for a flex bar; in this grid each takes its cell. */}
-      <FilterBar action="/decide/fees" params={params} cols="md:grid-cols-3 xl:grid-cols-4 [&>label]:min-w-0" more={moreSet}>
+      <FilterBar
+        action="/decide/fees"
+        params={params}
+        cols="md:grid-cols-3 xl:grid-cols-4 [&>label]:min-w-0"
+        active={chips.length}
+        clear={L.to("/decide/fees")}
+        search={
+          <label className="grid min-w-56 flex-1 text-sm">
+            <span className="sr-only">Institute or state</span>
+            <input name="q" type="search" defaultValue={f.q ?? ""} placeholder="Search institute or state" className={control} />
+          </label>
+        }
+      >
         <label className={bare}>
           <span className="sr-only">Programme</span>
           <Select name="program" value={f.program} all={d.programmes ? `Your profile: ${d.programmes.join(", ")}` : "All programmes"}
@@ -166,16 +176,12 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           <Select name="state" value={f.state} all={d.states ? `Your profile: ${d.states.join(", ")}` : "All states"}
             options={[...(d.states ? [{ value: "all", label: "All states" }] : []), ...meta.states.map((s) => ({ value: s, label: s }))]} />
         </label>
-        <label className={`${bare} ${more}`}>
-          <span className="sr-only">Institute</span>
-          <input name="q" type="search" defaultValue={f.q ?? ""} placeholder="Institute or state" className={control} />
-        </label>
-        <TermFilterControls f={f} caps={d} more={more} />
-        <label className={`${bare} ${more}`}>
+        <TermFilterControls f={f} caps={d} />
+        <label className={bare}>
           <span className="sr-only">Sort by</span>
           <Select name="sort" value={f.sort} options={(Object.keys(sortLabel) as FeeSort[]).map((k) => ({ value: k, label: `Sort: ${sortLabel[k]}` }))} />
         </label>
-        <label className={`${bare} ${more}`}>
+        <label className={bare}>
           <span className="sr-only">Order</span>
           <Select name="dir" value={f.dir} all={`Order: ${byName ? "A to Z" : natural(f.sort) === "desc" ? "highest first" : "lowest first"}`}
             options={[{ value: "asc", label: byName ? "A to Z" : "Lowest first" }, { value: "desc", label: byName ? "Z to A" : "Highest first" }]} />
@@ -193,10 +199,10 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
               <Link href={L.with("/decide/fees", { nd: "keep", page: null })} className="text-sky underline">include them</Link>
             </span>
           )}
-        </h2>
+         <ColourLegend className="ml-1 align-middle" /></h2>
         {res.total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <ViewToggle page="fees" />
+            <ViewToggle page="fees" view={view} />
             <CsvLink href={`/api/v1/fees/export?${params}`} what={`these ${formatRank(res.total)} programmes`} />
           </div>
         )}
@@ -205,7 +211,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       {res.total === 0 ? (
         <EmptyState title="Nothing matches these filters." href={L.to("/decide/fees", { program: "all", state: "all", maxfee: "any", bondyrs: "any" })} />
       ) : (
-        <div><ViewPanes page="fees" view={await chosenView(params, "fees")} cards={cards} table={table} /></div>
+        <div><ViewPanes page="fees" view={view} cards={cards} table={table} /></div>
       )}
       <Pager page={res.page} pageSize={res.pageSize} total={res.total} href={(n) => L.page("/decide/fees", n)} focusId="results" label="Fees" />
     </AppPage>

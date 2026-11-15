@@ -30,7 +30,7 @@ test("a brand-new account signs up without a code, lands on /decide and sees Opt
 
   await page.goto("/decide/options?rank=42284&cat=OBC");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Options");
-  await page.goto("/decide/residents?course=all&ranks=all");
+  await page.goto("/decide/residents?course=all");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Residents");
   await expect(page.locator("#results")).toHaveText(/^[\d,]+ residents/);
   const rows = page.getByRole("table").locator("tbody tr").or(page.getByRole("region", { name: "Residents", exact: true }).getByRole("listitem"));

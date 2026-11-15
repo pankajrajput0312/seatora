@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { statCells, statLabel, type StatCell, type StatKey } from "../lib/stat-format";
+import { feeBandText, statCells, statLabel, type Level, type StatCell, type StatKey } from "../lib/stat-format";
 import type { ProgrammeTerms } from "../server/terms";
 import { NBEMS_BOND_RULES, termDocs } from "./fees";
 import { InfoTip } from "./info-tip";
@@ -30,16 +30,21 @@ function CellTip({ c, t, of }: { c: StatCell; t: ProgrammeTerms; of?: string }) 
   );
 }
 
+/** A value's colour by its level (lib/stat-format.ts Level; the colour key: colour-legend.tsx). */
+export const levelClass: Record<Level, string> = { good: "text-leaf", caution: "text-sun", strong: "text-flame", heavy: "text-ember" };
+
 /** The value: short ("₹50 L", read out in full) or full. `nb`: it breaks only after a range's dash (a table cell). */
 function Value({ c, full, nb }: { c: StatCell; full?: boolean; nb?: boolean }) {
   const raw = full ? c.full : c.short;
   // "₹1.5 Cr" never splits from its unit; in a table nothing splits but a range ("₹10 L–₹20 L" wraps after its dash).
   const v = nb ? raw.replace(/ /g, "\u00a0") : raw.replace(/ (L|Cr)\b/g, "\u00a0$1");
   return (
-    <span className={cn("numeric", c.tone === "muted" ? "text-muted-foreground" : "font-semibold", c.tone === "bond" && "text-sun")}>
+    <span className={cn("numeric", c.tone === "muted" && !c.level ? "text-muted-foreground" : "font-semibold", c.level ? levelClass[c.level] : c.tone === "bond" && "text-sun")}>
       {/* A short value ("₹50 L") is read out in full ("₹50,00,000"). */}
       {full || c.short === c.full ? v : <><span aria-hidden>{v}</span><span className="sr-only">{c.full}</span></>}
       {c.missing && <span className="sr-only"> (not in Seatora&apos;s data)</span>}
+      {/* The fee band is colour on screen: in words for screen readers (the (i) says it too). */}
+      {c.key === "fee" && c.levelWord && <span className="sr-only"> ({c.levelWord})</span>}
     </span>
   );
 }
@@ -69,11 +74,11 @@ export function StatCellView({ c, t, of, short, tip = true }: { c: StatCell; t: 
 
 /** A compact table's column notes (its header (i)): what the values and markers mean. */
 const columnNote: Record<StatKey, string> = {
-  fee: "Year 1 fee a year for this course and quota. max: the most NBEMS lets a DNB hospital charge, not the college's own fee. above NBEMS max: the hospital declared more than that. GST removed: the college's figure less the 18% GST NBEMS withdrew. at admission: paid when joining. See text: in words only. —: not in Seatora's data.",
-  stipend: "Year 1 stipend a month. min: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. + DA: plus dearness allowance. NMC list: one figure for every PG year. See text: in words only. —: not in Seatora's data.",
-  bond: "Service bond years (1Y: one year). Yes: a bond, years not stated. state rule: the years are the state's rule, not the college's own document's. + state rule: a state rule applies as well. NBEMS rule: no bond at a private DNB hospital. caveat: no bond, with a doubt in the (i). Unknown · state law may apply: the document says no bond, but a state law's service may apply. Unknown or —: not declared or not checked, never read as no bond.",
-  bondInr: "What you pay if you do not serve the bond. state rule: the state rule's amount. by specialty: a range over the subjects. computed: per year × years, by Seatora. incl. additional: an amount owed on top included. + words: part in words only. None: no bond. Unknown or —: not known.",
-  leaving: "The college's or state's penalty for leaving the seat or course after joining. by specialty, + words: as for Bond ₹. See text: in words only. —: not in Seatora's data.",
+  fee: "Year 1 fee a year for this course and quota. max: the most NBEMS lets a DNB hospital charge, not the college's own fee. above NBEMS max: the hospital declared more than that. GST removed: the college's figure less the 18% GST NBEMS withdrew. at admission: paid when joining. See text: in words only. —: not in Seatora's data. Colour: green a low fee, red a high one, for the course type (" + feeBandText + ").",
+  stipend: "Year 1 stipend a month. min: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. + DA: plus dearness allowance. NMC list: one figure for every PG year. See text: in words only. —: not in Seatora's data. Colour: amber below the NBEMS minimum.",
+  bond: "Service bond years (1Y: one year). Yes: a bond, years not stated. state rule: the years are the state's rule, not the college's own document's. + state rule: a state rule applies as well. NBEMS rule: no bond at a private DNB hospital. caveat: no bond, with a doubt in the (i). Unknown · state law may apply: the document says no bond, but a state law's service may apply. Unknown or —: not declared or not checked, never read as no bond. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey unknown.",
+  bondInr: "What you pay if you do not serve the bond. state rule: the state rule's amount. by specialty: a range over the subjects. computed: per year × years, by Seatora. incl. additional: an amount owed on top included. + words: part in words only. None: no bond. Unknown or —: not known. Colour: red ₹25 L or more, amber below that, green none.",
+  leaving: "The college's or state's penalty for leaving the seat or course after joining. by specialty, + words: as for Bond ₹. See text: in words only. —: not in Seatora's data. Colour: red ₹25 L or more.",
 };
 
 /** A compact table's column header: "Fee" and one (i) for the whole column (the cells have none). */

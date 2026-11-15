@@ -14,9 +14,11 @@ import { InfoTip } from "@/features/decide/components/info-tip";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
 import { flagShort, reportedCount, SELF_REPORTED, ValueSource } from "@/features/decide/components/institute/hospital-bits";
-import { Rank, residentDocs } from "@/features/decide/components/residents-results";
+import { residentDocs } from "@/features/decide/components/residents-results";
 import { allotmentMixAt, clinicalAt, headerLists, hospitalInfo, optionSeats, roundSeatsAt, roundSeatTotals, websiteUrl } from "@/features/decide/components/institute/institute-data";
 import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, HospitalFacts } from "@/features/decide/components/institute/institute-parts";
+import { KeyFacts } from "@/features/decide/components/institute/key-facts";
+import { keyRows } from "@/features/decide/components/institute/key-facts-data";
 import { courseName, RoundGrid, SeatsBelowNote, seatKindShort, toChoiceItem } from "@/features/decide/components/options-view";
 import { SourceRefs } from "@/features/decide/components/page-sources";
 import { ResultCard } from "@/features/decide/components/result-card";
@@ -168,9 +170,40 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             {college.state && <> / <Link href={L.institutes({ state: college.state })} className={smallLink}>{college.state}</Link></>}
           </p>
           <PageHead title={college.name} />
-          {/* The state is in the breadcrumb; the address, MCC profile and website one tap away. */}
-          <p className="mt-1 flex flex-wrap items-center gap-x-1 text-sm">
-            {info?.type && <TypeBadge type={info.type} className="mr-2" />}
+          {/* Type, place and beds on one line; the address, MCC profile and website one tap away. */}
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            {info?.type && <TypeBadge type={info.type} />}
+            {(college.state || college.pincode) && <span>{college.state}{college.pincode && <span className="numeric text-muted-foreground"> {college.pincode}</span>}</span>}
+            <span className="inline-flex items-center gap-1">
+              {beds ? (
+                <Link href={L.institute(slug, "clinical")} className="inline-flex min-h-11 items-center text-sky hover:underline"><span className="numeric font-semibold">{beds.text}</span>&nbsp;beds<span className="sr-only">: see Hospital facts</span></Link>
+              ) : (
+                <span className="text-muted-foreground">Beds not found</span>
+              )}
+              {bedsFlags.length > 0 && <span className="text-xs text-sun">{bedsFlags.join(", ")}</span>}
+              <InfoTip label="beds">
+                {beds ? (
+                  <>
+                    <span className="block">{SELF_REPORTED}{beds.period && `, ${beds.period}`}{info!.beds!.kind && `: ${info!.beds!.kind}`}.</span>
+                    {/* Only this count's flags, once (ValueSource's badges): the block's others may be about another figure. */}
+                    <span className="mt-1 block"><ValueSource m={beds.meta} /></span>
+                  </>
+                ) : (
+                  "No bed count found in this institute's own disclosures, its NBEMS mandatory disclosure or its MCC profile. Seatora does not use paid aggregators' figures."
+                )}
+              </InfoTip>
+            </span>
+            {roundSeats.map(({ list, n }) => (
+              <span key={list.key} className="inline-flex items-center gap-0.5">
+                <Link href={L.to(`/decide/institutes/${slug}`, { tab: "seats" })} className="inline-flex min-h-11 items-center hover:underline">
+                  <span className="text-muted-foreground">{list.year} {roundLabel[list.round]} {list.kind}:</span>&nbsp;<span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{n > 0 ? formatRank(n) : "None"}</span>
+                  <span className="sr-only"> seats: see Seats</span>
+                </Link>
+                <InfoTip label={`${listTitle(list)} seats`}>
+                  The {listTitle(list)} list. {n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves." : "Every course, quota and category here.") : "The MCC list prints none here."} The lists overlap, so they are never added.
+                </InfoTip>
+              </span>
+            ))}
             {college.address && (
               <span className="inline-flex items-center gap-0.5 text-muted-foreground">
                 Address<InfoTip label="address">{college.address} (as printed by MCC)</InfoTip>
@@ -182,7 +215,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               </a>
             )}
             {website && (
-              <a href={website} target="_blank" rel="noopener noreferrer" title={`Website: ${info!.website}`} className="inline-flex size-11 items-center justify-center text-sky hover:text-foreground">
+              <a href={website} target="_blank" rel="noopener noreferrer" title={`Website: ${info!.website}`} className="-ml-3 inline-flex size-11 items-center justify-center text-sky hover:text-foreground">
                 <Globe className="size-5" strokeWidth={2} aria-hidden /><span className="sr-only">Website: {info!.website}, as declared on its MCC profile (opens in a new tab)</span>
               </a>
             )}
@@ -190,44 +223,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           {/* On paper the tip doesn't open: the address prints in full. */}
           {college.address && <p className="hidden text-sm print:block">Address as printed by MCC: {college.address}</p>}
         </div>
-        <dl aria-label="Key numbers" className="grid grid-cols-2 gap-x-8 gap-y-4 border-y border-border py-4 sm:grid-cols-3">
-          <div>
-            <dt className="flex items-center gap-1 text-sm text-muted-foreground">
-              Beds
-              {beds && (
-                <InfoTip label="beds">
-                  <span className="block">{SELF_REPORTED}{beds.period && `, ${beds.period}`}{info!.beds!.kind && `: ${info!.beds!.kind}`}.</span>
-                  {/* Only this count's flags, once (ValueSource's badges): the block's others may be about another figure. */}
-                  <span className="mt-1 block"><ValueSource m={beds.meta} /></span>
-                </InfoTip>
-              )}
-            </dt>
-            <dd className="text-2xl font-bold">
-              {beds ? (
-                <Link href={L.institute(slug, "clinical")} className="numeric inline-flex min-h-11 items-center text-sky hover:underline">{beds.text}<span className="sr-only"> beds: see Hospital facts</span></Link>
-              ) : (
-                <Dash />
-              )}
-            </dd>
-            <dd className="text-xs text-muted-foreground">{beds ? "Self-reported" : "Not found"}</dd>
-            {bedsFlags.length > 0 && <dd className="text-xs text-sun">{bedsFlags.join(", ")}</dd>}
-          </div>
-          {roundSeats.map(({ list, n }) => (
-            <div key={list.key}>
-              <dt className="flex items-center gap-1 text-sm text-muted-foreground">
-                {roundLabel[list.round]} {list.kind} seats
-                <InfoTip label={`${listTitle(list)} seats`}>
-                  The {listTitle(list)} list. {n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves." : "Every course, quota and category here.") : "The MCC list prints none here."} The lists overlap, so they are never added.
-                </InfoTip>
-              </dt>
-              <dd className="text-2xl font-bold">
-                <Link href={L.to(`/decide/institutes/${slug}`, { tab: "seats" })} className="numeric inline-flex min-h-11 items-center text-sky hover:underline">
-                  {n > 0 ? formatRank(n) : "None"}<span className="sr-only"> {listTitle(list)} seats: see Seats</span>
-                </Link>
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <KeyFacts rows={keyRows(options, profile ? yours : null)} total={options.length} mine={!!profile && yours.length > 0} cats={!!profile} list={inst.seatList} name={college.name} slug={slug} L={L} />
       </div>
 
       <SubTabs label="Institute sections" current={tab} items={tabs.map((t) => ({ key: t.key, label: t.label, href: L.to(`/decide/institutes/${slug}`, { tab: t.key }) }))} />
@@ -634,17 +630,15 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       <caption className="sr-only">Residents in {g.course.degree} {g.course.name} at {college.name}, newest year first</caption>
                       <thead><tr className={tbl.headRow}>
                         <th scope="col" className={tbl.th}>Name</th><th scope="col" className={tbl.th}>Year</th><th scope="col" className={tbl.th}>MCC list</th>
-                        <th scope="col" className={`${tbl.th} text-right`}><span className="inline-flex items-center gap-0.5">Rank<InfoTip label="Rank">All India Rank from that year&apos;s NBEMS NEET PG result, where known. It is where one person got in, not a closing rank or a prediction. It can be looked up in MCC&apos;s public allotment results (Allotments), which list each rank&apos;s seat and candidate category, PwD included.</InfoTip></span></th>
                       </tr></thead>
                       {g.years.map((y) => (
                         <tbody key={y.year}>
-                          <tr className="border-b border-border bg-muted/40"><th scope="rowgroup" colSpan={5} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground"><span className="numeric">{y.year}</span> · {formatRank(y.rows.length)}</th></tr>
+                          <tr className="border-b border-border bg-muted/40"><th scope="rowgroup" colSpan={3} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground"><span className="numeric">{y.year}</span> · {formatRank(y.rows.length)}</th></tr>
                           {y.rows.map((r) => (
-                            <HideableRow key={r.id} id={r.id} name={r.name} hide={hideResidentAction} colSpan={5} className={tbl.row}>
+                            <HideableRow key={r.id} id={r.id} name={r.name} hide={hideResidentAction} colSpan={3} className={tbl.row}>
                               <th scope="row" className={`${tbl.td} text-left font-medium`}>{r.name}</th>
                               <td className={`${tbl.td} numeric`}>{r.year}</td>
                               <td className={tbl.td}>{r.list}</td>
-                              <td className={tbl.num}><Rank rank={r.rank} year={r.year} /></td>
                             </HideableRow>
                           ))}
                         </tbody>
@@ -655,7 +649,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               ))}
             </>
           )}
-          <SourceRefs docs={residentDocs(residents.rows, residents.sources)} />
+          {/* No rank shown, so the NBEMS results it came from are not cited. */}
+          <SourceRefs docs={residentDocs(residents.rows.map((r) => ({ ...r, rankBasis: null })), residents.sources.filter((x) => !residents.rows.some((r) => r.rankBasis === x.key)))} />
         </section>
       )}
     </AppPage>

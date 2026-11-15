@@ -50,7 +50,9 @@ describe("fee and stipend cells", () => {
   it("year 1's declared fee and stipend; later years and the whole course behind the (i), each with its source", () => {
     const c = cells("MD/MS", fees("MD", [rec("MD/MS", { fee_per_year: [fee(41000), fee(41000), null], stipend_per_month: [1, 2, 3].map(() => ({ inr: 136008, kind: "declared" as const, src: 1 })) })]));
     expect(shown(c.fee)).toEqual(["₹41,000", "₹41,000", null, null]);
-    expect(c.fee.tip).toEqual([{ text: "Year 1: ₹41,000 a year", src: 1 }, { text: "Year 2: ₹41,000 a year", src: 1 }, { text: "Year 3: not stated" }]);
+    expect(c.fee.tip.slice(0, 3)).toEqual([{ text: "Year 1: ₹41,000 a year", src: 1 }, { text: "Year 2: ₹41,000 a year", src: 1 }, { text: "Year 3: not stated" }]);
+    // Its band (green) in words, last.
+    expect([c.fee.level, c.fee.tip[3].text]).toEqual(["good", expect.stringMatching(/^Low fee for MD\/MS \(MD\/MS and Diploma: low under ₹1 L/)]);
     expect(shown(c.stipend)).toEqual(["₹1,36,008", "₹1,36,008", null, null]);
     expect(c.stipend.tip[0]).toEqual({ text: "Year 1: ₹1,36,008 a month", src: 1 });
   });
@@ -303,3 +305,21 @@ describe("leaving cell", () => {
     expect(tip(cells("DNB", [words]).leaving)).not.toContain("Part of it");
   });
 });
+
+describe("colour levels (display only; the colour key)", () => {
+  const lv = (c: StatCell) => [c.level ?? null, c.levelWord ?? null];
+  it("a bond: amber up to 2 years, orange from 3; its amount red from ₹25 L, amber below", () => {
+    const one = cells("MD/MS", [bond("MD", "Service bond: 1 year · ₹50 L", 5000000, { status: "documented", years: "1" })]);
+    expect(lv(one.bond)).toEqual(["caution", "a bond of 1 to 2 years"]);
+    expect(lv(one.bondInr)).toEqual(["heavy", "₹25 L or more"]);
+    const four = cells("MD/MS", [bond("MD", "Service bond: 1 + 3 years · ₹25 L–₹1.5 Cr by subject", 15000000, { status: "documented", years: "1 + 3" })]);
+    expect(lv(four.bond)[0]).toBe("strong");
+    const small = cells("MD/MS", [bond("MD", "Service bond: 1 year · ₹10 L", 1000000, { status: "documented", years: "1" })]);
+    expect(lv(small.bondInr)[0]).toBe("caution");
+  });
+  it("missing stays uncoloured (grey via tone), never green", () => {
+    const c = cells("MD/MS", []);
+    for (const k of statKeysAll) expect(c[k].level).toBeUndefined();
+  });
+});
+const statKeysAll = ["fee", "stipend", "bond", "bondInr", "leaving"] as const;

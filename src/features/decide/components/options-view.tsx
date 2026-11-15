@@ -47,10 +47,13 @@ export function SeatsHead({ list, short }: { list: SeatList; short?: boolean }) 
 }
 
 /** `n` seats of one option (`at`, named `name`) in one list, linking to them on Seats; "—" when the list prints none. `end`: right-aligned (columns). */
+/** Seat-kind colours (as the institute's key facts and the Colour key): green clear, amber virtual, blue new; the kind is always in words too (header, screen-reader text). */
+export const seatKindClass = { clear: "text-leaf", virtual: "text-sun", new: "text-sky" } as const;
+
 export function SeatsLink({ n, list, L, at, name, end }: { n: number | null | undefined; list: SeatList; L: DecideLinks; at: { inst: string; course?: string; quota: string }; name: string; end?: boolean }) {
   if (n == null) return <Dash />;
   return (
-    <Link href={L.seats({ list: list.key, ...at })} className={`${smallLink} numeric min-w-11 font-semibold text-sky ${end ? "justify-end" : ""}`}>
+    <Link href={L.seats({ list: list.key, ...at })} className={`${smallLink} numeric min-w-11 font-semibold ${seatKindClass[list.kind]} ${end ? "justify-end" : ""}`}>
       {formatRank(n)}<span className="sr-only"> seats in the {list.year} {roundLabel[list.round]} {seatKindLabel[list.kind].toLowerCase()} list: {name}</span>
     </Link>
   );
