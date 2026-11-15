@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import { GeistPixelSquare } from "geist/font/pixel/square"; // not "geist/font/pixel": that preloads all five pixel faces
 import { siteConfig } from "@/config/site";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { VercelAnalytics } from "@/components/analytics/vercel-analytics";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="min-h-screen">
         {children}
         <InstallPrompt />
+        <VercelAnalytics />
       </body>
     </html>
   );

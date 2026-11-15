@@ -53,6 +53,11 @@ export default function PrivacyPage() {
               the site&apos;s access check. Each expires after 30 days, and signing out removes all three. We use no
               analytics, tracking or advertising cookies.
             </p>
+            <p className="mt-2">
+              To see which pages are used and how fast they load, we use Vercel Web Analytics and Speed Insights. They set no
+              cookies and keep no personal data: they count page visits by address (without the part after &ldquo;?&rdquo;, so never your
+              rank or searches), with the country, browser and device type, and page load timings.
+            </p>
           </section>
           <section>
             <h2>Where it is stored</h2>
