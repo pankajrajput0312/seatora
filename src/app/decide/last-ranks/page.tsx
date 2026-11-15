@@ -236,9 +236,11 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   );
 
   return (
-    <AppPage className="grid grid-cols-1 gap-6">
+    <AppPage className="grid grid-cols-1 gap-4">
       <PageHead title="Last ranks" about={about}>Newest year first.</PageHead>
 
+      {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
+      <div className="filter-row">
       <FilterBar action="/decide/last-ranks" params={params} cols="md:grid-cols-4 [&>label]:min-w-0" active={chips.length} clear={clear}>
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         <Field label="Course"><Select name="course" value={course.slug} options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
@@ -284,6 +286,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
           <DataSource used={years.map((year) => ({ year }))} />
         </div>
         {lr.total > 0 && <ViewToggle page={VIEW} view={view} />}
+      </div>
       </div>
 
       {/* Her institute (a link from it, #inst-…) in view in either view: its card above the list. */}

@@ -65,7 +65,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
   const f = parseSeatsParams(params);
 
   return (
-    <AppPage className="grid grid-cols-1 gap-6">
+    <AppPage className="grid grid-cols-1 gap-4">
       <PageHead
         title="Seats"
         about={<>MCC&apos;s seat lists for a round, as each PDF printed them: the seat matrix (every list of the round with every closing rank, fee and bond per row), one list, or the round&apos;s lists side by side.{profile && " Filtered to the courses, quotas, states, seat categories and fee and bond caps in your profile."}</>}

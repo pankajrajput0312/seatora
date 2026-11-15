@@ -127,7 +127,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   );
 
   return (
-    <AppPage className="grid grid-cols-1 gap-6">
+    <AppPage className="grid grid-cols-1 gap-4">
       <PageHead
         title="Fees, stipend and bond"
         about={
@@ -153,6 +153,8 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       </PageHead>
 
       {/* min-w-0: TermFilterControls' selects are sized for a flex bar; in this grid each takes its cell. */}
+      {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
+      <div className="filter-row">
       <FilterBar
         action="/decide/fees"
         params={params}
@@ -206,6 +208,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             <CsvLink href={`/api/v1/fees/export?${params}`} what={`these ${formatRank(res.total)} programmes`} />
           </div>
         )}
+      </div>
       </div>
 
       {res.total === 0 ? (

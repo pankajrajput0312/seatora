@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { formatRank } from "@/features/cutoffs/lib/format";
+import { toolbarRow } from "@/features/decide/components/csv-link";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
 import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
@@ -38,7 +39,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   );
 
   const denied = (why: "locked" | "rate_limited") => (
-    <AppPage className="grid grid-cols-1 gap-6">
+    <AppPage className="grid grid-cols-1 gap-4">
       {head()}
       {why === "locked" ? (
         <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.to("/decide/institutes")} action="See the institutes" />
@@ -91,9 +92,11 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     ...meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${specialtyName(c.name)}` })),
   ];
   return (
-    <AppPage className="grid grid-cols-1 gap-6">
+    <AppPage className="grid grid-cols-1 gap-4">
       {head(<ResidentsAbout />)}
 
+      {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
+      <div className="filter-row">
       <FilterBar
         action="/decide/residents"
         params={params}
@@ -111,11 +114,12 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className={toolbarRow}>
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
           <span className="numeric font-semibold text-foreground">{formatRank(total)}</span> residents
         </p>
         {total > 0 && <ViewToggle page="residents" view={view} />}
+      </div>
       </div>
 
       {total === 0 ? (

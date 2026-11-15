@@ -172,12 +172,14 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   );
 
   return (
-    <AppPage className="grid grid-cols-1 gap-6">
+    <AppPage className="grid grid-cols-1 gap-4">
       <PageHead
         title="Institutes"
         about={<>Every institute in the MCC results: where it is, its type and beds, the courses it offers and how many allotments were made there in {PAST_YEARS[1]} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments, fees and bond.</>}
       />
 
+      {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
+      <div className="filter-row">
       <FilterBar
         action={PATH}
         params={params}
@@ -209,6 +211,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
           )}
          <ColourLegend className="ml-1 align-middle" /></p>
         {res.total > 0 && <ViewToggle page="institutes" view={view} />}
+      </div>
       </div>
 
       {res.total === 0 ? <EmptyState title="No institutes match these filters." href={L.to(PATH, { maxfee: "any", bondyrs: "any" })} /> : <ViewPanes page="institutes" view={view} cards={cards} table={table} />}

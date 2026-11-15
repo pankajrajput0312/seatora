@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, IndianRupee, LayoutDashboard, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Pencil } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -174,7 +174,13 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
                     </Button>
                   </span>
                 )}
-                <Link href="/" className="inline-flex min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground">Back to site</Link>
+                {/* Phones: the rank and its edit button as one chip here (the sidebar, with its rank card, is in the drawer). */}
+                <button type="button" data-profile-edit aria-label={shown ? `AIR ${formatRank(shown.rank)} ${shown.category}${shown.pwd ? " PwD" : ""}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(true)}
+                  className="inline-flex h-8 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
+                  {shown ? <><span className="numeric font-semibold">AIR {formatRank(shown.rank)}</span><span className="text-muted-foreground">· {shown.category}{shown.pwd ? " PwD" : ""}</span></> : hydrated ? "Set your rank" : "Loading…"}
+                  <Pencil className="size-3 text-muted-foreground" aria-hidden />
+                </button>
+                <Link href="/" className="hidden min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground md:inline-flex">Back to site</Link>
               </span>
             }
           />
@@ -196,6 +202,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
                   <p className="mt-0.5 text-sm">{hydrated ? "Not set yet" : "Loading…"}</p>
                 )}
                 <Button data-profile-edit variant="secondary" className="mt-2 w-full" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
+                <Link href="/" className="mt-1 inline-flex min-h-10 items-center text-sm text-muted-foreground hover:text-foreground md:hidden">Back to site</Link>
               </div>
             }
           >
@@ -209,11 +216,6 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
           </SideNav>
         }
       >
-        {/* Phones: the sidebar lives in the drawer, so keep the rank and Edit visible here. */}
-        <div className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-2 md:hidden">
-          <p className="text-sm">{shown ? <><span className="font-bold">AIR {formatRank(shown.rank)}</span> <span className="text-muted-foreground">{shown.category}{shown.pwd ? " PwD" : ""}</span></> : hydrated ? "Rank not set" : "Loading…"}</p>
-          <Button data-profile-edit variant="secondary" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
-        </div>
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
         <div aria-busy={loading || undefined} className={cn("isolate pb-[calc(6rem+env(safe-area-inset-bottom))] transition-opacity md:pb-0", loading && "opacity-60")}>
           <RenamedSaved />
@@ -227,8 +229,8 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
 
       <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {[...bottom, compare.length ? { href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows } : { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch }].map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 border-t-2 text-xs", isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
-            <Icon className="size-5" strokeWidth={1.75} aria-hidden />
+          <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-[11px]", isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
+            <Icon className="size-[1.25rem]" strokeWidth={1.75} aria-hidden />
             <span className="numeric">{label}</span>
           </Link>
         ))}

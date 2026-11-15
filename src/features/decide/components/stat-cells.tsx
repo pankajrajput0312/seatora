@@ -106,7 +106,7 @@ export function TermStatCells({ t, variant = "card", short, of, className, tdCla
   if (variant !== "card") {
     return cells.map((c) => (
       // The default padding at zero specificity, so a caller's px-/py- wins whatever the CSS order.
-      <td key={c.key} data-col={c.key} className={cn("text-right align-top [:where(&)]:px-3 [:where(&)]:py-3", tdClassName)}>
+      <td key={c.key} data-col={c.key} className={cn("text-right align-top [:where(&)]:px-3 [:where(&)]:py-2", tdClassName)}>
         <StatCellView c={c} t={t} of={of} short={short || variant === "compact"} tip={variant === "table"} />
       </td>
     ));
@@ -126,7 +126,7 @@ export function TermStatCells({ t, variant = "card", short, of, className, tdCla
             {c.label}
             <CellTip c={c} t={t} of={of} />
           </dt>
-          <dd className="text-sm leading-snug">
+          <dd className="text-[0.9375rem] leading-snug sm:text-sm">
             <Value c={c} />
             <Marker c={c} />
           </dd>

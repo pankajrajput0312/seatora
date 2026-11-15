@@ -53,7 +53,7 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
         <p key={s.round + s.step} className="flex flex-wrap items-center gap-x-2">
           <Badge tone={statusBadge[s.now].tone}>{statusBadge[s.now].text}</Badge>
           {/* The deadline is the Overview's first fact: body size, whatever the banner's small print. */}
-          <strong className="text-base font-semibold">
+          <strong className="text-[0.9375rem] font-semibold md:text-base">
             {roundName[s.round]} {stepName[s.step].toLowerCase()}{s.now !== "suspended" && s.scheduled?.to && <> until <span className="numeric">{fmtIST(s.scheduled.to)}</span></>}
           </strong>
           {/* The end date's own source when the status cites a later notice (e.g. a suspension) that doesn't print it. */}

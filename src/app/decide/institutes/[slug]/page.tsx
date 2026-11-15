@@ -159,7 +159,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const roundSeats = totals ?? headerLists(round.map((r) => r.list)).map((list) => ({ list, n: round.find((r) => r.list === list)!.rows.reduce((a, r) => a + r.seats, 0) }));
 
   return (
-    <AppPage className="grid grid-cols-1 gap-6">
+    <AppPage className="grid grid-cols-1 gap-4">
       {/* A div: globals.css hides every <header> on paper (the app bar), and this one holds the name and address. */}
       <div className="grid gap-4">
         <div>

@@ -160,7 +160,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <thead className={tbl.head}><tr className="text-left">
           <th scope="col" className={`${th} ${stick} text-right`}>Rank</th>
           <th scope="col" className={th}>Round</th>
-          <th scope="col" className={th}>Institute</th>
+          <th scope="col" className={th}>{inst ? "Course" : "Institute"}</th>
           {/* The five numbers right after the institute, before what the card's header row has (quota, category). */}
           {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={`${th} text-right whitespace-nowrap`}><StatHead k={k} /></th>)}
           <th scope="col" data-col="quota" className={th}>Quota</th>
@@ -181,17 +181,26 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
                 <span className="font-medium"><span className="numeric">{a.year}</span> {roundLabel[a.round]}</span>
                 <span className="block"><Provisional when={a.provisional} /></span>
               </td>
-              <td className={`${td} min-w-52`}>
-                <Link href={L.institute(a.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{a.college.name}</Link>
-                <span className="block text-xs">{courseLink(a)}</span>
-                {/* Type and beds share a line: wrapped one above the other, the lower (i)'s 44px target covered the upper. */}
-                <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                  <span>{a.college.state}</span>
-                  <span className="inline-flex items-center gap-x-2 whitespace-nowrap">
-                    {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.college.name} />}
-                    {a.hospital?.beds && <Beds beds={a.hospital.beds} of={a.college.name} />}
-                  </span>
-                </span>
+              {/* Two lines at most: the institute, then its course, state, type and beds on one small line. Filtered to one
+                  institute (said once above the table): the course alone. */}
+              <td className={`${td} ${inst ? "min-w-48" : "min-w-72"}`}>
+                {inst ? (
+                  <span className="font-medium">{courseLink(a)}</span>
+                ) : (
+                  <>
+                    <Link href={L.institute(a.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{a.college.name}</Link>
+                    {/* Type and beds stay together: wrapped one above the other, the lower (i)'s 44px target covered the upper. */}
+                    <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                      <span className="text-foreground">{courseLink(a)}</span>
+                      <span aria-hidden>·</span><span className="sr-only">, </span>
+                      <span>{a.college.state}</span>
+                      <span className="inline-flex items-center gap-x-1.5 whitespace-nowrap">
+                        {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.college.name} />}
+                        {a.hospital?.beds && <Beds beds={a.hospital.beds} of={a.college.name} />}
+                      </span>
+                    </span>
+                  </>
+                )}
               </td>
               {/* Compact: one (i) a column (its header), not 250 a page; each card's (i)s have the exact words. */}
               <TermStatCells t={a.fees} variant="compact" of={of(a)} tdClassName="px-3 py-2" />
@@ -209,16 +218,25 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   );
 
   return (
-    <AppPage className="grid grid-cols-1 gap-6">
+    <AppPage className="grid grid-cols-1 gap-4">
       <PageHead title="Allotments" about={about}>MCC allotment results by rank, never names.</PageHead>
 
       {inst && (
-        <p className="flex flex-wrap items-center gap-x-3 rounded-lg border border-border bg-card px-4 py-1 text-sm">
-          Showing allotments at <Link href={L.institute(inst.slug)} className={`${smallLink} font-semibold text-sky`}>{inst.name}</Link>
-          <Link href={L.with("/decide/allotments", { inst: null, page: null })} className={`${smallLink} text-muted-foreground`}>Show all institutes</Link>
+        // A slim line, not a card: the institute once (the table's rows then show the course alone), with its state, type and beds.
+        <p className="flex flex-wrap items-center gap-x-2 text-sm">
+          <span className="text-muted-foreground">Showing allotments at</span>
+          <Link href={L.institute(inst.slug)} className="inline-flex min-h-8 items-center font-semibold text-sky underline">{inst.name}</Link>
+          {rows[0]?.college.slug === inst.slug && (
+            <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground [&_button]:before:top-0">
+              {instMeta(rows[0]).filter(Boolean).map((n, i) => <span key={i} className="inline-flex items-center">{n}</span>)}
+            </span>
+          )}
+          <Link href={L.with("/decide/allotments", { inst: null, page: null })} className="inline-flex min-h-8 items-center text-muted-foreground underline hover:text-foreground">Show all institutes</Link>
         </p>
       )}
 
+      {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
+      <div className="filter-row">
       <FilterBar action="/decide/allotments" params={params} cols="grid-cols-2 md:grid-cols-4 xl:grid-cols-6 [&>label]:min-w-0" active={active.length} clear={L.to("/decide/allotments", { inst: inst?.slug })}>
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
@@ -246,6 +264,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
             {view === "table" && <AllotmentsDisplay cols={cols} />}
           </div>
         )}
+      </div>
       </div>
 
       {unknownTerms > 0 && (

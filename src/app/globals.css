@@ -390,3 +390,65 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
     scrollbar-width: thin;
   }
 }
+
+/* ---------- Phones (below md): one compact type and spacing scale, like a native app ----------
+   Tailwind's utilities read these tokens, so every text-* size, padding, gap and height steps down together; md up is
+   untouched. Body 14px, small 12px, h1 20-22px, stat numbers 20-24px; spacing at 80% (p-4 = 12.8px, h-11 = 35px), with
+   the main actions (Button md, inputs) kept at 40px and form fields at 16px so iOS never zooms. */
+@media (width < 48rem) {
+  :root {
+    --spacing: 0.2rem;
+    --text-xs: 0.75rem;
+    --text-sm: 0.8125rem;
+    --text-base: 0.875rem;
+    --text-base--line-height: 1.45;
+    --text-lg: 1rem;
+    --text-xl: 1.0625rem;
+    --text-2xl: 1.25rem;
+    --text-3xl: 1.375rem;
+    --text-4xl: 1.625rem;
+    --text-5xl: 1.875rem;
+    --text-6xl: 2.125rem;
+    --text-7xl: 2.5rem;
+    --text-8xl: 2.75rem;
+    --text-9xl: 3rem;
+  }
+  body { font-size: 0.875rem; line-height: 1.45; }
+  .app [data-astryx-theme] {
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.8125rem;
+    --font-size-base: 0.875rem;
+    --font-size-lg: 1rem;
+    --font-size-xl: 1.0625rem;
+    --font-size-2xl: 1.25rem;
+    --text-body-leading: 1.45;
+  }
+  /* Form fields stay 16px: iOS zooms into anything smaller. */
+  :is(input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea) { font-size: 1rem; }
+  /* Headings: page titles 22px, sections 16-17px, card titles 15px, whatever size class the page gave them. */
+  .app h1 { font-size: 1.375rem; line-height: 1.25; }
+  .app h2:not(.sr-only) { line-height: 1.3; }
+  /* Astryx's top bar: one slim row (40px controls, 4px padding). */
+  .app [data-testid="mobile-nav-toggle"] { min-width: 2.5rem !important; min-height: 2.5rem !important; }
+  .app .astryx-mobile-nav .astryx-button { min-width: 2.5rem; min-height: 2.5rem; }
+  .app .astryx-top-nav-heading { min-height: 2.5rem; }
+  .app header:has(.astryx-top-nav-heading) > * { padding-block: 0.25rem; }
+}
+/* A list page's filters and results tools on one row: the Filters form, then the count, Cards | Table, CSV, Display; the
+   rest (active-filter chips, notes) on the lines under it. The row positions the Filters panel, so it spans the row. */
+.filter-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.filter-row > form { position: static; }
+.filter-row > :not(form, .toolbar) { order: 1; flex-basis: 100%; }
+@media (width < 48rem) {
+  /* Filter chips (reach chips, active filters): 32px. */
+  .app .chip-row a, .app [aria-label="Active filters"] > a { min-height: 2rem; }
+}
+.filter-row > form:has(input[type="search"]) { flex: 1 1 18rem; }
+/* The tools take a line of their own rather than squeeze beside a search box; on phones they sit beside Filters, the
+   count on the line under them. */
+.filter-row > .toolbar { min-width: min(100%, max-content); }
+@media (width < 48rem) {
+  .filter-row > .toolbar { display: contents; }
+  .filter-row > .toolbar > :first-child { order: 1; flex-basis: 100%; }
+  .filter-row > .toolbar > :last-child:not(:first-child) { display: contents; }
+}

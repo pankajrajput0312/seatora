@@ -29,7 +29,7 @@ it("table: five tds with full values, keyed by data-col; nothing breaks but a ra
   expect([...html.matchAll(/data-col="(\w+)"/g)].map((m) => m[1])).toEqual(["fee", "stipend", "bond", "bondInr", "leaving"]);
   expect(text(html)).toContain("₹50,00,000");
   expect(html).toContain("1\u00a0year");
-  expect(html).toContain("[:where(&amp;)]:px-3 [:where(&amp;)]:py-3 px-2");
+  expect(html).toContain("[:where(&amp;)]:px-3 [:where(&amp;)]:py-2 px-2");
   expect(html.match(/<button/g)).toHaveLength(5);
 });
 
