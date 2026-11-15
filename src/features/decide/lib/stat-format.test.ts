@@ -173,9 +173,9 @@ describe("fee and stipend cells", () => {
     expect(shown(range.fee).slice(0, 2)).toEqual(["₹1–68 L", "₹1–68 L/yr"]);
   });
 
-  it("missing is '—' (not in Seatora's data), never 0", () => {
+  it("missing is '—' (none published), never 0", () => {
     const c = cells("MD/MS", []);
-    for (const k of ["fee", "stipend", "leaving"] as const) expect([c[k].short, c[k].missing, c[k].tip.at(-1)?.text]).toEqual(["—", true, "Not in Seatora's MCC data yet."]);
+    for (const k of ["fee", "stipend", "leaving"] as const) expect([c[k].short, c[k].missing, c[k].tip.at(-1)?.text]).toEqual(["—", true, "Not published."]);
   });
 });
 

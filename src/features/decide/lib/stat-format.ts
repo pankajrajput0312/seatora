@@ -111,7 +111,7 @@ const FEE_BANDS = { "MD/MS": [1e5, 5e5], Diploma: [1e5, 5e5], DNB: [125000, 1250
 export const feeBandText = "MD/MS and Diploma: low under ₹1 L a year, high from ₹5 L. DNB and NBEMS Diploma: low under the NBEMS maximum of ₹1.25 L, high above it.";
 const levelOf = (c: StatCell, level: Level | undefined, word: string | undefined): StatCell => (level ? { ...c, level, levelWord: word } : c);
 
-export const NOT_IN_DATA = "Not in Seatora's MCC data yet.";
+export const NOT_IN_DATA = "Not published.";
 const NOT_CHECKED = "Not checked yet: Seatora has no bond record for this programme.";
 const DNB_RULE = "NBEMS rule: private DNB hospitals may not take any bond or deposit; government hospitals may apply a state service bond only if they declared it to MCC before counselling.";
 const STATE_CAUTION = "Government colleges may still have a state service bond: check the state's PG rules.";

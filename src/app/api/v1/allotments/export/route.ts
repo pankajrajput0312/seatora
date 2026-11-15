@@ -21,7 +21,7 @@ export async function GET(req: Request) {
       ...(v.latest ? [`No filter given, so this is the latest round, ${v.latest.year} ${roundLabel[v.latest.rounds.at(-1)!]}.`] : []),
       "Seat category = the seat's category; candidate category = the allotted candidate's own category as the PDF prints it (an OBC, SC, ST or EWS candidate often holds an Open seat). Choice no. = the candidate's choice number of this seat (R2 and R3 PDFs only). Status: allotted (R1 and stray rounds), fresh or upgraded (R2, R3). In R2 and later the results list only new or upgraded allotments.",
       "Previous seat = the seat the PDF prints in the previous round's columns (R1 for R2, R2 for R3) and the remark printed there; — where it prints none.",
-      "Fee, stipend, bond and leaving penalty: the course's programme terms as published (DNB seats follow NBEMS; MD, MS and Diploma seats the college), each with its document. — = not in Seatora's data.",
+      "Fee, stipend, bond and leaving penalty: the course's programme terms as published (DNB seats follow NBEMS; MD, MS and Diploma seats the college), each with its document. — = none published.",
     ];
     const name = ["seatora-allotments", v.inst?.slug, v.filters.year, v.filters.round].filter(Boolean).join("-");
     return new Response(`﻿${allotmentsCsv(v.r.rows, v.meta.sources, notes)}`, {

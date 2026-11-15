@@ -152,7 +152,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             it (a range where it varies by specialty; sorting and filters use the highest).
             <br /><strong>Leaving penalty</strong>: the penalty for leaving the seat or course after joining. MCC&apos;s Round 2 forfeit is on
             each institute&apos;s Fees tab.
-            <br />&quot;—&quot;: not in Seatora&apos;s MCC data, never zero or &quot;no bond&quot;. &quot;No bond&quot; only where the
+            <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. &quot;No bond&quot; only where the
             college&apos;s document or the NBEMS rule says so; &quot;Not published&quot; where Seatora&apos;s check found no clear answer.
             &quot;state law may apply&quot;: the college&apos;s document says no bond, but a state law&apos;s service may apply
             (the filters count it as not published).
@@ -160,7 +160,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           </>
         }
       >
-        — means not in Seatora&apos;s data.
+        — means none published.
       </PageHead>
 
       {/* min-w-0: TermFilterControls' selects are sized for a flex bar; in this grid each takes its cell. */}
@@ -205,7 +205,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       <div className={toolbarRow}>
         <h2 id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm font-normal text-muted-foreground">
           <span><span className="numeric font-semibold text-foreground">{rangeLabel(res)}</span> programmes</span>
-          {res.undeclared > 0 && <InfoTip label="these programmes"><span className="numeric">{formatRank(res.undeclared)}</span> of them have nothing in Seatora&apos;s MCC data (every figure is —).</InfoTip>}
+          {res.undeclared > 0 && <InfoTip label="these programmes"><span className="numeric">{formatRank(res.undeclared)}</span> of them have no published figures (every figure is —).</InfoTip>}
           {res.unknownTerms > 0 && (
             <span>
               · <span className="numeric">{formatRank(res.unknownTerms)}</span> without a published figure left out:{" "}

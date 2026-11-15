@@ -68,7 +68,7 @@ export function KeyFacts({ rows, total, mine, cats, list, name, slug, L }: { row
           <InfoTip label="key facts">
             {mine ? "The course and quota options here in your profile." : "The quotas anyone can take first, then the most seats in the newest round."} Fee and stipend are year 1; each (i) has
             years 1, 2 and 3 and the exact words with their source. Bond period: the years you must serve; Bond penalty: what you pay if you don&apos;t; Leaving penalty: the penalty for
-            leaving after joining. &quot;—&quot; is not in Seatora&apos;s data, never zero or no bond.
+            leaving after joining. &quot;—&quot; is none published, never zero or no bond.
           </InfoTip>
         </h2>
         <span className="flex items-center gap-3">

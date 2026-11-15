@@ -48,7 +48,7 @@ function Value({ c, full, nb }: { c: StatCell; full?: boolean; nb?: boolean }) {
     <span className={cn("numeric", c.tone === "muted" && !c.level ? "text-muted-foreground" : "font-semibold", c.level ? levelClass[c.level] : c.tone === "bond" && "text-sun")}>
       {/* A short value ("₹50 L") is read out in full ("₹50,00,000"). */}
       {full || c.short === c.full ? v : <><span aria-hidden>{v}</span><span className="sr-only">{c.full}</span></>}
-      {c.missing && <span className="sr-only"> (not in Seatora&apos;s data)</span>}
+      {c.missing && <span className="sr-only"> (none published)</span>}
       {/* The fee band is colour on screen: in words for screen readers (the (i) says it too). */}
       {c.key === "fee" && c.levelWord && <span className="sr-only"> ({c.levelWord})</span>}
     </span>
@@ -84,7 +84,7 @@ const columnNote: Record<StatKey, string> = {
   stipend: "Year 1 stipend a month. From / ≥: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. Not stated: no figure published. —: none published. Colour: amber below the NBEMS minimum.",
   bond: "Service bond years (1Y: one year). Yes: a bond, years not stated. Not published: no bond declared, or no clear answer; never read as no bond. state law may apply: the document says no bond, but a state law's service may apply. —: not checked. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey not published.",
   bondInr: "What you pay if you do not serve the bond. ≤ at most, ≥ at least; a range where it varies by specialty; + more conditions. A short phrase (Refund stipend, Rest of course fee, No amount stated…): no ₹ figure. None: no bond. Colour: red ₹25 L or more, amber below that, green none.",
-  leaving: "The college's or state's penalty for leaving the seat or course after joining. ≤, ≥, + and the short phrases (Per state rule, No money penalty…): as for Bond penalty. —: not in Seatora's data. Colour: red ₹25 L or more.",
+  leaving: "The college's or state's penalty for leaving the seat or course after joining. ≤, ≥, + and the short phrases (Per state rule, No money penalty…): as for Bond penalty. —: none published. Colour: red ₹25 L or more.",
 };
 
 /** Year 2 or 3's fee or stipend in a table column: the full figure, its marker under it; a 2-year course's year 3 says so. */

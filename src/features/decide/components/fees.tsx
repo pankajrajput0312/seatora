@@ -33,7 +33,7 @@ const NOT_CHECKED = "Not checked yet: Seatora has no bond record for this progra
 const DNB_NO_BOND = `${NOT_CHECKED} NBEMS rule: private DNB hospitals may not take any bond or deposit; government hospitals may apply a state service bond only if they declared it to MCC before counselling.`;
 const MD_NO_BOND = `${NOT_CHECKED} Government colleges may still have a state service bond: check the state's PG rules.`;
 const STATE_CAUTION = "Government colleges may still have a state service bond: check the state's PG rules.";
-const NOT_IN_DATA = "Not in Seatora's MCC data yet";
+const NOT_IN_DATA = "Not published";
 
 /** "—" with "not in our MCC data" for screen readers: missing is never 0 and never "no bond". */
 export function NotDeclared({ what = "not in our MCC data" }: { what?: string }) {
@@ -378,8 +378,8 @@ function TermsYears({ t }: { t: ProgrammeTerms }) {
         <div className="grid gap-1 text-xs text-muted-foreground">
           {t.durationYears === 2 && <p>No year 3: a 2-year course.</p>}
           {t.notes.map((n) => <p key={n}>{n}</p>)}
-          {!anyFee && !t.notes.length && !t.unread.some((u) => u.kind === "FEE") && <p>Fee: not in Seatora&apos;s MCC data yet.</p>}
-          {!anyStipend && !t.notes.length && <p>Stipend: not in Seatora&apos;s MCC data yet.</p>}
+          {!anyFee && !t.notes.length && !t.unread.some((u) => u.kind === "FEE") && <p>Fee: not published.</p>}
+          {!anyStipend && !t.notes.length && <p>Stipend: not published.</p>}
           {t.feeNote && <p>Fee: {t.feeNote}.</p>}
           {minimum && <p>Minimum: the hospital must pay at least this; the actual pay may be higher. Later years are not declared.</p>}
           {fee.map((u) => (
