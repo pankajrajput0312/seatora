@@ -327,11 +327,11 @@ for (const a of aliases) {
 /** RetiredCollegeKey.oldKey of a key this bundle retired (the key, or its hash), else null. */
 const retiredAs = (k: string) => (retiredTo.has(k) ? k : retiredTo.has(`sha256:${sha(k)}`) ? `sha256:${sha(k)}` : null);
 
-// notices: DataSource key = URL, so URLs are unique and never a term document's
+// notices: DataSource key = URL, so URLs are unique. A notice may also be a term document (the PG Information Bulletin
+// holds the AFMS bond): both share that one DataSource row, named and dated as the notice.
 const termUrls = new Set(terms.flatMap((t) => (t.src_url ? [t.src_url] : [])));
 const noticeByUrl = new Map(notices.map((n) => [n.url, n]));
 if (noticeByUrl.size !== notices.length) fail("notices.json: duplicate url");
-for (const n of notices) if (termUrls.has(n.url)) fail(`notices.json: ${n.url} is also a term document`);
 
 // round steps
 const steps = roundStatus
