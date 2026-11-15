@@ -51,7 +51,7 @@ export type StatCell = {
   full: string;
   /** Tiny text beside the value: "max", "min", "state rule", "by specialty"… */
   marker: string | null;
-  /** bond: a bond applies (orange); muted: "—", "Unknown", "See text"; warn: the marker is a caveat. */
+  /** bond: a bond applies (orange); muted: "—", "Not declared", "See text"; warn: the marker is a caveat. */
   tone: "bond" | "muted" | null;
   markerWarn?: true;
   /** "—": not in the data (screen readers hear it). */
@@ -195,7 +195,7 @@ function stipendCell(t: ProgrammeTerms): StatCell {
   return levelOf({ ...c, short: inrShort(s.inr), full: inrFull(s.inr), marker, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
 }
 
-/** A bond that is not declared: why ("Unknown": the record's words; "—": no record, or a record for other courses). */
+/** A bond that is not declared: why ("Not declared": the record's words; "—": no record, or a record for other courses). */
 function bondMissing(t: ProgrammeTerms, c: Pick<StatCell, "key" | "label" | "about">): StatCell {
   const b = t.bond;
   const doc: TipLine[] = b.doc != null ? [{ text: "The college's own bond document on MCC", src: b.doc }] : [];
@@ -205,7 +205,7 @@ function bondMissing(t: ProgrammeTerms, c: Pick<StatCell, "key" | "label" | "abo
     // A no-bond document where a state law's service may apply (`caveat`): the Bond cell marks it.
     const law = b.caveat && c.key === "bond";
     return {
-      ...c, short: "Unknown", full: "Unknown", marker: law ? "state law may apply" : null, ...(law && { markerWarn: true as const }), tone: "muted",
+      ...c, short: "Not declared", full: "Not declared", marker: law ? "state law may apply" : null, ...(law && { markerWarn: true as const }), tone: "muted",
       tip: [...(b.caveat ? [{ text: MAY_APPLY, warn: true as const }] : []), { text: b.text, src: b.src }, ...doc, ...(isDnb(t) ? rules.map((r) => ({ ...r, text: "NBEMS bond rules" })) : [])],
     };
   }

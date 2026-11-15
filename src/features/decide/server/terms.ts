@@ -305,6 +305,8 @@ const STATUS: Record<BondDetails["status"], Pick<Bond, "status" | "basis">> = {
   no_bond_verified: { status: "none", basis: "document" },
   no: { status: "none", basis: "document" },
   no_bond_rule: { status: "none", basis: "nbems_rule" },
+  // Checked every official place (MCC profile and bond page, state rules, NBEMS rules, website): nothing declared.
+  not_declared: { status: "not_declared", basis: null },
   unknown: { status: "not_declared", basis: null },
   unclear: { status: "not_declared", basis: null },
 };

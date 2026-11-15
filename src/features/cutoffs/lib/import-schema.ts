@@ -135,7 +135,7 @@ const words = z.string().nullable().optional();
 const doc = z.object({ title: z.string().min(1), url: z.url(), date: z.string().nullable().optional(), mirror: z.url().optional(), note: z.string().optional() }).strict();
 const bondAmount = z.object({ applies_to: z.string(), inr: inr.nullable() }).strict();
 /** documented / no_bond_verified: the college's own document says a bond / no bond (older bundles: yes / no / unclear). */
-export const bondStatuses = ["documented", "no_bond_verified", "state_rule", "no_bond_rule", "unknown", "yes", "no", "unclear"] as const;
+export const bondStatuses = ["documented", "no_bond_verified", "state_rule", "no_bond_rule", "not_declared", "unknown", "yes", "no", "unclear"] as const;
 export const bondCourses = ["MD/MS", "Diploma", "DNB", "NBEMS Diploma"] as const;
 /** A verified bond record (BOND `details`): who checked what, in which document. Free text stays as the source has it. */
 export const bondDetailsSchema = z

@@ -251,12 +251,12 @@ describe("bond cells, by record status", () => {
 
   it("no bond, but a state law's service may apply: 'Unknown' (never 'No bond'), marked, as the filters read it", () => {
     const ka = cells("MD/MS", [bond("MD", "No bond per the college's MCC bond document; Karnataka law: 1 yr compulsory govt service may apply", null, { status: "no_bond_verified" })]);
-    expect([...shown(ka.bond), ka.bond.markerWarn]).toEqual(["Unknown", "Unknown", "state law may apply", "muted", true]);
+    expect([...shown(ka.bond), ka.bond.markerWarn]).toEqual(["Not declared", "Not declared", "state law may apply", "muted", true]);
     expect(ka.bond.tip.slice(0, 2)).toEqual([
       { text: "The college's own document says no bond, but a state law's service may apply, so Seatora counts it as unknown.", warn: true },
       { text: "No bond per the college's MCC bond document; Karnataka law: 1 yr compulsory govt service may apply", src: 1 },
     ]);
-    expect(shown(ka.bondInr)).toEqual(["Unknown", "Unknown", null, "muted"]);
+    expect(shown(ka.bondInr)).toEqual(["Not declared", "Not declared", null, "muted"]);
     expect(ka.bondInr.tip[0]).toMatchObject({ warn: true });
   });
 
@@ -274,7 +274,7 @@ describe("bond cells, by record status", () => {
     const unknown = bond("MD", "MCC bond document has no clear terms — check with the college", null, { status: "unknown", reason: "mcc_document_unclear" });
     const c = cells("MD/MS", [unknown]);
     for (const k of ["bond", "bondInr"] as const) {
-      expect(shown(c[k])).toEqual(["Unknown", "Unknown", null, "muted"]);
+      expect(shown(c[k])).toEqual(["Not declared", "Not declared", null, "muted"]);
       expect(c[k].tip[0]).toEqual({ text: "MCC bond document has no clear terms — check with the college", src: 1 });
     }
   });
