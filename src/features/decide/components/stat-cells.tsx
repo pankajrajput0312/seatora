@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { feeBandText, statCells, statLabel, type Level, type StatCell, type StatKey } from "../lib/stat-format";
+import { feeBandText, statCells, statLabel, yearValue, type Level, type StatCell, type StatKey } from "../lib/stat-format";
 import type { ProgrammeTerms } from "../server/terms";
 import { NBEMS_BOND_RULES, termDocs } from "./fees";
 import { InfoTip } from "./info-tip";
@@ -74,12 +74,32 @@ export function StatCellView({ c, t, of, short, tip = true }: { c: StatCell; t: 
 
 /** A compact table's column notes (its header (i)): what the values and markers mean. */
 const columnNote: Record<StatKey, string> = {
-  fee: "Year 1 fee a year for this course and quota. max: the most NBEMS lets a DNB hospital charge, not the college's own fee. above NBEMS max: the hospital declared more than that. GST removed: the college's figure less the 18% GST NBEMS withdrew. at admission: paid when joining. See text: in words only. —: not in Seatora's data. Colour: green a low fee, red a high one, for the course type (" + feeBandText + ").",
+  fee: "Year 1 fee a year for this course and quota. ≤ … NBEMS max: no fee declared; the most NBEMS lets a DNB hospital charge, not the college's own fee. above NBEMS max: the hospital declared more than that. GST removed: the college's figure less the 18% GST NBEMS withdrew. at admission: paid when joining. see text: read from the MCC profile's own fee words, which the (i) quotes. In words: the profile gives no one figure for this seat type (its words are in the (i)). —: not in Seatora's data. Colour: green a low fee, red a high one, for the course type (" + feeBandText + ").",
   stipend: "Year 1 stipend a month. min: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. + DA: plus dearness allowance. NMC list: one figure for every PG year. See text: in words only. —: not in Seatora's data. Colour: amber below the NBEMS minimum.",
   bond: "Service bond years (1Y: one year). Yes: a bond, years not stated. state rule: the years are the state's rule, not the college's own document's. + state rule: a state rule applies as well. NBEMS rule: no bond at a private DNB hospital. caveat: no bond, with a doubt in the (i). Unknown · state law may apply: the document says no bond, but a state law's service may apply. Unknown or —: not declared or not checked, never read as no bond. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey unknown.",
   bondInr: "What you pay if you do not serve the bond. state rule: the state rule's amount. by specialty: a range over the subjects. computed: per year × years, by Seatora. incl. additional: an amount owed on top included. + words: part in words only. None: no bond. Unknown or —: not known. Colour: red ₹25 L or more, amber below that, green none.",
   leaving: "The college's or state's penalty for leaving the seat or course after joining. by specialty, + words: as for Bond ₹. See text: in words only. —: not in Seatora's data. Colour: red ₹25 L or more.",
 };
+
+/** Year 2 or 3's fee or stipend in a table column: the full figure, its marker under it; a 2-year course's year 3 says so. */
+function YearCell({ t, pick, year, className }: { t: ProgrammeTerms; pick: "fee" | "stipend"; year: number; className: string }) {
+  const v = yearValue(t, pick, year);
+  return (
+    <td data-col={`${pick}${year}`} className={className}>
+      {!v ? (
+        <span className="text-muted-foreground">—<span className="sr-only">no year {year}: a {t.durationYears}-year course</span></span>
+      ) : (
+        <>
+          <span className={cn("numeric", v.text === "—" ? "text-muted-foreground" : "font-semibold")}>
+            {v.text.replace(/ /g, "\u00a0")}
+            {v.text === "—" && <span className="sr-only"> (not stated)</span>}
+          </span>
+          {v.marker && <span className="block text-[11px] leading-snug font-normal text-muted-foreground">{v.marker}</span>}
+        </>
+      )}
+    </td>
+  );
+}
 
 /** A compact table's column header: "Fee" and one (i) for the whole column (the cells have none). */
 export function StatHead({ k }: { k: StatKey }) {
@@ -101,15 +121,18 @@ export function StatHead({ k }: { k: StatKey }) {
  * Table cells break only after a range's dash, their marker on its own line; `tdClassName`'s padding wins over theirs.
  * `of`: the row ("AIIMS Delhi, MD Anaesthesiology"), so each (i) button is named "About fee, AIIMS Delhi, …".
  */
-export function TermStatCells({ t, variant = "card", short, of, className, tdClassName }: { t: ProgrammeTerms; variant?: "card" | "table" | "compact"; short?: boolean; of?: string; className?: string; tdClassName?: string }) {
+export function TermStatCells({ t, variant = "card", short, of, className, tdClassName, years }: { t: ProgrammeTerms; variant?: "card" | "table" | "compact"; short?: boolean; of?: string; className?: string; tdClassName?: string; years?: boolean }) {
   const cells = statCells(t);
   if (variant !== "card") {
-    return cells.map((c) => (
-      // The default padding at zero specificity, so a caller's px-/py- wins whatever the CSS order.
-      <td key={c.key} data-col={c.key} className={cn("text-right align-top [:where(&)]:px-3 [:where(&)]:py-3", tdClassName)}>
+    // The default padding at zero specificity, so a caller's px-/py- wins whatever the CSS order.
+    const td = cn("text-right align-top [:where(&)]:px-3 [:where(&)]:py-3", tdClassName);
+    return cells.flatMap((c) => [
+      <td key={c.key} data-col={c.key} className={td}>
         <StatCellView c={c} t={t} of={of} short={short || variant === "compact"} tip={variant === "table"} />
-      </td>
-    ));
+      </td>,
+      // `years`: Fee and Stipend's years 2 and 3 as columns of their own (YearHeads), after year 1's cell.
+      ...(years && (c.key === "fee" || c.key === "stipend") ? [2, 3].map((y) => <YearCell key={`${c.key}${y}`} t={t} pick={c.key as "fee" | "stipend"} year={y} className={td} />) : []),
+    ]);
   }
   return (
     <dl className={cn("grid grid-cols-6 border-t border-border sm:grid-cols-5", className)}>

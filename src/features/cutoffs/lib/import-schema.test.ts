@@ -77,6 +77,15 @@ describe("mccFeesStructuredSchema", () => {
     expect(mccFeesStructuredSchema.safeParse({ ...rec, bond: { ...rec.bond, signatory: "Dr X" } }).success).toBe(false);
   });
   it("lists every source a record cites", () => expect(new Set(citedSources(rec))).toEqual(new Set([1, 2, 3])));
+  it("takes fee_parsed on a verbatim record only, each quote in its fee_text", () => {
+    const fig = { amount: 125000, currency: "INR", field: "Year 1", quote: "Year 1: 125000" };
+    const v = { ...rec, fee_display: "verbatim", fee_per_year: [null, null, null], fee_text: "Year 1: 125000 | Annual fees: 105000" };
+    const p = { basis: "parsed from MCC profile text", src: 2, per_year: [fig, null, null] };
+    expect(mccFeesStructuredSchema.safeParse({ ...v, fee_parsed: p }).success).toBe(true);
+    expect(mccFeesStructuredSchema.safeParse({ ...rec, fee_parsed: p }).success).toBe(false);
+    expect(mccFeesStructuredSchema.safeParse({ ...v, fee_parsed: { ...p, per_year: [{ ...fig, quote: "Year 1: 99" }, null, null] } }).success).toBe(false);
+    expect(mccFeesStructuredSchema.safeParse({ ...v, fee_parsed: { ...p, per_year: [fig] } }).success).toBe(false);
+  });
 });
 
 describe("mccTermSchema", () => {

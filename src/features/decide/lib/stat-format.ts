@@ -19,6 +19,16 @@ export function inrShort(inr: number): string {
   return formatINR(inr);
 }
 
+/**
+ * A fee on a card: "₹1.7 L" (lakh to one decimal; "₹1.25 L" where that is exact), "₹41,000" under ₹1 L. Cards only: the
+ * full figure is read out with it, in tables and in the (i).
+ */
+export function inrApprox(inr: number): string {
+  if (inr < 1e5 || inr % 1e3 === 0) return inrShort(inr);
+  const [v, u] = inr >= 1e7 ? [inr / 1e7, "Cr"] : [inr / 1e5, "L"];
+  return `₹${Number(v.toFixed(1))} ${u}`;
+}
+
 /** "₹35 L–₹50 L", or one figure when min is absent or the same. */
 export const inrRange = (min: number | null | undefined, max: number, short = true) => {
   const f = short ? inrShort : inrFull;
@@ -89,7 +99,7 @@ const isDnb = (t: ProgrammeTerms) => t.programme === "DNB" || t.programme === "N
 const yrs = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
 const sameYears = (text: string, n: number | null) => n != null && text.replace(/\s*years?\.?$/i, "").trim() === String(n);
 const dash = (c: Pick<StatCell, "key" | "label" | "about">, tip: TipLine[]): StatCell => ({ ...c, short: "—", full: "—", marker: null, tone: "muted", missing: true, tip });
-const words = (c: Pick<StatCell, "key" | "label" | "about">, tip: TipLine[]): StatCell => ({ ...c, short: "See text", full: "See text", marker: null, tone: "muted", tip });
+const words = (c: Pick<StatCell, "key" | "label" | "about">, tip: TipLine[], label = "See text"): StatCell => ({ ...c, short: label, full: label, marker: null, tone: "muted", tip });
 const unread = (t: ProgrammeTerms, kind: ProgrammeTerms["unread"][number]["kind"]) => t.unread.find((u) => u.kind === kind);
 const asQuote = (u: { text: string; src: number }): TipLine => ({ text: u.text, src: u.src, quote: true });
 
@@ -105,12 +115,32 @@ const yearLines = (t: ProgrammeTerms, pick: "fee" | "stipend", unit: string): Ti
 const figureNotes = (t: ProgrammeTerms): TipLine[] =>
   [...new Map(t.years.flatMap((y) => (y.fee?.note ? [[y.fee.note, y.fee.noteSrc ?? y.fee.src] as const] : []))).entries()].map(([n, src]) => ({ text: n[0].toUpperCase() + n.slice(1), src }));
 
+/** The hostel fee line: "Hostel: ₹50,660 a year", "(included in the fee above)". */
+const hostelLines = (t: ProgrammeTerms): TipLine[] => {
+  const h = t.hostelFee;
+  if (!h) return [];
+  const per = h.period === "per_year" ? " a year" : h.period === "per_month" ? " a month" : "";
+  return [{ text: `Hostel: ${inrFull(h.inr)}${per}${h.included ? " (included in the fee above)" : ""}.`, src: h.src }];
+};
+/** Figures read out of the profile's own words: what they are, their exact words, then the record's whole fee text. */
+function textLines(t: ProgrammeTerms, u: ReturnType<typeof unread>): TipLine[] {
+  const read = [...t.years.map((y) => y.fee), ...t.feeExtras.map((x) => x.f)].filter((f): f is Figure => !!f?.fromText);
+  if (!read.length) return [];
+  const quotes = [...new Map(read.map((f) => [f.fromText!.quote, f.src])).entries()];
+  return [
+    { text: "Read from the MCC profile's own fee words for these seats: the figure, its year and the seat type are stated there. Their exact words:" },
+    ...quotes.map(([text, src]) => ({ text, src, quote: true as const })),
+    ...t.feeExtras.map((x) => ({ text: `${x.label}: ${inrFull(x.f.inr)}${x.label === "Annual fee" ? " a year" : ""} (as the profile states it).`, src: x.f.src })),
+    ...(u ? [{ text: "The profile's whole fee text:" }, asQuote(u)] : []),
+  ];
+}
+
 function feeCell(t: ProgrammeTerms): StatCell {
   const c = { key: "fee", label: statLabel.fee, about: "fee" } as const;
   const f = t.years[0]?.fee;
   const u = unread(t, "FEE");
   if (!t.years.some((y) => y.fee)) {
-    if (u) return words(c, [{ text: "The MCC profile gives this fee in words only, so Seatora shows no figure. Its words:" }, asQuote(u)]);
+    if (u) return words(c, [{ text: "The MCC profile gives this fee in words only (no one figure for this course and seat type), so Seatora shows no figure. Its words:" }, asQuote(u), ...hostelLines(t)], "In words");
     return dash(c, t.notes.length ? t.notes.map((text) => ({ text, ...(t.notesSrc != null && { src: t.notesSrc }) })) : [{ text: NOT_IN_DATA }]);
   }
   const max = t.years.some((y) => y.fee?.kind === "maximum");
@@ -118,16 +148,26 @@ function feeCell(t: ProgrammeTerms): StatCell {
     ...(f?.kind === "maximum" ? [{ text: `Up to ${inrFull(f.inr)} a year: ${NBEMS_MAX}.`, src: f.src }] : []),
     ...(f?.above ? [{ text: ABOVE_MAX, warn: true as const }] : []),
     ...yearLines(t, "fee", " a year"),
-    ...(t.wholeCourseFee != null ? [{ text: max ? `Whole course: up to ${inrFull(t.wholeCourseFee)} (NBEMS maximum)` : `Whole course: ${inrFull(t.wholeCourseFee)}` }] : []),
+    ...(t.wholeCourseFee != null ? [{ text: `Whole course: ${max ? "up to " : ""}${inrFull(t.wholeCourseFee)} total (${t.durationYears} yrs)${max ? " (NBEMS maximum)" : ""}` }] : []),
     ...(f?.min != null ? [{ text: "A range: the fee depends on the subject." }] : []),
+    ...hostelLines(t),
     ...figureNotes(t),
     ...(t.feeNote ? [{ text: t.feeNote }] : []),
+    ...textLines(t, u),
   ];
   if (!f) return { ...dash(c, tip), tip: [{ text: "Year 1's fee is not stated." }, ...tip] };
-  const own = [f.atAdmission && "at admission", f.declared != null && "GST removed"].filter(Boolean).join(" · ") || null;
-  const marker = f.above ? "above NBEMS max" : f.kind === "maximum" ? "max" : own;
+  const own = [f.atAdmission && "at admission", f.declared != null && "GST removed", f.fromText && "see text"].filter(Boolean).join(" · ") || null;
+  const marker = f.above ? ["above NBEMS max", f.fromText && "see text"].filter(Boolean).join(" · ") : f.kind === "maximum" ? "NBEMS max" : own;
   const warn = f.above || f.declared != null;
-  const cell: StatCell = { ...c, short: inrRange(f.min, f.inr), full: inrRange(f.min, f.inr, false), marker, ...(warn && { markerWarn: true as const }), tone: null, tip };
+  // "₹1,71,462/yr" (a sum paid at admission has its marker instead); the NBEMS ceiling "≤ ₹1,25,000/yr", never the college's own.
+  const bound = f.kind === "maximum" ? "≤ " : "";
+  const unit = f.atAdmission ? "" : "/yr";
+  const cell: StatCell = {
+    ...c,
+    short: bound + (f.min != null ? inrRange(f.min, f.inr) : inrApprox(f.inr)),
+    full: `${bound}${inrRange(f.min, f.inr, false)}${unit}`,
+    marker, ...(warn && { markerWarn: true as const }), tone: null, tip,
+  };
   const [low, high] = FEE_BANDS[t.programme as keyof typeof FEE_BANDS] ?? [];
   if (f.kind === "maximum" || f.atAdmission || low == null) return cell;
   const band = f.above || f.inr >= high ? "high" : f.inr < low ? "low" : null;
@@ -277,6 +317,18 @@ function leavingCell(t: ProgrammeTerms): StatCell {
   const tip = [head, ...partLines(b.leaving, b.src), ...amountLines(a, null), ...other, ...forfeit];
   if (a.state !== "figure" || a.max == null) return words(c, tip);
   return levelOf({ ...c, short: amountValue(a, true), full: amountValue(a, false), marker: amountMarker(a), tone: null, tip }, a.max >= HIGH_PENALTY ? "heavy" : undefined, "₹25 L or more");
+}
+
+/**
+ * Year `year`'s fee or stipend for a table column ("Fee Y2"): the full figure ("₹1,58,000", "≤ ₹1,25,000" for the NBEMS
+ * ceiling) with its marker, "—" when not stated; null past the course (a 2-year course has no year 3).
+ */
+export function yearValue(t: ProgrammeTerms, pick: "fee" | "stipend", year: number): { text: string; marker: string | null } | null {
+  if (year > t.durationYears) return null;
+  const f = t.years[year - 1]?.[pick];
+  if (!f) return { text: "—", marker: null };
+  const marker = f.kind === "maximum" ? "NBEMS max" : f.kind === "minimum" ? "min" : f.atAdmission ? "at admission" : f.fromText ? "see text" : f.above ? "above NBEMS max" : null;
+  return { text: `${f.kind === "maximum" ? "≤ " : ""}${inrRange(f.min, f.inr, false)}`, marker };
 }
 
 /** The five cells of one course's terms, in order: Fee, Stipend, Bond, Bond ₹, Leaving. */

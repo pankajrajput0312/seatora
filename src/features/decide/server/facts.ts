@@ -47,7 +47,7 @@ export type FeeQuotaGroup = {
         variants: NonNullable<FeeRecord["fee_variants"]>;
         notes: string[];
       })
-    | (Text & { display: "verbatim" });
+    | (Text & { display: "verbatim"; /** Figures its words state for these seats, each with its quote (tools/parse_fee_text.py); null: none. */ parsed: FeeRecord["fee_parsed"] | null });
   stipendPerMonth: FeeRecord["stipend_per_month"];
   stipendNote: string | null;
   bond: FeeRecord["bond"];
@@ -79,7 +79,7 @@ export function feeGroup(quotaGroup: string, d: FeeRecord): FeeQuotaGroup {
             variants: d.fee_variants ?? [],
             notes: d.fee_notes ?? [],
           }
-        : { display: "verbatim", ...text },
+        : { display: "verbatim", ...text, parsed: d.fee_parsed ?? null },
     stipendPerMonth: d.stipend_per_month,
     stipendNote: d.stipend_note ?? null,
     bond: d.bond,

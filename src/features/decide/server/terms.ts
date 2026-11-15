@@ -50,7 +50,14 @@ export type FigureKind = "declared" | "maximum" | "minimum" | "nmc" | "published
 export type Figure = {
   inr: number; kind: FigureKind; src: number; min?: number; atAdmission?: true; above?: true; below?: true; plusDa?: true; note?: string; noteSrc?: number;
   declared?: number; nbems?: { inr: number; src: number };
+  /**
+   * Read out of the MCC profile's own fee words (fee_parsed, a verbatim record): `quote` the exact words it stands in,
+   * `field` the form field ("Year 2", "Annual fees"). The words stay one tap away ("see text").
+   */
+  fromText?: { quote: string; field?: string };
 };
+/** A hostel fee the record states: a year, a month, or (period null) as the record gives it; `included`: part of the year figures. */
+export type HostelFee = { inr: number; period: "per_year" | "per_month" | null; src: number; included?: true; quote?: string };
 /**
  * `mccId`: the MCC institute profile the figure was read from. `sharedBy`: how many institutes in our data cite that
  * profile (more than 1: it may be another institute's).
@@ -141,6 +148,10 @@ export type ProgrammeTerms = {
   resignForfeit: Figure | null;
   /** That forfeit when the PENALTY record gives it in words only (no ₹ figure): never the leaving penalty. */
   resignForfeitText?: { text: string; src: number } | null;
+  /** The hostel fee, where the fee record states one (a numbers record's one hostel head, or a verbatim record's words). */
+  hostelFee: HostelFee | null;
+  /** Read out of the fee words beside the year figures: the amount at admission and the annual fee, when they differ from them. */
+  feeExtras: { label: "At admission" | "Annual fee"; f: Figure }[];
   /** A term whose shape isn't read: shown as published. Also a bond or penalty without its record (an import older than the records). */
   unread: { kind: Term["kind"]; text: string; src: number }[];
   /** Plain sentences about figures left out for this programme. */
@@ -424,6 +435,9 @@ function recordFor(recs: FeeTableRecord[], quota: string | undefined) {
  * (null: not stated, never copied from another year); the whole course only when the record gives it (every year stated).
  * Stipends always (an NBEMS floor is `minimum`). MCC's Round 2 forfeit from its form fields.
  */
+/** The NBEMS annual DNB course fee (no GST): the most a DNB hospital may charge. */
+const NBEMS_FEE = 125000;
+
 function fromRecords(r: FeeTableRecord | undefined, src: (s: FeeTableRecord["sources"][number]) => number) {
   if (!r) return null;
   const at = (n: number) => src(r.sources.find((s) => s.n === n)!); // the importer checks every cited n is listed
@@ -442,6 +456,29 @@ function fromRecords(r: FeeTableRecord | undefined, src: (s: FeeTableRecord["sou
         }
       : null,
   );
+  // A verbatim record's figures its own words state for this seat type (tools/parse_fee_text.py): the record's words stay
+  // its display, these figures stand beside them with their quote. Year 1 with none: the amount at admission (as a
+  // numbers record's year 1). US$ (NRI) figures are never read as ₹.
+  const p = numbers ? null : r.fee_parsed;
+  const dnb = r.programme === "DNB" || r.programme === "NBEMS Diploma";
+  const read = (x: NonNullable<FeeTableRecord["fee_parsed"]>["per_year"][number] | undefined, adm?: true): Figure | null =>
+    p && x && x.currency === "INR"
+      ? { inr: x.amount, kind: "declared", src: at(p.src), fromText: { quote: x.quote, ...(x.field && { field: x.field }) }, ...(adm && { atAdmission: true as const }), ...(dnb && !adm && x.amount > NBEMS_FEE && { above: true as const }) }
+      : null;
+  const textFee = p ? p.per_year.map((x, i) => read(x) ?? (i === 0 ? read(p.at_admission, true) : null)) : null;
+  const extras = p
+    ? [
+        ...(p.per_year[0] && p.at_admission ? [{ label: "At admission" as const, f: read(p.at_admission, true)! }] : []),
+        ...(p.annual_fee ? [{ label: "Annual fee" as const, f: read(p.annual_fee)! }] : []),
+      ].filter((x) => x.f)
+    : [];
+  const hostels = numbers ? (r.other_fees ?? []).filter((o) => o.kind === "hostel" && o.currency === "INR") : [];
+  const ph = p?.hostel?.currency === "INR" ? p.hostel : null;
+  const hostel: HostelFee | null = ph
+    ? { inr: ph.amount, period: ph.period, src: at(p!.src), quote: ph.quote }
+    : hostels.length === 1
+      ? { inr: hostels[0].amount, period: hostels[0].period === "per_month" || hostels[0].period === "per_year" ? hostels[0].period : null, src: at(hostels[0].src), ...(hostels[0].included_in_fee && { included: true as const }) }
+      : null;
   const stipend = r.stipend_per_month.map((s, i): Figure | null => {
     if (!s) return null;
     const nb = s.below_nbems_minimum ? r.stipend_nbems_minimum?.[i] : undefined;
@@ -456,7 +493,9 @@ function fromRecords(r: FeeTableRecord | undefined, src: (s: FeeTableRecord["sou
   const forfeitWords = cf?.forfeited_if_resign_or_not_join_from_round2?.text;
   return {
     verbatim: !numbers,
-    fee,
+    fee: textFee ?? fee,
+    extras,
+    hostel,
     stipend,
     whole: w && w.currency === "INR" && w.amount_max == null ? w.amount : null,
     forfeit: cf && forfeit != null ? ({ inr: forfeit, kind: "declared", src: at(cf.src) } satisfies Figure) : null,
@@ -570,6 +609,8 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     durationYears: def.years,
     years,
     feeNote: fee && feeFig ? fee.note : null,
+    hostelFee: read?.hostel ?? null,
+    feeExtras: read?.extras ?? [],
     // A range (by subject) has no one whole-course figure.
     wholeCourseFee: recs ? (read?.whole ?? null) : feeFig && feeFig.min == null ? feeFig.inr * def.years : null,
     bond,
