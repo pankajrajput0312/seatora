@@ -48,8 +48,9 @@ const sections = [
   },
   { title: "Help", items: [{ href: "/decide/requests", label: "Request a feature", icon: MessageCircle }] },
 ];
-// Phones: the round's working screens first, in the sidebar's order; the fourth slot is the Compare tray when it has items.
+// Phones: Residents (the main feature) first, then the round's working screens, in the sidebar's order; the fifth slot is the Compare tray when it has items.
 const bottom = [
+  { href: "/decide/residents", label: "Residents", icon: Users },
   { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
   { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
   { href: "/decide/choices", label: "Choices", icon: ListOrdered },
@@ -224,7 +225,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
       <div aria-hidden className={cn("fixed inset-x-0 top-0 z-50 h-0.5 bg-mark", loading ? "animate-pulse" : "hidden")} />
       <p role="status" className="sr-only">{loading ? "Loading the page…" : ""}</p>
 
-      <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
+      <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {[...bottom, compare.length ? { href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows } : { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch }].map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 border-t-2 text-xs", isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <Icon className="size-5" strokeWidth={1.75} aria-hidden />
