@@ -19,11 +19,15 @@ export function LoadingPage({ className, children }: { className?: string; child
   );
 }
 
-/** PageHead: the title (its width roughly the title's), and the line under it when the page has one. */
-export function SkHead({ w = "w-56", sub }: { w?: string; sub?: string }) {
+/**
+ * PageHead: the title (its width roughly the title's), and the line under it when the page has one. `text`: the page's
+ * title itself, in PageHead's type, so the first paint already says where she is (and is the page's largest text early).
+ */
+export function SkHead({ w = "w-56", sub, text }: { w?: string; sub?: string; text?: string }) {
   return (
     <div className="max-w-3xl">
-      <Skeleton className={cn("h-11 max-w-full", w)} />
+      {/* PageHead's own markup (an h1, hidden: LoadingPage announces the wait), so the page's title paints the same. */}
+      {text ? <h1 aria-hidden className="text-2xl font-bold tracking-tight md:text-3xl">{text}</h1> : <Skeleton className={cn("h-11 max-w-full", w)} />}
       {sub && <Skeleton className={cn("mt-3 h-5 max-w-full", sub)} />}
     </div>
   );
@@ -124,10 +128,10 @@ export function SkPanel({ lines = 3, className }: { lines?: number; className?: 
 }
 
 /** The usual list page: title, filter bar, result line with the view toggle, then a table. */
-export function SkListPage({ title, sub, filters = 11, labels = true, rows = 8, cols = 6 }: { title?: string; sub?: string; filters?: number; labels?: boolean; rows?: number; cols?: number }) {
+export function SkListPage({ title, heading, sub, filters = 11, labels = true, rows = 8, cols = 6 }: { title?: string; heading?: string; sub?: string; filters?: number; labels?: boolean; rows?: number; cols?: number }) {
   return (
     <LoadingPage className="grid grid-cols-1 gap-6">
-      <SkHead w={title} sub={sub} />
+      <SkHead w={title} sub={sub} text={heading} />
       <SkFilters n={filters} labels={labels} />
       <SkToolbar />
       <SkTable rows={rows} cols={cols} />

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Atkinson_Hyperlegible_Next } from "next/font/google";
+import { headers } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import { DatabaseZap } from "lucide-react";
 import "@astryxdesign/core/reset.css";
@@ -11,6 +12,7 @@ import { DecideShell } from "@/features/decide/components/decide-shell";
 import { NavPending } from "@/features/decide/components/nav-pending";
 import type { ProfileMeta } from "@/features/decide/components/profile-dialog";
 import { EmptyState } from "@/features/decide/components/ui";
+import { deviceView } from "@/features/decide/components/view-toggle";
 import { getMeta } from "@/features/decide/service";
 
 // Inside app uses its own "case sheet" system (docs/APP_DESIGN_SYSTEM.md): light, hyperlegible numerals.
@@ -35,10 +37,13 @@ export default async function DecideLayout({ children }: { children: React.React
     unstable_rethrow(e); // the sign-in redirect when access is gone
     console.error("[decide] data unavailable", e);
   }
+  // A phone's first paint already has the drawer layout (no sidebar column), so nothing shifts when the shell hydrates.
+  const h = await headers();
+  const phone = deviceView(h.get("user-agent"), h.get("sec-ch-ua-mobile")) === "cards";
   return (
     <div className={`app ${app.variable} min-h-screen`}>
       <AstryxProvider>
-        <DecideShell meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
+        <DecideShell phone={phone} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (
             <NavPending>{children}</NavPending>
           ) : (

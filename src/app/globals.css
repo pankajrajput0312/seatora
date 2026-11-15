@@ -35,9 +35,11 @@
   --color-transparent: transparent;
   --color-current: currentColor;
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --font-pixel: var(--font-geist-pixel-square), ui-monospace, monospace;
+  /* Geist's families by name (next/font/local names them after src/app/site-fonts.ts's imports): loaded only on pages
+     that import that file, so Decide (its own font, .app below) never downloads them. */
+  --font-sans: "GeistSans", "GeistSans Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "GeistMono", ui-monospace, monospace;
+  --font-pixel: "GeistPixelSquare", "GeistMono", ui-monospace, monospace;
 
   --radius-sm: 0.45rem;
   --radius-md: 0.6rem;

@@ -25,7 +25,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { getMeta, LATEST_YEAR, listInstitutes, PAST_YEARS } from "@/features/decide/service";
 
 export const metadata: Metadata = { title: "Institutes" };
-const PAGE_SIZE = 48; // splits evenly into 2, 3 and 4 columns
+const PAGE_SIZE = 24; // splits evenly into 2, 3 and 4 columns; small enough for a phone to paint fast
 const PATH = "/decide/institutes";
 const sorts = [
   { value: "name", label: "Name" },
@@ -47,22 +47,14 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params, ["state", "course"]);
   const { params: tp, filters: tf } = readTermFilters(params, profile);
-  const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort === "beds" ? ("name" as const) : f.sort };
   const pg = { page: f.page, pageSize: PAGE_SIZE };
   const [meta, info, byTerms, view] = await Promise.all([getMeta(), hospitalInfo(), institutesByTerms(tf, f.course), chosenView(params, "institutes")]);
-  // Term filters and the beds sort need the whole list here: then this page pages it.
-  // ponytail: whole list, then a page (≈2,000 institutes, reach for her options only); move into listInstitutes if slow.
-  const local = !!byTerms || f.sort === "beds";
-  const got = await listInstitutes(profile, filters, local ? undefined : pg);
-  let res = got;
-  let unknown = 0;
-  if (local) {
-    const all = byTerms ? got.rows.filter((r) => byTerms.pass.has(r.college.key)) : got.rows;
-    unknown = byTerms ? got.rows.filter((r) => byTerms.unknown.has(r.college.key)).length : 0;
-    if (f.sort === "beds") all.sort((a, b) => (info.get(b.college.key)?.beds?.n ?? -1) - (info.get(a.college.key)?.beds?.n ?? -1) || a.college.name.localeCompare(b.college.name));
-    const page = Math.min(Math.max(1, f.page), Math.max(1, Math.ceil(all.length / PAGE_SIZE)));
-    res = { ...got, rows: all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total: all.length, page, pageSize: PAGE_SIZE };
-  }
+  // Term filters and the beds sort narrow and order the list before it is paged, so reach is read for one page only.
+  const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort, only: byTerms?.pass, bedsOf: (key: string) => info.get(key)?.beds?.n };
+  const [res, unknown] = await Promise.all([
+    listInstitutes(profile, filters, pg),
+    byTerms ? listInstitutes(null, { ...filters, only: byTerms.unknown }, { page: 1, pageSize: 1 }).then((r) => r.total) : 0,
+  ]);
 
   const courseLabel = (slug: string) => {
     const c = meta.courses.find((x) => x.slug === slug);
@@ -118,10 +110,8 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
                 <div className="flex text-sm">
                   <dl className="grid flex-1 grid-cols-2">
                     <div className="grid px-4 py-1">
-                      <dt className="flex items-center gap-0.5 pt-1 text-xs text-muted-foreground">
-                        Courses
-                        {r.courses.length > 0 && <InfoTip label={`courses, ${r.college.name}`}>{r.courses.map((c) => `${c.degree} ${c.name}`).join(" · ")}</InfoTip>}
-                      </dt>
+                      {/* No (i) listing the courses: the count opens them (24 cards of course lists weighed down the page). */}
+                      <dt className="pt-1 text-xs text-muted-foreground">Courses</dt>
                       <dd><Link href={L.institute(r.college.slug, "courses")} className={`${smallLink} numeric font-semibold text-sky`}>{formatRank(r.courses.length)}<span className="sr-only"> courses: see them</span></Link></dd>
                     </div>
                     <div className="grid border-l border-border px-4 py-1">

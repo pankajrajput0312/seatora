@@ -56,7 +56,8 @@ const bottom = [
   { href: "/decide/choices", label: "Choices", icon: ListOrdered },
 ];
 
-export function DecideShell({ meta, children }: { meta: ProfileMeta; children: React.ReactNode }) {
+/** `phone`: the server's guess from the user agent (layout.tsx), so the first paint has the right layout. */
+export function DecideShell({ meta, phone, children }: { meta: ProfileMeta; phone?: boolean; children: React.ReactNode }) {
   const pathname = usePathname();
   const sp = useSearchParams();
   const router = useRouter();
@@ -157,6 +158,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
       <AppShell
         height="auto"
         variant="section"
+        mobileNav={{ defaultIsMobile: phone }}
         topNav={
           <TopNav
             label="App"
