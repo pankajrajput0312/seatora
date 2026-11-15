@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, CalendarDays, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, MessageCircle, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import type { DecideLinks } from "../lib/links";
 
 // The planner's home: a promo card (Residents, free till 19 Nov) and every tool as a coloured tile, phone-app style.
@@ -27,7 +27,7 @@ export function HomeHub({ L }: { L: DecideLinks }) {
         <p className="flex items-center gap-2 text-[11px] font-bold tracking-[0.2em] text-[#ffd84d]">
           <span className="size-2 rounded-full bg-[#4ade80]" aria-hidden /> FREE TILL {FREE_UNTIL.toUpperCase()}
         </p>
-        <h2 id="promo-h" className="mt-2 text-xl font-bold leading-tight sm:text-2xl">
+        <h2 id="promo-h" className="mt-2 text-xl font-bold leading-tight sm:text-2xl" style={{ color: "#fff" }}>
           Residents&apos; names are <span className="text-[#ffd84d]">live now</span>
         </h2>
         <p className="mt-1 text-sm text-white/85">77,000+ residents · 1,800+ hospitals · MCC lists 2023–2025</p>
@@ -52,10 +52,6 @@ export function HomeHub({ L }: { L: DecideLinks }) {
             <span className="leading-tight">{label}</span>
           </Link>
         ))}
-        <Link href={L.to("/decide/requests")} className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border px-1 py-2 text-center text-[12px] font-medium text-muted-foreground">
-          <MessageCircle className="size-6" strokeWidth={1.75} aria-hidden />
-          <span className="leading-tight">Request</span>
-        </Link>
       </nav>
     </div>
   );
