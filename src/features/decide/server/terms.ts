@@ -820,7 +820,37 @@ export function collegeTerms(cat: Catalog, college: string): ProgrammeTerms[] {
  * The terms for one course at a college (its programme). `specialty`: a bond that varies by specialty (the record's
  * by_subject) gives that course's own figure. `quota`: the fee and stipend of that quota's fee-table record (memoized).
  */
+/**
+ * A deemed university's fee for one course: its fee record (this quota's) lists per-course figures (`fee_variants`,
+ * applies_to "MD ANAESTHESIOLOGY"); the course's own years replace the record's range (min-max across subjects).
+ */
+function withFeeVariant(cat: Catalog, t: ProgrammeTerms, college: string, degree: string, specialty: string | undefined, quota: string | undefined): ProgrammeTerms {
+  if (!specialty) return t;
+  const p = programmeOfDegree(degree);
+  const own = indexOf(cat).terms.get(college)?.filter((x) => x.program === programmes[p].bucket) ?? [];
+  const recs = recordsOf(p, own.find((x) => x.kind === "FEE"), own.find((x) => x.kind === "STIPEND"));
+  const v = recs ? recordFor(recs, quota)?.fee_variants : undefined;
+  if (!v?.length) return t;
+  const norm = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
+  const want = norm(`${degree} ${specialty}`);
+  const hit = v.find((x) => norm(x.applies_to) === want) ?? v.find((x) => norm(x.applies_to).endsWith(norm(specialty)));
+  if (!hit) return t;
+  const years = t.years.map((y, i) => {
+    const f = hit.per_year[i];
+    if (!f || !y.fee) return y;
+    const { min: _min, ...rest } = y.fee;
+    void _min;
+    return { ...y, fee: { ...rest, inr: f.amount_max ?? f.amount, ...(f.amount_max != null && f.amount_max !== f.amount && { min: f.amount }) } };
+  });
+  const all = years.every((y) => y.fee && y.fee.min == null);
+  return { ...t, years, wholeCourseFee: all ? years.reduce((n, y) => n + (y.fee?.inr ?? 0), 0) : t.wholeCourseFee };
+}
+
 export function courseTerms(cat: Catalog, college: string, degree: string, specialty?: string, quota?: string): ProgrammeTerms {
+  return withFeeVariant(cat, courseTermsBase(cat, college, degree, specialty, quota), college, degree, specialty, quota);
+}
+
+function courseTermsBase(cat: Catalog, college: string, degree: string, specialty?: string, quota?: string): ProgrammeTerms {
   const p = programmeOfDegree(degree);
   const m = indexOf(cat);
   const k = quota ? `${college}|${p}|${quota}` : null;

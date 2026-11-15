@@ -447,7 +447,7 @@ export const mccFeesStructuredSchema = z
         z
           .object({
             n: src,
-            kind: z.enum(["mcc_profile", "bond_document", "nmc_list", "nbems_rule"]),
+            kind: z.enum(["mcc_profile", "bond_document", "nmc_list", "nbems_rule", "official_document"]),
             label: z.string().min(1),
             url: z.url(),
             year: z.union([z.number().int(), z.string().min(1)]).optional(),

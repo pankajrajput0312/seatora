@@ -57,6 +57,8 @@ export type Term = {
 };
 /** A fee-table record (FeesStructured) as a summary line reads it: fee and stipend by course year, their sources, MCC's Round 2 forfeit. */
 export type FeeTableRecord = Pick<MccFeesStructured, "programme" | "seat_groups" | "fee_per_year" | "stipend_per_month" | "sources"> & {
+  /** Per-course figures of a deemed university's fee notice (applies_to "MD ANAESTHESIOLOGY"); absent in an older import. */
+  fee_variants?: MccFeesStructured["fee_variants"] | null;
   /** null (an export older than it): verbatim, never a figure. */
   fee_display: MccFeesStructured["fee_display"] | null;
   /** The MCC profile's fee words for these seats (a verbatim record's only fee) and where they were read; absent in an older import. */
