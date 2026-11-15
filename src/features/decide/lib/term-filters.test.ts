@@ -104,6 +104,14 @@ describe("filters", () => {
     expect(termVerdict(noBond, null, { maxBondInr: 100000 })).toBe("pass");
   });
 
+  it("a computed amount: an exact one as a figure; 'at most' passes under the cap, else unknown; 'at least' fails over it, else unknown", () => {
+    const f = (bound: "upTo" | "atLeast" | null): Amount => ({ ...amt(1500000), formula: { text: "Computed", bound, words: [] } });
+    const t = (bound: "upTo" | "atLeast" | null) => terms(null, null, { status: "declared", basis: "document", years: 1, amount: f(bound), leavingAmount: f(bound) });
+    expect([2e6, 1e6].map((cap) => termVerdict(t(null), null, { maxBondInr: cap, maxLeavingInr: cap }))).toEqual(["pass", "fail"]);
+    expect([2e6, 1e6].map((cap) => termVerdict(t("upTo"), null, { maxLeavingInr: cap }))).toEqual(["pass", "unknown"]);
+    expect([2e6, 1e6].map((cap) => termVerdict(t("atLeast"), null, { maxBondInr: cap }))).toEqual(["unknown", "fail"]);
+  });
+
   it("leaving penalty ₹ at most", () => {
     expect(termVerdict(known, null, { maxLeavingInr: 500000 })).toBe("pass");
     expect(termVerdict(known, null, { maxLeavingInr: 100000 })).toBe("fail");

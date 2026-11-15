@@ -51,7 +51,7 @@ export type StatCell = {
   full: string;
   /** Tiny text beside the value: "max", "min", "state rule", "by specialty"… */
   marker: string | null;
-  /** bond: a bond applies (orange); muted: "—", "Not declared", "See text"; warn: the marker is a caveat. */
+  /** bond: a bond applies (orange); muted: "—", "Not declared", a phrase for words ("Refund stipend"); warn: the marker is a caveat. */
   tone: "bond" | "muted" | null;
   markerWarn?: true;
   /** "—": not in the data (screen readers hear it). */
@@ -99,7 +99,7 @@ const isDnb = (t: ProgrammeTerms) => t.programme === "DNB" || t.programme === "N
 const yrs = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
 const sameYears = (text: string, n: number | null) => n != null && text.replace(/\s*years?\.?$/i, "").trim() === String(n);
 const dash = (c: Pick<StatCell, "key" | "label" | "about">, tip: TipLine[]): StatCell => ({ ...c, short: "—", full: "—", marker: null, tone: "muted", missing: true, tip });
-const words = (c: Pick<StatCell, "key" | "label" | "about">, tip: TipLine[], label = "See text"): StatCell => ({ ...c, short: label, full: label, marker: null, tone: "muted", tip });
+const words = (c: Pick<StatCell, "key" | "label" | "about">, tip: TipLine[], label: string): StatCell => ({ ...c, short: label, full: label, marker: null, tone: "muted", tip });
 const unread = (t: ProgrammeTerms, kind: ProgrammeTerms["unread"][number]["kind"]) => t.unread.find((u) => u.kind === kind);
 const asQuote = (u: { text: string; src: number }): TipLine => ({ text: u.text, src: u.src, quote: true });
 
@@ -181,7 +181,7 @@ function stipendCell(t: ProgrammeTerms): StatCell {
   const s = t.years[0]?.stipend;
   const u = unread(t, "STIPEND");
   if (!s) {
-    if (u) return words(c, [{ text: "The stipend as published:" }, asQuote(u)]);
+    if (u) return words(c, [{ text: "The stipend as published:" }, asQuote(u)], "As published");
     return dash(c, [{ text: t.years.some((y) => y.stipend) ? "Year 1's stipend is not stated." : NOT_IN_DATA }, ...(t.years.some((y) => y.stipend) ? yearLines(t, "stipend", " a month") : [])]);
   }
   const below = t.years.find((y) => y.stipend?.below)?.stipend;
@@ -210,7 +210,7 @@ function bondMissing(t: ProgrammeTerms, c: Pick<StatCell, "key" | "label" | "abo
     };
   }
   const u = unread(t, "BOND");
-  if (u) return words(c, [{ text: "The bond as published (no verified record yet):" }, asQuote(u)]);
+  if (u) return words(c, [{ text: "The bond as published (no verified record yet):" }, asQuote(u)], "As published");
   return dash(c, [{ text: NOT_CHECKED }, ...rules]);
 }
 
@@ -259,17 +259,38 @@ function bondCell(t: ProgrammeTerms): StatCell {
   };
 }
 
+/** A formula amount (server/terms.ts formulaAmount): the record's words it read, then how Seatora computed it or why not. */
+const formulaLines = (a: Amount, src: number | null): TipLine[] =>
+  a.formula ? [{ text: "The record's words:" }, ...a.formula.words.map((text) => ({ text, src, quote: true as const })), { text: a.formula.text, ...(a.formula.bound && { warn: true as const }) }] : [];
+/**
+ * The short phrase for an amount in words only (at most ~18 characters; the words are in the (i)): the formula's
+ * ("Refund stipend", "Rest of course fee"), a state rule's ("No money penalty", "Per state rule"), else what the words say.
+ */
+function phrase(a: Amount, texts: (string | null | undefined)[]): string {
+  if (a.formula?.label) return a.formula.label;
+  const t = texts.filter(Boolean).join(" ");
+  if (/^State rule/.test(t)) return /\bno money penalty\b/i.test(t) ? "No money penalty" : "Per state rule";
+  if (/by subject|by specialt/i.test(t)) return "Varies by subject";
+  if (/left blank|_{3,}/i.test(t)) return "Amount left blank";
+  if (/as per (?:the )?policy|as applicable/i.test(t)) return "As per policy";
+  return "No ₹ figure";
+}
+
 /** What a figure leaves out: "₹10,00,000 per year × 3 years, computed", "incl. ₹10,00,000 additional". */
-function amountLines(a: Amount, years: number | null): TipLine[] {
+function amountLines(a: Amount, years: number | null, src: number | null = null): TipLine[] {
   return [
+    ...formulaLines(a, src),
     ...(a.perYear && years ? [{ text: `${inrFull(a.perYear)} per year × ${years} years, computed by Seatora.` }] : []),
     ...(a.extra ? [{ text: `Includes ${inrFull(a.extra)} owed on top (additional).` }] : []),
     ...(a.varies ? [{ text: "The amount varies by specialty: this is the range over the subjects.", warn: true as const }] : []),
     ...(a.more ? [{ text: a.state === "words" ? "In words only (no ₹ figure)." : "Part of it is in words only (no ₹ figure)." }] : []),
   ];
 }
-const amountValue = (a: Amount, short: boolean) => `${a.perYear ? "up to " : ""}${inrRange(a.min, a.max!, short)}`;
-const amountMarker = (a: Amount) => (a.varies ? "by specialty" : a.perYear ? "computed" : a.extra ? "incl. additional" : a.more ? "+ words" : null);
+// A computed formula's bound: "≤ ₹3.75 L" (at most), "≥ ₹18 L" (at least).
+const BOUND = { upTo: "≤ ", atLeast: "≥ " } as const;
+// A range (₹10 L plus a stipend received by the date of leaving: "₹10 L–₹38 L") says its own bounds.
+const amountValue = (a: Amount, short: boolean) => `${a.perYear ? "up to " : a.formula?.bound && (a.min == null || a.min === a.max) ? BOUND[a.formula.bound] : ""}${inrRange(a.min, a.max!, short)}`;
+const amountMarker = (a: Amount) => (a.varies ? "by specialty" : a.perYear || a.formula ? "computed" : a.extra ? "incl. additional" : a.more ? "+ words" : null);
 const partLines = (parts: TermPart[], src: number | null): TipLine[] => parts.map((p) => ({ text: p.text, src: p.src ?? src }));
 
 function bondInrCell(t: ProgrammeTerms): StatCell {
@@ -289,11 +310,12 @@ function bondInrCell(t: ProgrammeTerms): StatCell {
     return {
       ...c, short: amountValue(a, true), full: amountValue(a, false), marker: amountMarker(a) ?? (rule ? "state rule" : null), tone: "bond",
       level: high ? "heavy" : "caution", levelWord: high ? "₹25 L or more" : "a bond amount",
-      tip: [head, { text: `${amountValue(a, false)} for this course.`, src: rule?.src ?? b.src }, ...ruleLine, ...amountLines(a, b.years), ...parts, ...other],
+      tip: [head, { text: `${amountValue(a, false)} for this course.`, src: rule?.src ?? b.src }, ...ruleLine, ...amountLines(a, b.years, b.src), ...parts, ...other],
     };
   }
   const quote: TipLine[] = b.quote ? [{ text: b.quote, src: b.src, quote: true }] : [];
-  if (a.state === "words") return words(c, [head, { text: "Declared without a ₹ figure for this course.", src: b.src }, ...partLines(b.amounts, b.src), ...quote, ...other]);
+  if (a.state === "words")
+    return words(c, [head, { text: "Declared without a ₹ figure for this course.", src: b.src }, ...partLines(b.amounts, b.src), ...quote, ...formulaLines(a, b.src), ...other], phrase(a, [b.text, b.quote]));
   return dash(c, [head, { text: "Amount not stated in the bond record.", src: b.src }, ...quote, ...other]);
 }
 
@@ -311,11 +333,11 @@ function leavingCell(t: ProgrammeTerms): StatCell {
   if (!b.leaving.length) {
     // A PENALTY term without its record (an older import), as published; a record's forfeit in words is not this.
     const u = unread(t, "PENALTY");
-    if (u) return words(c, [head, { text: "As published:" }, asQuote(u), ...forfeit]);
+    if (u) return words(c, [head, { text: "As published:" }, asQuote(u), ...forfeit], "As published");
     return dash(c, [head, { text: NOT_IN_DATA }, ...other, ...forfeit]);
   }
-  const tip = [head, ...partLines(b.leaving, b.src), ...amountLines(a, null), ...other, ...forfeit];
-  if (a.state !== "figure" || a.max == null) return words(c, tip);
+  const tip = [head, ...partLines(b.leaving, b.src), ...amountLines(a, null, b.leaving[0]?.src ?? b.src), ...other, ...forfeit];
+  if (a.state !== "figure" || a.max == null) return words(c, tip, phrase(a, b.leaving.map((p) => p.text)));
   return levelOf({ ...c, short: amountValue(a, true), full: amountValue(a, false), marker: amountMarker(a), tone: null, tip }, a.max >= HIGH_PENALTY ? "heavy" : undefined, "₹25 L or more");
 }
 

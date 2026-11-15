@@ -85,9 +85,19 @@ type Group = "degree" | "diploma" | "super" | "inservice" | "all";
  * words: declared without a ₹ figure (the exact words say what); none: not declared. `perYear`: the published amount is
  * per defaulting year, so min/max are it × the bond years (computed). `varies`: the record prices it by specialty
  * (min–max over it). `more`: some rows have no ₹ figure (in words only). `extra`: owed on top (an "additional" penalty
- * item), included in `max`.
+ * item), included in `max`. `formula`: Seatora computed min/max from the record's own words over this row's figures
+ * (FORMULA below): `text` says how; `bound` upTo: at most it (a balance, a stipend received by the date of leaving, an
+ * NBEMS fee maximum), atLeast: at least it (an NBEMS minimum stipend, "+ DA").
  */
-export type Amount = { state: "figure" | "words" | "none"; min: number | null; max: number | null; perYear: number | null; varies: boolean; more: boolean; extra: number | null };
+export type Amount = {
+  state: "figure" | "words" | "none"; min: number | null; max: number | null; perYear: number | null; varies: boolean; more: boolean; extra: number | null;
+  formula?: Formula;
+};
+/**
+ * `words`: the record's own words it reads. `text`: how Seatora computed it, or why it could not. `label`: the short
+ * phrase a cell shows when there is no number ("Refund stipend", "Rest of course fee"); absent when computed.
+ */
+export type Formula = { text: string; bound: "upTo" | "atLeast" | null; words: string[]; label?: string };
 
 export type Bond = {
   /**
@@ -222,6 +232,146 @@ function amountOf(parts: TermPart[], years: number | null): Amount {
     more: parts.some((p) => p.inr == null),
     extra: xs.length && extra ? extra : null,
   };
+}
+
+// ---------- formulas ----------
+
+/**
+ * A bond or leaving amount the record gives as a formula over figures this row holds, only from its explicit words:
+ * "refund 3 years' stipend" (₹/month × 12, years 1..3), "stipend received" (every year's), "N months' stipend" (year 1's),
+ * "double the stipend", "balance / entire / remaining course fee(s) / tuition" (every year's fee), "N years' fee", plus a ₹
+ * figure joined with "+" / "plus". A part Seatora cannot price (a blank sum, interest, a share, a guarantee) or a figure it
+ * lacks: no number, a label saying what it is. A sum already paid ("fees paid forfeited") is not owed again.
+ */
+const NUMS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, twelve: 12 };
+const num = (s: string) => NUMS[s.toLowerCase()] ?? Number(s);
+const UNPRICED = /book grant|discontinuation fee|bank guarantee[^.;]*redeem|invoke the bank guarantee|security cheque|interest|\d+\s?%|amount spent|left blank|\betc\b|as applicable|\bas per\b|per the policy/i;
+const PAID = /\b(?:first-year |entire )?fees? (?:paid|collected)(?: at admission)?(?: (?:forfeited|not refunded))?|\bfirst-year fee (?:forfeited|not refunded)/gi;
+const FEE_WORD = /\b(?:fees?|tuition)\b/i;
+const WHOLE = /\b(?:entire|whole|full|complete)\b/i;
+const REST = /\b(?:balance|remaining|rest of)\b/i;
+const N_YEARS_FEE = /\b(one|two|three|\d) years?'? (?:tuition )?fees?\b/i;
+const STIPEND = /\bstipend/i;
+const PAY_BACK = /refund|repay|return|pay back|received|drawn|double|twice/i;
+const N_YEARS_ST = /\b(one|two|three|four|five|\d) years?'? stipend/i;
+const N_MONTHS_ST = /\b(one|two|three|four|five|six|twelve|\d+) months?'? stipend/i;
+const DOUBLE = /\b(?:double|twice)\b/i;
+const RUPEES = /(?:₹|\bRs\.?)\s?(\d[\d,]*(?:\.\d+)?)\s*(lakh|crore|L\b|Cr\b)?/gi;
+/** A clause about leaving the seat or course (a bond's own words keep only the not-serving ones). */
+const LEAVING_WORDS = /\bleav|discontinu|\bquit|resign|withdraw|abandon|mid-?way|lapse/i;
+
+type Years = ProgrammeTerms["years"];
+type Part = { inr: number; text: string; bound: Formula["bound"]; why?: string };
+/** Years 1..n of a fee (a year) or stipend (₹/month × 12), each stated; null when one is not (or a sum at admission). */
+function sumOf(years: Years, pick: "fee" | "stipend", n: number, label: string): Part | null {
+  if (n < 1 || n > years.length) return null;
+  const fs = years.slice(0, n).map((y) => y[pick]);
+  if (fs.some((f) => !f || f.atAdmission)) return null;
+  const xs = fs as Figure[];
+  const unit = pick === "stipend" ? 12 : 1;
+  const inr = xs.reduce((s, f) => s + f.inr * unit, 0);
+  const same = xs.every((f) => f.inr === xs[0].inr);
+  const each = pick === "stipend" ? (same ? `${formatINR(xs[0].inr)} a month × ${12 * n} months` : `(${xs.map((f) => formatINR(f.inr)).join(" + ")}) a month × 12`) : same && n > 1 ? `${formatINR(xs[0].inr)} a year × ${n} years` : xs.map((f) => formatINR(f.inr)).join(" + ");
+  const max = xs.some((f) => f.kind === "maximum" || f.min != null);
+  const min = xs.some((f) => f.kind === "minimum" || f.plusDa);
+  const why = max ? (xs.some((f) => f.kind === "maximum") ? "the fee is the NBEMS maximum" : "the figure is a range's highest") : min ? (xs.some((f) => f.kind === "minimum") ? "the stipend is the NBEMS minimum" : "the stipend is plus DA") : undefined;
+  return { inr, text: `${label}: ${each} = ${formatINR(inr)}`, bound: max ? "upTo" : min ? "atLeast" : null, why };
+}
+
+/** One clause: a computed part list, `words` (a formula Seatora cannot price: `label` says what), or null (no formula). */
+function clauseFormula(clause: string, years: Years, leaving: boolean): { parts: Part[] } | { label: string; why: string } | null {
+  const c = clause.replace(PAID, "");
+  // "the lesser of the stipend paid or ₹5 lakh": the figure is the most, no formula on top.
+  if (/\blesser\b|whichever is (?:less|lower)/i.test(c)) return null;
+  const nFee = c.match(N_YEARS_FEE);
+  // A fee of its own ("a discontinuation fee") is not the course's fee.
+  const fee = FEE_WORD.test(c.replace(/\b(?:discontinuation|processing) fees?\b/gi, "")) && (WHOLE.test(c) || REST.test(c) || !!nFee);
+  const st = STIPEND.test(c) && PAY_BACK.test(c);
+  if (!fee && !st) return null;
+  const nSt = c.match(N_YEARS_ST);
+  const months = c.match(N_MONTHS_ST);
+  const twice = st && DOUBLE.test(c);
+  const rest = fee && !nFee && REST.test(c);
+  const feeLabel = nFee ? `${num(nFee[1])} years' fee` : rest ? "Rest of course fee" : "Whole course fee";
+  const stLabel = months ? `${num(months[1])} months' stipend` : nSt ? `${num(nSt[1])} years' stipend` : twice ? "2× stipend" : "Refund stipend";
+  const label = fee && st ? "Fees + stipend" : fee ? feeLabel : stLabel;
+  if (UNPRICED.test(c)) return { label, why: "part of it has no figure Seatora holds" };
+  const parts: Part[] = [];
+  if (fee) {
+    const p = sumOf(years, "fee", nFee ? num(nFee[1]) : years.length, nFee ? `${num(nFee[1])} years' fee` : "Whole course fee");
+    if (!p) return { label, why: "Seatora has no fee figure for every year of this seat" };
+    parts.push(rest ? { ...p, bound: p.bound === "atLeast" ? p.bound : "upTo", why: p.why ?? "a balance is what is still unpaid when you leave" } : p);
+  }
+  if (st) {
+    const all = years.length;
+    const p = months ? sumOf(years, "stipend", 1, "") : sumOf(years, "stipend", nSt ? num(nSt[1]) : all, nSt ? `${num(nSt[1])} years' stipend` : "Stipend for the whole course");
+    if (!p) return { label, why: "Seatora has no stipend figure for every year needed" };
+    const m = months ? num(months[1]) : 1;
+    const q: Part = months ? { ...p, inr: (p.inr / 12) * m, text: `${m} months' stipend: ${formatINR(p.inr / 12)} a month × ${m} = ${formatINR((p.inr / 12) * m)}` } : p;
+    // Stipend received by the date of leaving: at most the whole course's.
+    const received = leaving && !nSt && !months;
+    if (received && q.bound === "atLeast") return { label, why: "the stipend received by the date you leave is at most the whole course's, and its figure is only a minimum" };
+    const r: Part = received ? { ...q, bound: "upTo", why: "the stipend received by the date you leave" } : q;
+    parts.push(twice ? { ...r, inr: r.inr * 2, text: `${r.text}, doubled = ${formatINR(r.inr * 2)}` } : r);
+  }
+  if (/\+|\bplus\b/i.test(c))
+    for (const m of c.matchAll(RUPEES)) {
+      const inr = toInr(m[1], m[2]);
+      parts.push({ inr, text: `${formatINR(inr)} as stated`, bound: null });
+    }
+  const bounds = new Set(parts.map((p) => p.bound).filter(Boolean));
+  if (bounds.size > 1) return { label, why: "one part is at most and another at least its figure" };
+  return { parts };
+}
+
+/**
+ * The formula over one set of clauses (a bond's not-serving words, a leaving penalty's words): the highest computed
+ * clause; any clause it cannot price: no number (`label`); none a formula: null.
+ */
+export function formulaAmount(clauses: string[], years: Years, leaving: boolean, stated?: number): { inr: number | null; formula: Formula } | null {
+  const read = clauses.map((c) => [c, clauseFormula(c, years, leaving)] as const).filter((x) => x[1]);
+  if (!read.length) return null;
+  const words = [...new Set(read.map(([c]) => c))];
+  const no = read.find((x) => "label" in x[1]!);
+  if (no) {
+    const r = no[1] as { label: string; why: string };
+    return { inr: null, formula: { text: `No number: ${r.why}.`, bound: null, words, label: r.label } };
+  }
+  const own: Part[] = stated != null ? [{ inr: stated, text: `${formatINR(stated)} as stated`, bound: null }] : [];
+  const best = read.map(([, r]) => [...(r as { parts: Part[] }).parts, ...own]).map((ps) => ({ ps, inr: ps.reduce((s, p) => s + p.inr, 0) })).sort((a, b) => b.inr - a.inr)[0];
+  const bound = best.ps.find((p) => p.bound)?.bound ?? null;
+  const why = best.ps.find((p) => p.why)?.why;
+  const lines = best.ps.map((p) => p.text).join("; ");
+  const total = best.ps.length > 1 ? `; total ${formatINR(best.inr)}` : "";
+  const b = bound === "upTo" ? ` At most this: ${why}.` : bound === "atLeast" ? ` At least this: ${why}.` : "";
+  return { inr: best.inr, formula: { text: `Computed by Seatora from the record's words and this seat's own figures: ${lines}${total}.${b}`, bound, words } };
+}
+
+const clausesOf = (s: string | null | undefined, split: RegExp) => (s ? s.split(split).map((x) => x.trim()).filter(Boolean) : []);
+/** The PENALTY text's seat-leaving section ("Seat-leaving penalty: X (when) · Y; Other penalty: …"), as clauses. */
+const leavingSection = (text: string | undefined) => clausesOf(text?.match(/Seat-leaving penalty: (.*?)(?:; (?:Other penalty|Counselling forfeit):|$)/)?.[1], / · /);
+
+/** A bond and leaving amount in words only that the record gives as a formula: computed where it can be (formulaAmount). */
+function withFormulas(b: Bond, years: Years, penaltyText: string | undefined): Bond {
+  let out = b;
+  if (b.status === "declared" && b.amount.state === "words") {
+    const clauses = [...clausesOf(b.text, / · |; /), ...clausesOf(b.quote, /\.{3}|\.\s/)].filter((c) => !LEAVING_WORDS.test(c));
+    const f = formulaAmount(clauses, years, false);
+    if (f) out = { ...out, amount: f.inr != null ? { ...NONE, state: "figure", min: f.inr, max: f.inr, formula: f.formula } : { ...out.amount, formula: f.formula } };
+  }
+  // The leaving items' own words, and the record text's when no item has a figure; never a state rule's prose.
+  const own = b.leaving.filter((p) => !p.text.startsWith("State rule"));
+  if (own.length && b.leavingAmount.state === "words") {
+    const f = formulaAmount([...own.map((p) => p.text), ...leavingSection(penaltyText)], years, true);
+    if (f) out = { ...out, leavingAmount: f.inr != null ? { ...NONE, state: "figure", min: f.inr, max: f.inr, formula: f.formula } : { ...out.leavingAmount, formula: f.formula } };
+  }
+  // A figure with a formula on top ("₹10,00,000: …; plus all stipend received up to leaving"): its highest, computed.
+  const a = out.leavingAmount;
+  if (own.length && a.state === "figure" && a.max != null && !a.extra) {
+    const top = own.filter((p) => p.inr != null).map((p) => formulaAmount([p.text.replace(/^₹[\d,]+: /, "")], years, true, p.inr!)).filter((f) => f?.inr != null && f.inr > a.max!).sort((x, y) => y!.inr! - x!.inr!)[0];
+    if (top) out = { ...out, leavingAmount: { ...a, min: Math.min(a.min ?? a.max, a.max), max: top.inr, formula: top.formula } };
+  }
+  return out;
 }
 
 // ---------- per kind ----------
@@ -603,6 +753,7 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
   // the Leaving cell shows "See text" with them, never a figure read out of the words.
   const rulePenalty = bond.basis === "state_rule" && bondT?.details && "status" in bondT.details ? bondT.details.penalty : null;
   if (rulePenalty && !bond.leaving.length) bond = { ...bond, leaving: [{ text: `State rule${bondT!.details && "state" in bondT!.details && bondT!.details.state ? ` (${bondT!.details.state})` : ""}: ${rulePenalty}`, inr: null, group: "all", src: bond.src ?? undefined }], leavingAmount: { ...NONE, state: "words" } };
+  bond = withFormulas(bond, years, penT?.text);
   resignForfeit ??= read?.forfeit ?? null;
   if (!resignForfeit && !resignForfeitText && read?.forfeitText) resignForfeitText = read.forfeitText;
 
@@ -677,13 +828,13 @@ export function courseTerms(cat: Catalog, college: string, degree: string, speci
   }
   const d = specialty && t.bond.status === "declared" && !t.bond.amounts.some((x) => x.rule) ? m.terms.get(college)?.find((x) => x.program === programmes[p].bucket && x.kind === "BOND")?.details : undefined;
   const own = d && "status" in d ? d.by_subject?.[specialty!] : undefined;
-  if (own != null) return { ...t, bond: { ...t.bond, amount: { ...t.bond.amount, state: "figure", min: own, max: own, perYear: null, varies: false } } };
+  if (own != null) return { ...t, bond: { ...t.bond, amount: { ...t.bond.amount, state: "figure", min: own, max: own, perYear: null, varies: false, formula: undefined } } };
   // Rows priced by subject group ("PG degree, clinical subjects" / "pre/para-clinical subjects"): this course's group's.
   const g = specialty ? subjectGroup(specialty) : null;
   if (!g) return t;
   const b = t.bond;
-  const amount = b.status === "declared" && b.amount.state === "figure" ? ofGroup(b.amounts, g) : null;
-  const leaving = b.leavingAmount.state === "figure" ? ofGroup(b.leaving, g) : null;
+  const amount = b.status === "declared" && b.amount.state === "figure" && !b.amount.formula ? ofGroup(b.amounts, g) : null;
+  const leaving = b.leavingAmount.state === "figure" && !b.leavingAmount.formula ? ofGroup(b.leaving, g) : null;
   if (!amount && !leaving) return t;
   return { ...t, bond: { ...b, ...(amount && { amount: amountOf(amount, b.years) }), ...(leaving && { leavingAmount: amountOf(leaving, null) }) } };
 }

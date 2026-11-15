@@ -107,8 +107,9 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
     // SBLS DNB: the All India "DNB/Diploma" ₹10 L, not the state-quota ₹15 L; Tamil Nadu HQ hospital: NBEMS Diploma ₹10 L, DNB ₹15 L leaving.
     expect(of("SBLSCIVILHOSPITAL", "DNB").bond).toMatchObject({ years: 1, amount: { max: 1000000 } });
     expect([of("GOVERNMENTHEADQUARTERSHOSPITALDISTRICTGO", "NBEMS Diploma"), of("GOVERNMENTHEADQUARTERSHOSPITALDISTRICTGO", "DNB")].map((t) => t.bond.leavingAmount.max)).toEqual([1000000, 1500000]);
-    // Karnataka: "DNB/Diploma" leaving items reach DNB; "1 yr compulsory + up to 3 yrs if called" is 4 years.
-    expect(of("DISTRICTHOSPITALBALLARI", "DNB").bond.leavingAmount.max).toBe(2000000);
+    // Karnataka: "DNB/Diploma" leaving items reach DNB (₹20 L, plus the fee of the entire course its affidavit adds: at
+    // most ₹1,25,000 × 3, the NBEMS maximum, computed); "1 yr compulsory + up to 3 yrs if called" is 4 years.
+    expect(of("DISTRICTHOSPITALBALLARI", "DNB").bond.leavingAmount).toMatchObject({ min: 2000000, max: 2375000, formula: { bound: "upTo" } });
     expect(of("MYSOREMEDICALCOLLEGE", "MD/MS").bond).toMatchObject({ years: 4, yearsSum: "1 + 3" });
     // Rajasthan "All PG (MD/MS/DM/MCh)": MD/MS leaving ₹10 L.
     expect(of("JHALAWARMEDICALCOLLEGE", "MD/MS").bond.leavingAmount.max).toBe(1000000);
