@@ -80,10 +80,10 @@ export function StatCellView({ c, t, of, short, tip = true }: { c: StatCell; t: 
 
 /** A compact table's column notes (its header (i)): what the values and markers mean. */
 const columnNote: Record<StatKey, string> = {
-  fee: "Year 1 fee a year for this course and quota. Up to / ≤ ₹1.25 L: a DNB hospital that declared none; the most NBEMS lets it charge. Varies by subject, On college website, Ask college: the profile gives no one figure for these seats (its words are in the institute's Fees tab). —: not in Seatora's data. Colour: green a low fee, red a high one, for the course type (" + feeBandText + ").",
-  stipend: "Year 1 stipend a month. From / ≥: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. Ask college: no figure published. —: not in Seatora's data. Colour: amber below the NBEMS minimum.",
+  fee: "Year 1 fee a year for this course and quota. Up to / ≤ ₹1.25 L: a DNB hospital that declared none; the most NBEMS lets it charge. Varies by subject, On college website, Not stated: the profile gives no one figure for these seats (its words are in the institute’s Fees tab). A range (₹1 L–40 L): the profile gives only the range across subjects. —: none published. Colour: green a low fee, red a high one, for the course type (" + feeBandText + ").",
+  stipend: "Year 1 stipend a month. From / ≥: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. Not stated: no figure published. —: none published. Colour: amber below the NBEMS minimum.",
   bond: "Service bond years (1Y: one year). Yes: a bond, years not stated. Not published: no bond declared, or no clear answer; never read as no bond. state law may apply: the document says no bond, but a state law's service may apply. —: not checked. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey not published.",
-  bondInr: "What you pay if you do not serve the bond. ≤ at most, ≥ at least; a range where it varies by specialty; + more conditions. A short phrase (Refund stipend, Rest of course fee, Ask college…): no ₹ figure. None: no bond. Colour: red ₹25 L or more, amber below that, green none.",
+  bondInr: "What you pay if you do not serve the bond. ≤ at most, ≥ at least; a range where it varies by specialty; + more conditions. A short phrase (Refund stipend, Rest of course fee, No amount stated…): no ₹ figure. None: no bond. Colour: red ₹25 L or more, amber below that, green none.",
   leaving: "The college's or state's penalty for leaving the seat or course after joining. ≤, ≥, + and the short phrases (Per state rule, No money penalty…): as for Bond penalty. —: not in Seatora's data. Colour: red ₹25 L or more.",
 };
 

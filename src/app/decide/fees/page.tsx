@@ -145,7 +145,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           <>
             <strong>Fee</strong>: a year, from the college&apos;s MCC profile (the table: years 1 to 3). &quot;Up to ₹1.25 L&quot;: a DNB
             hospital that declared none; the most NBEMS lets it charge (no GST, paid to the hospital), not its own fee. &quot;Varies by
-            subject&quot;, &quot;On college website&quot;, &quot;Ask college&quot;: the profile gives no one figure for these seats; its
+            subject&quot;, &quot;On college website&quot;, &quot;Not stated&quot;: the profile gives no one figure for these seats; its
             words are in the (i). The whole-course fee is in the Fee (i).
             <br /><strong>Stipend</strong>: a month, before tax. &quot;From ₹…&quot;: the NBEMS floor; the pay may be higher.
             <br /><strong>Bond period</strong>: years to serve after the course; <strong>Bond penalty</strong>: what you pay if you don&apos;t serve

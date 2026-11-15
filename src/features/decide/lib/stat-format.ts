@@ -83,7 +83,7 @@ export type StatCell = {
   marker: string | null;
   /** The value is a link (a fee "On college website ↗"). */
   href?: string;
-  /** bond: a bond applies (orange); muted: "—", "Not published", a short reason ("Refund stipend", "Ask college"); warn: the marker is a warning. */
+  /** bond: a bond applies (orange); muted: "—", "Not published", a short reason ("Refund stipend", "Not stated"); warn: the marker is a warning. */
   tone: "bond" | "muted" | null;
   markerWarn?: true;
   /** "—": not in the data (screen readers hear it). */
@@ -170,14 +170,21 @@ function textLines(t: ProgrammeTerms, u: ReturnType<typeof unread>): TipLine[] {
 /**
  * A fee in words only, as a short reason: "Varies by subject" (words saying it depends on the subject), "On college
  * website ↗" (words pointing to the college's site: the link is the words' own address, else the college's MCC
- * website), else "Ask college". The words are in the (i).
+ * website), a ₹ range the words give, else "Not stated". The words are in the (i).
  */
 function feeWords(text: string, website: string | null | undefined): { label: string; href?: string } {
   const url = websiteUrl(text.match(/\b(?:https?:\/\/|www\.)[^\s,;()<>"']+[^\s,;()<>"'.]/i)?.[0]);
+  // A ₹ range in the words ("100000 to 4000000 depending upon the specialty", "Rs.3,00,000/- to Rs.48,00,000/-"): shown
+  // as the range, never US$ (an NRI line).
+  const r = text.replace(/US\$[^|]*/gi, "").match(/(\d[\d,]{4,})\s*(?:\/-)?\s*(?:to|-|–)\s*(?:rs\.?|₹|inr)?\s*(\d[\d,]{4,})/i);
+  if (r) {
+    const [lo, hi] = [r[1], r[2]].map((x) => Number(x.replace(/,/g, "")));
+    if (lo >= 10000 && hi > lo) return { label: `${inrShort(lo)}–${inrShort(hi).replace("₹", "")}/yr`, ...(url && { href: url }) };
+  }
   if (/\b(?:by|per|depend\w* on)\b[^.|]{0,20}?\b(?:subject|speciality|specialty|branch|discipline)|(?:subject|speciality|specialty|branch|course)[- ]?wise|var(?:y|ies)|differ/i.test(text))
     return { label: "Varies by subject", ...(url && { href: url }) };
   const href = url ?? (/website|web ?site|\bsite\b|portal|online/i.test(text) ? websiteUrl(website) : null);
-  return href ? { label: "On college website ↗", href } : { label: "Ask college" };
+  return href ? { label: "On college website ↗", href } : { label: "Not stated" };
 }
 
 function feeCell(t: ProgrammeTerms): StatCell {
@@ -229,7 +236,7 @@ function stipendCell(t: ProgrammeTerms): StatCell {
   const s = t.years[0]?.stipend;
   const u = unread(t, "STIPEND");
   if (!s) {
-    if (u) return words(c, [{ text: "The stipend is published in words only:" }, asQuote(u)], "Ask college");
+    if (u) return words(c, [{ text: "The stipend is published in words only:" }, asQuote(u)], "Not stated");
     return dash(c, [{ text: t.years.some((y) => y.stipend) ? "Year 1's stipend is not stated." : NOT_IN_DATA }, ...(t.years.some((y) => y.stipend) ? yearLines(t, "stipend", " a month") : [])]);
   }
   const below = t.years.find((y) => y.stipend?.below)?.stipend;
@@ -320,7 +327,7 @@ function phrase(a: Amount, texts: (string | null | undefined)[]): string {
   if (/by subject|by specialt/i.test(t)) return "Varies by subject";
   if (/left blank|_{3,}/i.test(t)) return "Amount left blank";
   if (/as per (?:the )?policy|as applicable/i.test(t)) return "As per college policy";
-  return "Ask college";
+  return /no (?:fixed )?amount|amount not (?:stated|specified)/i.test(t) ? "No amount stated" : "Not stated";
 }
 
 /** What a figure leaves out: "₹10,00,000 per year × 3 years, computed", "incl. ₹10,00,000 additional". */
@@ -385,7 +392,7 @@ function leavingCell(t: ProgrammeTerms): StatCell {
   if (!b.leaving.length) {
     // A PENALTY term without its record (an older import), as published; a record's forfeit in words is not this.
     const u = unread(t, "PENALTY");
-    if (u) return words(c, [head, { text: "The MCC profile's words:" }, asQuote(u), ...forfeit], "Ask college");
+    if (u) return words(c, [head, { text: "The MCC profile's words:" }, asQuote(u), ...forfeit], "Not stated");
     return dash(c, [head, { text: NOT_IN_DATA }, ...other, ...forfeit]);
   }
   const tip = [head, ...partLines(b.leaving, b.src), ...amountLines(a, null, b.leaving[0]?.src ?? b.src), ...other, ...forfeit];
