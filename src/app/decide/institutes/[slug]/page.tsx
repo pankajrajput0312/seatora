@@ -159,7 +159,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const roundSeats = totals ?? headerLists(round.map((r) => r.list)).map((list) => ({ list, n: round.find((r) => r.list === list)!.rows.reduce((a, r) => a + r.seats, 0) }));
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       {/* A div: globals.css hides every <header> on paper (the app bar), and this one holds the name and address. */}
       <div className="grid gap-4">
         <div>
@@ -433,7 +433,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             }
           />
           <DataSource />
-          {roundLists.map((l) => <SeatSource key={l.key} list={l} L={L} />)}
+          <SeatSource lists={roundLists} L={L} />
         </section>
       )}
 
@@ -464,7 +464,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   ) : (
                     <p className="text-sm text-muted-foreground">This list prints no seats here.</p>
                   )}
-                  <SeatSource list={list} L={L} />
+                  <SeatSource lists={[list]} L={L} />
                 </section>
               );
             })}

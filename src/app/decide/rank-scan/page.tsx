@@ -75,7 +75,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const youText = rank ? `Your rank, ${formatRank(rank)}, falls here` : "";
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Rank scan"
         about="Allotments to ranks near yours, round by round, in one year's MCC results: every course and seat category. In R2 and later only new or upgraded allotments are listed."
@@ -108,7 +108,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         <>
           <div className={toolbarRow}>
             {/* The results' sources here, before the panes: the MCC result is numbered first (the term (i)s come after). */}
-            <div className="grid gap-0.5">
+            <div className="flex flex-wrap items-center gap-x-2">
               <p id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
                 <span><span className="numeric font-semibold text-foreground">{rangeLabel({ rows, page, pageSize: PAGE_SIZE, total: kept.length })}</span> allotments: history, not a prediction</span>
                 <InfoTip label="these allotments">

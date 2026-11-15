@@ -34,8 +34,8 @@ const groupOf = (l: SeatList) => `${l.year} ${roundLabel[l.round]}`;
 export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; current: string; href: (key: string) => string }) {
   const [latest, ...earlier] = [...new Set(lists.map(groupOf))];
   const group = (g: string) => (
-    <div key={g} className="flex flex-wrap items-center gap-2">
-      <span className="numeric w-full text-sm font-semibold sm:w-20 sm:shrink-0" aria-hidden>{g}</span>
+    <div key={g} className="chip-row flex flex-wrap items-center gap-2">
+      <span className="numeric text-sm font-semibold sm:w-20 sm:shrink-0" aria-hidden>{g}</span>
       {lists.filter((l) => groupOf(l) === g).map((l, _, xs) => (
         <Link
           key={l.key}
@@ -53,12 +53,12 @@ export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; cu
     </div>
   );
   return (
-    <nav aria-label="Seat lists" className="grid gap-3">
+    <nav aria-label="Seat lists" className="flex flex-wrap items-center gap-2">
       {latest && group(latest)}
       {earlier.length > 0 && (
-        <details open={lists.some((l) => l.key === current && groupOf(l) !== latest)}>
+        <details open={lists.some((l) => l.key === current && groupOf(l) !== latest)} className="open:basis-full">
           <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm text-sky underline">Earlier rounds: {earlier.join(", ")}</summary>
-          <div className="mt-3 grid gap-3">{earlier.map(group)}</div>
+          <div className="mt-2 grid gap-2">{earlier.map(group)}</div>
         </details>
       )}
     </nav>

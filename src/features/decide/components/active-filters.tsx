@@ -25,7 +25,7 @@ export function ActiveFilters({ items, clear }: { items: { label: string; href: 
     to?.focus();
   }, [sig]);
   return (
-    <div ref={box} role="group" aria-label="Active filters" className={cn("flex flex-wrap items-center gap-x-2 gap-y-1 text-sm", !items.length && "hidden")}>
+    <div ref={box} role="group" aria-label="Active filters" className={cn("chip-row flex flex-wrap items-center gap-x-2 gap-y-1 text-sm", !items.length && "hidden")}>
       {items.length > 0 && <span className="text-muted-foreground">Filtered by</span>}
       {items.map((i, n) => (
         <Link key={i.label} href={i.href} scroll={false} onClick={() => (removed = n)} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border bg-card px-3 hover:border-foreground/70">

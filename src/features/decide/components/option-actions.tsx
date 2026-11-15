@@ -268,7 +268,7 @@ function OptionsList({ rows, caption, start, L, view, latestYear, pastYears, inc
  * `tools`: after the Cards | Table toggle beside the count (the CSV download). `historyMore`: what the closing
  * ranks count, behind the history note's (i).
  */
-export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, tools, historyMore, view, latestYear, pastYears, includeLatest, seatLists }: {
+export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, tools, notes, historyMore, view, latestYear, pastYears, includeLatest, seatLists }: {
   initial: ListRow[];
   page: number;
   pageSize: number;
@@ -277,6 +277,8 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
   caption: string;
   firstPageHref?: string;
   tools?: React.ReactNode;
+  /** Beside the history note: the seat lists' "as printed" and a later MCC notice chip (SeatSource). */
+  notes?: React.ReactNode;
   historyMore?: React.ReactNode;
   /** Cards or table on show (chosenView "options"). */
   view: View;
@@ -308,15 +310,16 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
   return (
     <>
       {/* csv-link.tsx toolbarRow (that module is server-only): the tools under the count on a phone. */}
-      <div className="grid justify-items-start gap-2 md:flex md:flex-wrap md:items-center md:justify-between md:gap-x-4">
-        <div className="grid">
+      <div className="grid justify-items-start gap-2 md:flex md:items-center md:justify-between md:gap-x-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 md:flex-1">
           <p id="options-count" aria-live="polite" className="text-sm text-muted-foreground">
             Showing <span className="numeric font-semibold text-foreground">{formatRank(start + 1)}–{formatRank(shown)}</span> of <span className="numeric">{formatRank(total)}</span> options
             {firstPageHref && <> · <Link href={firstPageHref} className={`${smallLink} text-sky`}>Back to the first</Link></>}
            <ColourLegend className="ml-1 align-middle" /></p>
           <HistoryNote more={historyMore} />
+          {notes}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <ViewToggle page="options" view={view} />
           {tools}
         </div>

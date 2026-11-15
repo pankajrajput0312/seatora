@@ -125,6 +125,25 @@ export function DisplayMenu({ cols, hidden, setHidden, always = "The institute c
   );
 }
 
+/** The matrix's columns Display can hide (the institute column always shows). */
+const matrixCols = (groups: SeatGroup[], ranked: boolean, years: ClosingYear[]) => [
+  { key: "course", label: "Course" },
+  { key: "quota", label: "Quota" },
+  { key: "category", label: "Category" },
+  ...statKeys.map((k) => ({ key: k, label: statLabel[k] })),
+  ...groups.map((g) => ({ key: g.key, label: `${g.label} seats` })),
+  { key: "beds", label: "Beds (as reported)" },
+  ...(ranked ? [{ key: "chances", label: "Your chances" }] : []),
+  ...years.map((y) => ({ key: `closing-${y.year}`, label: `Closing ranks ${y.year}` })),
+];
+
+/** The matrix table's Display (columns) menu, for the page's toolbar row: the matrix reads the same saved choice. */
+export function SeatMatrixDisplay({ groups, ranked, years }: { groups: SeatGroup[]; ranked: boolean; years: ClosingYear[] }) {
+  const cols = useMemo(() => matrixCols(groups, ranked, years), [groups, ranked, years]);
+  const [hidden, save] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
+  return <DisplayMenu cols={cols} hidden={hidden} setHidden={save} />;
+}
+
 /**
  * The matrix. `groups`: seat columns per round (newest first); `years`: closing-rank columns; `results`: the MCC result
  * PDFs behind them; `ranked`: she has a rank (the "Your chances" column). `list` / `lists`: the picked list and every list
@@ -144,20 +163,8 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   view: View;
 }) {
   const L = useDecideLinks();
-  const cols = useMemo(
-    () => [
-      { key: "course", label: "Course" },
-      { key: "quota", label: "Quota" },
-      { key: "category", label: "Category" },
-      ...statKeys.map((k) => ({ key: k, label: statLabel[k] })),
-      ...groups.map((g) => ({ key: g.key, label: `${g.label} seats` })),
-      { key: "beds", label: "Beds (as reported)" },
-      ...(ranked ? [{ key: "chances", label: "Your chances" }] : []),
-      ...years.map((y) => ({ key: `closing-${y.year}`, label: `Closing ranks ${y.year}` })),
-    ],
-    [groups, ranked, years],
-  );
-  const [hidden, save] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
+  const cols = useMemo(() => matrixCols(groups, ranked, years), [groups, ranked, years]);
+  const [hidden] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   const [open, setOpen] = useState<string | null>(null);
   const row = rows.find((r) => rowKey(r) === open) ?? null;
   // The row last opened: closing the drawer puts focus on its Details button (there is no Dialog.Trigger).
@@ -179,11 +186,6 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   return (
     // grid-cols-1, not a bare grid: an auto track would grow to the table's width and the table box would not scroll.
     <div data-seat-rows className="grid grid-cols-1 gap-2">
-      {view === "table" && (
-        <div className="justify-self-end">
-          <DisplayMenu cols={cols} hidden={hidden} setHidden={save} />
-        </div>
-      )}
       {/* Hiding is CSS on data-col, so a header group and its cells go together (keys are the known columns only). */}
       <style>{[...hidden].map((k) => `#seat-matrix [data-col="${k}"]{display:none}`).join("")}</style>
       <ViewPanes

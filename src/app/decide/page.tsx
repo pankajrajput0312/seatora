@@ -66,7 +66,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} not declared</Link></>;
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4 md:gap-6">
+    <AppPage className="grid grid-cols-1 gap-3 md:gap-4">
       <PageHead title="Overview" about={`Closing ranks here are on ${seats} seats, the seat categories you can take.`} />
       <RoundStatusBanner params={params} />
 
@@ -229,7 +229,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       <div className="grid gap-2 text-xs text-muted-foreground">
         <HistoryNote />
         <DataSource />
-        {list && r.seatLists.map((l) => <SeatSource key={l.key} list={l} L={L} />)}
+        {list && <SeatSource lists={r.seatLists} L={L} />}
       </div>
     </AppPage>
   );

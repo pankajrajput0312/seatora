@@ -11,30 +11,31 @@ export const HISTORY_CAPTION =
   "Based on previous years' closing ranks. History, not a prediction — seat matrix, category and competition change every round.";
 
 /**
- * HISTORY_CAPTION as one short line, the rest behind an (i). `more`: the block's own caveat, added in the tip (phrasing
- * content). Every block of past closing ranks keeps the short line visible (docs/DATA_INTEGRITY.md, rule 3).
+ * HISTORY_CAPTION as a few words, the rest behind an (i): an inline span, so it sits on a results page's count line
+ * (or any line) instead of a line of its own. `more`: the block's own caveat, added in the tip (phrasing content). Every
+ * block of past closing ranks keeps the short words visible (docs/DATA_INTEGRITY.md, rule 3).
  */
 export function HistoryNote({ more, className }: { more?: React.ReactNode; className?: string }) {
   return (
-    <p className={cn("flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground", className)}>
-      Previous years&apos; closing ranks: history, not a prediction.
+    <span className={cn("inline-flex items-center gap-x-1 text-xs text-muted-foreground", className)}>
+      History, not a prediction
       <InfoTip label="previous years' closing ranks">{HISTORY_CAPTION}{more && <> {more}</>}</InfoTip>
-    </p>
+    </span>
   );
 }
 
 /**
- * Page title. The h1 takes focus (id main-h1) when the content it heads is removed, e.g. the last Compare column.
- * `children`: one short intro line. `about`: the longer explanation, behind an (i) beside the title (phrasing content).
+ * Page title and its (i). `children`: the page's intro, kept in the (i) with `about` (the longer explanation; phrasing
+ * content), so results start right under the title. `note`: a few words that must stay in view (a caveat), beside the
+ * title. The h1 takes focus (id main-h1) when the content it heads is removed, e.g. the last Compare column.
  */
-export function PageHead({ title, children, about }: { title: string; children?: React.ReactNode; about?: React.ReactNode }) {
+export function PageHead({ title, children, about, note }: { title: string; children?: React.ReactNode; about?: React.ReactNode; note?: React.ReactNode }) {
+  const tip = children && about ? <>{children} {about}</> : (children ?? about);
   return (
-    <div className="max-w-3xl">
-      <div className="flex items-center gap-2">
-        <h1 id="main-h1" tabIndex={-1} className="text-3xl font-bold tracking-tight md:text-[2.25rem]">{title}</h1>
-        {about && <InfoTip label={title}>{about}</InfoTip>}
-      </div>
-      {children && <p className="mt-2 text-base leading-relaxed text-muted-foreground">{children}</p>}
+    <div className="flex flex-wrap items-center gap-x-2">
+      <h1 id="main-h1" tabIndex={-1} className="text-2xl font-bold tracking-tight md:text-3xl">{title}</h1>
+      {tip && <InfoTip label={title}>{tip}</InfoTip>}
+      {note && <p className="text-sm text-muted-foreground">{note}</p>}
     </div>
   );
 }

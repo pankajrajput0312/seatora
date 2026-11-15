@@ -27,7 +27,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   const [user, mine, all] = await Promise.all([getCurrentUser(), listMyRequests(), listAllRequests(f)]);
 
   return (
-    <AppPage className="grid grid-cols-1 gap-8">
+    <AppPage className="grid grid-cols-1 gap-4">
       <PageHead
         title="Request a feature"
         about={

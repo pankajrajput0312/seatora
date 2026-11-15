@@ -61,10 +61,8 @@ export default async function RankToolsPage({ searchParams }: { searchParams: Pr
   ]);
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
-      <PageHead title="Score & rank" about="What a NEET PG score or rank meant in earlier NBEMS results: the rank a score was, and how many candidates of a category were ahead of a rank.">
-        Earlier NBEMS results: history, not a prediction.
-      </PageHead>
+    <AppPage className="grid grid-cols-1 gap-3">
+      <PageHead title="Score & rank" about="What a NEET PG score or rank meant in earlier NBEMS results: the rank a score was, and how many candidates of a category were ahead of a rank." note="Earlier NBEMS results: history, not a prediction." />
 
       <FilterBar action="/decide/rank-tools" params={params} cols="md:grid-cols-[1fr_1fr_1fr_auto]">
         <Field label="NEET PG score">

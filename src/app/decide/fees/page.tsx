@@ -138,7 +138,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   );
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Fees, stipend and bond"
         about={

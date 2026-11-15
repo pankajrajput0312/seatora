@@ -236,7 +236,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   );
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       <PageHead title="Last ranks" about={about}>Newest year first.</PageHead>
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}

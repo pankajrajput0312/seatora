@@ -121,7 +121,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   );
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Options"
         about={
@@ -227,7 +227,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       </FilterForm>
       <ActiveFilters items={active} clear={clearAll} />
 
-      <nav aria-label="Filter by reach" className="chip-row flex flex-wrap gap-2">
+      {/* One row that scrolls sideways (never wraps), the closed-before toggle its last chip. */}
+      <nav aria-label="Filter by reach" className="chip-row flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] *:shrink-0 *:whitespace-nowrap">
         <Link href={here({ reach: null })} aria-current={!f.reach ? "true" : undefined} className={chip(!f.reach)}>
           All <span className="numeric font-semibold">{formatRank(all)}</span><span className="sr-only"> options</span>
         </Link>
@@ -237,37 +238,19 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             {x === "reached-latest" && <Provisional when={latestProvisional && !f.prov} />}
           </Link>
         ))}
+        {(r.hiddenClosed > 0 || (r.showClosed && !f.reach && r.counts["closed-before"] > 0)) && (
+          <span className="inline-flex items-center gap-1 border-l border-border pl-2">
+            {/* One link in both states, so React keeps the element and focus stays on it after the toggle. */}
+            <Link href={here({ closed: r.hiddenClosed > 0 ? "1" : "0" })} className={`${chip(false)} border-dashed`}>
+              {r.hiddenClosed > 0 ? <>Closed before your rank: {n(r.hiddenClosed)} hidden · Show</> : "Closed ones shown · Hide them"}
+            </Link>
+            <InfoTip label="closed before your rank">
+              Options whose closing rank came before yours in every round of {counted}
+              {r.hiddenProvisional > 0 && ` (${formatRank(r.hiddenProvisional)} of the hidden ones only in the provisional ${LATEST_YEAR} R1)`}.
+            </InfoTip>
+          </span>
+        )}
       </nav>
-      {(r.hiddenClosed > 0 || (r.showClosed && !f.reach && r.counts["closed-before"] > 0)) && (
-        <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
-          <span className="mr-1">{r.hiddenClosed > 0 ? <>{n(r.hiddenClosed)} closed before your rank hidden.</> : "Closed ones shown."}</span>
-          {/* One link in both states, so React keeps the element and focus stays on it after the toggle. */}
-          <Link href={here({ closed: r.hiddenClosed > 0 ? "1" : "0" })} className={`${smallLink} text-sky`}>{r.hiddenClosed > 0 ? "Show them" : "Hide them"}</Link>
-          <InfoTip label="closed before your rank">
-            Options whose closing rank came before yours in every round of {counted}
-            {r.hiddenProvisional > 0 && ` (${formatRank(r.hiddenProvisional)} of the hidden ones only in the provisional ${LATEST_YEAR} R1)`}.
-          </InfoTip>
-        </p>
-      )}
-
-      {r.virtualOnly && r.virtualOnly.options > 0 && (
-        <p className="text-sm text-muted-foreground">
-          {n(r.virtualOnly.options)} more only in the {r.virtualOnly.list.year} {roundLabel[r.virtualOnly.list.round]} virtual vacancy list.{" "}
-          <Link href={here({ seats: "virtual" })} className={`${smallLink} text-sky`}>Show options with virtual vacancy seats</Link>
-        </p>
-      )}
-      {unlisted && <UnlistedSeats u={unlisted} profile href={L.to("/decide/seats", { view: "list", list: unlisted.list.key, nohist: "1" })} />}
-      {r.noState > 0 && (
-        <p className="text-sm text-muted-foreground">
-          {n(r.noState)} more with {round} seats left out by the state filter: no state in Decide&apos;s data.
-        </p>
-      )}
-      {r.unknownTerms > 0 && (
-        <p className="text-sm text-muted-foreground">
-          {n(r.unknownTerms)} more left out: a filtered fee, stipend, bond or leaving figure is not declared.{" "}
-          <Link href={here({ nd: "keep" })} className={`${smallLink} text-sky`}>Include them</Link>
-        </p>
-      )}
       {/* Stays mounted across filter changes (OptionsResults remounts), so the new count is announced. */}
       <p role="status" className="sr-only">{formatRank(r.total)} {r.total === 1 ? "option matches" : "options match"}</p>
 
@@ -281,6 +264,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           query={api.toString()}
           caption={caption}
           firstPageHref={r.page > 1 ? here({}) : undefined}
+          notes={<SeatSource lists={lists} L={L} />}
           tools={<CsvLink href={`/api/v1/options/export?${api}`} what={`these ${formatRank(r.total)} options`} total={r.total} />}
           latestYear={LATEST_YEAR}
           pastYears={PAST_YEARS}
@@ -303,11 +287,27 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           action="Clear search and page filters"
         />
       )}
+      {!r.total && <SeatSource lists={lists} L={L} />}
 
-      <div className="grid gap-1 text-xs text-muted-foreground">
-        <DataSource terms={termDocs(r.rows.map((x) => x.fees))} />
-        {lists.map((l) => <SeatSource key={l.key} list={l} L={L} />)}
-      </div>
+      {r.virtualOnly && r.virtualOnly.options > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {n(r.virtualOnly.options)} more only in the {r.virtualOnly.list.year} {roundLabel[r.virtualOnly.list.round]} virtual vacancy list.{" "}
+          <Link href={here({ seats: "virtual" })} className={`${smallLink} text-sky`}>Show options with virtual vacancy seats</Link>
+        </p>
+      )}
+      {unlisted && <UnlistedSeats u={unlisted} profile href={L.to("/decide/seats", { view: "list", list: unlisted.list.key, nohist: "1" })} />}
+      {r.noState > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {n(r.noState)} more with {round} seats left out by the state filter: no state in Decide&apos;s data.
+        </p>
+      )}
+      {r.unknownTerms > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {n(r.unknownTerms)} more left out: a filtered fee, stipend, bond or leaving figure is not declared.{" "}
+          <Link href={here({ nd: "keep" })} className={`${smallLink} text-sky`}>Include them</Link>
+        </p>
+      )}
+      <DataSource terms={termDocs(r.rows.map((x) => x.fees))} />
     </AppPage>
   );
 }

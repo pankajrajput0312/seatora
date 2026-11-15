@@ -10,10 +10,10 @@ import { PageSources, PageSourcesFooter } from "./page-sources";
 export function AppPage({ className, children, ...props }: React.ComponentProps<"div">) {
   return (
     <PageSources>
-      <div className={cn("w-full min-w-0 max-w-[110rem] px-4 py-6 md:px-6 xl:px-10 print:px-0", className)} {...props}>
+      <div className={cn("w-full min-w-0 max-w-[110rem] px-4 py-4 md:px-6 xl:px-10 print:px-0", className)} {...props}>
         {children}
         {/* In a grid page the gap spaces it; otherwise its own margin. */}
-        <PageSourcesFooter className="mt-6 [.grid>&]:mt-0" />
+        <PageSourcesFooter className="mt-4 [.grid>&]:mt-0" />
       </div>
     </PageSources>
   );

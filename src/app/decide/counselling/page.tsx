@@ -50,7 +50,7 @@ export default async function CounsellingPage({ searchParams }: { searchParams: 
   const f = parseSearchParams(schema, params);
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       <PageHead title="Counselling" about="Where each MCC All India PG round stands, every MCC notice in the data, and the NEET PG results. Each item links its official document; confirm on the MCC site before acting.">
         MCC rounds, notices and results, from official documents.
       </PageHead>

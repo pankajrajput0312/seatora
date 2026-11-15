@@ -54,13 +54,12 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
   const of = (a: Row) => `${a.collegeName}, ${a.courseName}, ${roundLabel[a.round]}`;
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Rank journey"
         about="One All India Rank's seat in every round of one year's MCC results: the seat, MCC's status, the choice number and the seat held a round earlier. Ranks only, never names."
-      >
-        History, not a prediction.
-      </PageHead>
+        note="History, not a prediction."
+      />
 
       <FilterBar action="/decide/rank-journey" params={params} cols="md:grid-cols-[1fr_1fr_auto]">
         <Field label="All India Rank">

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { LayoutGrid } from "lucide-react";
 import { AppPage } from "@/features/decide/components/app-page";
-import { CsvLink, toolbarRow } from "@/features/decide/components/csv-link";
+import { CsvLink } from "@/features/decide/components/csv-link";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HistoryNote, PageHead } from "@/features/decide/components/bits";
@@ -17,7 +17,7 @@ import { MccLink } from "@/features/decide/components/pages/mcc-link";
 import { PAST_ROUNDS, parseSeatsParams, seatCategories, seatSorts, seatsView, type SeatLine, type SeatSort, type SeatsParams } from "@/features/decide/components/seats/find-seats";
 import { SeatCards } from "@/features/decide/components/seats/seat-cards";
 import { listTitle, SeatListPicker, SeatTable, seatKindNote } from "@/features/decide/components/seats/seat-lists";
-import { SeatMatrix, type ClosingYear, type MatrixRow, type SeatGroup } from "@/features/decide/components/seats/seat-matrix";
+import { SeatMatrix, SeatMatrixDisplay, type ClosingYear, type MatrixRow, type SeatGroup } from "@/features/decide/components/seats/seat-matrix";
 import { ViewField, ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { chosenView } from "@/features/decide/server/view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
@@ -65,7 +65,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
   const f = parseSeatsParams(params);
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Seats"
         about={<>MCC&apos;s seat lists for a round, as each PDF printed them: the seat matrix (every list of the round with every closing rank, fee and bond per row), one list, or the round&apos;s lists side by side.{profile && " Filtered to the courses, quotas, states, seat categories and fee and bond caps in your profile."}</>}
@@ -157,6 +157,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
 
   return (
     <>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <SeatListPicker lists={all} current={list.key} href={(key) => here({ list: key })} />
       <div className="chip-row flex flex-wrap items-center gap-2">
         <nav aria-label="Seats view" className="flex flex-wrap gap-2">
@@ -172,9 +173,13 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         )}
         <InfoTip label={matrix ? "the seat matrix" : compare ? `the ${round} lists side by side` : `the ${title} list`}>{about}</InfoTip>
       </div>
+      </div>
 
       {/* As on Options: the search box shows, the rest open from Filters; the form, its buttons and the panel stay mounted, the fields remount to show what was applied. */}
-      <FilterForm action="/decide/seats" role="search" aria-label="Filter seats" className="relative flex flex-wrap items-end gap-2">
+      {/* One row: the search, Filters and the results' tools (Cards | Table, CSV, Display); the count line under it. The row
+          is the Filters panel's box (the form is static), so the panel spans it. */}
+      <div className="relative flex flex-wrap items-center gap-2">
+      <FilterForm action="/decide/seats" role="search" aria-label="Filter seats" className="static flex min-w-0 flex-[1_1_18rem] flex-wrap items-end gap-2">
         {(["rank", "cat", "pwd", "fee", "bond"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         <input type="hidden" name="list" value={list.key} />
         {!matrix && <input type="hidden" name="view" value={f.view} />}
@@ -238,6 +243,14 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         </div>
         </FiltersPanel>
       </FilterForm>
+        {r.total > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <ViewToggle page="seats" view={view} />
+            <CsvLink href={L.with("/api/v1/seats/export", { tab: null, page: null })} what={`${matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row`} total={r.total} />
+            {matrix && view === "table" && <SeatMatrixDisplay groups={seatGroups(r.lists)} ranked={!!profile} years={years} />}
+          </div>
+        )}
+      </div>
       <ActiveFilters items={active} clear={clearAll} />
 
       {one && (
@@ -254,8 +267,8 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
           <Link href={here({ list: list.key, nohist: null })} className={`${smallLink} ml-2 text-muted-foreground`}>Show every seat</Link>
         </p>
       )}
-      <div className="grid gap-2">
-        <div className={toolbarRow}>
+      <div className="grid gap-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
             {matrix ? (
               <>
@@ -274,12 +287,10 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             )}
             {r.total > 0 && <> · rows <span className="numeric">{rangeLabel(r)}</span></>}
            <ColourLegend className="ml-1 align-middle" /></p>
-          {r.total > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <ViewToggle page="seats" view={view} />
-              <CsvLink href={L.with("/api/v1/seats/export", { tab: null, page: null })} what={`${matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row`} total={r.total} />
-            </div>
-          )}
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <SeatSource lists={several ? roundLists : [list]} L={L} />
+            {r.total > 0 && <HistoryNote more={closingNote} />}
+          </span>
         </div>
         {r.unknownTerms > 0 && f.nd !== "keep" && (
           <p className="text-sm text-muted-foreground">
@@ -295,7 +306,6 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             </InfoTip>
           </p>
         )}
-        {several ? roundLists.map((l) => <SeatSource key={l.key} list={l} L={L} />) : <SeatSource list={list} L={L} />}
       </div>
 
       {r.total === 0 ? (
@@ -307,13 +317,11 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         />
       ) : matrix ? (
         <>
-          <HistoryNote more={closingNote} />
           <SeatMatrix rows={r.rows.map(matrixRow)} groups={seatGroups(r.lists)} years={years} results={meta.sources} ranked={!!profile} sort={sort} caption={caption} list={list} lists={r.lists} view={view} />
           <DataSource terms={termDocs(r.rows.map((x) => x.fees))} />
         </>
       ) : (
         <>
-          <HistoryNote more={closingNote} />
           <ViewPanes
             page="seats"
             view={view}
@@ -327,7 +335,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
       {allRounds && r.lists.length > roundLists.length && (
         <details className="text-xs text-muted-foreground">
           <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky underline">Sources of the other rounds&apos; lists</summary>
-          <div className="grid gap-3">{r.lists.filter((l) => !roundLists.includes(l)).map((l) => <SeatSource key={l.key} list={l} L={L} />)}</div>
+          <div className="grid gap-2">{[...new Set(r.lists.filter((l) => !roundLists.includes(l)).map((l) => `${l.year} ${l.round}`))].map((g) => <p key={g}>{g}: <SeatSource lists={r.lists.filter((l) => !roundLists.includes(l) && `${l.year} ${l.round}` === g)} L={L} /></p>)}</div>
         </details>
       )}
     </>

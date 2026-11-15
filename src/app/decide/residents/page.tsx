@@ -39,7 +39,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   );
 
   const denied = (why: "locked" | "rate_limited") => (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       {head()}
       {why === "locked" ? (
         <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.to("/decide/institutes")} action="See the institutes" />
@@ -92,7 +92,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     ...meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${specialtyName(c.name)}` })),
   ];
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       {head(<ResidentsAbout />)}
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}

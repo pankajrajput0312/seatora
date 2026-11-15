@@ -218,7 +218,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   );
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       <PageHead title="Allotments" about={about}>MCC allotment results by rank, never names.</PageHead>
 
       {inst && (

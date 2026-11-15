@@ -27,37 +27,55 @@ const noticeLinks = (ns: MccNotice[]) =>
   ));
 
 /**
- * The seat list behind a seats column or the Seats page, in one line: its PDF (numbered in the page's Sources) and,
- * behind an (i), its notice date and what "as printed" means. MCC seat notices of the round dated after the list (not
- * applied here) stay in view, in warning ink: she checks them before locking choices.
+ * The seat lists behind a seats column or the Seats page, compact enough for a results toolbar: "As printed (i)", the
+ * (i) naming each list's PDF (numbered in the page's Sources), its notice date and what "as printed" means. MCC seat
+ * notices of the round dated after a list (not applied here) stay in view as one warning chip, its notices behind its
+ * (i): she checks them before locking choices.
  */
-export async function SeatSource({ list, L }: { list: SeatList | null; L: DecideLinks }) {
-  if (!list) return null;
-  const [all, notices] = await Promise.all([seatLists(), listNotices({ kind: "seat_matrix", year: list.year, round: list.round })]);
-  const { later, sameDay } = seatChanges(list, all, notices);
-  const noticesHref = L.to("/decide/counselling", { tab: "announcements", kind: "seat_matrix", year: list.year, round: list.round });
-  const dated = list.publishedAt && `MCC notice dated ${fmtDay(list.publishedAt)}`;
-  const doc: SourceDoc = { key: `seat-list|${list.key}`, name: `${list.name}, PDF${dated ? ` (${dated})` : ""}`, url: list.url, type: "OFFICIAL" };
+export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLinks }) {
+  if (!lists.length) return null;
+  const all = await seatLists();
+  const each = await Promise.all(
+    lists.map(async (list) => ({ list, ...seatChanges(list, all, await listNotices({ kind: "seat_matrix", year: list.year, round: list.round })) })),
+  );
+  const seen = new Set<string>();
+  const once = (ns: MccNotice[]) => ns.filter((n) => !seen.has(n.url ?? n.title) && !!seen.add(n.url ?? n.title));
+  const later = once(each.flatMap((e) => e.later));
+  const sameDay = once(each.flatMap((e) => e.sameDay));
+  const { year, round } = lists[0];
+  const noticesHref = L.to("/decide/counselling", { tab: "announcements", kind: "seat_matrix", year, round });
+  const named = lists.length === 1 ? `the ${listTitle(lists[0])} list` : `the ${year} ${roundLabel[round]} seat lists`;
   return (
-    <div className="grid gap-1 text-xs text-muted-foreground">
-      {/* The later and same-day notices are in the page's Sources too (the warning below stays in view). The page's
-          own MCC documents are numbered first (`first`), before the term documents its rows cite. */}
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      {/* The later and same-day notices are in the page's Sources too. The page's own MCC documents are numbered first
+          (`first`), before the term documents its rows cite. */}
       <RegisterSources first docs={[...later, ...sameDay].map((n) => ({ name: `${n.title}, ${fmtDay(n.date)}`, url: n.url, type: "OFFICIAL" as const }))} />
-      {/* gap-x-3: the (i)'s 44px hit area never covers the source number; before:top-0: nor the line above's (i) (stacked lists). */}
-      <p className="flex flex-wrap items-center gap-x-3 [&_button]:before:top-0">
-        <span>Seats: the {listTitle(list)} list as its PDF printed it<SourceRef doc={doc} first /></span>
-        <InfoTip label={`the ${listTitle(list)} list`}>
-          {list.name}{dated && `, ${dated}`}. Seats MCC added or removed after it are not applied here.
+      <span className="inline-flex items-center gap-x-1">
+        Seats as printed
+        <InfoTip label={named}>
+          {each.map(({ list }) => {
+            const dated = list.publishedAt && `MCC notice dated ${fmtDay(list.publishedAt)}`;
+            const doc: SourceDoc = { key: `seat-list|${list.key}`, name: `${list.name}, PDF${dated ? ` (${dated})` : ""}`, url: list.url, type: "OFFICIAL" };
+            return (
+              <span key={list.key} className="block">
+                Seats: the {listTitle(list)} list as its PDF printed it<SourceRef doc={doc} first />: {list.name}{dated && `, ${dated}`}.
+              </span>
+            );
+          })}
+          Seats MCC added or removed after {lists.length === 1 ? "it" : "them"} are not applied here.
           {sameDay.length > 0 && <> Published the same day as the list, so it may already include {sameDay.length === 1 ? "this notice" : "these notices"}: {noticeLinks(sameDay)}.</>}{" "}
-          <Link href={noticesHref} className={`${smallLink} text-sky`}>All MCC seat notices, PG {list.year} {roundName[list.round]}</Link>
+          <Link href={noticesHref} className={`${smallLink} text-sky`}>All MCC seat notices, PG {year} {roundName[round]}</Link>
         </InfoTip>
-      </p>
+      </span>
       {later.length > 0 && (
-        <p className="text-sun">
-          Check {later.length === 1 ? "this later MCC notice" : `these ${later.length} later MCC notices`} before you lock your choices: {noticeLinks(later)}
-        </p>
+        <span className="inline-flex items-center gap-x-1 rounded-full border border-sun/40 bg-sun/10 py-0.5 pl-2.5 pr-1 font-medium text-sun">
+          {later.length === 1 ? "Later MCC notice: check it" : `${later.length} later MCC notices: check them`}
+          <InfoTip label={later.length === 1 ? "the later MCC seat notice" : "the later MCC seat notices"}>
+            Check {later.length === 1 ? "this later MCC notice" : `these ${later.length} later MCC notices`} before you lock your choices (their seats are not applied here): {noticeLinks(later)}
+          </InfoTip>
+        </span>
       )}
-    </div>
+    </span>
   );
 }
 

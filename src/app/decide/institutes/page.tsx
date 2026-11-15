@@ -177,7 +177,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   );
 
   return (
-    <AppPage className="grid grid-cols-1 gap-4">
+    <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Institutes"
         about={<>Every institute in the MCC results: where it is, its type and beds, the courses it offers and how many allotments were made there in {PAST_YEARS[1]} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments, fees and bond.</>}
