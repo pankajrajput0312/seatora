@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { formatLakh } from "../lib/format";
+import { formatInrShort } from "../lib/format";
 import type { DecideLinks } from "../lib/links";
 import { LATEST_YEAR, PAST_YEARS, reachLabel, seatsBelowText, type Deepest } from "../lib/reach";
 import type { ChoiceItem } from "../lib/choices";
@@ -14,8 +14,13 @@ import { smallLink } from "./ui";
 
 export const courseName = (r: Pick<OptionRow, "course">) => `${r.course.degree} ${r.course.name}`;
 
+/** What the Options list (a client component) reads of a row: everything but the published terms and their flat texts, about half a row's bytes (the line shows `fees`). */
+const notListed = ["terms", "feeText", "stipendText", "bondText", "penaltyText", "allotmentsByYear"] as const;
+export type ListRow = Omit<OptionRow, (typeof notListed)[number]>;
+export const listRow = (r: OptionRow) => Object.fromEntries(Object.entries(r).filter(([k]) => !(notListed as readonly string[]).includes(k))) as ListRow;
+
 /** A snapshot for the choice list; Choices relabels it from the current data when her rank is known. */
-export function toChoiceItem(r: OptionRow): ChoiceItem {
+export function toChoiceItem(r: ListRow): ChoiceItem {
   return {
     id: r.id, institute: r.college.name, slug: r.college.slug, state: r.college.state, course: courseName(r), courseSlug: r.course.slug, quota: r.quota,
     reachLabel: reachLabel(r.reach, LATEST_YEAR, PAST_YEARS), closedEveryRound: r.reach === "closed-before",
@@ -41,7 +46,7 @@ export function SeatsLink({ n, list, L, at, name, end }: { n: number | null | un
 }
 
 /** One option's seats in that one list (`n`, default its clear vacancy `seats`), linking to them on Seats; "—" when none. */
-export function SeatsCell({ r, list, L, n = r.seats, end = true }: { r: OptionRow; list: SeatList; L: DecideLinks; n?: number | null; end?: boolean }) {
+export function SeatsCell({ r, list, L, n = r.seats, end = true }: { r: ListRow; list: SeatList; L: DecideLinks; n?: number | null; end?: boolean }) {
   return <SeatsLink n={n} list={list} L={L} at={{ inst: r.college.slug, course: r.course.slug, quota: r.quota }} name={`${r.college.name}, ${courseName(r)}, ${r.quota}`} end={end} />;
 }
 
@@ -60,13 +65,13 @@ export function ClosingCell({ d }: { d: Deepest | null | undefined }) {
   );
 }
 
-/** A fee as published, with its source link; a plain amount reads in lakh per year. "—" when not listed. */
+/** A fee as published, with its source link; a plain amount reads in lakh (crore from ₹1 Cr) per year. "—" when not listed. */
 export function FeeText({ t }: { t: Term | undefined }) {
-  return <TermText term={t && t.amountInr != null ? { ...t, text: `${formatLakh(t.amountInr)}/yr` } : t} />;
+  return <TermText term={t && t.amountInr != null ? { ...t, text: `${formatInrShort(t.amountInr)}/yr` } : t} />;
 }
 
 /** Year × round grid: closing rank with its seat category, and allotments made (all categories) in brackets. */
-export function RoundGrid({ row, caption }: { row: OptionRow; caption: string }) {
+export function RoundGrid({ row, caption }: { row: Pick<OptionRow, "grid" | "reach">; caption: string }) {
   const years = Object.keys(row.grid).map(Number).sort();
   const used = rounds.filter((r) => years.some((y) => row.grid[y]?.[r]));
   if (!years.length)

@@ -82,10 +82,12 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
     expect(kokila.years.map((y) => [y.fee?.inr, y.fee?.kind, y.stipend?.inr, y.stipend?.kind])).toEqual([[125000, "maximum", 43000, "minimum"], [125000, "maximum", 45000, "minimum"], [125000, "maximum", 47000, "minimum"]]);
     expect(kokila.wholeCourseFee).toBe(375000);
     expect(kokila.bond).toMatchObject({ status: "none", basis: "nbems_rule", years: 0 });
-    // GMC Nagpur MD/MS: its own document, 1 year, ₹50 L; MCC's Round 2 forfeit ₹1,500; its own MCC profile only.
+    // GMC Nagpur MD/MS: its own document, 1 year, ₹50 L; MCC's Round 2 forfeit ₹1,500; of MCC's profiles, its own only
+    // (the Maharashtra leaving penalty cites the state CET cell's brochure, no MCC id).
     const nagpur = of("GOVERNMENTMEDICALCOLLEGENAGPURGOVERNMENT", "MD/MS");
     expect([nagpur.bond.basis, nagpur.bond.years, nagpur.bond.amount.max, nagpur.resignForfeit?.inr]).toEqual(["document", 1, 5000000, 1500]);
-    expect(nagpur.sources.every((s) => s.mccId === "700303" && s.sharedBy === 1)).toBe(true);
+    expect(nagpur.sources.every((s) => (s.mccId ?? "700303") === "700303" && s.sharedBy === 1)).toBe(true);
+    expect(nagpur.sources.filter((s) => s.mccId === "700303").length).toBeGreaterThan(0);
     // Seth GS (Maharashtra): the state rule, 1 year, ₹50 L; leaving ₹10 L, and ₹10 L more for a lapsed seat (two items:
     // ₹10 L–₹20 L, the additional one included); Diploma is a 2-year course.
     const seth = of("SETHGORDHANDASSUNDERDASMEDICALCOLLEGEMUM", "Diploma");

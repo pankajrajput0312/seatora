@@ -98,7 +98,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
                     <td className={short}>{a.quota}</td>
                     <td className={short}>{a.category}</td>
                     <td className={short}>{a.candidateCategory ?? <Dash />}</td>
-                    <td className={`${short} numeric text-right`}>{a.optionNo ?? <Dash />}</td>
+                    <td className={`${short} numeric text-right`}>{a.optionNo != null ? formatRank(a.optionNo) : <Dash />}</td>
                     <td className={short}>{statusLabel[a.status] ?? a.status}</td>
                     <td className={`${td} min-w-48`}><PrevSeatCell prev={a.prev} L={L} /></td>
                   </tr>

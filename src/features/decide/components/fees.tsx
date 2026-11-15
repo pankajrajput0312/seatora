@@ -210,7 +210,7 @@ function FeeWords({ fee }: { fee: FeeQuotaGroup["fee"] }) {
  * (also a record without fee_display): only the profile's fee words and their link, never a figure, then the stipends.
  * NBEMS ceilings and floors are labelled, never the college's figure.
  */
-function FeeGroup({ g, id, title, off }: { g: FeeQuotaGroup; id: string; title: string; off: number }) {
+function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of: string; title: string; off: number }) {
   const sources = groupSources(g, off);
   const at: At = (x) => <Sup n={x == null ? x : x + off} sources={sources} />;
   const n = g.fee.display === "numbers" ? g.fee : null;
@@ -260,7 +260,7 @@ function FeeGroup({ g, id, title, off }: { g: FeeQuotaGroup; id: string; title: 
     ...g.notes,
   ].filter(Boolean);
   return (
-    <section aria-labelledby={id} className="grid content-start gap-2">
+    <section aria-labelledby={`${id} ${of}`} className="grid content-start gap-2">
       <h4 id={id} className="text-sm font-semibold">
         {name}
         {/* The MCC quotas, when the group covers more than its own (All India: also "IP University"). */}
@@ -311,7 +311,6 @@ function FeeGroup({ g, id, title, off }: { g: FeeQuotaGroup; id: string; title: 
           <div className="grid gap-1"><FeeWords fee={n} /></div>
         </details>
       )}
-      <SourceList sources={sources} label={`Sources, ${title}, ${name}`} />
     </section>
   );
 }
@@ -324,8 +323,11 @@ function TermsYears({ t }: { t: ProgrammeTerms }) {
   const anyFee = t.years.some((y) => y.fee);
   const anyStipend = t.years.some((y) => y.stipend);
   const minimum = t.years.some((y) => y.stipend?.kind === "minimum");
+  // Fee and stipend words as published; the bond's and penalty's are in the bond box.
+  const fee = t.unread.filter((u) => u.kind === "FEE" || u.kind === "STIPEND");
   return (
-    <>
+    <div className="grid content-start gap-2">
+      <h4 className="text-sm font-semibold">Fee and stipend by year</h4>
       <table className="w-full max-w-xl text-sm">
         <caption className="sr-only">{title}: fee and stipend by year of the course</caption>
         <thead>
@@ -361,7 +363,7 @@ function TermsYears({ t }: { t: ProgrammeTerms }) {
           </tr>
         </tbody>
       </table>
-      {(t.durationYears === 2 || !anyFee || !anyStipend || t.feeNote || minimum || t.unread.length > 0 || t.notes.length > 0) && (
+      {(t.durationYears === 2 || !anyFee || !anyStipend || t.feeNote || minimum || fee.length > 0 || t.notes.length > 0) && (
         <div className="grid gap-1 text-xs text-muted-foreground">
           {t.durationYears === 2 && <p>No year 3: a 2-year course.</p>}
           {t.notes.map((n) => <p key={n}>{n}</p>)}
@@ -369,107 +371,133 @@ function TermsYears({ t }: { t: ProgrammeTerms }) {
           {!anyStipend && !t.notes.length && <p>Stipend: not in Seatora&apos;s MCC data yet.</p>}
           {t.feeNote && <p>Fee: {t.feeNote}.</p>}
           {minimum && <p>Minimum: the hospital must pay at least this; the actual pay may be higher. Later years are not declared.</p>}
-          {t.unread.map((u) => (
+          {fee.map((u) => (
             <p key={u.kind}>
               {termLabel[u.kind]} as published: {u.text}<Sup n={u.src} sources={sources} />
             </p>
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
 /**
- * One programme's fees, stipend and bond (college Fees tab). `groups` (the fee table, FeesStructured): one block per
- * seat-type group; without them (MCh, MPH, an import before the table) a year table from the programme's terms (a
- * 2-year course has no year 3) with the whole-course fee. Then the bond and leaving block, MCC's Round 2 forfeit, and
- * numbered sources.
+ * One programme's fees, stipend and bond (college Fees tab): fees on the left (wide screens), the bond box on the right,
+ * one numbered source list under both. `groups` (the fee table, FeesStructured): one block per seat-type group; without
+ * them (MCh, MPH, an import before the table) a year table from the programme's terms (a 2-year course has no year 3)
+ * with the whole-course fee.
  */
 export function FeesSection({ t: all, id, className, groups = [] }: { t: ProgrammeTerms; id: string; className?: string; groups?: FeeQuotaGroup[] }) {
   // One numbering per programme: each group's sources, then the bond block's.
   const offs = groups.reduce<number[]>((o, g, i) => [...o, o[i] + lastSource(g)], [0]);
   const t = groups.length ? bondBlock(all, offs[groups.length]) : all;
   const title = programmeTitle(t);
+  const sources = [...groups.flatMap((g, i) => groupSources(g, offs[i])), ...t.sources];
+  return (
+    <section aria-labelledby={id} className={cn("grid content-start gap-5", className)}>
+      <h3 id={id} className="text-lg font-semibold">{title}</h3>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="grid min-w-0 content-start gap-6">
+          {groups.length > 0 ? groups.map((g, i) => <FeeGroup key={g.quotaGroup} g={g} id={`${id}-g${i}`} of={id} title={title} off={offs[i]} />) : <TermsYears t={t} />}
+        </div>
+        <BondBox t={t} id={`${id}-bond`} of={id} />
+      </div>
+      {sources.length > 0 && (
+        <div className="grid gap-1 border-t border-border pt-3">
+          <h4 className="text-xs font-semibold text-muted-foreground">Sources</h4>
+          <SourceList sources={sources} label={`Sources, ${title}`} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** "2" or "2 years" says no more than the years shown; "1 year (extendable up to 2 more years)" does. */
+const sameYears = (text: string, n: number | null) => n != null && text.replace(/\s*years?\.?$/i, "").trim() === String(n);
+
+/**
+ * The bond box: years · ₹ and who it applies to (or the record's "no bond", or why it is unknown), then leaving the
+ * course after joining, other penalties and MCC's Round 2 forfeit, and the bond document's exact words.
+ */
+function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
   const { bond, sources } = t;
   const declared = bond.status === "declared";
   const perYear = declared && bond.amount.perYear && bond.years ? bond.amount : null;
+  const note = "block text-xs text-muted-foreground";
+  const term = "text-xs font-semibold text-muted-foreground";
   return (
-    <section aria-labelledby={id} className={cn("grid content-start gap-4", className)}>
-      <h3 id={id} className="text-base font-semibold">{title}</h3>
-      {groups.length > 0 ? (
-        <>
-          {groups.map((g, i) => <FeeGroup key={g.quotaGroup} g={g} id={`${id}-g${i}`} title={title} off={offs[i]} />)}
-          <h4 className="text-sm font-semibold">Bond and penalties</h4>
-          {t.unread.filter((u) => u.kind === "BOND" || u.kind === "PENALTY").map((u) => (
-            <p key={u.kind} className="text-xs text-muted-foreground">{termLabel[u.kind]} as published: {u.text}<Sup n={u.src} sources={sources} /></p>
-          ))}
-        </>
-      ) : (
-        <TermsYears t={t} />
-      )}
-
-      <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[minmax(9rem,auto)_1fr]">
-        <dt className="text-muted-foreground">Service bond</dt>
-        <dd>
-          {declared ? (
-            <>
+    <section aria-labelledby={`${id} ${of}`} className="grid min-w-0 content-start gap-4 rounded-lg border border-border bg-muted/30 p-4">
+      <h4 id={id} className="text-sm font-semibold">Service bond</h4>
+      <div className="text-sm">
+        {declared ? (
+          <>
+            <p className="text-base">
               <span className="numeric font-semibold">{bondYears(bond)}</span>
-              {bond.amounts.length ? ` · ${partsText(bond.amounts)}` : ` · ${amountText(bond.amount, true) ?? "amount not stated"}`}
+              {" · "}
+              <span className="numeric font-semibold">{bond.amounts.length ? partsText(bond.amounts) : (amountText(bond.amount, true) ?? "amount not stated")}</span>
               <Sup n={bond.src} sources={sources} />
-              {bond.basis && bond.text && <span className="block text-xs text-muted-foreground">{bond.text}</span>}
-              {bond.basis === "state_rule" && <span className="block text-xs text-sun">From the state&apos;s rule (its order is the source), not the college&apos;s own bond document.</span>}
-              {bond.yearsText && bond.yearsText !== (bond.years != null ? years(bond.years) : null) && <span className="block text-xs text-muted-foreground">Years as written: {bond.yearsText}</span>}
-              {perYear && <span className="block text-xs text-muted-foreground">{amountText(perYear, true)} for {bond.years} years (computed from the per-year amount).</span>}
-              {bond.amount.varies && <span className="block text-xs text-sun">The amount varies by specialty: check the exact words below.</span>}
-              {bond.otherAmounts && <span className="block text-xs text-muted-foreground">Figures for other courses or quotas are in the exact words below.</span>}
-            </>
-          ) : bond.status === "none" ? (
-            <>
-              <span className="font-semibold">No bond</span> ({BASIS[bond.basis ?? "document"]})<Sup n={bond.src} sources={sources} />
-              {bond.text && <span className="block text-xs text-muted-foreground">{bond.text}</span>}
-              {bond.caveat && <span className="block text-xs text-sun">{bond.basis === "nbems_rule" ? `Seatora's check: ${bond.caveat}.` : `${bond.caveat}.`}</span>}
-              {bond.basis === "nbems_rule" && <NbemsRules />}
-            </>
-          ) : bond.status === "other_course" ? (
-            <>{otherCourse(t)}<Sup n={bond.src} sources={sources} />{isDnb(t) ? <NbemsRules /> : ` ${STATE_CAUTION}`}</>
-          ) : bond.text ? (
-            // The record's status is unknown: its words say why (not checked yet, not declared on MCC, no clear terms).
-            <>{bond.text}<Sup n={bond.src} sources={sources} />{isDnb(t) && <NbemsRules />}</>
-          ) : isDnb(t) ? (
-            <>{DNB_NO_BOND} <NbemsRules /></>
-          ) : (
-            MD_NO_BOND
-          )}
-          {bond.doc != null && <span className="block text-xs text-muted-foreground">The college&apos;s own bond document on MCC<Sup n={bond.doc} sources={sources} /></span>}
-        </dd>
-        {bond.appliesTo && (
-          <>
-            <dt className="text-muted-foreground">Applies to</dt>
-            <dd>{bond.appliesTo}<Sup n={bond.src} sources={sources} /></dd>
+            </p>
+            {bond.basis && bond.text && <span className={note}>{bond.text}</span>}
+            {bond.basis === "state_rule" && <span className="block text-xs text-sun">From the state&apos;s rule (its order is the source), not the college&apos;s own bond document.</span>}
+            {bond.yearsText && !sameYears(bond.yearsText, bond.years) && <span className={note}>Years as written: {bond.yearsText}</span>}
+            {perYear && <span className={note}>{amountText(perYear, true)} for {bond.years} years (computed from the per-year amount).</span>}
+            {bond.amount.varies && <span className="block text-xs text-sun">The amount varies by specialty: check the exact words below.</span>}
+            {bond.otherAmounts && <span className={note}>Figures for other courses or quotas are in the exact words below.</span>}
           </>
+        ) : bond.status === "none" ? (
+          <>
+            <p className="text-base"><span className="font-semibold">No bond</span> ({BASIS[bond.basis ?? "document"]})<Sup n={bond.src} sources={sources} /></p>
+            {bond.text && <span className={note}>{bond.text}</span>}
+            {bond.caveat && <span className="block text-xs text-sun">{bond.basis === "nbems_rule" ? `Seatora's check: ${bond.caveat}.` : `${bond.caveat}.`}</span>}
+            {bond.basis === "nbems_rule" && <NbemsRules />}
+          </>
+        ) : bond.status === "other_course" ? (
+          <p>{otherCourse(t)}<Sup n={bond.src} sources={sources} />{isDnb(t) ? <NbemsRules /> : ` ${STATE_CAUTION}`}</p>
+        ) : bond.text ? (
+          // The record's status is unknown: its words say why (not checked yet, not declared on MCC, no clear terms).
+          <p>{bond.text}<Sup n={bond.src} sources={sources} />{isDnb(t) && <NbemsRules />}</p>
+        ) : isDnb(t) ? (
+          <p>{DNB_NO_BOND} <NbemsRules /></p>
+        ) : (
+          <p>{MD_NO_BOND}</p>
         )}
-        <dt className="text-muted-foreground">Leaving the course after joining</dt>
-        <dd>{bond.leaving.length ? <Parts parts={bond.leaving} src={bond.src} sources={sources} /> : NOT_IN_DATA}</dd>
+        {bond.doc != null && <span className={note}>The college&apos;s own bond document on MCC<Sup n={bond.doc} sources={sources} /></span>}
+      </div>
+      {(declared || bond.appliesTo) && (
+        <p className="text-sm">
+          <span className={cn(term, "block")}>Applies to</span>
+          {bond.appliesTo ? <>{bond.appliesTo}<Sup n={bond.src} sources={sources} /></> : <span className="text-muted-foreground">Not stated in the bond record</span>}
+        </p>
+      )}
+      <dl className="grid gap-3 border-t border-border pt-3 text-sm">
+        <div>
+          <dt className={term}>Leaving the course after joining</dt>
+          <dd>{bond.leaving.length ? <Parts parts={bond.leaving} src={bond.src} sources={sources} /> : NOT_IN_DATA}</dd>
+        </div>
         {bond.otherPenalties.length > 0 && (
-          <>
-            <dt className="text-muted-foreground">Other penalties</dt>
+          <div>
+            <dt className={term}>Other penalties</dt>
             <dd><Parts parts={bond.otherPenalties} src={bond.src} sources={sources} /></dd>
-          </>
+          </div>
         )}
-        <dt className="text-muted-foreground">Resign or don&apos;t join from Round 2</dt>
-        <dd>
-          {t.resignForfeit ? <span className="numeric font-semibold">{formatINR(t.resignForfeit.inr)}<Sup n={t.resignForfeit.src} sources={sources} /></span> : NOT_IN_DATA}
-          <span className="block text-xs text-muted-foreground">What MCC lets the college keep if you resign or don&apos;t join from Round 2. Separate from the leaving penalty.</span>
-        </dd>
+        <div>
+          <dt className={term}>Resign or don&apos;t join from Round 2</dt>
+          <dd>
+            {t.resignForfeit ? <span className="numeric font-semibold">{formatINR(t.resignForfeit.inr)}<Sup n={t.resignForfeit.src} sources={sources} /></span> : NOT_IN_DATA}
+            <span className={note}>What MCC lets the college keep if you resign or don&apos;t join from Round 2. Separate from the leaving penalty.</span>
+          </dd>
+        </div>
       </dl>
+      {t.unread.filter((u) => u.kind === "BOND" || u.kind === "PENALTY").map((u) => (
+        <p key={u.kind} className="text-xs text-muted-foreground">{termLabel[u.kind]} as published: {u.text}<Sup n={u.src} sources={sources} /></p>
+      ))}
       {(bond.quote ?? bond.text) && (
         <details className="text-sm">
           <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky">{bond.quote ? "Exact words of the bond document" : "Exact words of the bond summary"}</summary>
           <blockquote className="mt-1 border-l-2 border-border pl-3 text-muted-foreground">{bond.quote ?? bond.text}</blockquote>
         </details>
       )}
-      <TermSources t={t} label={groups.length ? `Sources, ${title}, bond and penalties` : undefined} />
     </section>
   );
 }

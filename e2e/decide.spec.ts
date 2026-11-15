@@ -1,3 +1,4 @@
+import { PrismaClient } from "@prisma/client";
 import { expect, test } from "./auth";
 
 // Runs on the real MCC import (spot values: neetpg-planner docs/HANDOFF_CONTEXT.md §7), signed in to the invited account
@@ -230,6 +231,15 @@ const SETH_GS = "seth-gordhandas-sunderdas-medical-college-400012";
 const KOKILA_NM = "kokilaben-dhirubhai-ambani-hospital-400710";
 const GMC_NAGPUR = "government-medical-college-nagpur-440003";
 const h1 = (page: import("@playwright/test").Page) => page.getByRole("heading", { level: 1 });
+/** A college's slug by key: an import sets it when it first creates the college and never changes it (import-mcc.ts), so it depends on the database's history. */
+async function slugOf(key: string) {
+  const db = new PrismaClient();
+  try {
+    return (await db.college.findUniqueOrThrow({ where: { key }, select: { slug: true } })).slug;
+  } finally {
+    await db.$disconnect();
+  }
+}
 
 test("saved ids under a retired college key move to the key the college has now, once, with a notice", async ({ page }) => {
   // AMRI Hospitals Mukundapur: its key before the round-2 bundle (key_aliases.json) and the one it has now.
@@ -237,7 +247,7 @@ test("saved ids under a retired college key move to the key the college has now,
   const [oldId, newId] = [id("AMRIHOSPITALSMUKUNDAPUR223BARAKHOLALANEB#700099"), id("AMRIHOSPITALSWESTBENGALAMRIHOSPITALSMUKU#700099")];
   await page.goto(`/decide/choices?${PROFILE}`);
   await page.evaluate((oldId) => {
-    const item = { id: oldId, institute: "AMRI Hospitals (old name)", slug: "amri-hospitals-700099", state: "West Bengal", course: "DNB Anaesthesiology", courseSlug: "dnb-anaesthesiology", quota: "DNB Quota", reachLabel: "", closedEveryRound: false };
+    const item = { id: oldId, institute: "AMRI Hospitals (old name)", slug: "amri-hospitals-mukundapur-700099", state: "West Bengal", course: "DNB Anaesthesiology", courseSlug: "dnb-anaesthesiology", quota: "DNB Quota", reachLabel: "", closedEveryRound: false };
     localStorage.setItem("medpath.choices", JSON.stringify({ lists: [{ id: "r2", name: "Round 2 · 2026", items: [item], typedIds: [oldId] }], activeId: "r2" }));
     localStorage.setItem("medpath.compare", JSON.stringify([oldId]));
   }, oldId);
@@ -245,7 +255,7 @@ test("saved ids under a retired college key move to the key the college has now,
   await expect(page.getByRole("status").filter({ hasText: "1 saved option was renamed after MCC's college names were cleaned up." })).toBeVisible();
   const stored = await page.evaluate(() => [JSON.parse(localStorage.getItem("medpath.choices")!), JSON.parse(localStorage.getItem("medpath.compare")!)]);
   expect([stored[0].lists[0].items[0].id, stored[0].lists[0].typedIds, stored[1]]).toEqual([newId, [newId], [newId]]);
-  expect(stored[0].lists[0].items[0].slug).not.toBe("amri-hospitals-700099");
+  expect(stored[0].lists[0].items[0].slug).toBe(await slugOf("AMRIHOSPITALSWESTBENGALAMRIHOSPITALSMUKU#700099"));
   // Once: nothing left to rename on the next load. An old compare link opens the option under its new key.
   await page.goto(`/decide/compare?${new URLSearchParams({ ids: oldId })}`);
   await expect.poll(() => new URL(page.url()).searchParams.get("ids")).toBe(newId);
@@ -301,6 +311,15 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
   await page.goto(`/decide/allotments?${PROFILE}&from=30,000&to=50,000`);
   await expect(page.getByLabel("Rank from")).toHaveValue("30,000");
   await expect(page.locator("#results")).not.toContainText("2,09,566");
+  // Phones fold Round, Quota and Seat category behind "Show all filters"; her tick survives an Apply that sets none of them.
+  const more = page.getByLabel("Show all filters");
+  if (await more.isVisible()) {
+    await more.check();
+    await page.getByLabel("Rank from").fill("31000");
+    await page.getByRole("button", { name: "Apply" }).click();
+    await expect(page).toHaveURL(/from=31000/);
+    await expect(more).toBeChecked();
+  }
   await page.getByRole("combobox", { name: "Quota" }).selectOption("All India");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/aq=All\+India/);
@@ -340,6 +359,26 @@ test("rank journey: 2023 rank 23 in R1 at LTMMC, upgraded in R2 to Seth GS on ch
   await expect(h1(page)).toHaveText("Rank journey");
 });
 
+test("print: every table box lets all its rows onto paper", async ({ page }) => {
+  test.setTimeout(90_000);
+  for (const path of [
+    `/decide/options?${PROFILE}`, `/decide/seats?${PROFILE}`, `/decide/allotments?${PROFILE}&course=md-anaesthesiology&year=2025&round=R2`,
+    `/decide/last-ranks?${PROFILE}&course=dnb-anaesthesiology`, `/decide/compare?${new URLSearchParams({ ids: [OPT_KOKILA_ANAES, OPT_GMC_NAGPUR].join(",") })}&${PROFILE}`,
+  ]) {
+    await page.goto(path);
+    await page.emulateMedia({ media: "print" });
+    const boxes = page.locator('[role=region][tabindex="0"]');
+    await expect(boxes.first(), path).toBeAttached();
+    for (const b of await boxes.all()) expect(await b.evaluate((e) => e.scrollHeight - e.clientHeight), path).toBeLessThanOrEqual(1);
+    await page.emulateMedia({ media: null });
+  }
+  // The college's name and address print above its tabs.
+  await page.goto(`/decide/institutes/${KOKILA_NM}?${PROFILE}&tab=fees`);
+  await page.emulateMedia({ media: "print" });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByText(/^Address as printed by MCC/)).toBeVisible();
+});
+
 test("institute page: MCC address, terms with their sources, paginated allotments", async ({ page }) => {
   await page.goto(`/decide/institutes/${KOKILA_NM}?${PROFILE}&tab=fees`);
   await expect(page.getByText(/Navi Mumbai/).first()).toBeVisible();
@@ -353,7 +392,9 @@ test("institute page: MCC address, terms with their sources, paginated allotment
   await expect(quota.getByRole("link", { name: /^Source 3: NBEMS annual course fee \(ceiling, no GST\)/ }).first()).toHaveAttribute("href", /natboard\.edu\.in/);
   await expect(dnb).toContainText("No bond (NBEMS rule)");
   await expect(dnb).not.toContainText("GST to NBEMS");
-  await expect(dnb.getByRole("list", { name: "Sources, DNB, bond and penalties" }).getByRole("listitem").first()).toHaveText(/^4/);
+  // One numbered list under the card: the bond box's figures go on from the fee groups' numbers.
+  await expect(dnb.getByRole("region", { name: "Service bond" }).getByRole("link", { name: /^Source 4:/ }).first()).toBeVisible();
+  await expect(dnb.getByRole("list", { name: "Sources, DNB" }).getByRole("listitem").nth(3)).toHaveText(/^4/);
 
   await page.goto(`/decide/institutes/${SETH_GS}?${PROFILE}&tab=allotments`);
   const results = page.locator("#results");
@@ -366,9 +407,11 @@ test("institute page: MCC address, terms with their sources, paginated allotment
 
 test("fees: a fee in the profile's own words shows no figure anywhere; MCC's Round 2 forfeit from the fee table", async ({ page }) => {
   // Chettinad: the MCC profile gives ₹3 L–₹48 L by specialty, so the fee table is verbatim: words and link, no ₹ fee.
-  await page.goto(`/decide/institutes/chettinad-hospital-research-institute-603103?${PROFILE}`);
+  // Its slug comes from the name it had when this database first imported it (renamed since): by key.
+  const slug = await slugOf("CHETTINADSUPERSPECIALITYHOSPITALTAMILNAD#603103");
+  await page.goto(`/decide/institutes/${slug}?${PROFILE}`);
   await expect(page.getByText(/MD\/MS · Fee see terms/)).toBeVisible();
-  await page.goto(`/decide/institutes/chettinad-hospital-research-institute-603103?${PROFILE}&tab=fees`);
+  await page.goto(`/decide/institutes/${slug}?${PROFILE}&tab=fees`);
   const group = page.getByRole("region", { name: "MD/MS", exact: true }).getByRole("region", { name: "Deemed/Paid seats" });
   await expect(group).toContainText("Seatora shows no fee figure here");
   await expect(group.getByRole("columnheader", { name: "Fee that year" })).toHaveCount(0);

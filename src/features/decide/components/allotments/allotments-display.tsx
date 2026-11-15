@@ -1,23 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
-import { z } from "zod";
-import { useLocal } from "../../lib/local-store";
-import { DisplayMenu } from "../seats/seat-matrix";
+import { DisplayMenu, useHiddenCols } from "../seats/seat-matrix";
 
 const DISPLAY_KEY = "medpath.allotments.hidden";
-const NONE: unknown = [];
+/** Hidden until she picks them in Display: each rank's Journey shows both. */
+const DEFAULT_HIDDEN = ["cand", "option"];
 
 /** Allotments' column chooser (the Seats matrix's): hides `#allotments [data-col]` cells by CSS, saved on the device. */
 export function AllotmentsDisplay({ cols }: { cols: { key: string; label: string }[] }) {
-  const [saved, save] = useLocal<unknown>(DISPLAY_KEY, NONE);
-  const hidden = useMemo(() => {
-    const r = z.array(z.string()).safeParse(saved);
-    return new Set(r.success ? r.data.filter((k) => cols.some((c) => c.key === k)) : []);
-  }, [saved, cols]);
+  const [hidden, save] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   return (
     <>
-      <DisplayMenu cols={cols} hidden={hidden} setHidden={save} />
+      <DisplayMenu cols={cols} hidden={hidden} setHidden={save} always="Rank, round and institute always show." />
       {/* Only known column keys reach the selector. */}
       <style>{[...hidden].map((k) => `#allotments [data-col="${k}"]{display:none}`).join("")}</style>
     </>

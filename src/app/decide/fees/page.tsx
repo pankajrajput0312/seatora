@@ -82,7 +82,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         What each institute charges and pays per programme, its service bond and the penalty for leaving, from what colleges declared to MCC and NBEMS rules. A dash means not in Seatora&apos;s MCC data, never zero or &quot;no bond&quot;.
       </PageHead>
 
-      <FilterBar action="/decide/fees" params={params} cols="md:grid-cols-4">
+      <FilterBar action="/decide/fees" params={params} cols="md:grid-cols-4" more={moreSet}>
         <Field label="Programme">
           <Select name="program" value={f.program} all={d.programmes ? `Your profile: ${d.programmes.join(", ")}` : "All programmes"}
             options={[...(d.programmes ? [{ value: "all", label: "All programmes" }] : []), ...programmeNames.map((p) => ({ value: programmes[p].slug, label: p }))]} />
@@ -132,10 +132,6 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           <span>Include colleges that haven&apos;t declared it<span className="block text-xs text-muted-foreground">For the fee, stipend and bond caps (bond: not declared or unknown)</span></span>
         </label>
         <input type="hidden" name="nd" value="hide" />
-        <label className="flex min-h-11 items-center gap-2 text-sm md:hidden">
-          <input type="checkbox" className="more-toggle size-5 accent-sky" defaultChecked={moreSet} />
-          Show all filters
-        </label>
       </FilterBar>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

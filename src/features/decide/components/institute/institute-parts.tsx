@@ -130,22 +130,32 @@ const said = (v: Said) => (v == null ? null : typeof v === "boolean" ? (v ? "Yes
 const num = (v: number | undefined, unit = "") => (v == null ? null : `${formatRank(v)}${unit}`);
 
 type Line = { label: string; value: React.ReactNode; note?: string | null; meta: ValueMeta | null | undefined };
+type Group = { title: string; lines: Line[] };
+const has = (l: Line) => l.value != null && l.value !== "";
+/** Flags of a block's entry that hold for each of its values (the period's); the rest (rounded, derived, conflicting) are of some value in it. */
+const PER_VALUE: ValueMeta["flags"][number][] = ["self_reported", "old"];
+
 /**
- * Fact · as reported ("—" when not found) · period as printed · source. `whole`: the source of every row without one of
- * its own (the record's block-level entry), with its flags, said once above the table instead of on every row.
+ * Fact · as reported ("—" when not found) · period as printed · source, in row groups. `whole`: the record's block-level
+ * entry, the source of every value without one of its own: each such value shows its period and source; the block's
+ * other flags are said once above the table, never pinned on a value they may not be about.
  */
-function FactsTable({ caption, lines, whole }: { caption: string; lines: Line[]; whole?: ValueMeta | null }) {
+function FactsTable({ caption, groups, whole }: { caption: string; groups: Group[]; whole?: ValueMeta | null }) {
+  const inherited = whole && { ...whole, flags: whole.flags.filter((f) => PER_VALUE.includes(f)) };
+  const blockFlags = whole?.flags.filter((f) => !PER_VALUE.includes(f)) ?? [];
   return (
     <>
-      {whole && lines.some((l) => !l.meta && l.value != null && l.value !== "") && (
+      {blockFlags.length > 0 && groups.some((g) => g.lines.some((l) => !l.meta && has(l))) && (
         <div className="grid gap-1 text-xs text-muted-foreground">
-          <span>Rows without a source of their own: {whole.period}</span>
-          <ValueSource m={whole} />
+          <span>Rows without a source of their own share this one, flagged for its figures as a whole:</span>
+          <ValueSource m={{ ...whole!, flags: blockFlags }} />
         </div>
       )}
       <div role="region" aria-label={caption} tabIndex={0} className={tbl.wrap}>
-        <table className={tbl.table}>
+        {/* Fixed columns from md: the hospital's table and each course's line up. Phones: columns fit their text. */}
+        <table className={cn(tbl.table, "md:min-w-[44rem] md:table-fixed")}>
           <caption className="sr-only">{caption}. {SELF_REPORTED}.</caption>
+          <colgroup><col className="w-[26%]" /><col className="w-[22%]" /><col className="w-[22%]" /><col className="w-[30%]" /></colgroup>
           <thead>
             <tr className={tbl.headRow}>
               <th scope="col" className={tbl.th}>Fact</th>
@@ -154,22 +164,29 @@ function FactsTable({ caption, lines, whole }: { caption: string; lines: Line[];
               <th scope="col" className={tbl.th}>Source</th>
             </tr>
           </thead>
-          <tbody>
-            {lines.map((l) => {
-              const has = l.value != null && l.value !== "";
-              return (
-                <tr key={l.label} className={tbl.row}>
-                  <th scope="row" className={cn(tbl.td, "text-left font-normal text-muted-foreground")}>{l.label}</th>
-                  <td className={cn(tbl.td, "text-right font-semibold", typeof l.value === "string" && /^[\d,.]+[%+]?$/.test(l.value) && "numeric")}>
-                    {has ? l.value : <Dash />}
-                    {has && l.note && <span className="block text-xs font-normal text-muted-foreground">{l.note}</span>}
-                  </td>
-                  <td className={cn(tbl.td, "max-w-64 text-xs text-muted-foreground")}>{has && l.meta?.period}</td>
-                  <td className={cn(tbl.td, "min-w-48")}>{has && <ValueSource m={l.meta} />}</td>
+          {groups.map((g) => (
+            <tbody key={g.title}>
+              {groups.length > 1 && (
+                <tr className="border-b border-border bg-muted/40">
+                  <th scope="rowgroup" colSpan={4} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">{g.title}</th>
                 </tr>
-              );
-            })}
-          </tbody>
+              )}
+              {g.lines.map((l) => {
+                const m = l.meta ?? inherited;
+                return (
+                  <tr key={l.label} className={tbl.row}>
+                    <th scope="row" className={cn(tbl.td, "text-left font-normal text-muted-foreground")}>{l.label}</th>
+                    <td className={cn(tbl.td, "text-right font-semibold break-words", typeof l.value === "string" && /^[\d,.]+[%+]?$/.test(l.value) && "numeric")}>
+                      {has(l) ? l.value : <Dash />}
+                      {has(l) && l.note && <span className="block text-xs font-normal text-muted-foreground">{l.note}</span>}
+                    </td>
+                    <td className={cn(tbl.td, "text-xs text-muted-foreground")}>{has(l) && m?.period}</td>
+                    <td className={tbl.td}>{has(l) && <ValueSource m={m} />}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          ))}
         </table>
       </div>
     </>
@@ -184,40 +201,61 @@ const DISCLOSURE: Record<ClinicalAt["disclosure"]["status"], string> = {
 };
 
 /**
- * The Hospital facts card: hospital-wide facts, then each course's department record (hers first), every value with its
- * period, source, check date and flags; the NBEMS mandatory disclosure check. Nothing is filled in: "—" when not found.
+ * The Hospital facts card: hospital-wide facts grouped (capacity, workload, facilities, stipend), then each course's
+ * department record (hers first), every value with its period, source, check date and flags; the NBEMS mandatory
+ * disclosure check. Nothing is filled in: "—" when not found.
  */
 export function HospitalFacts({ f, name }: { f: ClinicalAt; name: string }) {
   const d = f.disclosure;
   const facts: Partial<Facts> = f.facts ?? {};
-  // A value's own source; a block's ("facts", "courses[i]") is shown once above its table (FactsTable `whole`).
+  // A value's own source; else its block's ("facts", "courses[i]"; FactsTable `whole`).
   const meta = (path: string) => f.values_meta?.[path];
   const fact = (key: keyof Facts, label: string, value: React.ReactNode, note?: string | null): Line => ({ label, value, note, meta: meta(`facts.${key}`) });
   const sd = f.stipend_disclosed;
   const sdMeta = meta("stipend_disclosed");
-  const lines: Line[] = [
-    fact("beds_total", "Beds", facts.beds_total != null ? reportedCount({ n: facts.beds_total, meta: meta("facts.beds_total"), own: true }).text : null, facts.beds_kind),
-    fact("icu_beds", "ICU beds", num(facts.icu_beds)),
-    fact("emergency_24x7", "Emergency, 24×7", said(facts.emergency_24x7)),
-    fact("blood_bank", "Blood bank", said(facts.blood_bank)),
-    fact("ct", "CT", said(facts.ct)),
-    fact("mri", "MRI", said(facts.mri)),
-    fact("cath_lab", "Cath lab", said(facts.cath_lab)),
-    fact("hospital_opd_year", "Outpatients (OPD) a year", num(facts.hospital_opd_year)),
-    fact("hospital_opd_day", "Outpatients (OPD) a day", num(facts.hospital_opd_day)),
-    fact("hospital_ipd_year", "Inpatients (IPD) a year", num(facts.hospital_ipd_year)),
-    fact("occupancy_pct", "Bed occupancy", num(facts.occupancy_pct, "%")),
-    fact("operating_theatres", "Operating theatres", num(facts.operating_theatres)),
-    fact("deliveries_year", "Deliveries a year", num(facts.deliveries_year)),
-    fact("accommodation", "Accommodation", said(facts.accommodation)),
-    fact("library", "Library", said(facts.library)),
-    fact("e_library", "E-library", said(facts.e_library)),
-    fact("ethics_committee", "Ethics committee", said(facts.ethics_committee)),
+  const groups: Group[] = [
     {
-      label: "Stipend disclosed, a month",
-      value: sd && `${[sd.y1, sd.y2, ...(sd.y3 != null ? [sd.y3] : [])].map(formatINR).join(" / ")} (yr 1/2${sd.y3 != null ? "/3" : ""})`,
-      note: sd && sd.period !== sdMeta?.period ? sd.period : null,
-      meta: sdMeta,
+      title: "Capacity",
+      lines: [
+        fact("beds_total", "Beds", facts.beds_total != null ? reportedCount({ n: facts.beds_total, meta: meta("facts.beds_total"), own: true }).text : null, facts.beds_kind),
+        fact("icu_beds", "ICU beds", num(facts.icu_beds)),
+        fact("operating_theatres", "Operating theatres", num(facts.operating_theatres)),
+      ],
+    },
+    {
+      title: "Workload",
+      lines: [
+        fact("hospital_opd_year", "Outpatients (OPD) a year", num(facts.hospital_opd_year)),
+        fact("hospital_opd_day", "Outpatients (OPD) a day", num(facts.hospital_opd_day)),
+        fact("hospital_ipd_year", "Inpatients (IPD) a year", num(facts.hospital_ipd_year)),
+        fact("occupancy_pct", "Bed occupancy", num(facts.occupancy_pct, "%")),
+        fact("deliveries_year", "Deliveries a year", num(facts.deliveries_year)),
+      ],
+    },
+    {
+      title: "Facilities",
+      lines: [
+        fact("emergency_24x7", "Emergency, 24×7", said(facts.emergency_24x7)),
+        fact("blood_bank", "Blood bank", said(facts.blood_bank)),
+        fact("ct", "CT", said(facts.ct)),
+        fact("mri", "MRI", said(facts.mri)),
+        fact("cath_lab", "Cath lab", said(facts.cath_lab)),
+        fact("accommodation", "Accommodation", said(facts.accommodation)),
+        fact("library", "Library", said(facts.library)),
+        fact("e_library", "E-library", said(facts.e_library)),
+        fact("ethics_committee", "Ethics committee", said(facts.ethics_committee)),
+      ],
+    },
+    {
+      title: "Stipend",
+      lines: [
+        {
+          label: "Stipend disclosed, a month",
+          value: sd && `${[sd.y1, sd.y2, ...(sd.y3 != null ? [sd.y3] : [])].map(formatINR).join(" / ")} (yr 1/2${sd.y3 != null ? "/3" : ""})`,
+          note: sd && sd.period !== sdMeta?.period ? sd.period : null,
+          meta: sdMeta,
+        },
+      ],
     },
   ];
   return (
@@ -240,7 +278,7 @@ export function HospitalFacts({ f, name }: { f: ClinicalAt; name: string }) {
           </>
         )}
       </p>
-      <FactsTable caption={`Hospital facts at ${name}, as reported`} lines={lines} whole={meta("facts")} />
+      <FactsTable caption={`Hospital facts at ${name}, as reported`} groups={groups} whole={meta("facts")} />
       {f.courses.length > 0 && (
         <div className="grid gap-4">
           <h3 className="text-base font-semibold">By course, as reported</h3>
@@ -254,7 +292,7 @@ export function HospitalFacts({ f, name }: { f: ClinicalAt; name: string }) {
                 <FactsTable
                   caption={`${c.course} at ${name}, as reported`}
                   whole={meta(`courses[${c.i}]`)}
-                  lines={[
+                  groups={[{ title: c.course, lines: [
                     { label: "Department beds", value: num(c.dept_beds), meta: m("dept_beds") },
                     { label: "Outpatients (OPD) a year", value: num(c.opd_year), meta: m("opd_year") },
                     { label: "Inpatients (IPD) a year", value: num(c.ipd_year), meta: m("ipd_year") },
@@ -264,7 +302,7 @@ export function HospitalFacts({ f, name }: { f: ClinicalAt; name: string }) {
                     { label: "Trainee record", value: trainees || null, meta: m("trainees") },
                     { label: "First accredited", value: c.first_accreditation, meta: m("first_accreditation") },
                     { label: "Accreditation valid up to", value: c.valid_up_to, meta: m("valid_up_to") },
-                  ]}
+                  ] }]}
                 />
               </section>
             );

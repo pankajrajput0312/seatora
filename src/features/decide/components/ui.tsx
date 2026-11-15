@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
+import { X, type LucideIcon } from "lucide-react";
 import { EmptyState as AstryxEmptyState } from "@astryxdesign/core/EmptyState";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -20,30 +20,72 @@ export const tbl = {
   row: "border-b border-border last:border-0 hover:bg-muted/50",
   td: "px-4 py-3 align-top",
   num: "px-4 py-3 text-right align-top text-[15px] font-semibold tabular-nums",
+  /**
+   * Wide tables: the box scrolls both ways inside the window's height, so the header row (`head`, on the thead) and a
+   * sticky first column stay in view; scroll-pt keeps a focused cell clear of the header. On paper the box lets every
+   * row through (a window-high box would cut the rest off).
+   */
+  scroll: "overflow-auto overscroll-x-contain scroll-pt-40 [@media(min-height:40rem)]:max-h-[calc(100dvh-9rem)] print:max-h-none print:overflow-visible",
+  head: "sticky top-0 z-[2] bg-card shadow-[0_1px_0_var(--color-border)] print:static",
 };
 
 /**
  * GET filter form that keeps the profile params (every repeated value, comma-joined). The form and its Apply button
  * stay mounted across navigations so focus stays on Apply (Enter in a field moves it there); only the fields remount
- * to show the applied values.
+ * to show the applied values. `more`: a MoreFilters box with that `open`, kept mounted too.
  * Submitting drops `page`, so results start at page 1.
  */
-export function FilterBar({ action, params, children, cols = "md:grid-cols-4" }: { action: string; params: URLSearchParams; children: React.ReactNode; cols?: string }) {
+export function FilterBar({ action, params, children, cols = "md:grid-cols-4", more }: { action: string; params: URLSearchParams; children: React.ReactNode; cols?: string; more?: boolean }) {
   return (
     <FilterForm action={action} scroll={false} role="search" className={cn("grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2", cols, "md:items-end")}>
       {[...keepProfileParams(params)].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       <Fragment key={params.toString()}>{children}</Fragment>
+      {more != null && <MoreFilters open={more} />}
       <Button type="submit">Apply</Button>
     </FilterForm>
   );
 }
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/** `className`: e.g. "more-filter", folded on phones until "Show all filters" (MoreFilters) is ticked. */
+export function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <label className="grid gap-1.5 text-sm">
+    <label className={cn("grid gap-1.5 text-sm", className)}>
       <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       {children}
     </label>
+  );
+}
+
+/**
+ * Phones: the filters marked `more-filter` stay folded until this unnamed box is ticked (globals.css `.more-toggle`);
+ * `open` when one of them is set, so an applied filter is never hidden. Render it outside the fields' keyed Fragment
+ * (FilterBar `more`) so her tick survives Apply; React still moves an untouched box to a new `open`.
+ */
+export function MoreFilters({ open }: { open: boolean }) {
+  return (
+    <label className="flex min-h-11 items-center gap-2 text-sm md:hidden">
+      <input type="checkbox" className="more-toggle size-5 accent-sky" defaultChecked={open} />
+      Show all filters
+    </label>
+  );
+}
+
+/**
+ * The filters a page applies, as chips: each removes its filter in one click (`href` = this page without it), and
+ * "Clear all" (`clear`) when there are two or more. Nothing when none is set.
+ */
+export function ActiveFilters({ items, clear }: { items: { label: string; href: string }[]; clear: string }) {
+  if (!items.length) return null;
+  return (
+    <div role="group" aria-label="Active filters" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <span className="text-muted-foreground">Filtered by</span>
+      {items.map((i) => (
+        <Link key={i.label} href={i.href} scroll={false} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border bg-card px-3 hover:border-foreground/70">
+          <span className="sr-only">Remove filter: </span>{i.label}<X className="size-4 text-muted-foreground" aria-hidden />
+        </Link>
+      ))}
+      {items.length > 1 && <Link href={clear} scroll={false} className={cn(smallLink, "px-1 text-sky")}>Clear all</Link>}
+    </div>
   );
 }
 

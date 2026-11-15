@@ -29,24 +29,26 @@ import type { PastClosing, SeatLine, SeatSort } from "./find-seats";
 export type SeatGroup = { key: string; label: string; clear: SeatList | null; virtual: SeatList | null; added: SeatList[] };
 /** Closing-rank columns: one group per year, newest first. */
 export type ClosingYear = { year: number; rounds: Round[] };
+/** What the matrix reads of a seat row (the page leaves out the rest: the published terms are most of a row's bytes). */
+export type MatrixRow = Omit<SeatLine, "terms" | "rounds" | "deepest" | "list" | "seats" | "cs">;
 
 const DISPLAY_KEY = "medpath.seatMatrix.hidden";
-const NONE: unknown = [];
-const rowKey = (r: SeatLine) => [r.college.key, r.degree, r.specialty, r.quota, r.category].join("|");
-const courseOf = (r: SeatLine) => `${r.degree} ${r.course?.name ?? r.specialty}`;
+/** Hidden until she picks them in Display: both are in every row's details too. */
+const DEFAULT_HIDDEN = ["type", "beds"];
+const rowKey = (r: MatrixRow) => [r.college.key, r.degree, r.specialty, r.quota, r.category].join("|");
+const courseOf = (r: MatrixRow) => `${r.degree} ${r.course?.name ?? r.specialty}`;
 const listName = (l: SeatList) => `${l.year} ${roundLabel[l.round]} ${seatKindLabel[l.kind].toLowerCase()}`;
-const at = (r: SeatLine, year: number, round: Round) => r.closings.find((c) => c.year === year && c.round === round);
+const at = (r: MatrixRow, year: number, round: Round) => r.closings.find((c) => c.year === year && c.round === round);
 
+/** "1,23,456 (12)": closing rank (allotments made). Its cell is right-aligned, tabular and unwrapped already; the markup stays small (there are hundreds). */
 function ClosingValue({ c }: { c: PastClosing | undefined }) {
   if (!c) return <Dash />;
   return (
-    <span className="grid justify-items-end gap-1">
-      <span className="numeric whitespace-nowrap">
-        {formatRank(c.closing)}
-        <span className="text-xs font-normal text-muted-foreground"> ({formatRank(c.n)}<span className="sr-only"> allotted</span>)</span>
-      </span>
-      <Provisional when={c.provisional} />
-    </span>
+    <>
+      {formatRank(c.closing)}
+      <span className="text-xs text-muted-foreground"> ({formatRank(c.n)}<span className="sr-only"> allotted</span>)</span>
+      {c.provisional && <span className="mt-1 block"><Provisional when /></span>}
+    </>
   );
 }
 
@@ -54,7 +56,7 @@ function ClosingValue({ c }: { c: PastClosing | undefined }) {
  * "+3 new" per newly added list that prints seats for the row (most are also in the clear vacancy list: never added).
  * A round with two newly added PDFs dates the badge (listDay), so the two can be told apart.
  */
-function AddedBadges({ r, added }: { r: SeatLine; added: SeatList[] }) {
+function AddedBadges({ r, added }: { r: MatrixRow; added: SeatList[] }) {
   return added.map((l) => {
     const day = added.length > 1 ? listDay(l) : undefined;
     return (r.byList[l.key] ?? 0) > 0 ? (
@@ -66,7 +68,6 @@ function AddedBadges({ r, added }: { r: SeatLine; added: SeatList[] }) {
   });
 }
 
-/** Column chooser: a checkbox per column (the institute always shows), saved in localStorage. Closes on Escape. */
 /** A Beds cell: the count as the source prints it ("270+"), marked where the source prints conflicting figures. */
 function Beds({ b }: { b: NonNullable<NonNullable<SeatLine["hospital"]>["beds"]> }) {
   const c = reportedCount(b);
@@ -78,7 +79,21 @@ function Beds({ b }: { b: NonNullable<NonNullable<SeatLine["hospital"]>["beds"]>
   );
 }
 
-export function DisplayMenu({ cols, hidden, setHidden }: { cols: { key: string; label: string }[]; hidden: Set<string>; setHidden: (keys: string[]) => void }) {
+/**
+ * The hidden columns of a table, saved on the device under `key`: `defaults` (a stable array) until she picks, and
+ * again after "Default columns". Only known column keys come back (they go into a CSS selector).
+ */
+export function useHiddenCols(key: string, cols: { key: string }[], defaults: string[]) {
+  const [saved, save] = useLocal<unknown>(key, null);
+  const hidden = useMemo(() => {
+    const r = z.array(z.string()).safeParse(saved);
+    return new Set((r.success ? r.data : defaults).filter((k) => cols.some((c) => c.key === k)));
+  }, [saved, cols, defaults]);
+  return [hidden, save] as const;
+}
+
+/** Column chooser: a checkbox per column (the first column always shows), saved on the device. Closes on Escape. `null` = the default columns. */
+export function DisplayMenu({ cols, hidden, setHidden, always = "The institute column always shows." }: { cols: { key: string; label: string }[]; hidden: Set<string>; setHidden: (keys: string[] | null) => void; always?: string }) {
   return (
     <details
       className="group relative"
@@ -107,8 +122,9 @@ export function DisplayMenu({ cols, hidden, setHidden }: { cols: { key: string; 
             {c.label}
           </label>
         ))}
-        <p className="px-2 pt-1 text-xs text-muted-foreground">Saved on this device. The institute column always shows.</p>
+        <p className="px-2 pt-1 text-xs text-muted-foreground">Saved on this device. {always}</p>
         <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => setHidden([])}>Show every column</Button>
+        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => setHidden(null)}>Default columns</Button>
       </fieldset>
     </details>
   );
@@ -119,7 +135,7 @@ export function DisplayMenu({ cols, hidden, setHidden }: { cols: { key: string; 
  * PDFs behind them; `ranked`: she has a rank (the "Your chances" column). Rows are one page, in the server's order.
  */
 export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption }: {
-  rows: SeatLine[];
+  rows: MatrixRow[];
   groups: SeatGroup[];
   years: ClosingYear[];
   results: Source[];
@@ -143,11 +159,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
     ],
     [typed, groups, ranked, years],
   );
-  const [saved, save] = useLocal<unknown>(DISPLAY_KEY, NONE);
-  const hidden = useMemo(() => {
-    const r = z.array(z.string()).safeParse(saved);
-    return new Set(r.success ? r.data.filter((k) => cols.some((c) => c.key === k)) : []);
-  }, [saved, cols]);
+  const [hidden, save] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   const [open, setOpen] = useState<string | null>(null);
   const row = rows.find((r) => rowKey(r) === open) ?? null;
   // The row last opened: closing the drawer puts focus on its Details button (there is no Dialog.Trigger).
@@ -173,11 +185,11 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
       </div>
       {/* Hiding is CSS on data-col, so a header group and its cells go together (keys are the known columns only). */}
       <style>{[...hidden].map((k) => `#seat-matrix [data-col="${k}"]{display:none}`).join("")}</style>
-      <div id="seat-matrix" role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, "scroll-pl-44 md:scroll-pl-68")}>
+      <div id="seat-matrix" role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, tbl.scroll, "scroll-pl-44 md:scroll-pl-68")}>
         <table className={tbl.table}>
           <caption className="sr-only">{caption}</caption>
-          <thead>
-            <tr className={tbl.headRow}>
+          <thead className={tbl.head}>
+            <tr className="text-left">
               <th rowSpan={2} scope="col" className={cn(th, sticky)} aria-sort={sorted("college", "ascending")}>Institute</th>
               {typed && (
                 <th rowSpan={2} scope="col" data-col="type" className={th} title="Inferred from name and quota (a few from Seatora's research on the hospital), not an official field">
@@ -199,7 +211,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                 <th key={y.year} colSpan={y.rounds.length} scope="colgroup" data-col={`closing-${y.year}`} className={cn(th, "border-l border-border text-center")}>Closing rank {y.year}</th>
               ))}
             </tr>
-            <tr className={tbl.headRow}>
+            <tr className="text-left">
               {groups.map((g) => (
                 <Fragment key={g.key}>
                   <th scope="col" data-col={g.key} className={cn(th, "border-l border-border text-right")} aria-sort={g.clear?.key === firstClear ? sorted("seats", "descending") : undefined}><span className="sr-only">{g.label} </span>Clear</th>
@@ -230,10 +242,13 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                 >
                   <th scope="row" className={cn(td, sticky, "text-left font-normal")}>
                     <Link href={L.institute(r.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{r.college.name}</Link>
-                    <span className="block text-xs text-muted-foreground">{r.college.state ?? "State not listed"}</span>
-                    <Button type="button" variant="ghost" className="-ml-4 text-sky" data-row={k} onClick={() => show(k)} aria-haspopup="dialog">
-                      Details<span className="sr-only">: {name}</span>
-                    </Button>
+                    {/* State and Details share a line (the whole row opens the details too, so the button can be the small one). */}
+                    <span className="flex flex-wrap items-center gap-x-1">
+                      <span className="text-xs text-muted-foreground">{r.college.state ?? "State not listed"}</span>
+                      <Button type="button" variant="ghost" size="sm" className="-ml-1 px-2 text-sky" data-row={k} onClick={() => show(k)} aria-haspopup="dialog">
+                        Details<span className="sr-only">: {name}</span>
+                      </Button>
+                    </span>
                   </th>
                   {typed && <td data-col="type" className={td}>{r.hospital?.type ? <TypeBadge type={r.hospital.type} /> : <Dash />}</td>}
                   <td data-col="course" className={td}>{courseOf(r)}</td>
@@ -280,7 +295,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
 
 /** Every number of one row with its source: seats per list (PDF and date), closing ranks per round (result PDF), the course's terms and their documents. */
 function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }: {
-  row: SeatLine | null;
+  row: MatrixRow | null;
   groups: SeatGroup[];
   years: ClosingYear[];
   results: Source[];

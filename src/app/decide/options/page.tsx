@@ -12,15 +12,16 @@ import { termDocs } from "@/features/decide/components/fees";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm } from "@/features/decide/components/filter-form";
 import { OptionsResults } from "@/features/decide/components/option-actions";
+import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
-import { control, EmptyState, smallLink } from "@/features/decide/components/ui";
+import { ActiveFilters, control, EmptyState, MoreFilters, smallLink } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
 import { BOND_YEAR_CHOICES, feeChoices, keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, LATEST_YEAR, listOptions, optionsView, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
-import { openQuotas, openQuotasNote, optionsViews, roundLabel, seatKindLabel, seatKinds } from "@/features/decide/types";
+import { openQuotas, openQuotasNote, optionsViews, roundLabel, seatKindLabel, seatKinds, type SeatKind } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
@@ -75,6 +76,21 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const api = profileToParams(profile);
   for (const [k, v] of [["q", f.q], ["reach", f.reach], ["prov", f.prov], ["view", r.view], ["showClosed", r.showClosed ? "1" : "0"], ["hasSeats", r.seats ?? "all"]] as const) if (v) api.set(k, v);
   const caption = `Options for AIR ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added` : ""}`;
+  // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
+  const bondWords = (y: number) => (y === 0 ? "No bond (or unknown)" : `Bond up to ${y} ${y === 1 ? "yr" : "yrs"}`);
+  const seatsWords = (s: SeatKind | "any") => (s === "any" ? `Has seats in a ${round} list` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
+  const closedDefault = roundView ? "1" : "0";
+  const active = [
+    f.q && { label: `Search: “${f.q}”`, href: here({ q: null }) },
+    f.reach && { label: reachLabel(f.reach, LATEST_YEAR, PAST_YEARS, !f.prov), href: here({ reach: null, closed: null }) },
+    f.seats && lists.length > 0 && (r.seats ?? null) !== (roundView ? "any" : null) && { label: r.seats ? seatsWords(r.seats) : `With or without ${round} seats`, href: here({ seats: null }) },
+    f.closed && f.closed !== closedDefault && !f.reach && { label: f.closed === "1" ? "Closed before your rank: shown" : "Closed before your rank: hidden", href: here({ closed: null }) },
+    f.prov && { label: `Without ${LATEST_YEAR} R1 (provisional)`, href: here({ prov: null }) },
+    profile.quotas.length > 0 && { label: `Quota: ${profile.quotas.length > 2 ? `${profile.quotas.length} selected` : profile.quotas.join(", ")}`, href: here({ quota: null }) },
+    profile.states.length > 0 && { label: `State: ${profile.states.length > 2 ? `${profile.states.length} selected` : profile.states.join(", ")}`, href: here({ st: null }) },
+    profile.maxFeeLakh != null && { label: `Fee up to ₹${profile.maxFeeLakh} L`, href: here({ fee: null }) },
+    profile.maxBondYears != null && { label: bondWords(profile.maxBondYears), href: here({ bond: null }) },
+  ].filter((x) => !!x);
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
 
@@ -154,39 +170,41 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           )}
           <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" noneNote={openQuotasNote} />
           <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} />
-          <label className="w-44">
+          <label className="more-filter w-44">
             <span className="sr-only">Maximum fee per year</span>
             <select name="fee" defaultValue={profile.maxFeeLakh ?? ""} className={control}>
               <option value="">Any fee</option>
               {feeChoices(profile.maxFeeLakh).map((l) => <option key={l} value={l}>Fee up to ₹{l} L</option>)}
             </select>
           </label>
-          <label className="w-44">
+          <label className="more-filter w-44">
             <span className="sr-only">Maximum service bond</span>
             <select name="bond" defaultValue={profile.maxBondYears ?? ""} className={control}>
               <option value="">Any bond</option>
-              {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? "No bond (or unknown)" : `Bond up to ${y} ${y === 1 ? "yr" : "yrs"}`}</option>)}
+              {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{bondWords(y)}</option>)}
             </select>
           </label>
           {lists.length > 0 && (
-            <label className="w-64">
+            <label className="more-filter w-64 max-w-full">
               <span className="sr-only">Seats in the {round} seat lists</span>
               <select name="seats" defaultValue={r.seats ?? "all"} className={control}>
                 <option value="all">With or without {round} seats</option>
-                <option value="any">Has seats in a {round} list</option>
-                {lists.map((l) => <option key={l.kind} value={l.kind}>Has {round} {seatKindLabel[l.kind].toLowerCase()}{l.kind === "new" ? "" : " seats"}</option>)}
+                <option value="any">{seatsWords("any")}</option>
+                {lists.map((l) => <option key={l.kind} value={l.kind}>{seatsWords(l.kind)}</option>)}
               </select>
             </label>
           )}
           {latestProvisional && (
-            <label className="inline-flex min-h-11 items-center gap-2 px-1 text-sm">
+            <label className="more-filter inline-flex min-h-11 items-center gap-2 px-1 text-sm">
               <input type="checkbox" name="prov" value="0" defaultChecked={!!f.prov} className="size-4 accent-sky" />
               Leave out {LATEST_YEAR} R1 (provisional) from the labels
             </label>
           )}
         </Fragment>
+        <MoreFilters open={profile.maxFeeLakh != null || profile.maxBondYears != null || !!f.seats || !!f.prov} />
         <Button type="submit">Apply</Button>
       </FilterForm>
+      <ActiveFilters items={active} clear={here({ q: null, reach: null, seats: null, closed: null, prov: null, quota: null, st: null, fee: null, bond: null })} />
 
       <nav aria-label="Filter by reach" className="flex flex-wrap gap-2">
         <Link href={here({ reach: null })} aria-current={!f.reach ? "true" : undefined} className={chip(!f.reach)}>
@@ -246,7 +264,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       {r.total ? (
         <OptionsResults
           key={`${api}|${r.page}`}
-          initial={r.rows}
+          initial={r.rows.map(listRow)}
           page={r.page}
           pageSize={r.pageSize}
           total={r.total}

@@ -9,13 +9,12 @@ import { cn } from "@/lib/cn";
 import { MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
 import type { DecideLinks } from "../lib/links";
 import { useChoices, useCompare, useDecideLinks } from "../lib/use-decide-store";
-import type { OptionRow } from "../service";
 import type { SeatList } from "../types";
 import { ReachBadge } from "./bits";
 import { TermsSummary } from "./fees";
 import { FocusItem } from "./focus-item";
-import { ClosingCell, courseName, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, toChoiceItem } from "./options-view";
-import { smallLink } from "./ui";
+import { ClosingCell, courseName, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, toChoiceItem, type ListRow } from "./options-view";
+import { smallLink, tbl } from "./ui";
 
 export function ChoiceStar({ item }: { item: ChoiceItem }) {
   const [state, setState] = useChoices();
@@ -63,7 +62,7 @@ export function CompareToggle({ id, label }: { id: string; label: string }) {
 type Years = { latestYear: number; pastYears: [number, number]; includeLatest: boolean; seatLists: SeatList[] };
 
 /** Cross-links for one option, each a 44px target (a new option has no closing ranks or allotments to link). */
-function Related({ r, L }: { r: OptionRow; L: DecideLinks }) {
+function Related({ r, L }: { r: ListRow; L: DecideLinks }) {
   const link = cn(smallLink, "text-sky");
   return (
     <>
@@ -79,12 +78,15 @@ function Related({ r, L }: { r: OptionRow; L: DecideLinks }) {
 }
 
 const summary = "inline-flex min-h-11 cursor-pointer items-center text-sky";
+// The star and the row header stay in view while the table scrolls sideways (the star column is w-12, 3rem).
+const stick = "sticky left-0 z-[1] bg-card";
+const stickName = "sticky left-12 z-[1] min-w-52 max-w-72 border-r border-border bg-card";
 
 /**
  * Options as a table (md and up) and as cards (phones). A row's "Rounds by year" grid is rendered only once she opens
  * it (it is most of a row's markup). `start` = rows before these, for data-item numbering (focus after Show more).
  */
-function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeLatest, seatLists }: { rows: OptionRow[]; caption: string; start: number; L: DecideLinks } & Years) {
+function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeLatest, seatLists }: { rows: ListRow[]; caption: string; start: number; L: DecideLinks } & Years) {
   const [older, last] = pastYears;
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string, on: boolean) =>
@@ -95,17 +97,17 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeL
       else next.delete(id);
       return next;
     });
-  const gridCaption = (r: OptionRow) => `${r.college.name}, ${courseName(r)}, ${r.quota}: closing ranks by year and round`;
-  const label = (r: OptionRow) => `${r.college.name}, ${courseName(r)}, ${r.quota}`;
+  const gridCaption = (r: ListRow) => `${r.college.name}, ${courseName(r)}, ${r.quota}: closing ranks by year and round`;
+  const label = (r: ListRow) => `${r.college.name}, ${courseName(r)}, ${r.quota}`;
   return (
     <>
-      <div role="region" aria-label={caption} tabIndex={0} className="relative hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
+      <div role="region" aria-label={caption} tabIndex={0} className={cn("relative hidden rounded-xl border border-border bg-card md:block", tbl.scroll, "scroll-pl-72")}>
         <table className="w-full text-sm">
           <caption className="sr-only">{caption}</caption>
-          <thead>
-            <tr className="border-b border-border text-left text-xs font-semibold text-muted-foreground">
-              <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Add to choices</span></th>
-              <th scope="col" className="px-3 py-3">Institute and course</th>
+          <thead className={tbl.head}>
+            <tr className="text-left text-xs font-semibold text-muted-foreground">
+              <th scope="col" className={cn(stick, "w-12 px-2 py-3")}><span className="sr-only">Add to choices</span></th>
+              <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course</th>
               <th scope="col" className="px-3 py-3">Reach</th>
               {seatLists.map((l) => <th key={l.key} scope="col" className="px-1.5 py-3 text-right"><SeatsHead list={l} short /></th>)}
               <th scope="col" className="px-3 py-3 text-right">{latestYear} R1 closing</th>
@@ -119,9 +121,9 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeL
           <tbody>
             {rows.flatMap((r, i) => [
               <tr key={r.id} data-item={start + i + 1} tabIndex={-1} className="border-t border-border align-top hover:bg-muted/40">
-                <td className="px-2 py-2"><ChoiceStar item={toChoiceItem(r)} /></td>
+                <td className={cn(stick, "px-2 py-2")}><ChoiceStar item={toChoiceItem(r)} /></td>
                 {/* Row header: only what names the option, so it reads short for every cell. */}
-                <th scope="row" className="px-3 py-3 text-left font-normal">
+                <th scope="row" className={cn(stickName, "px-3 py-3 text-left font-normal")}>
                   <Link href={L.institute(r.college.slug)} className="font-semibold hover:text-sky hover:underline">{r.college.name}</Link>
                   <span className="block">{courseName(r)}<span className="text-muted-foreground">, {r.quota}, {r.college.state ?? "state not listed"}</span></span>
                 </th>
@@ -199,7 +201,7 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeL
  * profile and filters) and moves focus to the first new row. The page never holds more rows than she asked to see.
  */
 export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, latestYear, pastYears, includeLatest, seatLists }: {
-  initial: OptionRow[];
+  initial: ListRow[];
   page: number;
   pageSize: number;
   total: number;
@@ -220,7 +222,7 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
     setStatus("loading");
     try {
       const res = await fetch(`/api/v1/options?${query}&page=${next}&pageSize=${pageSize}`);
-      const body = (await res.json()) as { ok: boolean; data?: { rows: OptionRow[] } };
+      const body = (await res.json()) as { ok: boolean; data?: { rows: ListRow[] } };
       if (!body.ok || !body.data) throw new Error("options request failed");
       setRows((r) => [...r, ...body.data!.rows]);
       setNext((n) => n + 1);

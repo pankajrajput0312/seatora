@@ -25,6 +25,23 @@ export async function roundSeatsAt(collegeKey: string): Promise<RoundSeats> {
   return Promise.all(lists.map(async (list) => ({ list, rows: (await listSeats({ list: list.key, college: collegeKey })).rows })));
 }
 
+/** The college header's lists: the newest PDF of the clear and of the virtual vacancy list, of `round` (seatLists() order). */
+export const headerLists = (round: SeatList[]) =>
+  (["clear", "virtual"] as const).flatMap((kind) => round.filter((l) => l.kind === kind).slice(0, 1));
+
+/** The header's numbers without the rows (tabs other than Courses and Seats): Σ seats here in each headerLists list. */
+export async function roundSeatTotals(collegeKey: string): Promise<{ list: SeatList; n: number }[]> {
+  const all = await seatLists();
+  const lists = headerLists(all.filter((l) => l.year === all[0]?.year && l.round === all[0]?.round));
+  if (!lists.length) return [];
+  const sums = await db.$queryRaw<{ key: string; n: number }[]>`
+    SELECT d.key, SUM(x.seats)::int AS n
+    FROM "SeatCount" x JOIN "DataSource" d ON d.id = x."seatSourceId" JOIN "College" c ON c.id = x."collegeId"
+    WHERE d.key = ANY(${lists.map((l) => l.key)}) AND c.key = ${collegeKey}
+    GROUP BY 1`;
+  return lists.map((list) => ({ list, n: sums.find((s) => s.key === list.key)?.n ?? 0 }));
+}
+
 /** One option's seats in ONE list's rows: its course and quota, in `categories` (all when omitted); null when the list prints none. */
 export const optionSeats = (rows: SeatRow[], o: { degree: string; specialty: string; quota: string }, categories?: string[]) =>
   sumSeats(rows.filter((r) => r.degree === o.degree && r.specialty === o.specialty), { quota: o.quota, categories });

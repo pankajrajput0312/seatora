@@ -12,7 +12,7 @@ import { AppPage } from "@/features/decide/components/app-page";
 import { Dash, PageHead, Provisional } from "@/features/decide/components/bits";
 import { DataSource } from "@/features/decide/components/data-source";
 import { termDocs, TermsSummary } from "@/features/decide/components/fees";
-import { control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
+import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { toURLSearchParams } from "@/features/decide/profile";
 import { roundLabel, rounds } from "@/features/decide/types";
@@ -49,6 +49,22 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const th = `${tbl.th} px-3`;
   const td = "px-3 py-2 align-top";
   const short = `${td} whitespace-nowrap`;
+  // The rank stays in view while the row scrolls sideways.
+  const stick = "sticky left-0 z-[1] border-r border-border bg-card";
+  // Chips for the filters she set (the page's own default, the latest round, is not one); the institute has its own line.
+  const here = (changes: Record<string, string | null>) => L.with("/decide/allotments", { page: null, ...changes });
+  const set = (k: string) => !!params.get(k)?.trim();
+  const course = meta.courses.find((c) => c.slug === filters.course);
+  const ranks = filters.from != null && filters.to != null ? `Ranks ${formatRank(filters.from)}–${formatRank(filters.to)}` : filters.from != null ? `From rank ${formatRank(filters.from)}` : filters.to != null ? `Up to rank ${formatRank(filters.to)}` : null;
+  const active = [
+    set("year") && { label: filters.year ? `Year: ${meta.years.find((y) => y.year === filters.year)?.label ?? filters.year}` : "All years", href: here({ year: null }) },
+    set("round") && filters.round && { label: `Round: ${roundLabel[filters.round]}`, href: here({ round: null }) },
+    course && { label: `${course.degree} ${course.name}`, href: here({ course: null }) },
+    filters.quota && { label: `Quota: ${filters.quota}`, href: here({ aq: null }) },
+    filters.category && { label: `${filters.category} seats`, href: here({ acat: null }) },
+    filters.state && { label: `State: ${filters.state}`, href: here({ state: null }) },
+    ranks && { label: ranks, href: here({ from: null, to: null }) },
+  ].filter((x) => !!x);
 
   return (
     <AppPage className="grid grid-cols-1 gap-6">
@@ -61,16 +77,17 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         </p>
       )}
 
-      <FilterBar action="/decide/allotments" params={params} cols="md:grid-cols-4 xl:grid-cols-[1fr_1fr_2fr_1fr_1fr_1fr_1fr_auto]">
+      <FilterBar action="/decide/allotments" params={params} cols="grid-cols-2 md:grid-cols-4 xl:grid-cols-[1fr_1fr_2fr_1fr_1fr_1fr_1fr_auto]" more={!!(f.round || f.aq || f.acat)}>
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
-        <Field label="Round"><Select name="round" value={filters.round} all="All rounds" options={rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
-        <Field label="Course"><Select name="course" value={f.course} all="All courses" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
-        <Field label="Quota"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
-        <Field label="Seat category"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>
+        <Field label="Round" className="more-filter"><Select name="round" value={filters.round} all="All rounds" options={rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
+        <Field label="Course" className="col-span-2 md:col-span-1"><Select name="course" value={f.course} all="All courses" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
+        <Field label="Quota" className="more-filter"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
+        <Field label="Seat category" className="more-filter"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>
         <Field label="Rank from"><input {...rankInput("from")} placeholder="e.g. 30,000" /></Field>
         <Field label="Rank to"><input {...rankInput("to")} placeholder="e.g. 50,000" /></Field>
       </FilterBar>
+      <ActiveFilters items={active} clear={L.to("/decide/allotments", { inst: inst?.slug })} />
       {rankError && <p id="rank-error" role="alert" className="text-sm text-ember">{rankError}</p>}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -100,11 +117,11 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       {total === 0 ? (
         <EmptyState title="No allotments match these filters." href={L.to("/decide/allotments", { inst: inst?.slug })} />
       ) : (
-        <div id="allotments" role="region" aria-label="Allotments" tabIndex={0} className={tbl.wrap}>
+        <div id="allotments" role="region" aria-label="Allotments" tabIndex={0} className={`${tbl.wrap} ${tbl.scroll} scroll-pl-28`}>
           <table className={tbl.table}>
             <caption className="sr-only">Allotments, page {page}</caption>
-            <thead><tr className={tbl.headRow}>
-              <th scope="col" className={`${th} text-right`}>Rank</th>
+            <thead className={tbl.head}><tr className="text-left">
+              <th scope="col" className={`${th} ${stick} text-right`}>Rank</th>
               <th scope="col" className={th}>Round</th>
               <th scope="col" className={th}>Institute and course</th>
               <th scope="col" data-col="quota" className={th}>Quota</th>
@@ -118,7 +135,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
             <tbody>
               {rows.map((a, i) => (
                 <tr key={i} className={tbl.row}>
-                  <td className={`${td} text-right`}>
+                  <td className={`${td} ${stick} text-right`}>
                     <Link href={L.rankScan(a.rank, a.year)} className="numeric inline-flex min-h-6 min-w-6 items-center justify-end text-[15px] font-semibold hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link>
                     {/* Two stacked targets, each at least 24 × 24 px (WCAG 2.5.8). */}
                     <Link href={L.rankJourney(a.rank, a.year)} className="flex min-h-6 items-center justify-end text-xs text-muted-foreground hover:text-sky hover:underline" title={`This rank's seat in every ${a.year} round`}>
@@ -138,7 +155,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
                   <td data-col="quota" className={short}>{a.quota}</td>
                   <td data-col="seat" className={short}>{a.category}</td>
                   <td data-col="cand" className={short}>{a.candidateCategory ?? <Dash />}</td>
-                  <td data-col="option" className={`${short} numeric text-right`}>{a.optionNo ?? <Dash />}</td>
+                  <td data-col="option" className={`${short} numeric text-right`}>{a.optionNo != null ? formatRank(a.optionNo) : <Dash />}</td>
                   <td data-col="status" className={short}>{statusLabel[a.status] ?? a.status}</td>
                   <td data-col="prev" className={`${td} min-w-48`}><PrevSeatCell prev={a.prev} L={L} /></td>
                   <td data-col="terms" className={`${td} min-w-64`}><TermsSummary t={a.fees} className="text-xs" /></td>

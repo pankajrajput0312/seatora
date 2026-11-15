@@ -176,11 +176,11 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
   const sticky = "sticky left-0 z-[1] w-40 min-w-40 border-r border-border bg-card md:w-72 md:min-w-72";
   const several = lists.length > 1;
   return (
-    <div role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, "scroll-pl-48 md:scroll-pl-80")}>
+    <div role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, tbl.scroll, "scroll-pl-48 md:scroll-pl-80")}>
       <table className={tbl.table}>
         <caption className="sr-only">{caption}</caption>
-        <thead>
-          <tr className={tbl.headRow}>
+        <thead className={tbl.head}>
+          <tr className="text-left">
             <th scope="col" className={cn(th, sticky)} aria-sort={sort === "college" ? "ascending" : undefined}>Institute, course, quota and state</th>
             <th scope="col" className={th}>Seat category</th>
             {lists.map((l) => (

@@ -11,8 +11,8 @@ import { Closing, Dash, HISTORY_CAPTION, PageHead, Provisional, ReachBadge } fro
 import { FeesSection, programmeTitle, termDocs, TermsSummary } from "@/features/decide/components/fees";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
-import { TypeBadge } from "@/features/decide/components/institute/hospital-bits";
-import { allotmentMixAt, clinicalAt, hospitalInfo, optionSeats, roundSeatsAt, websiteUrl } from "@/features/decide/components/institute/institute-data";
+import { reportedCount, TypeBadge } from "@/features/decide/components/institute/hospital-bits";
+import { allotmentMixAt, clinicalAt, headerLists, hospitalInfo, optionSeats, roundSeatsAt, roundSeatTotals, websiteUrl } from "@/features/decide/components/institute/institute-data";
 import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, HospitalFacts, RoundSeatsHead, SeatNumber } from "@/features/decide/components/institute/institute-parts";
 import { courseName, RoundGrid, SeatsBelowNote, toChoiceItem } from "@/features/decide/components/options-view";
 import { listTitle, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
@@ -34,9 +34,9 @@ const tabs = [
   { key: "overview", label: "Overview" },
   { key: "courses", label: "Courses" },
   { key: "seats", label: "Seats" },
-  { key: "allotments", label: "Allotments" },
   { key: "fees", label: "Fees & bond" },
   { key: "clinical", label: "Hospital facts" },
+  { key: "allotments", label: "Allotments" },
   { key: "residents", label: "Residents" },
 ] as const;
 const PAGE_SIZE = 50;
@@ -103,10 +103,13 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       {unlisted.map((u) => <UnlistedSeats key={u.list.key} u={u} profile={!!profile} here href={L.to("/decide/seats", { view: "list", list: u.list.key, inst: slug, nohist: "1" })} options={newOnOptions} />)}
     </div>
   );
-  // The newest round's seat lists here (Courses columns, Seats tab), each separate; allotments by quota and seat category (Overview).
+  // The newest round's seat lists here (Courses columns, Seats tab), each separate; the header's totals from them there,
+  // else from one grouped sum; allotments by quota and seat category (Overview).
   // Fees tab: the fee table by seat-type group per programme (none for MCh, MPH); Hospital facts tab: clinical facts.
-  const [round, mix, info, feeGroups, clinical] = await Promise.all([
-    tab === "courses" || tab === "seats" ? roundSeatsAt(college.key) : [],
+  const listsTab = tab === "courses" || tab === "seats";
+  const [round, totals, mix, info, feeGroups, clinical] = await Promise.all([
+    listsTab ? roundSeatsAt(college.key) : [],
+    listsTab ? null : roundSeatTotals(college.key),
     tab === "overview" ? allotmentMixAt(college.key) : null,
     hospitalInfo().then((m) => m.get(college.key) ?? null),
     tab === "fees" ? Promise.all(fees.map((p) => feesFor(college.key, p.programme))) : [],
@@ -117,20 +120,22 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const roundName = round[0] && `${round[0].list.year} ${roundLabel[round[0].list.round]}`;
   const mine = profile ? eligibleCategories(profile.category, profile.pwd) : null;
   const seatCats = mine && f.scat !== "all" ? mine : undefined;
+  const beds = info?.beds ? { ...reportedCount(info.beds), period: info.beds.meta?.period } : null;
+  // Header: this round's clear and virtual vacancies here (the newest PDF of each kind); the lists overlap, so never added.
+  const roundSeats = totals ?? headerLists(round.map((r) => r.list)).map((list) => ({ list, n: round.find((r) => r.list === list)!.rows.reduce((a, r) => a + r.seats, 0) }));
 
   return (
     <AppPage className="grid grid-cols-1 gap-6">
-      <div>
-        <p className="text-sm text-muted-foreground">
-          <Link href={L.institutes()} className={smallLink}>Institutes</Link>
-          {college.state && <> / <Link href={L.institutes({ state: college.state })} className={smallLink}>{college.state}</Link></>}
-        </p>
-        <PageHead title={college.name} />
-        <p className="mt-2 max-w-3xl text-muted-foreground">
-          <span className="text-sm">Address as printed by MCC: </span>{college.address ?? <Dash />}
-        </p>
-        {(info?.type || info?.mccProfileUrl || website) && (
-          <p className="mt-1 flex flex-wrap items-center gap-x-4 text-sm">
+      {/* A div: globals.css hides every <header> on paper (the app bar), and this one holds the name and address. */}
+      <div className="grid gap-4">
+        <div>
+          <p className="text-sm text-muted-foreground">
+            <Link href={L.institutes()} className={smallLink}>Institutes</Link>
+            {college.state && <> / <Link href={L.institutes({ state: college.state })} className={smallLink}>{college.state}</Link></>}
+          </p>
+          <PageHead title={college.name} />
+          <p className="mt-2 flex flex-wrap items-center gap-x-4 text-sm">
+            {college.state && <span className="font-medium">{college.state}</span>}
             {info?.type && <TypeBadge type={info.type} note />}
             {info?.mccProfileUrl && (
               <a href={info.mccProfileUrl} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>Official MCC profile<span className="sr-only"> (opens in a new tab)</span></a>
@@ -141,7 +146,33 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               </a>
             )}
           </p>
-        )}
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Address as printed by MCC: {college.address ?? <Dash />}</p>
+        </div>
+        <dl aria-label="Key numbers" className="grid grid-cols-2 gap-x-8 gap-y-4 border-y border-border py-4 sm:grid-cols-3">
+          <div>
+            <dt className="text-sm text-muted-foreground">Beds, as reported</dt>
+            <dd className="text-2xl font-bold">
+              {beds ? (
+                <Link href={L.institute(slug, "clinical")} className="numeric inline-flex min-h-11 items-center text-sky hover:underline">{beds.text}<span className="sr-only"> beds: see Hospital facts</span></Link>
+              ) : (
+                <Dash />
+              )}
+            </dd>
+            <dd className="text-xs text-muted-foreground">{beds ? `Self-reported${beds.period ? `, ${beds.period}` : ""}` : "Not found yet"}</dd>
+            {beds?.conflicting && <dd className="text-xs text-sun">The source prints conflicting figures</dd>}
+          </div>
+          {roundSeats.map(({ list, n }) => (
+            <div key={list.key}>
+              <dt className="text-sm text-muted-foreground">{list.year} {roundLabel[list.round]} {seatKindLabel[list.kind].toLowerCase()}</dt>
+              <dd className="text-2xl font-bold">
+                <Link href={L.to(`/decide/institutes/${slug}`, { tab: "seats" })} className="numeric inline-flex min-h-11 items-center text-sky hover:underline">
+                  {n > 0 ? `${formatRank(n)} ${n === 1 ? "seat" : "seats"}` : "None"}<span className="sr-only">: see Seats</span>
+                </Link>
+              </dd>
+              <dd className="text-xs text-muted-foreground">{n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves" : "Every course, quota and category here") : "The MCC list prints none here"}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
 
       <SubTabs label="Institute sections" current={tab} items={tabs.map((t) => ({ key: t.key, label: t.label, href: L.to(`/decide/institutes/${slug}`, { tab: t.key }) }))} />
@@ -396,13 +427,18 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           {fees.length === 0 ? (
             <EmptyState title="No courses here in the MCC data" description="There is no programme here to show fees, stipend or bond for." href={L.institute(slug, "courses")} action="See the courses here" />
           ) : (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <>
+              {fees.length > 1 && (
+                <nav aria-label="Programmes here" className="flex flex-wrap gap-x-4 text-sm">
+                  {fees.map((p) => <a key={p.programme} href={`#fees-${programmes[p.programme].slug}`} className={`${smallLink} text-sky`}>{programmeTitle(p)}</a>)}
+                </nav>
+              )}
               {fees.map((p, i) => (
                 <div key={p.programme} className="rounded-xl border border-border bg-card p-5">
                   <FeesSection t={p} groups={feeGroups[i]} id={`fees-${programmes[p.programme].slug}`} />
                 </div>
               ))}
-            </div>
+            </>
           )}
           <p className="max-w-3xl text-xs text-muted-foreground">
             One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type (All India, Deemed/Paid, NRI, DNB Quota) where the MCC profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead, never a figure. NBEMS maximum and minimum are NBEMS&apos;s limits, not the college&apos;s figures. A dash means not stated (not in the MCC profile fields we import; the profile may say more), never zero.

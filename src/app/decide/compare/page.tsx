@@ -8,7 +8,7 @@ import { DataSource } from "@/features/decide/components/data-source";
 import { Dash, HISTORY_CAPTION, PageHead, ReachBadge, TermText } from "@/features/decide/components/bits";
 import { CompareFromDevice, RemoveFromCompare } from "@/features/decide/components/compare-controls";
 import { ClosingCell, courseName, FeeText, RoundGrid } from "@/features/decide/components/options-view";
-import { EmptyState, smallLink } from "@/features/decide/components/ui";
+import { EmptyState, smallLink, tbl } from "@/features/decide/components/ui";
 import { MAX_COMPARE } from "@/features/decide/lib/choices";
 import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams } from "@/features/decide/lib/params";
@@ -84,11 +84,11 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           action="Pick options to compare"
         />
       ) : (
-        <div role="region" aria-label="Comparison" tabIndex={0} className="relative mt-8 overflow-x-auto rounded-xl border border-border bg-card [scroll-padding-inline-start:11rem]">
+        <div role="region" aria-label="Comparison" tabIndex={0} className={`relative mt-8 rounded-xl border border-border bg-card [scroll-padding-inline-start:11rem] ${tbl.scroll}`}>
           <table className="w-full text-sm">
             <caption className="sr-only">Comparison of {options.length} {options.length === 1 ? "option" : "options"}</caption>
-            <thead>
-              <tr className="border-b border-border align-top">
+            <thead className={tbl.head}>
+              <tr className="align-top">
                 <td className="sticky left-0 z-10 w-44 bg-card p-3" />
                 {options.map((r, i) => (
                   <th key={r.id} id={`col-${r.id}`} tabIndex={-1} scope="col" className="p-3 text-left font-medium">
@@ -112,7 +112,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             <tbody>
               {rows.map((s) => (
                 <tr key={s.label} className="border-b border-border align-top last:border-0">
-                  <th scope="row" className="sticky left-0 z-10 bg-card p-3 text-left text-xs font-normal text-muted-foreground">{s.label}</th>
+                  <th scope="row" className="sticky left-0 z-[1] bg-card p-3 text-left text-xs font-normal text-muted-foreground">{s.label}</th>
                   {options.map((r) => <td key={r.id} className="numeric p-3">{s.cell(r)}</td>)}
                 </tr>
               ))}

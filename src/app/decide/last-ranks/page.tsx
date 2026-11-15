@@ -5,7 +5,7 @@ import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HISTORY_CAPTION, PageHead, Provisional } from "@/features/decide/components/bits";
-import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink } from "@/features/decide/components/ui";
+import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
@@ -105,13 +105,13 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       {lr.total === 0 ? (
         <EmptyState title={`No ${category}-seat closings for ${courseLabel}${quota ? `, ${quota}` : ""}`} description="Try another seat category or quota." href={L.to("/decide/last-ranks", { course: course.slug })} />
       ) : (
-        <div role="region" aria-label={caption} tabIndex={0} className="relative overflow-x-auto rounded-xl border border-border bg-card [scroll-padding-inline-start:16rem]">
+        <div role="region" aria-label={caption} tabIndex={0} className={`relative rounded-xl border border-border bg-card [scroll-padding-inline-start:16rem] ${tbl.scroll}`}>
           <table className="w-full min-w-[56rem] text-sm">
             <caption className="sr-only">{caption}, page {page}</caption>
             <colgroup span={2} />
             {cols.map((c) => <colgroup key={c.year} span={c.rounds.length} />)}
-            <thead>
-              <tr className="border-b border-border text-xs text-muted-foreground">
+            <thead className={tbl.head}>
+              <tr className="text-xs text-muted-foreground">
                 <th rowSpan={2} scope="col" className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-semibold">Institute</th>
                 <th rowSpan={2} scope="col" className="px-2 py-2 text-left text-xs font-semibold">R1 trend</th>
                 {cols.map((c) => (
@@ -120,7 +120,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                   </th>
                 ))}
               </tr>
-              <tr className="border-b border-border text-xs text-muted-foreground">
+              <tr className="text-xs text-muted-foreground">
                 {cols.flatMap((c) =>
                   c.rounds.map((r, i) => {
                     const key = `${c.year}-${r}`;
@@ -141,7 +141,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                 const mine = inst?.slug === r.college.slug;
                 return (
                   <tr key={r.id} id={r.id === anchor ? `inst-${r.college.slug}` : undefined} className={`scroll-mt-24 border-b border-border last:border-0 hover:bg-muted/50 ${mine ? "bg-sky/10" : ""}`}>
-                    <th scope="row" className={`sticky left-0 z-10 max-w-64 px-3 py-2 text-left font-normal ${mine ? "bg-mist" : "bg-card"}`}>
+                    <th scope="row" className={`sticky left-0 z-[1] max-w-64 px-3 py-2 text-left font-normal ${mine ? "bg-mist" : "bg-card"}`}>
                       <Link href={L.institute(r.college.slug)} className="font-medium hover:text-sky hover:underline">{r.college.name}</Link>
                       <span className="block text-xs text-muted-foreground">{r.college.state ?? <Dash />}, {r.quota}</span>
                       <Link href={L.allotments({ course: course.slug, inst: r.college.slug })} className={`${smallLink} text-xs text-sky`}>Allotments</Link>

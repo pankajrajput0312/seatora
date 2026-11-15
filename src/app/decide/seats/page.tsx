@@ -13,11 +13,11 @@ import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm } from "@/features/decide/components/filter-form";
 import { courseName } from "@/features/decide/components/options-view";
 import { MccLink } from "@/features/decide/components/pages/mcc-link";
-import { PAST_ROUNDS, parseSeatsParams, seatCategories, seatSorts, seatsView, type SeatSort, type SeatsParams } from "@/features/decide/components/seats/find-seats";
+import { PAST_ROUNDS, parseSeatsParams, seatCategories, seatSorts, seatsView, type SeatLine, type SeatSort, type SeatsParams } from "@/features/decide/components/seats/find-seats";
 import { listTitle, SeatListPicker, SeatTable, seatKindNote } from "@/features/decide/components/seats/seat-lists";
-import { SeatMatrix, type ClosingYear, type SeatGroup } from "@/features/decide/components/seats/seat-matrix";
+import { SeatMatrix, type ClosingYear, type MatrixRow, type SeatGroup } from "@/features/decide/components/seats/seat-matrix";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
-import { control, EmptyState, Pager, rangeLabel, smallLink, tbl } from "@/features/decide/components/ui";
+import { ActiveFilters, control, EmptyState, MoreFilters, Pager, rangeLabel, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { reachWindow } from "@/features/decide/lib/reach";
 import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, type Profile } from "@/features/decide/profile";
@@ -27,6 +27,8 @@ import { openQuotas, openQuotasNote, roundLabel, rounds, seatKindLabel, seatKind
 
 export const metadata: Metadata = { title: "Seats" };
 const PAGE_SIZE = 50;
+/** The matrix's rows carry every round of every year (and their terms for the details), so it pages by 25: half the HTML of 50. */
+const MATRIX_PAGE_SIZE = 25;
 /** "clear vacancy seats", "newly added seats". */
 const kindSeats = (l: SeatList) => `${seatKindLabel[l.kind].toLowerCase()}${l.kind === "new" ? "" : " seats"}`;
 const sortLabels: Record<SeatSort, string> = {
@@ -37,6 +39,9 @@ const kindCount = (l: SeatList, n: number, round: SeatList[]) => {
   const day = round.some((x) => x !== l && x.kind === l.kind) ? listDay(l) : undefined;
   return `${formatRank(n)} ${{ clear: "clear seats", virtual: "virtual", new: "newly added" }[l.kind]}${day ? ` (${fmtDay(day)} PDF)` : ""}`;
 };
+/** A matrix row without what the matrix never reads: the published terms alone are about half of a row's bytes. */
+const notInMatrix = ["terms", "rounds", "deepest", "list", "seats", "cs"];
+const matrixRow = (r: SeatLine) => Object.fromEntries(Object.entries(r).filter(([k]) => !notInMatrix.includes(k))) as MatrixRow;
 /** Seat columns of the matrix: one group per round of `lists` (seatLists order, newest first). */
 const seatGroups = (lists: SeatList[]): SeatGroup[] =>
   [...new Set(lists.map((l) => `${l.year}-${l.round}`))].map((g) => {
@@ -64,7 +69,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
 }
 
 async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: Profile | null; params: URLSearchParams; L: DecideLinks }) {
-  const { all, meta, inst, course, list, mine, sort, r } = await seatsView(f, profile, PAGE_SIZE);
+  const { all, meta, inst, course, list, mine, sort, r } = await seatsView(f, profile, f.view === "matrix" ? MATRIX_PAGE_SIZE : PAGE_SIZE);
   const one = !!(inst || course || f.squota);
   if (!list || !r)
     return (
@@ -91,6 +96,16 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
     ? `Seat matrix, ${round}${allRounds ? " and every other round" : ""}: seats per list, terms${profile ? ", your chances" : ""} and closing ranks by year and round, ${sortLabels[sort].toLowerCase()}, page ${r.page}`
     : `${compare ? `Seats in every ${round} list side by side` : `Seats in the ${title} list`} (MCC PDF${compare ? "s" : ""}), ${sortLabels[sort].toLowerCase()}, page ${r.page}`;
   const years: ClosingYear[] = meta.years.map((y, i) => ({ year: y.year, rounds: i === 0 ? y.rounds : [...rounds] }));
+  // Chips for what narrows the rows beyond the courses (the Course pill shows those); inst / course / nohist have their own lines below.
+  const listed = (label: string, xs: string[]) => `${label}: ${xs.length > 2 ? `${xs.length} selected` : xs.join(", ")}`;
+  const hasWords = { clear: "Has clear vacancy", virtual: "Has virtual vacancy", new: "Has newly added" } as const;
+  const active = [
+    f.q && { label: `Search: “${f.q}”`, href: here({ q: null }) },
+    f.quota.length > 0 && { label: listed("Quota", f.quota), href: here({ quota: null }) },
+    f.st.length > 0 && { label: listed("State", f.st), href: here({ st: null }) },
+    matrix && f.has.length > 0 && { label: `${round}: ${f.has.map((k) => hasWords[k].toLowerCase()).join(" or ")}`, href: here({ has: null }) },
+    f.scat && { label: f.scat === "all" ? "All seat categories" : `${f.scat} seats`, href: here({ scat: null }) },
+  ].filter((x) => !!x);
 
   return (
     <>
@@ -162,13 +177,13 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             <FilterDropdown
               label={`Seats in ${round}`}
               name="has"
-              options={seatKinds.filter((k) => roundLists.some((l) => l.kind === k)).map((k) => ({ value: k, label: { clear: "Has clear vacancy", virtual: "Has virtual vacancy", new: "Has newly added" }[k] }))}
+              options={seatKinds.filter((k) => roundLists.some((l) => l.kind === k)).map((k) => ({ value: k, label: hasWords[k] }))}
               selected={f.has}
               none="Any"
               noneNote={`None ticked means every row. Ticked: rows with seats in any ticked ${round} list.`}
             />
           )}
-          <label className="w-72 max-w-full">
+          <label className="more-filter w-72 max-w-full">
             <span className="sr-only">Seat category</span>
             <select name="scat" defaultValue={f.scat ?? ""} className={control}>
               <option value="">{mine ? `Your categories: ${mine.join(", ")}` : "All seat categories"}</option>
@@ -176,15 +191,17 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
               {seatCategories.map((c) => <option key={c} value={c}>{c} seats</option>)}
             </select>
           </label>
-          <label className="w-72 max-w-full">
+          <label className="more-filter w-72 max-w-full">
             <span className="sr-only">Sort</span>
             <select name="sort" defaultValue={sort} className={control}>
               {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && several ? `Most ${kindSeats(list)} first` : s === "reach" && matrix ? "Your chances: beyond your rank first" : sortLabels[s]}</option>)}
             </select>
           </label>
         </Fragment>
+        <MoreFilters open={!!f.scat || !!f.sort} />
         <Button type="submit">Apply</Button>
       </FilterForm>
+      <ActiveFilters items={active} clear={here({ list: list.key, q: null, quota: null, st: null, has: null, scat: null })} />
 
       {one && (
         <p className="flex flex-wrap items-center gap-x-3 rounded-lg border border-border bg-card px-4 py-1 text-sm">
@@ -271,7 +288,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             {profile && <> Your chances is Options&apos; label on that one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round); &quot;New&quot; when MCC never allotted the course and quota; no label on a row whose PDF prints no quota.</>}{" "}
             {HISTORY_CAPTION}
           </p>
-          <SeatMatrix rows={r.rows} groups={seatGroups(r.lists)} years={years} results={meta.sources} ranked={!!profile} sort={sort} caption={caption} />
+          <SeatMatrix rows={r.rows.map(matrixRow)} groups={seatGroups(r.lists)} years={years} results={meta.sources} ranked={!!profile} sort={sort} caption={caption} />
           <DataSource terms={termDocs(r.rows.map((x) => x.fees))} />
         </>
       ) : (
