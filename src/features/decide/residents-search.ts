@@ -9,6 +9,7 @@ export const RESIDENTS_PAGE_SIZE = 50;
 
 export const residentsQuery = z.object({
   q: z.string().trim().max(60).optional(), // name or college (name, city) search, case/space-insensitive tokens
+  name: z.array(z.string().trim().min(1).max(80)).max(20).optional(), // exact names picked from the search dropdown (any case)
   college: z.array(z.string().max(120)).max(20).optional(), // College.slug; empty/absent = all colleges
   cq: z.string().trim().max(60).optional(), // college name search (the College filter's box without JS)
   state: z.string().max(60).optional(),

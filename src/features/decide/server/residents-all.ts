@@ -43,13 +43,20 @@ function residentsWhere(q: ResidentsQuery): Prisma.ResidentWhereInput {
     quota: q.quota && (q.quota === MINORITY || RELIGIOUS.includes(q.quota)) ? { in: RELIGIOUS } : q.quota,
     college: q.college?.length || q.state || cq.length ? { slug: q.college?.length ? { in: q.college } : undefined, state: q.state, AND: cq.length ? cq.map((name) => ({ name })) : undefined } : undefined,
     specialty: q.course?.length ? { slug: { in: q.course } } : undefined,
-    AND: tokens(q.q).map((t) => ({ OR: [{ name: t }, { college: { name: t } }, { college: { city: t } }] })),
+    AND: [
+      ...tokens(q.q).map((t) => ({ OR: [{ name: t }, { college: { name: t } }, { college: { city: t } }] })),
+      ...(q.name?.length ? [{ OR: q.name.map((n) => ({ name: { equals: n, mode: "insensitive" as const } })) }] : []),
+    ],
   };
 }
 
 /** The years that have residents, newest first (the Year filter: no admitted list yet for the year in counselling). */
 export const residentYears = async () =>
   (await db.resident.groupBy({ by: ["year"], where: { hidden: false }, orderBy: { year: "desc" } })).map((g) => g.year);
+
+/** Up to `take` distinct resident names (not hidden) with every token of `q`, by name: the search dropdown's names. */
+export const residentNames = async (q: string, take = 10) =>
+  (await db.resident.findMany({ where: { hidden: false, AND: tokens(q).map((name) => ({ name })) }, select: { name: true }, distinct: ["name"], orderBy: { name: "asc" }, take })).map((r) => r.name);
 
 /** Colleges with residents (not hidden) whose name has every token of `q` (or, by `slugs`, those colleges), by name: the College filter's choices. Names of colleges only. */
 export const residentColleges = (by: { q: string } | { slugs: string[] }, take = 20) =>

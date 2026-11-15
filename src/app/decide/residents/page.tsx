@@ -6,7 +6,8 @@ import { PageHead } from "@/features/decide/components/bits";
 import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
 import { residentsFilters, ResidentsAbout, ResidentsCards, ResidentsTable, type ResidentTypes } from "@/features/decide/components/residents-results";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
-import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, Select } from "@/features/decide/components/ui";
+import { ResidentsSearch } from "@/features/decide/components/residents-search";
+import { ActiveFilters, EmptyState, Field, FilterBar, Pager, Select } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { decideLinks } from "@/features/decide/lib/links";
 import { specialtyName } from "@/features/decide/lib/specialty-search";
@@ -17,7 +18,7 @@ import { listResidentsAll, RESIDENTS_MAX_PAGE, residentColleges, residentQuota, 
 import { chosenView } from "@/features/decide/server/view";
 import { getDecideData, getMeta } from "@/features/decide/service";
 import { hideResidentAction } from "../institutes/[slug]/actions";
-import { findResidentColleges } from "./actions";
+import { findResidentColleges, findResidentNames } from "./actions";
 
 // People's names: never indexed.
 export const metadata: Metadata = { title: "Residents", robots: { index: false, follow: false } };
@@ -76,6 +77,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   const chips = [
     query.q && { label: `Search: “${query.q}”`, href: here({ q: null }) },
     picked.length > 0 && { label: listed("Colleges", picked.map(collegeName)), href: here({ college: null }) },
+    (query.name?.length ?? 0) > 0 && { label: listed("Names", query.name!), href: here({ name: null }) },
     query.cq && { label: `College: “${query.cq}”`, href: here({ cq: null }) },
     // Her courses are the default: a chip for them too, "All courses" lifts it.
     allCourses ? { label: "All courses", href: here({ course: null }) } : typedCourses.length ? { label: listed("Courses", typedCourses.map(courseName)), href: here({ course: null }) } : yours && { label: `Your courses (${yours.length})`, href: here({ course: "all" }) },
@@ -100,13 +102,9 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         active={chips.length}
         clear={clear}
         search={
-          <label className="min-w-0 flex-1 basis-32 md:min-w-56">
-            <span className="sr-only">Name or college</span>
-            <input type="search" name="q" defaultValue={query.q} maxLength={60} placeholder="Search a name or college" className={control} />
-          </label>
+          <ResidentsSearch q={query.q} colleges={pickedColleges.map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name }))} names={query.name ?? []} findColleges={findResidentColleges} findNames={findResidentNames} />
         }
       >
-        <FilterDropdown label="College (hospital)" name="college" find={findResidentColleges} findName="cq" options={pickedColleges.map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name }))} selected={picked} none="All colleges" noneNote="None ticked means every college. Type 2 or more letters of a name to find one; tick one or more." />
         <FilterDropdown label="Course (branch)" name="course" search options={courseChoices} selected={allCourses ? ["all"] : typedCourses} none={yours ? `Your courses (${yours.length})` : "All courses"} noneNote={yours ? "None ticked means your courses. Tick All courses for every one." : "None ticked means every course."} />
         <Field label="State"><Select name="state" value={query.state} all="All states" options={meta.states.map((s) => ({ value: s, label: s }))} /></Field>
         <Field label="Year"><Select name="year" value={query.year ? String(query.year) : undefined} all="All years" options={years.map((y) => ({ value: String(y), label: String(y) }))} /></Field>

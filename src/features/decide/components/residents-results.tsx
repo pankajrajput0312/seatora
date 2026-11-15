@@ -33,7 +33,7 @@ export function residentsFilters(params: URLSearchParams, profile: Profile | nul
   const raw = new URLSearchParams();
   for (const [k, v] of params) if (k !== "quota") raw.append(k, v);
   if (params.get("rq")) raw.set("quota", params.get("rq")!);
-  const f = parseSearchParams(residentsQuery, raw, ["course", "college"]);
+  const f = parseSearchParams(residentsQuery, raw, ["course", "college", "name"]);
   const mine = profile && (profile.pairs?.length || profile.specialties.length || profile.degrees.length) ? courses.filter((c) => profileHasCourse(profile, c)) : [];
   const yours = mine.length > 0 && mine.length <= 20;
   const allCourses = !!f.course?.includes("all");
