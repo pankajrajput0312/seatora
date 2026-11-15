@@ -98,6 +98,16 @@ export const feeValue = {
   leave: (t: ProgrammeTerms) => t.bond.leavingAmount.max,
 };
 
+/**
+ * A computed amount (server/terms.ts formulaAmount) against a cap: an "at most" figure under the cap passes, over it is
+ * unknown; an "at least" figure over the cap fails, under it is unknown. An exact computed figure is as a declared one.
+ */
+function bounded(v: number | null, a: ProgrammeTerms["bond"]["amount"] | null, cap: number | null | undefined): number | null {
+  const b = a?.formula?.bound;
+  if (v == null || cap == null || !b) return v;
+  return (b === "upTo" ? v <= cap : v > cap) ? v : null;
+}
+
 /** pass; fail (a known value is outside a cap, "No bond" not on record, no or another type); unknown: passes but for a value not declared. */
 export type TermVerdict = "pass" | "fail" | "unknown";
 
@@ -116,8 +126,8 @@ export function termVerdict(t: ProgrammeTerms, type: TypeValue | null | undefine
     [f.maxFee, feeUnsure ? null : feeValue.fee1(t), (v, cap) => v <= cap],
     [f.minStipend, !s || stipUnsure ? null : (s.min ?? s.inr), (v, cap) => v >= cap],
     [f.maxBondYears, feeValue.bondyrs(t), (v, cap) => v <= cap],
-    [f.maxBondInr, feeValue.bond(t), (v, cap) => v <= cap],
-    [f.maxLeavingInr, feeValue.leave(t), (v, cap) => v <= cap],
+    [f.maxBondInr, bounded(feeValue.bond(t), t.bond.status === "declared" ? t.bond.amount : null, f.maxBondInr), (v, cap) => v <= cap],
+    [f.maxLeavingInr, bounded(feeValue.leave(t), t.bond.leavingAmount, f.maxLeavingInr), (v, cap) => v <= cap],
   ];
   let unknown = false;
   for (const [cap, v, ok] of checks) {

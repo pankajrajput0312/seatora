@@ -286,10 +286,11 @@ describe("bond cells, by record status", () => {
     expect(cells("DNB", []).bond.tip[1]).toMatchObject({ rules: true, text: expect.stringMatching(/^NBEMS rule: private DNB hospitals/) });
   });
 
-  it("a declared bond with no ₹ figure for this course is 'See text'; years not stated is 'Yes'", () => {
+  it("a declared bond with no ₹ figure for this course is a short phrase (no stipend figures to compute it); years not stated is 'Yes'", () => {
     const words = cells("MD/MS", [bond("MD", "Service bond: double the stipend received for 3 years of study", null, { status: "documented", years: "3 years of study; service not stated" })]);
     expect(shown(words.bond)).toEqual(["Yes", "Years not stated", null, "bond"]);
-    expect(shown(words.bondInr)).toEqual(["See text", "See text", null, "muted"]);
+    expect(shown(words.bondInr)).toEqual(["2× stipend", "2× stipend", null, "muted"]);
+    expect(tip(words.bondInr)).toContain("No number: Seatora has no stipend figure for every year needed.");
   });
 });
 
@@ -327,7 +328,7 @@ describe("leaving cell", () => {
     expect(shown(cells("MD/MS", [ag]).bondInr)).toEqual(["₹35 L–₹50 L", "₹35,00,000–₹50,00,000", "by specialty", "bond"]);
   });
 
-  it("an additional item owed on top is included and marked; words only is 'See text'", () => {
+  it("an additional item owed on top is included and marked; words only is a short phrase", () => {
     const mh = penalty("MD", {
       items: [
         { kind: "leaving_penalty", applies_to: "PG at Govt seats", inr: 1000000, when: "non-completion of Junior residency tenure", quote: null, source_url: MCC.url },
@@ -336,9 +337,121 @@ describe("leaving cell", () => {
     });
     expect(shown(cells("MD/MS", [mh]).leaving)).toEqual(["₹10 L–₹20 L", "₹10,00,000–₹20,00,000", "incl. additional", null]);
     const words = penalty("DNB", { items: [{ kind: "leaving_penalty", applies_to: "DNB / Diploma", inr: null, when: "leaving the course", quote: "balance fee for the entire course", source_url: MCC.url }] });
-    expect(shown(cells("DNB", [words]).leaving)).toEqual(["See text", "See text", null, "muted"]);
+    expect(shown(cells("DNB", [words]).leaving)).toEqual(["Rest of course fee", "Rest of course fee", null, "muted"]);
     expect(tip(cells("DNB", [words]).leaving)).toContain("In words only (no ₹ figure).");
     expect(tip(cells("DNB", [words]).leaving)).not.toContain("Part of it");
+  });
+});
+
+
+// Real texts from the bundle (data/medpath-r3/terms.ndjson), each through the real normalizer with this row's own figures.
+describe("formula amounts: computed from the record's words over the row's own fee and stipend", () => {
+  const stip = (...xs: number[]) => [0, 1, 2].map((i) => (xs[i] != null ? { inr: xs[i], kind: "declared" as const, src: 1 } : null));
+  const verbatim = (stipend: number[]) => fees("MD", [rec("MD/MS", { seat_groups: ["Deemed/Paid"], fee_display: "verbatim", fee_text: "Annual fees: in words", stipend_per_month: stip(...stipend) })]);
+  const penaltyText = (program: Term["program"], text: string, details: PenaltyDetails): Term => ({ ...term(program, "PENALTY", text), details });
+  const leave = (applies_to: string, when: string, quote: string | null = null, inr: number | null = null) => ({ kind: "leaving_penalty" as const, applies_to, inr, when, quote, source_url: MCC.url });
+
+  // Sri Devaraj Urs (SDUAHER): "refund 3 years' stipend", its stipend ₹50,000 / ₹55,000 / ₹60,000 a month; the fee in words.
+  const sdu = [
+    bond("MD", "Service bond: 1 year + 1 yr compulsory govt service (Karnataka law) · refund 3 years' stipend, if not served", null, {
+      status: "yes", years: "1 (serve the institution)", amounts: [],
+      quote: "I shall serve this institution for a period of one year after successful completion of the course ... Failing to comply with SDUAHER terms and conditions, I shall refund three years stipend paid to me during the course.",
+    }),
+    penaltyText("MD", "Seat-leaving penalty: balance tuition and other fees for the entire course (discontinuing the course); Other penalty: refund of three years' stipend (not serving the institution for one year after the course)", {
+      items: [leave("MD/MS", "discontinuing the course"), { kind: "other", applies_to: "MD/MS", inr: null, when: "not serving the institution for one year after the course", quote: "I shall refund three years stipend paid to me during the course", source_url: MCC.url }],
+    }),
+  ];
+
+  it("N years' stipend: years 1..N, ₹/month × 12, marked computed with the formula in the (i) (Sri Devaraj Urs)", () => {
+    const c = cells("MD/MS", [...sdu, ...verbatim([50000, 55000, 60000])]);
+    expect(shown(c.bondInr)).toEqual(["₹19.8 L", "₹19,80,000", "computed", "bond"]);
+    expect(tip(c.bondInr)).toContain("refund 3 years' stipend, if not served");
+    expect(tip(c.bondInr)).toContain("3 years' stipend: (₹50,000 + ₹55,000 + ₹60,000) a month × 12 = ₹19,80,000.");
+    // The leaving words: the balance of the course fee, which is in words for this seat: a phrase, never "See text".
+    expect(shown(c.leaving)).toEqual(["Rest of course fee", "Rest of course fee", null, "muted"]);
+    expect(tip(c.leaving)).toContain("balance tuition and other fees for the entire course (discontinuing the course)");
+    // With fee figures: at most the whole course's (a balance).
+    const fig = cells("MD/MS", [...sdu, ...fees("MD", [rec("MD/MS", { fee_per_year: [fee(500000), fee(500000), fee(500000)], stipend_per_month: stip(50000, 50000, 50000) })])]);
+    expect(shown(fig.bondInr).slice(0, 3)).toEqual(["₹18 L", "₹18,00,000", "computed"]);
+    expect(shown(fig.leaving).slice(0, 3)).toEqual(["≤ ₹15 L", "≤ ₹15,00,000", "computed"]);
+    expect(tip(fig.leaving)).toMatch(/Whole course fee: ₹5,00,000 a year × 3 years = ₹15,00,000\. At most this: a balance is what is still unpaid when you leave\./);
+  });
+
+  it("double the stipend received: every year's, doubled; an NBEMS minimum stipend is 'at least' (Odisha)", () => {
+    const od = bond("MD", "Service bond: 2 years · double the stipend received, if not served · AIQ included", null, {
+      status: "yes", years: 2, amounts: [],
+      quote: "Monetary Penalty for defaulters (for not serving in state for two years after completion of course) shall be double the amount of stipend/salary received during study period. Candidates leaving the course before completion of the course leading to lapse of a seat shall be liable for monetary penalty of Rs. 10 lakh and the amount of stipend / salary received by the date of such leaving the course.",
+    });
+    const c = cells("MD/MS", [od, ...fees("MD", [rec("MD/MS", { stipend_per_month: stip(74456, 78001, 81547) })])]);
+    expect(shown(c.bondInr).slice(0, 3)).toEqual(["₹56,16,096", "₹56,16,096", "computed"]);
+    expect(c.bondInr.level).toBe("heavy");
+    const rule = bond("DNB", "State bond: 2 yrs, repay double the stipend; leaving ₹10 L + stipend; applied to DNB in practice (Odisha resolution 29-01-2024)", null, { status: "state_rule", amounts: [{ applies_to: "NBEMS Diploma", inr: null }] });
+    const nb = cells("NBEMS Diploma", [rule, ...fees("DNB", [rec("NBEMS Diploma", { stipend_per_month: [43000, 45000, null].map((v) => (v ? { inr: v, kind: "nbems_minimum" as const, minimum: true as const, src: 2 } : null)) })])]);
+    expect(shown(nb.bondInr).slice(0, 3)).toEqual(["≥ ₹21.12 L", "≥ ₹21,12,000", "computed"]);
+    expect(tip(nb.bondInr)).toContain("At least this: the stipend is the NBEMS minimum.");
+  });
+
+  it("the entire course's fee: every year's (KIMS); an NBEMS maximum is 'at most' (DNB balance fee)", () => {
+    const kims = penaltyText("MD", "Seat-leaving penalty: institutional fees for the entire course (discontinuing the course for any reason)", {
+      items: [leave("PG medical course", "discontinuing the course for any reason", "undertake to pay Institutional fees to Kalinga Institute of Medical Sciences payable for the entire course")],
+    });
+    const c = cells("MD/MS", [kims, ...fees("MD", [rec("MD/MS", { fee_per_year: [fee(2900000), fee(2900000), fee(2900000)] })])]);
+    expect(shown(c.leaving)).toEqual(["₹87 L", "₹87,00,000", "computed", null]);
+    expect(c.leaving.level).toBe("heavy");
+    const dnb = penaltyText("DNB", "Seat-leaving penalty: balance fee for the whole course (the institute may ask for a bond / bank guarantee) (leaving the institute / course midway)", {
+      items: [leave("DNB / Diploma", "leaving the institute / course midway", "liable to pay the balance fee for the whole course even if they leave the institute/course midway")],
+    });
+    const max = fees("DNB", [rec("DNB", { seat_groups: ["DNB Quota"], fee_per_year: [1, 2, 3].map(() => ({ amount: 125000, currency: "INR" as const, kind: "nbems_ceiling" as const, maximum: true as const, src: 2 })) })]);
+    expect(shown(cells("DNB", [dnb, ...max]).leaving).slice(0, 3)).toEqual(["≤ ₹3.75 L", "≤ ₹3,75,000", "computed"]);
+    // The fee in words only: what it is, no number.
+    expect(cells("MD/MS", [kims, ...verbatim([])]).leaving.short).toBe("Whole course fee");
+  });
+
+  it("a ₹ figure plus the stipend received: added, the figure to the total ('₹10 L–₹38 L'); 'the lesser of' adds nothing", () => {
+    const od = penaltyText("MD", "Seat-leaving penalty: ₹10,00,000 (leaving the course before completion so the seat lapses; plus all stipend/salary received up to leaving)", {
+      items: [leave("PG Diploma/DNB/DrNB/MD/MS/MDS/DM/MCh", "leaving the course before completion so the seat lapses; plus all stipend/salary received up to leaving", null, 1000000)],
+    });
+    const st = fees("MD", [rec("MD/MS", { stipend_per_month: stip(74456, 78001, 81547) })]);
+    const c = cells("MD/MS", [od, ...st]);
+    expect(shown(c.leaving).slice(0, 3)).toEqual(["₹10 L–₹38,08,048", "₹10,00,000–₹38,08,048", "computed"]);
+    expect(tip(c.leaving)).toContain("₹10,00,000 as stated; total ₹38,08,048. At most this: the stipend received by the date you leave.");
+    const bhav = penaltyText("MD", "Seat-leaving penalty: ₹5,00,000", {
+      items: [leave("MD/MS/Diploma in pre/para-clinical subjects", "leaving the course midway for any reason: the lesser of total stipend paid to that day or ₹5 lakh, paid to MK Bhavnagar University", null, 500000)],
+    });
+    expect(shown(cells("MD/MS", [bhav, ...st]).leaving).slice(0, 3)).toEqual(["₹5 L", "₹5,00,000", null]);
+  });
+
+  it("fees + stipend received, combined; a part with no figure (a blank fee, interest) is a phrase, never a number", () => {
+    const both = penaltyText("MD", "Seat-leaving penalty: x", {
+      items: [leave("MCC-allotted PG (All India [Management] & NRI)", "surrender/resignation after MCC schedule or abandoning mid-course: no refund, pay entire course fee (3 years) + stipend received")],
+    });
+    const c = cells("MD/MS", [both, ...fees("MD", [rec("MD/MS", { fee_per_year: [fee(1000000), fee(1000000), fee(1000000)], stipend_per_month: stip(45000, 50000, 55000) })])]);
+    expect(shown(c.leaving).slice(0, 3)).toEqual(["≤ ₹48 L", "≤ ₹48,00,000", "computed"]);
+    expect(cells("MD/MS", [both, ...verbatim([45000, 50000, 55000])]).leaving.short).toBe("Fees + stipend");
+    const em = penaltyText("MD", "Seat-leaving penalty: x", {
+      items: [leave("MD Emergency Medicine (PG degree, MD/MS), all candidates", "discontinues the course before completion: repay entire stipend received plus a discontinuation fee (amount left blank in form) with interest at Govt loan rate")],
+    });
+    const e = cells("MD/MS", [em, ...fees("MD", [rec("MD/MS", { stipend_per_month: stip(54025, 55150, 56275) })])]);
+    expect(shown(e.leaving)).toEqual(["Refund stipend", "Refund stipend", null, "muted"]);
+    expect(tip(e.leaving)).toContain("No number: part of it has no figure Seatora holds.");
+  });
+
+  it("N months' stipend: year 1's ₹/month × N (no bundle record words it so yet)", () => {
+    const m = bond("MD", "Service bond: 1 year · refund 6 months' stipend, if not served", null, { status: "yes", years: 1, amounts: [] });
+    expect(shown(cells("MD/MS", [m, ...fees("MD", [rec("MD/MS", { stipend_per_month: stip(50000, 55000, 60000) })])]).bondInr).slice(0, 3)).toEqual(["₹3 L", "₹3,00,000", "computed"]);
+  });
+
+  it("no formula: a phrase saying what it is (a state rule, no money penalty, no ₹ figure), never 'See text'", () => {
+    const rule = (state: string, penalty: string) => bond("MD", `State bond: 1 yr (${state})`, null, { status: "state_rule", amounts: [], state, penalty });
+    expect(cells("MD/MS", [rule("Uttar Pradesh", "No money penalty. Under government order I/676928/2024 dated 26-06-2024, a candidate who leaves a government-college seat after the final counselling round and before finishing the course is barred from the next academic session's admission.")]).leaving.short).toBe("No money penalty");
+    expect(cells("MD/MS", [rule("Punjab", "A candidate who drops out and seeks fresh admission must deposit the full course fee (3 years for degree).")]).leaving.short).toBe("Per state rule");
+    const plain = penaltyText("MD", "Seat-leaving penalty: x", { items: [leave("MD/MS", "leaving the course")] });
+    expect(cells("MD/MS", [plain]).leaving.short).toBe("No ₹ figure");
+    const policy = bond("MD", "Service bond: no period or amount stated", null, { status: "yes", amounts: [], quote: "I shall be liable to pay the Bond money (as applicable) as per the Policy" });
+    expect(cells("MD/MS", [policy]).bondInr.short).toBe("As per policy");
+    // Older imports without a record: "As published".
+    expect(cells("MD/MS", [term("MD", "PENALTY", "Leaving: as per the college's rules")]).leaving.short).toBe("As published");
+    for (const c of Object.values(cells("MD/MS", [...sdu, plain]))) expect(c.short).not.toBe("See text");
   });
 });
 
