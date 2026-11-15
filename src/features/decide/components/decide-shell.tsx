@@ -10,13 +10,13 @@ import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { LogoMark } from "@/components/layout/logo";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { MAX_COMPARE } from "../lib/choices";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
+import { AccountSync } from "./account-sync";
 import { ProfileDialog, type ProfileMeta } from "./profile-dialog";
 import { RenamedSaved } from "./renamed-saved";
 
@@ -25,7 +25,7 @@ const sections = [
     title: "Plan",
     items: [
       { href: "/decide", label: "Overview", icon: LayoutDashboard },
-      { href: "/decide/residents", label: "Residents", icon: Users, badge: "Premium" },
+      { href: "/decide/residents", label: "Residents", icon: Users },
       { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
       { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
       { href: "/decide/choices", label: "Choices", icon: ListOrdered },
@@ -165,8 +165,8 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
           >
             {sections.map((sec) => (
               <SideNavSection key={sec.title} title={sec.title}>
-                {sec.items.map(({ href, label, icon, badge }) => (
-                  <SideNavItem key={href} label={label} icon={icon} href={L.to(href)} isSelected={isCurrent(href)} endContent={badge && <Badge tone="info">{badge}</Badge>} />
+                {sec.items.map(({ href, label, icon }) => (
+                  <SideNavItem key={href} label={label} icon={icon} href={L.to(href)} isSelected={isCurrent(href)} />
                 ))}
               </SideNavSection>
             ))}
@@ -181,6 +181,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
         <div aria-busy={loading || undefined} className={cn("isolate pb-24 transition-opacity md:pb-0", loading && "opacity-60")}>
           <RenamedSaved />
+          <AccountSync />
           {children}
         </div>
       </AppShell>

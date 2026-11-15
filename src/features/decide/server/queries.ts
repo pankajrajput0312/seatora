@@ -1,7 +1,7 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import type { ReachInput } from "../lib/reach";
+import { isStrayRound, type ReachInput } from "../lib/reach";
 import { optionId, rounds, type Allotment, type Category, type Cutoff, type PrevSeat, type Round } from "../types";
 import type { Catalog } from "./catalog";
 
@@ -16,6 +16,7 @@ export const remarkOf = (status: string): Allotment["remark"] => (status === "up
 const roundPos = (r: string) => rounds.indexOf(r as Round);
 const memCs = (c: { college: string; degree: string; specialty: string }) => `${c.college}~${c.degree}~${c.specialty}`;
 const sqlRounds = [...rounds] as string[];
+const strayRounds = rounds.filter((r) => isStrayRound(r)) as string[];
 
 const byYearRound = (a: Cutoff, b: Cutoff) => a.year - b.year || roundPos(a.round) - roundPos(b.round);
 
@@ -77,10 +78,13 @@ export async function findReachInputs(
   if (q.cs?.length === 0) return new Map();
   // bx: the later year's deepest row as "closing|9-round position|round|category", so a plain MAX picks it (ties: the
   // earliest round, as deepestByYear does) without a sort (array_agg ORDER BY spilled to disk: 300 ms vs 50 ms).
-  const rows = await db.$queryRaw<{ cs: string; q: string; a: number | null; b: number | null; bx: string | null; c: number | null }[]>`
+  // a, b: R1 to R3; as, bs: the stray rounds, which never make a label "reached" on their own (isStrayRound).
+  const rows = await db.$queryRaw<{ cs: string; q: string; a: number | null; b: number | null; as: number | null; bs: number | null; bx: string | null; c: number | null }[]>`
     SELECT "collegeSpecialtyId" AS cs, quota AS q,
-      MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y1}) AS a,
-      MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y2}) AS b,
+      MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y1} AND round <> ALL(${strayRounds})) AS a,
+      MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y2} AND round <> ALL(${strayRounds})) AS b,
+      MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y1} AND round = ANY(${strayRounds})) AS "as",
+      MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y2} AND round = ANY(${strayRounds})) AS bs,
       MAX(lpad("closingRank"::text, 7, '0') || '|' || (9 - array_position(${sqlRounds}::text[], round)) || '|' || round || '|' || category) FILTER (WHERE "counsellingYear" = ${y2}) AS bx,
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${q.latestYear} AND round = 'R1') AS c
     FROM "Cutoff"
@@ -95,7 +99,12 @@ export async function findReachInputs(
     const list: ReachInput[] = [];
     if (r.a != null) list.push({ year: y1, closing: r.a });
     const [, , round, category] = r.bx?.split("|") ?? [];
-    if (r.b != null) list.push({ year: y2, closing: r.b, round: round as Round, category: category as Category });
+    if (r.as != null) list.push({ year: y1, closing: r.as, round: "stray" });
+    // bx is the year's deepest of every round: its round and category go on the entry it is (R1 to R3, or a stray round).
+    const bx = r.bx != null && Number(r.bx.split("|")[0]);
+    const at = { round: round as Round, category: category as Category };
+    if (r.b != null) list.push({ year: y2, closing: r.b, ...(bx === r.b && !isStrayRound(at.round) && at) });
+    if (r.bs != null) list.push({ year: y2, closing: r.bs, round: "stray", ...(bx === r.bs && isStrayRound(at.round) && at) });
     if (r.c != null) list.push({ year: q.latestYear, round: "R1", closing: r.c });
     out.set(optionId({ ...pair, quota: r.q }), list);
   }

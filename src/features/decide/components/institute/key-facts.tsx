@@ -36,6 +36,9 @@ function Seats({ r }: { r: OptionRow }) {
   );
 }
 
+/** A course and quota with seats this round but no past allotment here (service.ts newOptions). */
+const New = ({ r }: { r: OptionRow }) => (r.reach === "new" ? <span className="ml-1.5 text-xs font-semibold text-sky">New<span className="sr-only">: no past allotment</span></span> : null);
+
 function Last({ r }: { r: OptionRow }) {
   const c = newestClosing(r.grid);
   if (!c) return <Dash />;
@@ -94,7 +97,7 @@ export function KeyFacts({ rows, total, mine, cats, list, name, slug, L }: { row
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-border last:border-0">
                 <th scope="row" className="px-3 py-2 text-left align-top font-medium">
-                  <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link>
+                  <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link><New r={r} />
                   <span className="block text-xs font-normal text-muted-foreground">{r.quota}</span>
                 </th>
                 <TermStatCells t={r.fees} variant="table" short of={of(r)} tdClassName="px-3 py-2" />
@@ -112,7 +115,7 @@ export function KeyFacts({ rows, total, mine, cats, list, name, slug, L }: { row
           <li key={r.id} className={cn("rounded-xl border border-border bg-card", i >= KEY_ROWS_PHONE && "hidden")}>
             <div className="flex items-start justify-between gap-3 px-3 pt-2">
               <span className="min-w-0">
-                <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="py-2 text-sm font-semibold hover:text-sky hover:underline">{courseName(r)}</Link>
+                <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="py-2 text-sm font-semibold hover:text-sky hover:underline">{courseName(r)}</Link><New r={r} />
                 <span className="block text-xs text-muted-foreground">{r.quota}</span>
               </span>
               <span className="shrink-0 text-right text-xs text-muted-foreground">Last closing<span className="block text-sm text-foreground"><Last r={r} /></span></span>

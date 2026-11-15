@@ -16,7 +16,7 @@ const { db } = vi.hoisted(() => {
 });
 vi.mock("@/lib/db", () => ({ db }));
 
-import { getCatalog, perImport } from "./catalog";
+import { getCatalog, perImport, scrubNotes } from "./catalog";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -63,4 +63,10 @@ it("perImport: one read per key per import, shared across requests, re-read once
   db.dataSource.findUnique.mockResolvedValue({ createdAt: new Date("2026-11-15T10:05:00Z") });
   expect(await read("x")).not.toBe(a);
   expect(load).toHaveBeenCalledTimes(5);
+});
+
+it("scrubs first-person working notes from imported term text", () => {
+  const years = "3 years. An amending resolution reportedly reduces this to 2 years; I did not retrieve its official text.";
+  expect(scrubNotes({ years, n: 1 })).toEqual({ years: "3 years. An amending resolution reportedly reduces this to 2 years.", n: 1 });
+  expect(scrubNotes({ t: "If I fail to complete my tenure, I will pay." })).toEqual({ t: "If I fail to complete my tenure, I will pay." });
 });

@@ -4,6 +4,7 @@ import { requireDecideAccess } from "@/features/auth/lib/session";
 import { db } from "@/lib/db";
 import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type FeeTableRecord, type Round, type Source, type Term } from "../types";
 import { bucketOfDegree } from "./terms";
+import { specialtyName } from "../lib/specialty-search";
 
 /** A course at a college (CollegeSpecialty). `cs` is its id: the DB id, or "college~degree~specialty" in memory (tests). */
 export type Pair = { cs: string; college: string; degree: string; specialty: string };
@@ -110,7 +111,13 @@ export function indexCatalog(p: {
     retiredSlug: new Map(retired.flatMap((r) => (r.oldSlug ? [[r.oldSlug, r.newKey]] : []))),
     meta: {
       courses,
-      specialties: specialtyCodes.map((code) => ({ code, name: courses.find((c) => c.specialty === code)!.name })),
+      // One name per specialty: a mixed-case MCC name over an ALL-CAPS one, tidied; listed A–Z.
+      specialties: specialtyCodes
+        .map((code) => {
+          const names = courses.filter((c) => c.specialty === code).map((c) => c.name);
+          return { code, name: specialtyName(names.find((n) => !/[A-Z]{3}/.test(n)) ?? names[0], code) };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name)),
       degrees: uniq(courses.map((c) => c.degree)),
       quotas: uniq(options.map((o) => o.quota)),
       states: uniq(p.colleges.map((c) => c.state)),
@@ -135,6 +142,13 @@ export function memoryCatalog(d: DecideData): Catalog {
   });
 }
 
+/**
+ * Drops a researcher's first-person working note left in imported text ("…; I did not retrieve its official text."):
+ * not for readers. Fix at source too (the bond records' `years`); this keeps it off the page meanwhile.
+ */
+const WORKING_NOTE = /;?\s*\b(?:I|we) (?:did not|could not|have not|didn't|couldn't|haven't) [^."\\]*\./gi;
+export const scrubNotes = <T,>(x: T): T => JSON.parse(JSON.stringify(x).replace(WORKING_NOTE, (m) => (m.startsWith(";") ? "." : "")));
+
 async function loadCatalog(): Promise<Catalog> {
   const [sources, colleges, specialties, pairs, terms, options, details, retired, feeTable] = await Promise.all([
     db.dataSource.findMany({ select: { id: true, key: true, name: true, url: true, counsellingYear: true, round: true, provisional: true } }),
@@ -154,7 +168,7 @@ async function loadCatalog(): Promise<Catalog> {
         data->>'fee_text' AS fee_text, data->'fee_text_src' AS fee_text_src, data->'stipend_nbems_minimum' AS stipend_nbems_minimum
       FROM "FeesStructured"`,
   ]);
-  const detailsOf = new Map(details.map((d) => [d.id, d.details]));
+  const detailsOf = new Map(details.map((d) => [d.id, scrubNotes(d.details)]));
   // FEE and STIPEND terms carry their college + program's fee-table records, as the bundle's terms do (details.records).
   const feeRecords = Map.groupBy(feeTable, (r) => `${r.collegeId}|${bucketOfDegree(r.programme)}`);
   const recordsOf = (t: { collegeId: string; program: string; kind: string }) => (t.kind === "FEE" || t.kind === "STIPEND" ? feeRecords.get(`${t.collegeId}|${t.program}`) : undefined);

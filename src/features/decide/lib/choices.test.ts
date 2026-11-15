@@ -23,9 +23,13 @@ describe("lists", () => {
     expect(d.activeId).toBe(d.lists[1].id);
   });
   it("exports MCC order text and CSV", () => {
-    const s = toggleItem(defaultChoices, item("x"));
-    expect(toMccText(s.lists[0])).toBe("1. Inst x — DNB Anaesthesiology — DNB Quota");
-    expect(toCsv(s.lists[0]).split("\n")[1]).toBe('1,"Inst x","S","DNB Anaesthesiology","DNB Quota"');
+    const s = toggleItem(toggleItem(defaultChoices, item("x")), item("GANDHIMEDICALCOLLEGEBHOPAL#462001~MD~RADIODIAGNOSIS~All India"));
+    expect(toMccText(s.lists[0]).split("\n")).toEqual([
+      "1. Inst x, S — DNB Anaesthesiology — DNB Quota",
+      "2. Inst GANDHIMEDICALCOLLEGEBHOPAL#462001~MD~RADIODIAGNOSIS~All India, S 462001 — DNB Anaesthesiology — DNB Quota",
+    ]);
+    expect(toCsv(s.lists[0]).split("\n")[1]).toBe('1,"Inst x","S","","DNB Anaesthesiology","DNB Quota"');
+    expect(toCsv(s.lists[0]).split("\n")[2]).toMatch(/,"S","462001","DNB/);
   });
 });
 

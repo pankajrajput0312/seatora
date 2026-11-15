@@ -19,11 +19,19 @@ describe("eligibleCategories", () => {
 describe("classifyReach", () => {
   it("labels from history, latest R1 first", () => {
     expect(classifyReach(42000, [c(2026, "R1", 45000), c(2024, "R1", 10000)], opts)).toBe("reached-latest");
-    expect(classifyReach(42000, [c(2024, "R2", 43000), c(2025, "stray", 50000)], opts)).toBe("reached-both");
+    expect(classifyReach(42000, [c(2024, "R2", 43000), c(2025, "R2", 50000)], opts)).toBe("reached-both");
     expect(classifyReach(42000, [c(2024, "R1", 30000), c(2025, "R3", 42000)], opts)).toBe("reached-one");
     expect(classifyReach(42000, [c(2025, "R1", 39000)], opts)).toBe("within-10");
     expect(classifyReach(42000, [c(2025, "R1", 20000)], opts)).toBe("closed-before");
     expect(classifyReach(42000, [], opts)).toBe("no-data");
+  });
+  it("never calls an option reached from a stray round alone (R1 to R3 closed far earlier)", () => {
+    // Gandhi Medical College Bhopal, MD Radio-diagnosis, Open, for AIR 3,150: 2024 special stray 3,394; R3 2025 946; R1 2026 1,055.
+    const gmc = [c(2024, "special_stray", 3394), c(2025, "R3", 946), c(2026, "R1", 1055)];
+    expect(classifyReach(3150, gmc, opts)).toBe("stray-only");
+    expect(classifyReach(42000, [c(2024, "R2", 43000), c(2025, "stray", 50000)], opts)).toBe("reached-one");
+    expect(classifyReach(42000, [c(2024, "stray", 39000), c(2025, "R1", 20000)], opts)).toBe("closed-before");
+    expect(classifyReach(42000, [{ year: 2025, closing: 43000 }], opts)).toBe("reached-one"); // no round (SQL per-year): R1 to R3
   });
   it("ignores the provisional latest year when excluded", () => {
     expect(classifyReach(42000, [c(2026, "R1", 45000)], { ...opts, includeLatest: false })).toBe("no-data");

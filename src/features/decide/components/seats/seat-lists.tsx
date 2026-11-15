@@ -25,6 +25,8 @@ export const seatKindNote: Record<SeatKind, string> = {
 
 export { fmtDay } from "../../lib/format";
 export const listTitle = (l: SeatList) => `${l.year} ${roundLabel[l.round]} ${seatKindLabel[l.kind].toLowerCase()}`;
+/** "2026 R1 clear vacancy seats"; the new list's label already ends in seats ("newly added seats"). */
+export const listSeats = (l: SeatList) => `${listTitle(l)}${l.kind === "new" ? "" : " seats"}`;
 
 const groupOf = (l: SeatList) => `${l.year} ${roundLabel[l.round]}`;
 
@@ -76,7 +78,7 @@ export function UnlistedSeats({ u, profile, here, href, options }: { u: { list: 
     <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
       {/* "2026 R2 clear vacancy seats", "2026 R2 newly added seats" (that list's name already says seats). */}
       <span><span className="numeric">{formatRank(u.seats)}</span> {u.list.kind === "new" ? `${u.list.year} ${roundLabel[u.list.round]} newly added` : listTitle(u.list)} {u.seats === 1 ? "seat" : "seats"}{here && " here"} with no past allotment</span>
-      <InfoTip label={`${listTitle(u.list)} seats with no past allotment`}>
+      <InfoTip label={`${listSeats(u.list)} with no past allotment`}>
         {u.seats === 1 ? "It is" : "They are"} in <span className="numeric">{formatRank(u.options)}</span> {one ? "course and quota" : "courses and quotas"}
         {profile ? " that match your courses, quotas, states and seat categories" : ""} with no past MCC allotments, so there is no closing rank to
         compare{options ? `: Options lists ${one ? "it" : "them"} as “New: no past allotment”.` : `, and ${one ? "it is not an option" : "they are not options"} here.`}

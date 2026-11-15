@@ -10,6 +10,7 @@ import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, Select } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { decideLinks } from "@/features/decide/lib/links";
+import { specialtyName } from "@/features/decide/lib/specialty-search";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import type { ResidentsQuery } from "@/features/decide/residents-search";
 import { canSeeResidents } from "@/features/decide/server/residents";
@@ -74,7 +75,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   const typedCourses = !allCourses && params.has("course") ? query.course ?? [] : [];
   const listed = (what: string, names: string[]) => (names.length > 2 ? `${what}: ${names.length} selected` : names.join(", "));
   const chips = [
-    query.q && { label: `Name: “${query.q}”`, href: here({ q: null }) },
+    query.q && { label: `Search: “${query.q}”`, href: here({ q: null }) },
     picked.length > 0 && { label: listed("Colleges", picked.map(collegeName)), href: here({ college: null }) },
     query.cq && { label: `College: “${query.cq}”`, href: here({ cq: null }) },
     // Her courses are the default: a chip for them too, "All courses" lifts it.
@@ -87,7 +88,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   const clear = L.to("/decide/residents", { course: "all" });
   const courseChoices = [
     ...(yours ? [{ value: "all", label: "All courses" }] : []),
-    ...meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` })),
+    ...meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${specialtyName(c.name)}` })),
   ];
   return (
     <AppPage className="grid grid-cols-1 gap-6">
@@ -101,8 +102,8 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         clear={clear}
         search={
           <label className="min-w-56 flex-1">
-            <span className="sr-only">Name</span>
-            <input type="search" name="q" defaultValue={query.q} maxLength={60} placeholder="Search a name" className={control} />
+            <span className="sr-only">Name or college</span>
+            <input type="search" name="q" defaultValue={query.q} maxLength={60} placeholder="Search a name or college" className={control} />
           </label>
         }
       >

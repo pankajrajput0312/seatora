@@ -53,14 +53,17 @@ export function duplicateList(state: ChoicesState, sourceId: string): ChoicesSta
   return { lists: [...state.lists, { ...src, id, name: name === src.name ? `${src.name} (copy)` : name, typedIds: [] }], activeId: id };
 }
 
-/** Text in the order to type into the MCC portal. */
+/** The PIN in the item's college key (types.ts optionId: "NAME…#PIN~degree~specialty~quota"); null when the key has none. */
+export const pinOf = (i: Pick<ChoiceItem, "id">) => /#(\d{6})~/.exec(i.id)?.[1] ?? null;
+
+/** Text in the order to type into the MCC portal: institute, state and PIN (two colleges can share a name), course, MCC quota. */
 export function toMccText(list: ChoiceList): string {
-  return list.items.map((i, n) => `${n + 1}. ${i.institute} — ${i.course} — ${i.quota}`).join("\n");
+  return list.items.map((i, n) => `${n + 1}. ${[i.institute, [i.state, pinOf(i)].filter(Boolean).join(" ")].filter(Boolean).join(", ")} — ${i.course} — ${i.quota}`).join("\n");
 }
 
 export function toCsv(list: ChoiceList): string {
   const esc = (s: string | null) => `"${(s ?? "").replace(/"/g, '""')}"`;
-  return ["Order,Institute,State,Course,Quota", ...list.items.map((i, n) => [n + 1, esc(i.institute), esc(i.state), esc(i.course), esc(i.quota)].join(","))].join("\n");
+  return ["Order,Institute,State,PIN,Course,Quota", ...list.items.map((i, n) => [n + 1, esc(i.institute), esc(i.state), esc(pinOf(i)), esc(i.course), esc(i.quota)].join(","))].join("\n");
 }
 
 /** Mark the first n items as typed into MCC (what's in the portal now). */

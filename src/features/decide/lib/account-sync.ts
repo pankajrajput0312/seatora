@@ -1,0 +1,40 @@
+// Pure rules for syncing the profile and choice lists with the account (components/account-sync.tsx, tested).
+import type { ChoicesState } from "./choices";
+
+/** The newer copy wins; every list and choice only in the older one is kept, appended, so a choice is never lost. */
+export function mergeChoices(newer: ChoicesState, older: ChoicesState): ChoicesState {
+  const lists = newer.lists.map((l) => {
+    const o = older.lists.find((x) => x.id === l.id);
+    const ids = new Set(l.items.map((i) => i.id));
+    return o ? { ...l, items: [...l.items, ...o.items.filter((i) => !ids.has(i.id))] } : l;
+  });
+  return { ...newer, lists: [...lists, ...older.lists.filter((o) => o.items.length && !newer.lists.some((l) => l.id === o.id))] };
+}
+
+export const hasChoices = (s: ChoicesState) => s.lists.some((l) => l.items.length > 0);
+
+/** A short fingerprint of a stored value (its JSON), to tell whether it changed since the last sync. */
+export function fingerprint(value: unknown): string {
+  const s = JSON.stringify(value) ?? "";
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  return `${s.length}:${(h >>> 0).toString(36)}`;
+}
+
+/**
+ * What this device should do with one kind of data. `local`: its value here, null when empty (or another account's);
+ * `dirty`: changed here since the last sync; `localAt`: when (ms; 0 unknown); `seen`: the server copy's time at the last
+ * sync; `server`: the account's copy now. Result: the value to keep here and whether to upload it.
+ *   no server copy: upload what's here; nothing here: take the server's; server unchanged since the last sync: upload
+ *   if changed here; server changed and nothing changed here: take it; both changed: the newer wins, merged.
+ */
+export function reconcile<T>(
+  o: { local: T | null; dirty: boolean; localAt: number; seen: number | null; server: { value: T; at: number } | null },
+  merge: (newer: T, older: T) => T,
+): { value: T | null; upload: boolean } {
+  const { local, server } = o;
+  if (!server) return { value: local, upload: local != null };
+  if (local == null || !o.dirty) return { value: server.value, upload: false };
+  if (server.at === o.seen) return { value: local, upload: true };
+  return { value: o.localAt > server.at ? merge(local, server.value) : merge(server.value, local), upload: true };
+}

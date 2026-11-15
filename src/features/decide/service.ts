@@ -527,11 +527,14 @@ export async function getInstitute(slug: string, profile: Profile | null) {
   const cat = await getCatalog();
   const college = cat.collegeBySlug.get(slug);
   if (!college) return null;
-  const opts = cat.options.filter((o) => o.college === college.key);
-  const [built, lists] = await Promise.all([rowsFor(cat, opts, profile, true), roundLists(cat)]);
+  const known = cat.options.filter((o) => o.college === college.key);
+  const [built, lists] = await Promise.all([rowsFor(cat, known, profile, true), roundLists(cat)]);
   const seatList = lists[0] ?? null;
-  const [seats, unlistedBy] = await Promise.all([seatsOfOpts(lists, opts), Promise.all(lists.map((l) => unlistedOf(cat, l, profile, college.key)))]);
-  const options = withSeats(built, lists, seats, profile);
+  const [seats, unlistedBy] = await Promise.all([optionSeats(lists, { colleges: [college.key] }), Promise.all(lists.map((l) => unlistedOf(cat, l, profile, college.key)))]);
+  // Courses and quotas with seats in the round's lists but no past allotment here: options too, labelled "new".
+  const fresh = newOptions(cat, seats, null);
+  const opts = [...known, ...fresh];
+  const options = withSeats([...built, ...(await rowsFor(cat, fresh, profile, true))], lists, seats, profile);
   const mine = new Set(opts.filter((o) => optMatches(cat, o, profile)).map((o) => o.id));
   const allotmentsByYear = YEARS.map((year) => ({ year, n: sumYear(opts, year) }));
   const terms = { md: termsFor(cat, college.key, "MD"), dnb: termsFor(cat, college.key, "DNB") };

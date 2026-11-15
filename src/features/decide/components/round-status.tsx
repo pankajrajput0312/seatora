@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { decideLinks } from "../lib/links";
 import { LATEST_YEAR } from "../lib/reach";
-import { currentSteps, fmtIST, nextDate, roundName, statusBadge, stepName, stepsNow, type StepNow } from "../lib/round-status";
+import { currentSteps, fmtIST, fmtNote, nextDate, roundName, statusBadge, stepName, stepsNow, type StepNow } from "../lib/round-status";
 import { roundStatus } from "../server/notices";
 import { InfoTip } from "./info-tip";
 import { SourceRef } from "./page-sources";
@@ -58,6 +58,8 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
           {/* The end date's own source when the status cites a later notice (e.g. a suspension) that doesn't print it. */}
           {s.now !== "suspended" && s.scheduled?.to && s.scheduledBy && s.scheduledBy.url !== s.url && scheduleRef(s.scheduledBy)}
           {s.clock === "started" && <span className="text-muted-foreground">not yet confirmed by MCC</span>}
+          {/* The notice's own status line, e.g. a suspension that has since lifted ("suspended until …, then resumed"). */}
+          {s.note && <span className="text-muted-foreground">{fmtNote(s.note)}</span>}
           <NoticeLink s={s}>MCC notice</NoticeLink>
         </p>
       ))}

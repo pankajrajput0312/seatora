@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 import { baseCategories, openQuotas } from "../types";
 import { BOND_YEAR_CHOICES, coursesFromPicks, feeChoices, picksOf, profileSchema, type Profile } from "../profile";
 import { control } from "./ui";
+import { matchesSpecialty } from "../lib/specialty-search";
 
 export type ProfileMeta = { courses: { degree: string; specialty: string }[]; specialties: { code: string; name: string }[]; degrees: string[]; quotas: string[]; states: string[] };
 
@@ -89,8 +90,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
     if (step < steps.length - 1) go(step + 1);
     else save();
   };
-  const q = find.trim().toLowerCase();
-  const specialtyOptions = meta.specialties.filter((sp) => !q || picked[sp.code] || sp.name.toLowerCase().includes(q)).map((sp) => ({ value: sp.code, label: sp.name }));
+  const specialtyOptions = meta.specialties.filter((sp) => picked[sp.code] || matchesSpecialty(find, sp.name)).map((sp) => ({ value: sp.code, label: sp.name }));
 
   const exportJson = () => {
     const c = current();
@@ -151,6 +151,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
         value={Object.keys(picked)}
         onChange={pickSpecialties}
       />
+      {find.trim() && !meta.specialties.some((sp) => matchesSpecialty(find, sp.name)) && <p role="status" className="text-sm text-muted-foreground">No specialty matches “{find.trim()}”.</p>}
       {Object.keys(picked).length ? (
         <fieldset>
           <legend className="text-sm font-medium">Degrees</legend>
@@ -242,7 +243,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
           <div>
             <Dialog.Title className="text-xl font-semibold">{setup ? "Set up Decide" : "Your rank and preferences"}</Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-              Saved on this device. Your rank, category, PwD status and filters show in page addresses, so links you share carry them and they stay in browser history.
+              Saved to your account, so it follows you to any device you sign in on. Your rank, category, PwD status and filters show in page addresses, so links you share carry them and they stay in browser history.
             </Dialog.Description>
           </div>
           <Dialog.Close asChild>

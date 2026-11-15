@@ -8,7 +8,7 @@ import type { Course } from "./types";
 export const RESIDENTS_PAGE_SIZE = 50;
 
 export const residentsQuery = z.object({
-  q: z.string().trim().max(60).optional(), // name search, case/space-insensitive tokens
+  q: z.string().trim().max(60).optional(), // name or college (name, city) search, case/space-insensitive tokens
   college: z.array(z.string().max(120)).max(20).optional(), // College.slug; empty/absent = all colleges
   cq: z.string().trim().max(60).optional(), // college name search (the College filter's box without JS)
   state: z.string().max(60).optional(),

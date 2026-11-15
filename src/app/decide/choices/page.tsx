@@ -17,7 +17,7 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   const [lists, view] = await Promise.all([currentSeatLists(), chosenView(params, "choices")]);
   return (
     <AppPage className="py-6">
-      <PageHead title="Choices" about="Your list in the order you'll enter it on the MCC portal, saved on this device. Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons." />
+      <PageHead title="Choices" about="Your list in the order you'll enter it on the MCC portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons." />
       <ChoicesView reachFor={liveReach} view={view} />
       <div className="mt-6 grid gap-2 text-xs text-muted-foreground">
         <HistoryNote />

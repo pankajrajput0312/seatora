@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { ChevronDown } from "lucide-react";
+import { matchesSpecialty } from "../lib/specialty-search";
 
 /**
  * Compact multi-select for GET filter forms: a pill that opens a checkbox panel. Ticked boxes submit repeated params
@@ -26,7 +27,6 @@ export function FilterDropdown({ label, name, options, selected, none = "All", n
 }) {
   const count = selected.length;
   const [typed, setTyped] = useState("");
-  const words = typed.toLowerCase().split(/\s+/).filter(Boolean);
   const hydrated = useSyncExternalStore(noop, () => true, () => false);
   const [found, setFound] = useState<{ value: string; label: string }[]>([]);
   useEffect(() => {
@@ -83,8 +83,9 @@ export function FilterDropdown({ label, name, options, selected, none = "All", n
           />
         )}
         {find && typed.trim().length >= 2 && !found.length && <p role="status" className="px-2 py-1 text-xs text-muted-foreground">Nothing found yet.</p>}
+        {search && !find && typed.trim() && !options.some((o) => matchesSpecialty(typed, o.label)) && <p role="status" className="px-2 py-1 text-xs text-muted-foreground">No {label.toLowerCase().replace(/ \(.*\)$/, "")} matches “{typed.trim()}”.</p>}
         {shown.map((o) => (
-          <label key={o.value} hidden={(!find && !words.every((w) => o.label.toLowerCase().includes(w))) || undefined} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-muted">
+          <label key={o.value} hidden={(!find && !matchesSpecialty(typed, o.label)) || undefined} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-muted">
             <input type="checkbox" name={name} value={o.value} defaultChecked={selected.includes(o.value)} onChange={(e) => e.target.checked && keep(o)} className="size-4 accent-sky" />
             {o.label}
           </label>

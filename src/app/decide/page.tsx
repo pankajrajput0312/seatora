@@ -98,7 +98,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                 },
             {
               label: "Reached your rank in a past round",
-              info: `Options whose closing rank reached yours in at least one past round of ${counted}.`,
+              info: `Options whose closing rank reached yours in at least one of R1 to R3 of ${counted}. Stray rounds don't count here: an option reached only there is labelled "${reachLabel("stray-only", LATEST_YEAR, PAST_YEARS)}".`,
               value: formatRank(reached),
               note: (
                 <span className="inline-flex flex-wrap items-center gap-x-1.5">
@@ -119,6 +119,23 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         </StatStrip>
         {labelSources}
       </section>
+
+      {reached === 0 && (
+        <section aria-labelledby="next-h" className="rounded-xl border border-border bg-card p-4">
+          <h2 id="next-h" className="text-lg font-semibold">None of these reached your rank in {counted}: what you can still do</h2>
+          <ul className="mt-2 grid list-disc gap-1.5 pl-5 text-sm">
+            {list && sum && sum.fresh > 0 && (
+              <li><Link href={L.options({ reach: "new" })} className={smallLink}>{formatRank(sum.fresh)} new {sum.fresh === 1 ? "option" : "options"} in the {roundWords} lists</Link> have no past allotment, so no closing rank to compare. Look at them.</li>
+            )}
+            {list && <li><Link href={L.to("/decide/options", { seats: "virtual" })} className={smallLink}>Virtual vacancy seats</Link>: seats held now that free up when someone upgrades this round. Fill them as choices too.</li>}
+            {r.counts["stray-only"] > 0 && <li><Link href={L.options({ reach: "stray-only" })} className={smallLink}>{formatRank(r.counts["stray-only"])} reached your rank only in a stray round</Link>, after R1 to R3 had closed far earlier.</li>}
+            {r.counts["within-10"] > 0 && <li><Link href={L.options({ reach: "within-10" })} className={smallLink}>{formatRank(r.counts["within-10"])} closed within 10% of your rank</Link> in a past round.</li>}
+            <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>Widen your courses, quotas or states</Link>: add DNB and Diploma courses of your specialties, or more specialties, and the fee or bond caps.</li>
+            <li>The stray vacancy round comes after Round 3: see the <Link href={L.to("/decide/counselling")} className={smallLink}>schedule and notices</Link>.</li>
+            <li><Link href={L.rankScan(profile.rank)} className={smallLink}>Rank scan</Link> shows what ranks near yours were allotted in past rounds.</li>
+          </ul>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1.4fr_1fr]">
         {total ? (

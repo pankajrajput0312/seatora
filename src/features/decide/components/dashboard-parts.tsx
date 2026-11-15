@@ -17,7 +17,7 @@ export function SetRankPrompt({ path }: { path: string }) {
   return (
     <EmptyState
       title="Set up Decide in three steps"
-      description="Rank and category, your courses, then quotas. Options then opens on this round's seats. Saved on this device; your rank and category show in page addresses."
+      description="Rank and category, your courses, then quotas. Options then opens on this round's seats. Saved to your account, so it follows you to any device you sign in on; your rank and category show in page addresses."
       className="mt-6"
     >
       <Button asChild size="lg"><Link href={`${path}?editProfile=1`}>Set your rank</Link></Button>
@@ -25,7 +25,7 @@ export function SetRankPrompt({ path }: { path: string }) {
   );
 }
 
-/** StatStrip cell for her active choice list (on this device). Neutral until localStorage is read, never a false "0". */
+/** StatStrip cell for her active choice list (synced with the account when signed in). Neutral until localStorage is read, never a false "0". */
 export function ChoicesStat() {
   const [choices, , hydrated] = useChoices();
   const L = useDecideLinks();
@@ -52,7 +52,7 @@ export function TopChoices() {
         <Link href={L.choices()} className={`${smallLink} text-sm text-sky`}>Open list</Link>
       </div>
       {!hydrated ? (
-        <p className="mt-4 text-sm text-muted-foreground">Loading your list from this device…</p>
+        <p className="mt-4 text-sm text-muted-foreground">Loading your list…</p>
       ) : top.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">
           Nothing in this list yet. Star options on <Link href={L.options()} className={`${smallLink} text-sky`}>Options</Link> to add them.

@@ -198,7 +198,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <FilterDropdown label="Course" name="c" options={pairChoices(meta.courses)} selected={profile.pairs} />
           ) : (
             <>
-              <FilterDropdown label="Course" name="sp" options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} selected={profile.specialties} />
+              <FilterDropdown label="Course" name="sp" search options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} selected={profile.specialties} />
               <FilterDropdown label="Degree" name="deg" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={profile.degrees} />
             </>
           )}

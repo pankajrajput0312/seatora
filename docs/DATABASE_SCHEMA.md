@@ -62,3 +62,6 @@ Source: the PRIVATE neetpg-planner bundle `data/medpath-private/` (`residents.nd
 
 ## Feature requests (`FeatureRequest`)
 One row per request from the in-app page or the public form (`src/features/requests`, see ARCHITECTURE.md "Feature requests"): `kind` and `status` (default `new`) are the lists in `validations.ts`, stored as text; `message` plain text; `email` where to reply; `userId` nullable, `onDelete: SetNull` (deleting an account keeps its requests, unlinked); `page` where it was sent from. No IP (the privacy notice says it isn't stored). Indexes: (createdAt) for the owner's list, (userId) for her own.
+
+## Synced profile and choices (`UserProfile`, `UserChoices`)
+One row per signed-in user (`userId` is the key, cascade on account delete): the Decide profile and the Choices lists as Zod-validated JSON (`profileSchema`, `choicesSchema`; at most 400 KB), with the `updatedAt` the save action set. `src/app/decide/sync-actions.ts` saves only when the device sends the `updatedAt` it last saw, else returns the server copy; `components/account-sync.tsx` then merges (`lib/account-sync.ts`: the newer copy wins, every choice only in the other is appended, never lost) and saves again. Signed out, both stay in localStorage only. Migration `20261119000000_user_sync`.

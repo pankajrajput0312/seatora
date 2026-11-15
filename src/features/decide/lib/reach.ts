@@ -54,10 +54,17 @@ export type ReachInput = Pick<Cutoff, "year" | "closing"> & { round?: Round; cat
  * category), listed only because the newest round's seat lists print seats for it (Options' round view). classifyReach
  * never returns it. The chips' order; the round view sorts by roundReachOrder.
  */
-export const reachOrder = ["reached-latest", "reached-both", "reached-one", "within-10", "closed-before", "no-data", "new"] as const;
+export const reachOrder = ["reached-latest", "reached-both", "reached-one", "within-10", "stray-only", "closed-before", "no-data", "new"] as const;
 export type Reach = (typeof reachOrder)[number];
 /** Options' round view sort: what she can realistically get first; unknown (new, no allotment on her seats) before closed before her rank. */
-export const roundReachOrder: readonly Reach[] = ["reached-latest", "reached-both", "reached-one", "within-10", "new", "no-data", "closed-before"];
+export const roundReachOrder: readonly Reach[] = ["reached-latest", "reached-both", "reached-one", "within-10", "stray-only", "new", "no-data", "closed-before"];
+
+/**
+ * Stray and special stray rounds fill leftover seats, often far below the rank that closed R1 to R3, so they never make an
+ * option "reached": a rank reached only there is "stray-only". A cutoff with no round (a per-year deepest from SQL,
+ * findReachInputs) is from R1 to R3.
+ */
+export const isStrayRound = (round: Round | undefined) => round === "stray" || round === "special_stray";
 
 /** The MCC results in the data, e.g. "2023 to 2026 R1": oldest year to the newest year's last round (`years` newest first, as meta.years). */
 export function resultsSpan(years: { year: number; rounds: readonly Round[] }[]) {
@@ -69,7 +76,7 @@ export function resultsSpan(years: { year: number; rounds: readonly Round[] }[])
 
 /**
  * History-only label for how a rank compares with past closing ranks. "Reached" means the rank was within the
- * closing rank of that round. Never a chance or prediction.
+ * closing rank of that round, R1 to R3 only (isStrayRound). Never a chance or prediction.
  */
 export function classifyReach(
   rank: number,
@@ -79,13 +86,15 @@ export function classifyReach(
   // Only the years and rounds the labels talk about: the two past years, plus the latest year's R1.
   const used = cutoffs.filter((c) => pastYears.includes(c.year) || (includeLatest && c.year === latestYear && c.round === "R1"));
   if (used.length === 0) return "no-data";
-  const reachedIn = (y: number) => used.some((c) => c.year === y && c.closing >= rank);
-  if (includeLatest && used.some((c) => c.year === latestYear && c.round === "R1" && c.closing >= rank)) return "reached-latest";
+  const main = used.filter((c) => !isStrayRound(c.round));
+  const reachedIn = (y: number) => main.some((c) => c.year === y && c.closing >= rank);
+  if (includeLatest && main.some((c) => c.year === latestYear && c.round === "R1" && c.closing >= rank)) return "reached-latest";
   const [a, b] = pastYears;
   if (reachedIn(a) && reachedIn(b)) return "reached-both";
   if (reachedIn(a) || reachedIn(b)) return "reached-one";
+  if (used.some((c) => c.closing >= rank)) return "stray-only";
   // Agreed definition (neetpg-planner export_her.py): closing within 10% of her rank, i.e. closing >= rank * 0.9.
-  if (used.some((c) => c.closing >= rank * 0.9)) return "within-10";
+  if (main.some((c) => c.closing >= rank * 0.9)) return "within-10";
   return "closed-before";
 }
 
@@ -103,6 +112,7 @@ export function reachLabel(reach: Reach, latestYear: number, pastYears: [number,
     "reached-both": `Reached in ${pastYears[0]} and ${pastYears[1]}`,
     "reached-one": `Reached in ${pastYears[0]} or ${pastYears[1]}`,
     "within-10": "Within 10% in a past round",
+    "stray-only": "Reached only in stray rounds",
     "closed-before": "Closed before your rank",
     "no-data": `No allotment ${on ? `on ${on} seats` : "in your categories"} in ${reachWindow(latestYear, pastYears, includeLatest, true)}`,
     new: "New: no past allotment",
@@ -136,6 +146,7 @@ export const reachTone: Record<Reach, "info" | "neutral" | "warning"> = {
   "reached-both": "info",
   "reached-one": "neutral",
   "within-10": "warning",
+  "stray-only": "warning",
   "closed-before": "neutral",
   "no-data": "neutral",
   new: "neutral",

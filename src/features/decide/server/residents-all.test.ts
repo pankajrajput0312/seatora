@@ -72,6 +72,9 @@ describe("gates and budget", () => {
   });
 });
 
+// A search token: in the resident's name, or the college's name or city.
+const anyOf = (t: object) => ({ OR: [{ name: t }, { college: { name: t } }, { college: { city: t } }] });
+
 describe("query", () => {
   it("filters: name tokens, colleges, state, courses, year, quota; never hidden, never by rank", async () => {
     await list({ q: " aB  cD ", college: ["x-college", "y-college"], state: "Kerala", course: ["md-paediatrics", "ms-obg"], year: 2025, quota: "All India", rankFrom: 10, hasRank: "1" });
@@ -81,13 +84,13 @@ describe("query", () => {
       quota: "All India",
       college: { slug: { in: ["x-college", "y-college"] }, state: "Kerala" },
       specialty: { slug: { in: ["md-paediatrics", "ms-obg"] } },
-      AND: [{ name: { contains: "aB", mode: "insensitive" } }, { name: { contains: "cD", mode: "insensitive" } }],
+      AND: ["aB", "cD"].map((t) => anyOf({ contains: t, mode: "insensitive" })),
     });
     expect(m.count.mock.calls.map((c) => c[0].where)).toEqual([where()]);
     expect(m.findMany.mock.lastCall![0].select).not.toHaveProperty("rank");
     expect(m.findMany.mock.lastCall![0].select).not.toHaveProperty("rankBasis");
     await list({ q: "50%_a\\" }); // LIKE wildcards are matched literally
-    expect(where().AND).toEqual([{ name: { contains: "50\\%\\_a\\\\", mode: "insensitive" } }]);
+    expect(where().AND).toEqual([anyOf({ contains: "50\\%\\_a\\\\", mode: "insensitive" })]);
     await list();
     expect([where().college, where().specialty, where().AND]).toEqual([undefined, undefined, []]);
     await list({ state: "Kerala" });

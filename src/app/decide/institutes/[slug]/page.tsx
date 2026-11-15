@@ -22,7 +22,7 @@ import { keyRows } from "@/features/decide/components/institute/key-facts-data";
 import { courseName, RoundGrid, SeatsBelowNote, seatKindShort, toChoiceItem } from "@/features/decide/components/options-view";
 import { SourceRefs } from "@/features/decide/components/page-sources";
 import { ResultCard } from "@/features/decide/components/result-card";
-import { listTitle, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
+import { listSeats, listTitle, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { TermStatCells } from "@/features/decide/components/stat-cells";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TypeBadge } from "@/features/decide/components/type-badge";
@@ -199,7 +199,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   <span className="text-muted-foreground">{list.year} {roundLabel[list.round]} {list.kind}:</span>&nbsp;<span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{n > 0 ? formatRank(n) : "None"}</span>
                   <span className="sr-only"> seats: see Seats</span>
                 </Link>
-                <InfoTip label={`${listTitle(list)} seats`}>
+                <InfoTip label={listSeats(list)}>
                   The {listTitle(list)} list. {n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves." : "Every course, quota and category here.") : "The MCC list prints none here."} The lists overlap, so they are never added.
                 </InfoTip>
               </span>
@@ -462,7 +462,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     <InfoTip label={seatKindLabel[list.kind].toLowerCase()}><span className="first-letter:uppercase">{seatKindLabel[list.kind]}: {seatKindNote[list.kind]}</span></InfoTip>
                   </h3>
                   {rows.length > 0 ? (
-                    <CollegeSeatTable rows={rows} caption={`${listTitle(list)} seats at ${college.name} (MCC PDF), by course`} />
+                    <CollegeSeatTable rows={rows} caption={`${listSeats(list)} at ${college.name} (MCC PDF), by course`} />
                   ) : (
                     <p className="text-sm text-muted-foreground">This list prints no seats here.</p>
                   )}

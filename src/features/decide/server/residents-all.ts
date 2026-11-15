@@ -34,7 +34,7 @@ export const residentQuota = (quota: string) => (RELIGIOUS.includes(quota) ? MIN
 /** Each token (any case and spacing) must occur in the field; a typed % or _ is literal (Prisma passes `contains` to ILIKE unescaped). */
 const tokens = (q: string | undefined) => (q?.split(/\s+/).filter(Boolean) ?? []).map((t) => ({ contains: t.replace(/[\\%_]/g, "\\$&"), mode: "insensitive" as const }));
 
-/** The WHERE for a query: name tokens (any case and spacing) must all occur in the name; never hidden rows. */
+/** The WHERE for a query: each search token (any case and spacing) occurs in the name or the college's name or city ("Pudukkottai"); never hidden rows. */
 function residentsWhere(q: ResidentsQuery): Prisma.ResidentWhereInput {
   const cq = tokens(q.cq);
   return {
@@ -43,7 +43,7 @@ function residentsWhere(q: ResidentsQuery): Prisma.ResidentWhereInput {
     quota: q.quota && (q.quota === MINORITY || RELIGIOUS.includes(q.quota)) ? { in: RELIGIOUS } : q.quota,
     college: q.college?.length || q.state || cq.length ? { slug: q.college?.length ? { in: q.college } : undefined, state: q.state, AND: cq.length ? cq.map((name) => ({ name })) : undefined } : undefined,
     specialty: q.course?.length ? { slug: { in: q.course } } : undefined,
-    AND: tokens(q.q).map((name) => ({ name })),
+    AND: tokens(q.q).map((t) => ({ OR: [{ name: t }, { college: { name: t } }, { college: { city: t } }] })),
   };
 }
 

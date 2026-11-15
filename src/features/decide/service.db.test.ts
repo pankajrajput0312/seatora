@@ -77,7 +77,7 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     // with an Open or OBC allotment). The round-2 bundle's merged colleges hold one option where two keys held two.
     const every = await svc.listOptions({ ...her, quotas: (await svc.getMeta()).quotas }, { ...v, showClosed: true });
     expect(every.total).toBe(1312);
-    expect(every.counts).toMatchObject({ "reached-latest": 294, "reached-both": 56, "reached-one": 160, "within-10": 102, "closed-before": 645, "no-data": 55 });
+    expect(every.counts).toMatchObject({ "reached-latest": 294, "reached-both": 55, "reached-one": 121, "within-10": 75, "stray-only": 40, "closed-before": 672, "no-data": 55 });
     // None ticked: the open quotas only (30 options in restricted quotas left out).
     expect(all.total).toBe(1282);
     expect(all.rows.every((r) => ["All India", "DNB Quota", "Deemed/Paid Seats"].includes(r.quota))).toBe(true);

@@ -451,6 +451,26 @@ model User {
   createdAt    DateTime  @default(now())
   sessions     Session[]
   requests     FeatureRequest[]
+  profile      UserProfile?
+  choices      UserChoices?
+}
+
+/// The Decide profile (features/decide/profile.ts profileSchema) of a signed-in user, so it follows the account across
+/// devices (features/decide/components/account-sync.tsx). Signed out, it stays in localStorage only.
+model UserProfile {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  json      Json
+  /// Set by the save action; the client sends the one it last saw, so a stale device merges instead of overwriting.
+  updatedAt DateTime
+}
+
+/// The Choices lists (features/decide/lib/choices.ts choicesSchema) of a signed-in user, synced like UserProfile.
+model UserChoices {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  json      Json
+  updatedAt DateTime
 }
 
 /// Login sessions. Only a SHA-256 hash of the cookie token is stored.
