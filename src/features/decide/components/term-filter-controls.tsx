@@ -67,8 +67,8 @@ export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Pro
         options={[...(yrs != null ? [{ value: "any", label: "Any bond" }] : []), ...choices("bondyrs", num(f.bondyrs))]}
       />
       <TermSelect name="minstip" label="Stipend per month, at least" value={f.minstip} any="Any stipend" options={choices("minstip", f.minstip ?? null)} />
-      <TermSelect name="maxbond" label="Bond amount, at most" value={f.maxbond} any="Any bond ₹" options={choices("maxbond", f.maxbond ?? null)} />
-      <TermSelect name="maxleave" label="Leaving penalty, at most" value={f.maxleave} any="Any leaving ₹" options={choices("maxleave", f.maxleave ?? null)} />
+      <TermSelect name="maxbond" label="Bond penalty, at most" value={f.maxbond} any="Any bond penalty" options={choices("maxbond", f.maxbond ?? null)} />
+      <TermSelect name="maxleave" label="Leaving penalty, at most" value={f.maxleave} any="Any leaving penalty" options={choices("maxleave", f.maxleave ?? null)} />
       <span className="flex min-h-11 items-center gap-1 text-sm">
         <label className="flex min-h-11 cursor-pointer items-center gap-2">
           <input type="checkbox" name="nd" value="keep" defaultChecked={f.nd === "keep"} className="size-5 accent-sky" />

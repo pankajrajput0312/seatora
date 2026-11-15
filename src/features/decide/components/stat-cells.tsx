@@ -78,7 +78,7 @@ const columnNote: Record<StatKey, string> = {
   stipend: "Year 1 stipend a month. min: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. + DA: plus dearness allowance. NMC list: one figure for every PG year. See text: in words only. —: not in Seatora's data. Colour: amber below the NBEMS minimum.",
   bond: "Service bond years (1Y: one year). Yes: a bond, years not stated. state rule: the years are the state's rule, not the college's own document's. + state rule: a state rule applies as well. NBEMS rule: no bond at a private DNB hospital. caveat: no bond, with a doubt in the (i). Unknown · state law may apply: the document says no bond, but a state law's service may apply. Unknown or —: not declared or not checked, never read as no bond. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey unknown.",
   bondInr: "What you pay if you do not serve the bond. state rule: the state rule's amount. by specialty: a range over the subjects. computed: per year × years, by Seatora. incl. additional: an amount owed on top included. + words: part in words only. None: no bond. Unknown or —: not known. Colour: red ₹25 L or more, amber below that, green none.",
-  leaving: "The college's or state's penalty for leaving the seat or course after joining. by specialty, + words: as for Bond ₹. See text: in words only. —: not in Seatora's data. Colour: red ₹25 L or more.",
+  leaving: "The college's or state's penalty for leaving the seat or course after joining. by specialty, + words: as for Bond penalty. See text: in words only. —: not in Seatora's data. Colour: red ₹25 L or more.",
 };
 
 /** Year 2 or 3's fee or stipend in a table column: the full figure, its marker under it; a 2-year course's year 3 says so. */

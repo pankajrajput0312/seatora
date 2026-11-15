@@ -166,7 +166,7 @@ export const termValueLabel = {
   maxfee: (v: number) => `Fee up to ${lakhText(v)}/yr`,
   minstip: (v: number) => `Stipend at least ${formatInrShort(v)}/mo`,
   bondyrs: (v: number) => (v === 0 ? "No bond" : `Bond up to ${v} ${v === 1 ? "year" : "years"}`),
-  maxbond: (v: number) => `Bond ₹ up to ${lakhText(v)}`,
+  maxbond: (v: number) => `Bond penalty up to ${lakhText(v)}`,
   maxleave: (v: number) => `Leaving penalty up to ${lakhText(v)}`,
 };
 

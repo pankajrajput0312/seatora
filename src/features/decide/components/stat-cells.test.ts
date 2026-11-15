@@ -39,7 +39,7 @@ it("compact: short values, no (i) per cell; StatHead puts one (i) on the column;
   expect(html).toMatch(/<span aria-hidden="true">₹50.L<\/span><span class="sr-only">₹50,00,000<\/span>/);
   expect(text(html)).toContain("1Y");
   const head = renderToStaticMarkup(h(StatHead, { k: "bondInr" }));
-  expect(head).toContain('aria-label="About Bond ₹ column"');
+  expect(head).toContain('aria-label="About Bond penalty column"');
   expect(text(head)).toContain("What you pay if you do not serve the bond.");
   const bond = statCells(t)[2];
   const one = renderToStaticMarkup(h(StatCellView, { c: bond, t, of: "X" }));

@@ -37,7 +37,7 @@ export const inrRange = (min: number | null | undefined, max: number, short = tr
 
 export type StatKey = "fee" | "stipend" | "bond" | "bondInr" | "leaving";
 /** Column labels, in cell order (a table's headers). */
-export const statLabel: Record<StatKey, string> = { fee: "Fee", stipend: "Stipend", bond: "Bond", bondInr: "Bond ₹", leaving: "Leaving" };
+export const statLabel: Record<StatKey, string> = { fee: "Fee", stipend: "Stipend", bond: "Bond period", bondInr: "Bond penalty", leaving: "Leaving penalty" };
 export const statKeys = Object.keys(statLabel) as StatKey[];
 /** One line behind a cell's (i): exact words, the source number it cites. `rules`: cite the NBEMS bond rules. */
 export type TipLine = { text: string; src?: number | null; warn?: true; quote?: true; rules?: true };

@@ -30,7 +30,7 @@ const PAGE_SIZE = 50;
 const schema = feesParamsSchema.extend({ page: pageValue.default(1) });
 /** The table's stat columns (TermStatCells order) and the sort each header sets. */
 const sortOf: Record<StatKey, Exclude<FeeSort, "name">> = { fee: "fee1", stipend: "stip1", bond: "bondyrs", bondInr: "bond", leaving: "leave" };
-const sortLabel: Record<FeeSort, string> = { fee1: "fee, year 1", stip1: "stipend, year 1", bondyrs: "bond years", bond: "bond ₹", leave: "leaving penalty ₹", feetotal: "whole-course fee", name: "institute name" };
+const sortLabel: Record<FeeSort, string> = { fee1: "fee, year 1", stip1: "stipend, year 1", bondyrs: "bond years", bond: "bond penalty", leave: "leaving penalty", feetotal: "whole-course fee", name: "institute name" };
 /** Stipend sorts highest first by default, the rest lowest first. */
 const natural = (k: FeeSort) => (k === "stip1" ? "desc" : "asc");
 const arrow = (on: boolean, dir: string) => (on ? <span aria-hidden="true">{dir === "asc" ? " ↑" : " ↓"}</span> : null);
@@ -148,10 +148,10 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             fee. &quot;see text&quot;: read from the profile&apos;s own fee words (quoted in the (i)). &quot;In words&quot;: the profile
             gives no one figure for these seats. The whole-course fee is in the Fee (i).
             <br /><strong>Stipend</strong>: a month, before tax. &quot;min&quot;: the NBEMS floor; the pay may be higher.
-            <br /><strong>Bond</strong>: years to serve after the course; <strong>Bond ₹</strong>: what you pay if you don&apos;t serve
+            <br /><strong>Bond period</strong>: years to serve after the course; <strong>Bond penalty</strong>: what you pay if you don&apos;t serve
             it (a range where it varies by specialty; sorting and filters use the highest). &quot;state rule&quot;: the state&apos;s rule,
             not the college&apos;s own document.
-            <br /><strong>Leaving</strong>: the penalty for leaving the seat or course after joining. MCC&apos;s Round 2 forfeit is on
+            <br /><strong>Leaving penalty</strong>: the penalty for leaving the seat or course after joining. MCC&apos;s Round 2 forfeit is on
             each institute&apos;s Fees tab.
             <br />&quot;—&quot;: not in Seatora&apos;s MCC data, never zero or &quot;no bond&quot;. &quot;No bond&quot; only where the
             college&apos;s document or the NBEMS rule says so; &quot;Unknown&quot; where Seatora&apos;s check found no clear answer.

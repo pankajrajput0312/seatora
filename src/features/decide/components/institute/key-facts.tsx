@@ -67,7 +67,7 @@ export function KeyFacts({ rows, total, mine, cats, list, name, slug, L }: { row
           {mine ? "Your courses here" : "Main courses here"}
           <InfoTip label="key facts">
             {mine ? "The course and quota options here in your profile." : "The quotas anyone can take first, then the most seats in the newest round."} Fee and stipend are year 1; each (i) has
-            years 1, 2 and 3 and the exact words with their source. Bond: the years you must serve; Bond ₹: what you pay if you don&apos;t; Leaving: the penalty for
+            years 1, 2 and 3 and the exact words with their source. Bond period: the years you must serve; Bond penalty: what you pay if you don&apos;t; Leaving penalty: the penalty for
             leaving after joining. &quot;—&quot; is not in Seatora&apos;s data, never zero or no bond.
           </InfoTip>
         </h2>
@@ -86,7 +86,7 @@ export function KeyFacts({ rows, total, mine, cats, list, name, slug, L }: { row
               <th scope="col" className="px-3 py-2 text-left font-semibold">Course</th>
               {statKeys.map((k) => (
                 <th key={k} scope="col" className={cn("px-3 py-2 text-right font-semibold", k.startsWith("bond") && "bg-wash/60 text-foreground")}>
-                  {k === "fee" ? "Fee / yr" : k === "stipend" ? "Stipend / mo" : k === "leaving" ? "Leaving ₹" : statLabel[k]}
+                  {k === "fee" ? "Fee / yr" : k === "stipend" ? "Stipend / mo" : statLabel[k]}
                 </th>
               ))}
               <th scope="col" className="px-3 py-2 text-right font-semibold"><span className="inline-flex items-center gap-0.5">{seatsHead}<InfoTip label={seatsHead}>{seatsNote}</InfoTip></span></th>
