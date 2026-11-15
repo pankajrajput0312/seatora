@@ -69,11 +69,11 @@ export function HomeHub({ L }: { L: DecideLinks }) {
       {groups.map((g) => (
         <section key={g.title} aria-label={g.title} className="grid gap-2">
           <h2 className="font-mono text-[11px] tracking-[0.2em] text-muted-foreground uppercase">{g.title}</h2>
-          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-2 xl:grid-cols-4">
             {g.tools.map(({ href, label, note, icon: Icon }) => (
               <li key={href}>
-                <Link href={L.to(href)} className="group flex min-h-14 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 hover:border-[#5ccfe6]">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-md bg-[#0b0e12] text-[#5ccfe6]">
+                <Link href={L.to(href)} className="group flex min-h-12 items-center gap-2 rounded-lg border sm:gap-3 border-border bg-card px-3 py-2 hover:border-[#5ccfe6]">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-md sm:size-9 bg-[#0b0e12] text-[#5ccfe6]">
                     <Icon className="size-[1.125rem]" strokeWidth={1.75} aria-hidden />
                   </span>
                   <span className="min-w-0">
