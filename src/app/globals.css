@@ -456,5 +456,5 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
 }
 
 /* Residents, the main feature: its own colour in the sidebar (SideNavItem data-accent) as on the institute tab. */
-[data-accent="residents"], [data-accent="residents"] * { color: #6d28d9 !important; font-weight: 600; }
-[data-accent="residents"][aria-current="page"], [data-accent="residents"][aria-current="page"] * { color: #5b21b6 !important; }
+[data-accent="residents"], [data-accent="residents"] *:not(.text-white) { color: #6d28d9 !important; font-weight: 600; }
+[data-accent="residents"][aria-current="page"], [data-accent="residents"][aria-current="page"] *:not(.text-white) { color: #5b21b6 !important; }
