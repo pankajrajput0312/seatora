@@ -1,11 +1,8 @@
-import Link from "next/link";
 import { History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { LATEST_YEAR, PAST_YEARS, reachLabel, reachTone, type Deepest, type Reach } from "../lib/reach";
 import { roundLabel, type Term } from "../types";
-import { EmptyState } from "./ui";
 
 export const HISTORY_CAPTION =
   "Based on previous years' closing ranks. History, not a prediction — seat matrix, category and competition change every round.";
@@ -80,10 +77,5 @@ export function TermText({ term }: { term: Pick<Term, "text" | "source"> | null 
   );
 }
 
-export function SetRankPrompt({ path }: { path: string }) {
-  return (
-    <EmptyState title="Set your rank to begin" description="Add your All India Rank, category and courses. They are saved on this device and added to Decide page links, so your rank and category appear in the page address." className="mt-10">
-      <Button asChild size="lg"><Link href={`${path}?editProfile=1`}>Set your rank</Link></Button>
-    </EmptyState>
-  );
-}
+// A client component (it reads the saved profile), kept importable from here with the other page bits.
+export { SetRankPrompt } from "./dashboard-parts";

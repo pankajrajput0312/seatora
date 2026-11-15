@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, IndianRupee, LayoutDashboard, LayoutGrid, ListOrdered, Route, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
@@ -24,6 +24,7 @@ const sections = [
     items: [
       { href: "/decide", label: "Overview", icon: LayoutDashboard },
       { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
+      { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
       { href: "/decide/choices", label: "Choices", icon: ListOrdered },
       { href: "/decide/compare", label: "Compare", icon: GitCompareArrows },
     ],
@@ -40,14 +41,14 @@ const sections = [
       { href: "/decide/rank-journey", label: "Rank journey", icon: Route },
       { href: "/decide/rank-tools", label: "Score & rank", icon: Calculator },
       { href: "/decide/fees", label: "Fees & bond", icon: IndianRupee },
-      { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
     ],
   },
 ];
+// Phones: the round's working screens first, in the sidebar's order; the fourth slot is the Compare tray when it has items.
 const bottom = [
   { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
+  { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
   { href: "/decide/choices", label: "Choices", icon: ListOrdered },
-  { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch },
 ];
 
 export function DecideShell({ meta, children }: { meta: ProfileMeta; children: React.ReactNode }) {
@@ -60,11 +61,18 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
   const shown = profileFromParams(new URLSearchParams(sp.toString())) ?? profile;
   const [compare] = useCompare(); // Zod-validated tray: a malformed value is an empty tray, never a crash
   const [editing, setEditing] = useState(false);
+  // The first-run setup's destination while it loads: until then the effect below leaves the URL alone, or its
+  // replace (the new profile into the page she was on) would cancel the push.
+  const landing = useRef<string | null>(null);
 
   // URL params override; otherwise bring the saved profile into the URL. A URL profile that doesn't parse (a hand-edited
   // rank=abc or cat=GEN) counts as none, so the page and this sidebar both show the saved one, never a silent fallback.
   useEffect(() => {
     if (!hydrated) return;
+    if (landing.current) {
+      if (landing.current !== pathname) return;
+      landing.current = null;
+    }
     const next = new URLSearchParams(sp.toString());
     // Pages ask for the editor with ?editProfile=1 (e.g. the "Set your rank" button); open it once and drop the flag.
     const wantsEdit = next.get("editProfile") === "1";
@@ -77,10 +85,31 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
 
   const save = (p: Profile) => {
     setStored(p);
+    // First run: on to Options, which opens on the current round's seats in her courses (service.ts optionsView).
+    if (!shown) {
+      landing.current = "/decide/options";
+      return router.push(`/decide/options?${profileToParams(p)}`);
+    }
     const next = profileToParams(p, new URLSearchParams(sp.toString()));
     next.delete("editProfile");
     router.replace(`${pathname}?${next}`, { scroll: false });
   };
+
+  // Loading: a Decide link was followed and its page hasn't arrived (pages render on the server, no Suspense, so
+  // without this nothing moves for a second or two). Cleared when the address changes.
+  const [loading, setLoading] = useState(false);
+  const here = `${pathname}?${sp}`;
+  useEffect(() => setLoading(false), [here]);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as Element | null)?.closest?.("a");
+      if (!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || a.target || a.hasAttribute("download")) return;
+      const u = new URL(a.href, location.href);
+      if (u.origin === location.origin && u.pathname.startsWith("/decide") && u.pathname + u.search !== location.pathname + location.search) setLoading(true);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
 
   const isCurrent = (href: string) => (href === "/decide" ? pathname === href : pathname.startsWith(href));
 
@@ -125,7 +154,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
                     </p>
                   </>
                 ) : (
-                  <p className="mt-0.5 text-sm">Not set yet</p>
+                  <p className="mt-0.5 text-sm">{hydrated ? "Not set yet" : "Loading…"}</p>
                 )}
                 <Button data-profile-edit variant="secondary" className="mt-2 w-full" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
               </div>
@@ -143,18 +172,21 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
       >
         {/* Phones: the sidebar lives in the drawer, so keep the rank and Edit visible here. */}
         <div className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-2 md:hidden">
-          <p className="text-sm">{shown ? <><span className="font-bold">AIR {formatRank(shown.rank)}</span> <span className="text-muted-foreground">{shown.category}{shown.pwd ? " PwD" : ""}</span></> : "Rank not set"}</p>
+          <p className="text-sm">{shown ? <><span className="font-bold">AIR {formatRank(shown.rank)}</span> <span className="text-muted-foreground">{shown.category}{shown.pwd ? " PwD" : ""}</span></> : hydrated ? "Rank not set" : "Loading…"}</p>
           <Button data-profile-edit variant="secondary" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
         </div>
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
-        <div className="isolate pb-24 md:pb-0">
+        <div aria-busy={loading || undefined} className={cn("isolate pb-24 transition-opacity md:pb-0", loading && "opacity-60")}>
           <RenamedSaved />
           {children}
         </div>
       </AppShell>
 
-      <nav aria-label="Decide shortcuts" className={cn("fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-background md:hidden", compare.length ? "grid-cols-4" : "grid-cols-3")}>
-        {[...bottom, ...(compare.length ? [{ href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows }] : [])].map(({ href, label, icon: Icon }) => (
+      <div aria-hidden className={cn("fixed inset-x-0 top-0 z-50 h-0.5 bg-mark", loading ? "animate-pulse" : "hidden")} />
+      <p role="status" className="sr-only">{loading ? "Loading the page…" : ""}</p>
+
+      <nav aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-background md:hidden">
+        {[...bottom, compare.length ? { href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows } : { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch }].map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 border-t-2 text-xs", isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <Icon className="size-5" strokeWidth={1.75} aria-hidden />
             <span className="numeric">{label}</span>
@@ -171,6 +203,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
             if (!o) setTimeout(() => [...document.querySelectorAll<HTMLElement>("[data-profile-edit]")].find((e) => e.offsetParent !== null)?.focus(), 50);
           }}
           profile={shown}
+          setup={!shown}
           meta={meta}
           onSave={save}
         />

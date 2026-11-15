@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { cn } from "@/lib/cn";
+import { Badge } from "@/components/ui/badge";
 import { decideLinks } from "../lib/links";
 import { LATEST_YEAR } from "../lib/reach";
-import { currentSteps, fmtIST, nextDate, roundName, stepName, stepsNow, type StepNow } from "../lib/round-status";
+import { currentSteps, fmtIST, nextDate, roundName, statusBadge, stepName, stepsNow, type StepNow } from "../lib/round-status";
 import { roundStatus } from "../server/notices";
+import { MCC_PG } from "./pages/mcc-link";
 import { smallLink } from "./ui";
 
 /**
@@ -19,21 +20,34 @@ export function NoticeLink({ s, children }: { s: Pick<StepNow, "url" | "title">;
   );
 }
 
-/** Compact Overview banner: what is open now and the next scheduled date, each with its MCC notice. */
+const mccSite = (
+  <a href={MCC_PG} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>MCC PG counselling site<span className="sr-only"> (opens in a new tab)</span></a>
+);
+
+/**
+ * Overview's first block: what is open now and the next scheduled date, each with its MCC notice, in the Counselling
+ * page's status badges. No round status in the data: says so and points to MCC, never a made-up date.
+ */
 export async function RoundStatusBanner({ params }: { params: URLSearchParams }) {
   const rs = await roundStatus(LATEST_YEAR);
-  if (!rs) return null;
+  if (!rs)
+    return (
+      <section aria-label={`MCC counselling ${LATEST_YEAR} now`} className="rounded-xl border border-border bg-card px-4 py-1 text-sm">
+        <p className="flex flex-wrap items-center gap-x-2">
+          <span>No MCC round status for {LATEST_YEAR} is in the data, so no dates are shown. Check the</span>
+          {mccSite}
+        </p>
+      </section>
+    );
   const { live, next } = currentSteps(stepsNow(rs, new Date()));
   return (
     <section aria-label={`MCC counselling ${rs.year} now`} className="grid rounded-xl border border-border bg-card px-4 py-1 text-sm">
       {live.map((s) => (
         <p key={s.round + s.step} className="flex flex-wrap items-center gap-x-2">
-          <span className="flex items-start gap-2">
-            <span className={cn("mt-[0.45em] size-2 shrink-0 rounded-full", s.now === "open" ? "bg-leaf" : "bg-sun")} aria-hidden />
-            <strong className="font-semibold">
-              {roundName[s.round]} {stepName[s.step].toLowerCase()} {s.now === "suspended" ? "suspended" : s.scheduled?.to ? `open until ${fmtIST(s.scheduled.to)}` : "open"}
-            </strong>
-          </span>
+          <Badge tone={statusBadge[s.now].tone}>{statusBadge[s.now].text}</Badge>
+          <strong className="font-semibold">
+            {roundName[s.round]} {stepName[s.step].toLowerCase()}{s.now !== "suspended" && s.scheduled?.to && <> until <span className="numeric">{fmtIST(s.scheduled.to)}</span></>}
+          </strong>
           {s.clock === "started" && <span className="text-muted-foreground">as scheduled, not yet confirmed by an MCC notice</span>}
           {/* The end date's own source when the status cites a later notice (e.g. a suspension) that doesn't print it. */}
           {s.now !== "suspended" && s.scheduled?.to && s.scheduledBy && s.scheduledBy.url !== s.url && <NoticeLink s={s.scheduledBy}>MCC schedule</NoticeLink>}
@@ -43,8 +57,9 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
       {!live.length && <p className="py-2.5">No MCC counselling step is open now.</p>}
       {next && (
         <p className="flex flex-wrap items-center gap-x-2">
+          <Badge tone={statusBadge.upcoming.tone}>Next</Badge>
           <span>
-            Next: {roundName[next.round]} {stepName[next.step].toLowerCase()} {next.scheduled?.from ? "from" : "on"} <span className="numeric">{fmtIST(nextDate(next)!)}</span>
+            {roundName[next.round]} {stepName[next.step].toLowerCase()} {next.scheduled?.from ? "from" : "on"} <span className="numeric">{fmtIST(nextDate(next)!)}</span>
             {next.scheduled?.tentative && " (tentative)"}
           </span>
           <NoticeLink s={next.scheduledBy ?? next}>MCC schedule</NoticeLink>

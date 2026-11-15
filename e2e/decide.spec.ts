@@ -47,9 +47,12 @@ test("set profile, label options, and reorder choices with the keyboard only", a
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("All India Rank").fill("42284");
   await dialog.getByLabel("Category").selectOption("OBC");
+  // No saved profile: the first-run setup, one step at a time (rank, courses, quotas), then Options.
+  await dialog.getByRole("button", { name: "Next" }).click();
   await dialog.getByLabel("Anaesthesiology").check();
+  await dialog.getByRole("button", { name: "Next" }).click();
   await dialog.getByRole("button", { name: "Save" }).click();
-  await expect(page).toHaveURL(/rank=42284/);
+  await expect(page).toHaveURL(/\/decide\/options\?.*rank=42284/);
   await expect(page.getByText("Reached in 2026 R1").filter({ visible: true }).first()).toBeVisible();
 
   const stars = page.locator('button[aria-pressed="false"][aria-label^="In Round 2"]').filter({ visible: true });
@@ -71,6 +74,15 @@ test("set profile, label options, and reorder choices with the keyboard only", a
 
   await page.getByRole("button", { name: new RegExp(`^Move ${esc(before[2]!)}.* up$`) }).click();
   await expect.poll(names).toEqual([before[1], before[2], before[0]]);
+});
+
+test("overview leads with what's open now and the round's numbers, each opening that Options view", async ({ page }) => {
+  await page.goto(`/decide?${PROFILE}`);
+  await expect(page.getByRole("region", { name: "MCC counselling 2026 now" })).toBeVisible();
+  const numbers = page.getByRole("region", { name: "Round 2 seats in your courses" });
+  await expect(numbers).toContainText("Options with Round 2 seats1,065708 in the clear vacancy list, 357 virtual only.");
+  await numbers.getByRole("link", { name: "Open the Round 2 view" }).click();
+  await expect(page.locator("#options-count")).toContainText("of 1,065 options");
 });
 
 // ---- Options, choices and compare on the real MCC data (her profile: AIR 42,284, OBC, Anaesthesiology + Family Medicine) ----
