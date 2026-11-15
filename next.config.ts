@@ -42,6 +42,8 @@ const noindex = ["/decide/:path*", "/api/:path*", "/login", "/signup", "/account
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // The build-time catalog snapshot (prisma/snapshot.ts) ships with every server route.
+  outputFileTracingIncludes: { "/**": ["./.snapshot/catalog.json.gz"] },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }, ...noindex];
   },

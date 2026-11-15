@@ -3,7 +3,8 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { PageQuery, Paged } from "../service";
 import { optionId, rounds, seatKinds, type College, type Course, type MccNotice, type Round, type SeatKind, type SeatList } from "../types";
-import { getCatalog, perImport, type Catalog } from "./catalog";
+import { dataVersion, getCatalog, perImport, type Catalog } from "./catalog";
+import { categoryOrder, roundKey, seatRoundRows, snapshotAt, type SeatDbRow } from "./snapshot";
 
 // MCC seat lists (SeatSource + SeatCount, prisma/import-mcc.ts). Each list is one kind of one round as its PDF printed
 // it; kinds overlap, so everything here works on one kind at a time and never adds kinds together.
@@ -86,7 +87,6 @@ export type SeatRow = {
   cs: string | null;
 };
 
-const categoryOrder = ["Open", "OBC", "EWS", "SC", "ST", "Open PwD", "OBC PwD", "EWS PwD", "SC PwD", "ST PwD"];
 const like = (q: string) => `%${q.replace(/[\\%_]/g, "\\$&")}%`;
 
 /** listSeats' filters other than the list, on x (course, quota, category), sp (Specialty) and c (College). */
@@ -137,33 +137,54 @@ export async function listSeats(f: SeatFilters = {}, pg?: PageQuery): Promise<Pa
   const cat = await getCatalog();
   const lists = pickLists(await seatLists(), f);
   if (!lists.length) return { rows: [], total: 0, page: 1, pageSize: pg?.pageSize ?? 1, lists, seats: {} };
-  const where = Prisma.join([Prisma.sql`d.key = ANY(${lists.map((l) => l.key)})`, ...rowWhere(f)], " AND ");
-  const from = Prisma.sql`FROM "SeatCount" x JOIN "DataSource" d ON d.id = x."seatSourceId" JOIN "College" c ON c.id = x."collegeId" LEFT JOIN "Specialty" sp ON sp.id = x."specialtyId" WHERE ${where}`;
-  const rowsAt = (limit?: { size: number; page: number }) => db.$queryRaw<{ l: string; k: string; dg: string; sc: string; slug: string | null; name: string | null; q: string | null; c: string; n: number; cs: string | null }[]>`
-    SELECT d.key AS l, c.key AS k, x.degree AS dg, x.code AS sc, sp.slug, sp.name, x.quota AS q, x.category AS c, x.seats AS n, x."collegeSpecialtyId" AS cs
-    ${from}
-    ORDER BY c.name, c.key, x.degree, COALESCE(sp.name, x.code), x.quota NULLS FIRST, array_position(${categoryOrder}::text[], x.category), d.key, x.id
-    ${limit ? Prisma.sql`LIMIT ${limit.size} OFFSET ${(limit.page - 1) * limit.size}` : Prisma.empty}`;
-  // Every row (no page): the totals come from the rows themselves, one read. One page: the totals beside it, in parallel
-  // on the page asked for; a page past the end reads the last one again.
-  const asked = Math.max(1, pg?.page ?? 1);
-  const [all, first, counted] = await Promise.all([
-    pg ? null : rowsAt(),
-    pg ? rowsAt({ size: pg.pageSize, page: asked }) : null,
-    pg ? db.$queryRaw<{ key: string; n: number; seats: number }[]>`SELECT d.key, COUNT(*)::int AS n, SUM(x.seats)::int AS seats ${from} GROUP BY 1` : null,
-  ]);
-  const per = counted ?? [...Map.groupBy(all!, (r) => r.l)].map(([key, xs]) => ({ key, n: xs.length, seats: xs.reduce((a, r) => a + r.n, 0) }));
-  const total = per.reduce((a, r) => a + r.n, 0);
+  // pickLists' lists are all of one round: its rows, cached per import, filtered here as rowWhere filters in SQL.
+  const keys = new Set(lists.map((l) => l.key));
+  const match = rowMatch(cat, f);
+  const all = (await roundRows(roundKey(lists[0].year, lists[0].round))).filter((r) => keys.has(r.l) && match(r));
+  const total = all.length;
   const pageSize = pg?.pageSize ?? Math.max(1, total);
-  const page = pg ? Math.min(asked, Math.max(1, Math.ceil(total / pg.pageSize))) : 1;
-  const found = all ?? (page === asked ? first! : await rowsAt({ size: pageSize, page }));
-  const rows = found.flatMap((r): SeatRow[] => {
+  // A page past the end is the last one.
+  const page = pg ? Math.min(Math.max(1, pg.page), Math.max(1, Math.ceil(total / pg.pageSize))) : 1;
+  const rows = all.slice((page - 1) * pageSize, page * pageSize).flatMap((r): SeatRow[] => {
     const college = cat.collegeByKey.get(r.k);
     if (!college) return [];
     const course = r.slug && r.name ? { degree: r.dg, specialty: r.sc, name: r.name, slug: r.slug } : null;
     return [{ list: r.l, college, course, degree: r.dg, specialty: r.sc, quota: r.q, category: r.c, seats: r.n, cs: r.cs }];
   });
-  return { rows, total, page, pageSize, lists, seats: Object.fromEntries(lists.map((l) => [l.key, per.find((p) => p.key === l.key)?.seats ?? 0])) };
+  const seats = Object.fromEntries(lists.map((l) => [l.key, 0]));
+  for (const r of all) seats[r.l] += r.n;
+  return { rows, total, page, pageSize, lists, seats };
+}
+
+/**
+ * Every seat row of a round (roundKey), once per import per process: the build's snapshot holds the newest round
+ * (server/snapshot.ts), other rounds and data imported since the build are read from Postgres. ~10k rows per list.
+ */
+const roundRows = perImport(async (key): Promise<SeatDbRow[]> => {
+  const snap = await snapshotAt(await dataVersion());
+  if (snap?.seats[key]) return snap.seats[key];
+  const [year, round] = key.split("|");
+  return seatRoundRows(db, Number(year), round);
+});
+
+/** rowWhere in JS, on a cached seat row (SQL ILIKE ≈ case-insensitive contains). */
+function rowMatch(cat: Catalog, f: SeatFilters) {
+  const q = f.q?.trim().toLowerCase();
+  const has = (s: string | null | undefined) => !!s && s.toLowerCase().includes(q!);
+  return (r: SeatDbRow) => {
+    const college = cat.collegeByKey.get(r.k);
+    return (
+      (!f.courses || (r.slug != null && f.courses.includes(r.slug))) &&
+      (!f.specialties || f.specialties.includes(r.sc)) &&
+      (!f.degrees || f.degrees.includes(r.dg)) &&
+      (!f.pairs || f.pairs.includes(`${r.dg}~${r.sc}`)) &&
+      (!f.quota || r.q === f.quota) &&
+      (!f.categories || f.categories.includes(r.c)) &&
+      (!f.state || college?.state === f.state) &&
+      (!f.college || r.k === f.college) &&
+      (!q || has(college?.name) || has(college?.address) || has(college?.state))
+    );
+  };
 }
 
 /** The seat row's course and quota is an Options row (it has past allotments). A row with no quota printed never is. */

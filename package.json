@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run db:snapshot && next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -15,6 +15,7 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:import": "node --experimental-strip-types prisma/import-mcc.ts",
+    "db:snapshot": "node --experimental-strip-types prisma/snapshot.ts",
     "db:import-residents": "node --experimental-strip-types prisma/import-residents.ts"
   },
   "dependencies": {

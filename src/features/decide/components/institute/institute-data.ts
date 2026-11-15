@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { websiteUrl } from "../../lib/stat-format";
 import { anyTermFilter, termVerdict, type TermFilters, type TermVerdict } from "../../lib/term-filters";
 import { profileHasCourse, type Profile } from "../../profile";
-import { getCatalog, type Catalog, type YearInfo } from "../../server/catalog";
+import { dataVersion, getCatalog, type Catalog, type YearInfo } from "../../server/catalog";
+import { infoRows, snapshotAt } from "../../server/snapshot";
 import { clinicalFactsFor } from "../../server/facts";
 import { countAllotments, type AllotmentCount } from "../../server/queries";
 import { listSeats, seatLists, sumSeats, type SeatRow } from "../../server/seats";
@@ -107,13 +108,9 @@ export async function hospitalInfo(): Promise<Map<string, HospitalInfo>> {
   if (cat.mem) return new Map();
   let m = infoMemo.get(cat);
   if (!m) {
-    type Row = { key: string; ids: string[] | null; url: string | null; web: string | null; type: string | null; basis: string | null; beds: number | null; kind: string | null; meta: ValueMeta | null; own: boolean | null };
-    m = db
-      .$queryRaw<Row[]>`
-        SELECT c.key, c."mccIds" AS ids, c."mccProfileUrl" AS url, c.website AS web, c.type, c."typeBasis" AS basis,
-          (f.data->'facts'->>'beds_total')::int AS beds, f.data->'facts'->>'beds_kind' AS kind,
-          COALESCE(f.data->'values_meta'->'facts.beds_total', f.data->'values_meta'->'facts') AS meta, f.data->'values_meta' ? 'facts.beds_total' AS own
-        FROM "College" c LEFT JOIN "ClinicalFacts" f ON f."collegeId" = c.id`
+    // The build's snapshot while no import has committed since, else Postgres (server/snapshot.ts).
+    m = dataVersion()
+      .then(async (v) => (await snapshotAt(v))?.info ?? (await infoRows(db)))
       .then((rows) =>
         new Map(
           rows.map((r) => [

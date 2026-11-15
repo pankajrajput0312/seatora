@@ -2,9 +2,10 @@ import "server-only";
 import { cache as perRequest } from "react";
 import { requireDecideAccess } from "@/features/auth/lib/session";
 import { db } from "@/lib/db";
-import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type FeeTableRecord, type Round, type Source, type Term } from "../types";
+import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Source, type Term } from "../types";
 import { bucketOfDegree } from "./terms";
 import { specialtyName } from "../lib/specialty-search";
+import { catalogRows, markerOf, snapshotAt } from "./snapshot";
 
 /** A course at a college (CollegeSpecialty). `cs` is its id: the DB id, or "college~degree~specialty" in memory (tests). */
 export type Pair = { cs: string; college: string; degree: string; specialty: string };
@@ -149,26 +150,9 @@ export function memoryCatalog(d: DecideData): Catalog {
 const WORKING_NOTE = /;?\s*\b(?:I|we) (?:did not|could not|have not|didn't|couldn't|haven't) [^."\\]*\./gi;
 export const scrubNotes = <T,>(x: T): T => JSON.parse(JSON.stringify(x).replace(WORKING_NOTE, (m) => (m.startsWith(";") ? "." : "")));
 
-async function loadCatalog(): Promise<Catalog> {
-  const [sources, colleges, specialties, pairs, terms, options, details, retired, feeTable] = await Promise.all([
-    db.dataSource.findMany({ select: { id: true, key: true, name: true, url: true, counsellingYear: true, round: true, provisional: true } }),
-    db.college.findMany({ select: { id: true, key: true, slug: true, name: true, state: true, pincode: true, address: true, website: true }, orderBy: { name: "asc" } }),
-    db.specialty.findMany({ select: { id: true, slug: true, name: true, degree: true, code: true } }),
-    db.collegeSpecialty.findMany({ select: { id: true, collegeId: true, specialtyId: true } }),
-    db.collegeTerm.findMany({ select: { id: true, collegeId: true, program: true, kind: true, text: true, amountInr: true, source: { select: { name: true, url: true, type: true } } } }),
-    db.$queryRaw<{ cs: string; quota: string; year: number; n: number }[]>`
-      SELECT "collegeSpecialtyId" AS cs, quota, "counsellingYear" AS year, SUM(n)::int AS n FROM "Cutoff" GROUP BY 1, 2, 3`,
-    // Raw SQL: the generated client may predate the details column (prisma/schema.prisma).
-    db.$queryRaw<{ id: string; details: NonNullable<Term["details"]> }[]>`SELECT id, details FROM "CollegeTerm" WHERE details IS NOT NULL`,
-    db.$queryRaw<{ oldKey: string; oldSlug: string | null; newKey: string | null }[]>`SELECT "oldKey", "oldSlug", "newKey" FROM "RetiredCollegeKey"`,
-    // Bundle schema 2: the fee table's figures (what a summary line reads; the Fees tab reads whole records: ./facts.ts).
-    db.$queryRaw<(FeeTableRecord & { collegeId: string })[]>`
-      SELECT "collegeId", programme, string_to_array("quotaGroup", '+') AS seat_groups, data->'fee_display' AS fee_display, data->'fee_per_year' AS fee_per_year,
-        data->'fee_whole_course' AS fee_whole_course, data->'stipend_per_month' AS stipend_per_month, data->'counselling_forfeit' AS counselling_forfeit, data->'sources' AS sources, data->'quotas' AS quotas,
-        data->>'fee_text' AS fee_text, data->'fee_text_src' AS fee_text_src, data->'stipend_nbems_minimum' AS stipend_nbems_minimum,
-        data->'fee_parsed' AS fee_parsed, data->'other_fees' AS other_fees, data->'fee_variants' AS fee_variants
-      FROM "FeesStructured"`,
-  ]);
+async function loadCatalog(version: string): Promise<Catalog> {
+  // The build's snapshot while no import has committed since (zero DB egress), else Postgres.
+  const { sources, colleges, specialties, pairs, terms, options, details, retired, feeTable } = (await snapshotAt(version))?.catalog ?? (await catalogRows(db));
   const detailsOf = new Map(details.map((d) => [d.id, scrubNotes(d.details)]));
   // FEE and STIPEND terms carry their college + program's fee-table records, as the bundle's terms do (details.records).
   const feeRecords = Map.groupBy(feeTable, (r) => `${r.collegeId}|${bucketOfDegree(r.programme)}`);
@@ -208,10 +192,7 @@ async function loadCatalog(): Promise<Catalog> {
 let cache: { version: string; catalog: Promise<Catalog> } | null = null;
 let testCatalog: Catalog | null = null;
 const access = perRequest(() => requireDecideAccess());
-const dataVersion = perRequest(async () => {
-  const marker = await db.dataSource.findUnique({ where: { key: "import/mcc" }, select: { createdAt: true } });
-  return marker?.createdAt.toISOString() ?? "";
-});
+export const dataVersion = perRequest(() => markerOf(db));
 
 /** No database configured or reachable: Decide shows "Data unavailable", never stand-in data. */
 export class DataUnavailableError extends Error {
@@ -236,7 +217,7 @@ export async function getCatalog(): Promise<Catalog> {
   // Read before loading: an import committing during the load leaves the old version cached, so the next check reloads.
   const [, version] = await Promise.all([access(), dataVersion()]);
   if (cache?.version !== version) {
-    const catalog = loadCatalog();
+    const catalog = loadCatalog(version);
     catalog.catch(() => (cache = null)); // don't keep a failed load
     cache = { version, catalog };
   }
