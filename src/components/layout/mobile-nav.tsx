@@ -35,11 +35,6 @@ export function MobileNav() {
             </button>
           </div>
           <nav aria-label="Mobile" className="mt-4 grid">
-            {siteConfig.nav.map((item) => (
-              <Link key={item.href} href={item.href} onClick={close} className="border-b border-border py-3.5 text-base">
-                {item.label}
-              </Link>
-            ))}
             <AuthLink onClick={close} className="border-b border-border py-3.5 text-base" />
           </nav>
           <Button asChild size="lg" className="mt-5 w-full">

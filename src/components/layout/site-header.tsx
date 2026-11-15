@@ -14,13 +14,6 @@ export function SiteHeader() {
           <LogoMark className="size-6" />
           {siteConfig.name}
         </Link>
-        <nav aria-label="Primary" className="hidden gap-7 text-sm text-muted-foreground md:flex">
-          {siteConfig.nav.map((item) => (
-            <Link key={item.href} href={item.href} className="transition-colors hover:text-foreground">
-              {item.label}
-            </Link>
-          ))}
-        </nav>
         <div className="flex items-center gap-2">
           <div className="hidden items-center gap-2 md:flex">
             <Button asChild size="sm" variant="ghost">
