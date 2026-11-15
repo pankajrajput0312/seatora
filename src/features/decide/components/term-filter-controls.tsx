@@ -72,10 +72,10 @@ export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Pro
       <span className="flex min-h-11 items-center gap-1 text-sm">
         <label className="flex min-h-11 cursor-pointer items-center gap-2">
           <input type="checkbox" name="nd" value="keep" defaultChecked={f.nd === "keep"} className="size-5 accent-sky" />
-          Include not declared
+          Include not published
         </label>
-        <InfoTip label="not declared">
-          A college whose figure is not declared, or only in words, is left out of a fee, stipend, bond or leaving filter
+        <InfoTip label="not published">
+          A college whose figure is not published, or has no number, is left out of a fee, stipend, bond or leaving filter
           unless this is ticked. &quot;No bond&quot; only lists colleges whose record says no bond (ticked, also those where a
           state law&apos;s service may still apply), and a type filter never lists a college without a type.
         </InfoTip>

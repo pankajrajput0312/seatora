@@ -152,7 +152,7 @@ export const scrubNotes = <T,>(x: T): T => JSON.parse(JSON.stringify(x).replace(
 async function loadCatalog(): Promise<Catalog> {
   const [sources, colleges, specialties, pairs, terms, options, details, retired, feeTable] = await Promise.all([
     db.dataSource.findMany({ select: { id: true, key: true, name: true, url: true, counsellingYear: true, round: true, provisional: true } }),
-    db.college.findMany({ select: { id: true, key: true, slug: true, name: true, state: true, pincode: true, address: true }, orderBy: { name: "asc" } }),
+    db.college.findMany({ select: { id: true, key: true, slug: true, name: true, state: true, pincode: true, address: true, website: true }, orderBy: { name: "asc" } }),
     db.specialty.findMany({ select: { id: true, slug: true, name: true, degree: true, code: true } }),
     db.collegeSpecialty.findMany({ select: { id: true, collegeId: true, specialtyId: true } }),
     db.collegeTerm.findMany({ select: { id: true, collegeId: true, program: true, kind: true, text: true, amountInr: true, source: { select: { name: true, url: true, type: true } } } }),
@@ -176,9 +176,9 @@ async function loadCatalog(): Promise<Catalog> {
   const collegeKey = new Map(colleges.map((c) => [c.id, c.key]));
   const spec = new Map(specialties.map((s) => [s.id, s]));
   return indexCatalog({
-    // Beds and year established are not in the MCC data; type (inferred, College.typeBasis) and website are imported
-    // (bundle schema 2) but not shown yet. Never guessed.
-    colleges: colleges.map((c) => ({ key: c.key, slug: c.slug, name: c.name, state: c.state, pincode: c.pincode, address: c.address, type: null, beds: null, established: null, website: null })),
+    // Beds and year established are not in the MCC data; type (inferred, College.typeBasis) is imported (bundle schema
+    // 2) but not shown yet. Never guessed. website: the MCC profile's (a fee cell "On college website ↗" links it).
+    colleges: colleges.map((c) => ({ key: c.key, slug: c.slug, name: c.name, state: c.state, pincode: c.pincode, address: c.address, type: null, beds: null, established: null, website: c.website })),
     courses: specialties.map((s) => ({ degree: s.degree, specialty: s.code ?? "", name: s.name, slug: s.slug })),
     // Allotment-result PDFs only; term documents have no year or round and travel with their term.
     sources: sources.flatMap((s): [string, Source][] =>

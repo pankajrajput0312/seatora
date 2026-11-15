@@ -18,8 +18,8 @@ it("card: five labelled cells, short values, each with an (i) button named after
   expect(html.match(/<dt/g)).toHaveLength(5);
   for (const about of ["fee", "stipend", "service bond", "bond amount", "leaving penalty"]) expect(html).toContain(`aria-label="About ${about}, AIIMS, MD Anaesthesiology"`);
   expect(text(html)).toMatch(/1Y .*₹50 L/);
-  // The short value is read out in full.
-  expect(html).toMatch(/<span aria-hidden="true">₹50.L<\/span><span class="sr-only">₹50,00,000<\/span>/);
+  // Card and table show the same lakh figure (the (i) has it in full).
+  expect(html).toMatch(/₹50.L/);
   expect(html).toContain("text-sun"); // a bond applies: orange
   expect(text(html)).toContain("— (not in Seatora&#x27;s data)"); // the fee: missing, never 0
 });
@@ -27,7 +27,7 @@ it("card: five labelled cells, short values, each with an (i) button named after
 it("table: five tds with full values, keyed by data-col; nothing breaks but a range's dash; the caller's padding wins", () => {
   const html = renderToStaticMarkup(h("tr", null, h(TermStatCells, { t, variant: "table", tdClassName: "px-2" })));
   expect([...html.matchAll(/data-col="(\w+)"/g)].map((m) => m[1])).toEqual(["fee", "stipend", "bond", "bondInr", "leaving"]);
-  expect(text(html)).toContain("₹50,00,000");
+  expect(html).toMatch(/₹50.L/);
   expect(html).toContain("1\u00a0year");
   expect(html).toContain("[:where(&amp;)]:px-3 [:where(&amp;)]:py-2 px-2");
   expect(html.match(/<button/g)).toHaveLength(5);
@@ -36,7 +36,7 @@ it("table: five tds with full values, keyed by data-col; nothing breaks but a ra
 it("compact: short values, no (i) per cell; StatHead puts one (i) on the column; StatCellView is one cell", () => {
   const html = renderToStaticMarkup(h("tr", null, h(TermStatCells, { t, variant: "compact" })));
   expect(html).not.toContain("<button");
-  expect(html).toMatch(/<span aria-hidden="true">₹50.L<\/span><span class="sr-only">₹50,00,000<\/span>/);
+  expect(html).toMatch(/₹50.L/);
   expect(text(html)).toContain("1Y");
   const head = renderToStaticMarkup(h(StatHead, { k: "bondInr" }));
   expect(head).toContain('aria-label="About Bond penalty column"');

@@ -57,10 +57,8 @@ export function Money({ f, sources }: { f: Figure | null | undefined; sources: T
   if (!f) return <NotDeclared />;
   return (
     <span className="whitespace-nowrap">
-      {f.kind === "maximum" && "≤ "}{f.min != null && `${formatINR(f.min)}–`}{formatINR(f.inr)}
+      {f.kind === "maximum" ? "Up to " : f.kind === "minimum" ? "From " : ""}{f.min != null && `${formatINR(f.min)}–`}{formatINR(f.inr)}
       <Sup n={f.src} sources={sources} />
-      {f.kind === "minimum" && <Badge className="ml-1.5">minimum</Badge>}
-      {f.kind === "maximum" && <Badge className="ml-1.5">NBEMS maximum</Badge>}
       {f.atAdmission && <span className="block text-xs font-normal text-muted-foreground">paid at admission</span>}
       {kindNote[f.kind] && <span className="block text-xs font-normal text-muted-foreground">{kindNote[f.kind]}</span>}
     </span>
@@ -103,7 +101,7 @@ const years = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
 const bondYears = (b: ProgrammeTerms["bond"]) => (b.years == null ? "Years not stated" : b.yearsSum ? `${b.yearsSum} = ${years(b.years)}` : years(b.years));
 const BASIS: Record<NonNullable<ProgrammeTerms["bond"]["basis"]>, string> = { document: "the college's own document", state_rule: "state rule", nbems_rule: "NBEMS rule" };
 
-const otherCourse = (t: ProgrammeTerms) => `Not declared for ${t.programme}: the bond on the college's MCC profile is for other courses (its exact words are below).`;
+const otherCourse = (t: ProgrammeTerms) => `Not published for ${t.programme}: the bond on the college's MCC profile is for other courses (its exact words are below).`;
 
 /** The NBEMS bond rules as source numbers (the page's footer). */
 function NbemsRules() {
@@ -157,10 +155,9 @@ function FeeCell({ f, at }: { f: FeeEntry | null; at: At }) {
   if (!f) return <NotDeclared what="not stated" />;
   return (
     <span className="whitespace-nowrap">
-      {f.maximum && "≤ "}{f.amount != null ? feeMoney({ amount: f.amount, amount_max: f.amount_max, currency: f.currency }) : f.text}
+      {f.maximum && "Up to "}{f.amount != null ? feeMoney({ amount: f.amount, amount_max: f.amount_max, currency: f.currency }) : f.text}
       {at(f.src)}
-      {f.maximum && <Badge className="ml-1.5">NBEMS maximum</Badge>}
-      {f.above_nbems_ceiling && <Badge tone="warning" className="ml-1.5">above NBEMS maximum</Badge>}
+      {f.above_nbems_ceiling && <Badge tone="warning" className="ml-1.5">above NBEMS limit</Badge>}
       {FEE_KIND[f.kind] && <span className="block text-xs font-normal text-muted-foreground">{FEE_KIND[f.kind]}</span>}
     </span>
   );
@@ -174,7 +171,7 @@ function ParsedCell({ x, adm, at, src }: { x: Parsed["per_year"][number] | undef
     <span className="whitespace-nowrap">
       {feeMoney(x)}
       {at(src)}
-      <span className="block text-xs font-normal text-muted-foreground">{adm ? "paid at admission · " : ""}from the profile&apos;s words</span>
+      {adm && <span className="block text-xs font-normal text-muted-foreground">paid at admission</span>}
     </span>
   );
 }
@@ -184,10 +181,9 @@ function StipendCell({ s, at }: { s: StipendEntry | null; at: At }) {
   if (!s) return <NotDeclared what="not stated" />;
   return (
     <span className="whitespace-nowrap">
-      {formatINR(s.inr)}{s.plus_da && " + DA"}
+      {s.minimum && "From "}{formatINR(s.inr)}{s.plus_da && " + DA"}
       {at(s.src)}
-      {s.minimum && <Badge className="ml-1.5">NBEMS minimum</Badge>}
-      {s.below_nbems_minimum && <Badge tone="warning" className="ml-1.5">below NBEMS minimum</Badge>}
+      {s.below_nbems_minimum && <Badge tone="warning" className="ml-1.5">below NBEMS min</Badge>}
       {s.kind === "nmc_list" && <span className="block text-xs font-normal text-muted-foreground">NMC stipend list{s.one_figure_all_years && ": one figure for every year"}</span>}
     </span>
   );
@@ -308,7 +304,7 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
             <tr>
               <th scope="row" className="py-2 pr-3 text-left font-normal text-muted-foreground">Whole course</th>
               <td className="numeric px-3 py-2 text-right font-semibold">
-                <span className="whitespace-nowrap">{n.wholeCourse.maximum && "≤ "}{feeMoney(n.wholeCourse)} total ({g.years} yrs){n.wholeCourse.maximum && <Badge className="ml-1.5">NBEMS maximum</Badge>}</span>
+                <span className="whitespace-nowrap">{n.wholeCourse.maximum && "Up to "}{feeMoney(n.wholeCourse)} total ({g.years} yrs)</span>
               </td>
               <td />
             </tr>
@@ -367,7 +363,7 @@ function TermsYears({ t }: { t: ProgrammeTerms }) {
                 <>
                   {formatINR(t.wholeCourseFee)}
                   {fee1 && t.years.every((y) => y.fee?.inr === fee1.inr) && (
-                    <span className="block text-xs font-normal text-muted-foreground">{formatINR(fee1.inr)} × {t.durationYears} years, computed from one yearly figure; year-wise fees may differ</span>
+                    <span className="block text-xs font-normal text-muted-foreground">{formatINR(fee1.inr)} × {t.durationYears} years from one yearly figure; year-wise fees may differ</span>
                   )}
                 </>
               ) : (
@@ -388,7 +384,7 @@ function TermsYears({ t }: { t: ProgrammeTerms }) {
           {minimum && <p>Minimum: the hospital must pay at least this; the actual pay may be higher. Later years are not declared.</p>}
           {fee.map((u) => (
             <p key={u.kind}>
-              {termLabel[u.kind]} as published: {u.text}<Sup n={u.src} sources={sources} />
+              {termLabel[u.kind]} in the profile&apos;s words: {u.text}<Sup n={u.src} sources={sources} />
             </p>
           ))}
         </div>
@@ -449,7 +445,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
             {bond.basis && bond.text && <span className={note}>{bond.text}</span>}
             {bond.basis === "state_rule" && <span className="block text-xs text-sun">From the state&apos;s rule (its order is the source), not the college&apos;s own bond document.</span>}
             {bond.yearsText && !sameYears(bond.yearsText, bond.years) && <span className={note}>Years as written: {bond.yearsText}</span>}
-            {perYear && <span className={note}>{amountText(perYear, true)} for {bond.years} years (computed from the per-year amount).</span>}
+            {perYear && <span className={note}>{amountText(perYear, true)} for {bond.years} years (the per-year amount × the years).</span>}
             {bond.amount.varies && <span className="block text-xs text-sun">The amount varies by specialty: check the exact words below.</span>}
             {bond.otherAmounts && <span className={note}>Figures for other courses or quotas are in the exact words below.</span>}
           </>
@@ -500,7 +496,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
         </div>
       </dl>
       {t.unread.filter((u) => u.kind === "BOND" || u.kind === "PENALTY").map((u) => (
-        <p key={u.kind} className="text-xs text-muted-foreground">{termLabel[u.kind]} as published: {u.text}<Sup n={u.src} sources={sources} /></p>
+        <p key={u.kind} className="text-xs text-muted-foreground">{termLabel[u.kind]} in the profile&apos;s words: {u.text}<Sup n={u.src} sources={sources} /></p>
       ))}
       {(bond.quote ?? bond.text) && (
         <details className="text-sm">
