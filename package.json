@@ -16,9 +16,12 @@
     "db:studio": "prisma studio",
     "db:import": "node --experimental-strip-types prisma/import-mcc.ts",
     "db:snapshot": "node --experimental-strip-types prisma/snapshot.ts",
-    "db:import-residents": "node --experimental-strip-types prisma/import-residents.ts"
+    "db:import-residents": "node --experimental-strip-types prisma/import-residents.ts",
+    "ask:eval": "ASK_EVAL=1 vitest run src/features/ask/evals/run.test.ts"
   },
   "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^1.1.2",
+    "@anthropic-ai/sdk": "^1.8.0",
     "@astryxdesign/core": "^0.7.16",
     "@astryxdesign/theme-neutral": "^0.7.16",
     "@hookform/resolvers": "^7.0.6",

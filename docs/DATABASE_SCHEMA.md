@@ -65,3 +65,8 @@ One row per request from the in-app page or the public form (`src/features/reque
 
 ## Synced profile and choices (`UserProfile`, `UserChoices`)
 One row per signed-in user (`userId` is the key, cascade on account delete): the Decide profile and the Choices lists as Zod-validated JSON (`profileSchema`, `choicesSchema`; at most 400 KB), with the `updatedAt` the save action set. `src/app/decide/sync-actions.ts` saves only when the device sends the `updatedAt` it last saw, else returns the server copy; `components/account-sync.tsx` then merges (`lib/account-sync.ts`: the newer copy wins, every choice only in the other is appended, never lost) and saves again. Signed out, both stay in localStorage only. Migration `20261119000000_user_sync`.
+
+## Ask Seatora (`AskLog`, `AskReport`)
+Owner-only assistant (docs/ASK_SEATORA.md). Both cascade on account delete.
+- `AskLog`: one row per question, written when it starts (`outcome` "started"; the hourly request limit counts these rows) and finished with `model`, `effort`, input / output / cache-read / cache-write tokens, `tools` (names), `rounds`, `latencyMs` and `outcome` (ok, refusal, max_tokens, max_rounds, timeout, aborted, rate_limited, error). The daily token budget sums input + output + cache writes since 00:00 UTC. Never message text or names. Index (userId, createdAt).
+- `AskReport`: a plan report `create_report` saved: `title` and `json` (`features/ask/reports.ts` reportSchema: profile, summary, ordered choices with their facts at the time, residents counts, risks, sources). Shown at `/decide/ask/report/<id>` to its own account only. Index (userId, createdAt).

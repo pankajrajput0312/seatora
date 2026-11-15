@@ -441,18 +441,20 @@ model WaitlistEntry {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String           @id @default(cuid())
+  email        String           @unique
   name         String
   passwordHash String
   /// Consecutive failed sign-ins; the account is locked until lockedUntil after too many.
-  failedLogins Int       @default(0)
+  failedLogins Int              @default(0)
   lockedUntil  DateTime?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime         @default(now())
   sessions     Session[]
   requests     FeatureRequest[]
   profile      UserProfile?
   choices      UserChoices?
+  askLogs      AskLog[]
+  askReports   AskReport[]
 }
 
 /// The Decide profile (features/decide/profile.ts profileSchema) of a signed-in user, so it follows the account across
@@ -503,4 +505,39 @@ model FeatureRequest {
 
   @@index([createdAt])
   @@index([userId])
+}
+
+/// Ask Seatora (src/features/ask, owner only): one row per question, written when it starts (the hourly request limit
+/// counts these) and finished with its usage. Token counts, tool names, latency and outcome only: never message text or names.
+model AskLog {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  model            String
+  effort           String
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  tools            String[]
+  rounds           Int      @default(0)
+  latencyMs        Int      @default(0)
+  /// started, ok, refusal, max_tokens, timeout, aborted, rate_limited, error
+  outcome          String   @default("started")
+
+  @@index([userId, createdAt])
+}
+
+/// A plan report the assistant wrote (create_report), shown at /decide/ask/report/<id> to the account that made it.
+model AskReport {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  /// { profile, sections: [{ heading, body (markdown) }], choices: [...], sources: [...] } (features/ask/reports.ts)
+  json      Json
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

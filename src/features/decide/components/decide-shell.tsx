@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, IndianRupee, LayoutDashboard, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { MessageCircle, Pencil } from "lucide-react";
+import { MessageCircle, Pencil, Sparkles } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -57,7 +57,8 @@ const bottom = [
 ];
 
 /** `phone`: the server's guess from the user agent (layout.tsx), so the first paint has the right layout. */
-export function DecideShell({ meta, phone, children }: { meta: ProfileMeta; phone?: boolean; children: React.ReactNode }) {
+/** `ask`: the server says she is the owner with Ask Seatora on (layout.tsx); only then is its nav entry rendered. */
+export function DecideShell({ meta, phone, ask, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; children: React.ReactNode }) {
   const pathname = usePathname();
   const sp = useSearchParams();
   const router = useRouter();
@@ -208,10 +209,10 @@ export function DecideShell({ meta, phone, children }: { meta: ProfileMeta; phon
               </div>
             }
           >
-            {sections.map((sec) => (
+            {(ask ? [...sections.slice(0, -1), { ...sections.at(-1)!, items: [...sections.at(-1)!.items, { href: "/decide/ask", label: "Ask Seatora", icon: Sparkles }] }] : sections).map((sec) => (
               <SideNavSection key={sec.title} title={sec.title}>
                 {sec.items.map(({ href, label, icon }) => (
-                  <SideNavItem key={href} label={label} icon={icon} href={L.to(href)} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className="rounded-full bg-[#6d28d9] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">77K NAMES</span> })} />
+                  <SideNavItem key={href} label={label} icon={icon} href={L.to(href)} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className="rounded-full bg-[#6d28d9] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">77K NAMES</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">BETA</span> })} />
                 ))}
               </SideNavSection>
             ))}

@@ -42,8 +42,9 @@ const noindex = ["/decide/:path*", "/api/:path*", "/login", "/signup", "/account
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  // The build-time catalog snapshot (prisma/snapshot.ts) ships with every server route.
-  outputFileTracingIncludes: { "/**": ["./.snapshot/catalog.json.gz"] },
+  // The build-time catalog snapshot (prisma/snapshot.ts) ships with every server route; Ask Seatora's skills (read
+  // from disk, features/ask/skills.ts) with its chat route.
+  outputFileTracingIncludes: { "/**": ["./.snapshot/catalog.json.gz"], "/api/ask/chat": ["./src/features/ask/skills/*.md"] },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }, ...noindex];
   },
