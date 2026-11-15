@@ -22,6 +22,7 @@ import { listSeats, listTitle, seatKindNote, UnlistedSeats } from "@/features/de
 import { TermStatCells } from "@/features/decide/components/stat-cells";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TypeBadge } from "@/features/decide/components/type-badge";
+import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { chosenView } from "@/features/decide/server/view";
@@ -100,7 +101,13 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // ponytail: every row on one page (largest institute ~930 rows, ~1.6 MB HTML); add a course filter if that grows.
   const residentsAccess = tab !== "residents" ? null : !(await canSeeResidents()) ? "locked" : !(await residentsBudget("read")) ? "limited" : "ok";
   const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
-  const residentGroups = residents ? groupResidents(residents.rows, profile) : [];
+  // The tab's own filters: course and year, one or more of each (rcourse / ryear), over this college's residents.
+  const rCourses = sp.getAll("rcourse");
+  const rYears = sp.getAll("ryear").map(Number).filter(Number.isFinite);
+  const residentRows = residents ? residents.rows.filter((r) => (!rCourses.length || rCourses.includes(r.course.slug)) && (!rYears.length || rYears.includes(r.year))) : [];
+  const residentGroups = residents ? groupResidents(residentRows, profile) : [];
+  const residentCourseOptions = residents ? [...new Map(residents.rows.map((r) => [r.course.slug, `${r.course.degree} ${r.course.name}`])).entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)) : [];
+  const residentYearOptions = residents ? [...new Set(residents.rows.map((r) => r.year))].sort((a, b) => b - a).map((y) => ({ value: String(y), label: String(y) })) : [];
   // Seats here with no past allotments: not in the lists below; Seats shows them, and while Options opens in the round
   // view, Options lists those in her profile as new options (search: this institute's name, within its 100 characters).
   const newOnOptions = profile && optionsView(undefined, inst.seatList ? [inst.seatList] : [], meta.sources) === "round" ? L.options({ reach: "new", q: college.name.slice(0, 100) }) : undefined;
@@ -583,6 +590,17 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       {tab === "residents" && residents && (
         <section aria-labelledby="res-h" className="grid grid-cols-1 gap-4">
           <h2 id="res-h" className="sr-only">Residents</h2>
+          {residents.total > 0 && (
+            <form method="get" action={`/decide/institutes/${slug}`} className="flex flex-wrap items-center gap-2">
+              {[...sp.entries()].filter(([k]) => !["rcourse", "ryear", "tab"].includes(k)).map(([k, v], i) => <input key={`${k}-${i}`} type="hidden" name={k} value={v} />)}
+              <input type="hidden" name="tab" value="residents" />
+              <FilterDropdown label="Course" name="rcourse" search options={residentCourseOptions} selected={rCourses} none="All courses" noneNote="None ticked means every course. Tick one or more." />
+              <FilterDropdown label="Year" name="ryear" options={residentYearOptions} selected={rYears.map(String)} none="All years" noneNote="None ticked means every year. Tick one or more." />
+              <button type="submit" className="inline-flex min-h-9 items-center rounded-md bg-foreground px-3 text-sm font-semibold text-background">Apply</button>
+              {(rCourses.length > 0 || rYears.length > 0) && <Link href={L.to(`/decide/institutes/${slug}`, { tab: "residents" })} className={smallLink}>Clear</Link>}
+              <span className="text-sm text-muted-foreground"><span className="numeric">{formatRank(residentRows.length)}</span> residents</span>
+            </form>
+          )}
           {residents.total === 0 ? (
             <EmptyState title="No residents listed here" description="MCC's admitted-candidates lists have no names at this institute, or they were hidden." href={L.institute(slug, "courses")} action="See the courses here" />
           ) : (
