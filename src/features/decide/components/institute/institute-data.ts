@@ -172,12 +172,12 @@ const rank: Record<TermVerdict, number> = { pass: 2, unknown: 1, fail: 0 };
  * with `course`, that course's only) passes. `unknown`: institutes left out only because a filtered value is not
  * declared (what "Include not declared", nd=keep, would add; none when it is ticked). Null when no filter is set.
  */
-export async function institutesByTerms(tf: TermFilters, course?: string): Promise<{ pass: Set<string>; unknown: Set<string> } | null> {
+export async function institutesByTerms(tf: TermFilters, course?: string | string[]): Promise<{ pass: Set<string>; unknown: Set<string> } | null> {
   if (!anyTermFilter(tf)) return null;
   const [cat, info] = await Promise.all([getCatalog(), hospitalInfo()]);
   const best = new Map<string, TermVerdict>();
   for (const o of cat.options) {
-    if (best.get(o.college) === "pass" || (course && cat.courseOf.get(`${o.degree}|${o.specialty}`)?.slug !== course)) continue;
+    if (best.get(o.college) === "pass" || (course?.length && ![course].flat().includes(cat.courseOf.get(`${o.degree}|${o.specialty}`)?.slug ?? ""))) continue;
     const v = termVerdict(courseTerms(cat, o.college, o.degree, o.specialty, o.quota), info.get(o.college)?.type?.value, tf);
     const was = best.get(o.college);
     if (!was || rank[v] > rank[was]) best.set(o.college, v);

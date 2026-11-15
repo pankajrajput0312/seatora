@@ -697,7 +697,7 @@ export async function dashboard(profile: Profile) {
 
 // ---------- Institutes, allotments, fees ----------
 
-export type InstituteFilters = { search?: string; state?: string; type?: string; course?: string; sort?: "name" | "beds" | "established" | "allotments" };
+export type InstituteFilters = { search?: string; state?: string | string[]; type?: string; course?: string | string[]; sort?: "name" | "beds" | "established" | "allotments" };
 
 /**
  * Institutes, sorted, one page at a time. With a profile, `bestReach` is the best label among the options here that
@@ -710,9 +710,9 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
   for (const o of cat.options) (byCollege.get(o.college) ?? byCollege.set(o.college, []).get(o.college)!).push(o);
   const colleges = cat.colleges
     .filter((c) => !q || `${c.name} ${c.state ?? ""}`.toLowerCase().includes(q))
-    .filter((c) => !f.state || c.state === f.state)
+    .filter((c) => !f.state?.length || [f.state].flat().includes(c.state ?? ""))
     .filter((c) => !f.type || c.type === f.type)
-    .filter((c) => !f.course || (byCollege.get(c.key) ?? []).some((o) => cat.courseOf.get(`${o.degree}|${o.specialty}`)!.slug === f.course))
+    .filter((c) => !f.course?.length || (byCollege.get(c.key) ?? []).some((o) => [f.course].flat().includes(cat.courseOf.get(`${o.degree}|${o.specialty}`)!.slug)))
     .map((college) => ({ college, allotments2025: sumYear(byCollege.get(college.key) ?? [], 2025) }));
   const by = f.sort ?? "name";
   colleges.sort((a, b) =>

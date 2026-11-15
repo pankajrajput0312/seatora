@@ -19,6 +19,7 @@ import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle"
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
+import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, LATEST_YEAR, listInstitutes, PAST_YEARS } from "@/features/decide/service";
@@ -33,8 +34,8 @@ const sorts = [
 ] as const;
 const schema = z.object({
   q: z.string().max(100).optional(),
-  state: z.string().max(100).optional(),
-  course: z.string().max(100).optional(),
+  state: z.array(z.string().max(100)).max(40).optional(), // pick one or more
+  course: z.array(z.string().max(100)).max(40).optional(),
   sort: z.enum(["name", "allotments", "beds"]).default("name"),
   page: pageValue.default(1),
 });
@@ -44,7 +45,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
   const L = decideLinks(params);
-  const f = parseSearchParams(schema, params);
+  const f = parseSearchParams(schema, params, ["state", "course"]);
   const { params: tp, filters: tf } = readTermFilters(params, profile);
   const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort === "beds" ? ("name" as const) : f.sort };
   const pg = { page: f.page, pageSize: PAGE_SIZE };
@@ -63,14 +64,18 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
     res = { ...got, rows: all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total: all.length, page, pageSize: PAGE_SIZE };
   }
 
-  const course = meta.courses.find((c) => c.slug === f.course);
+  const courseLabel = (slug: string) => {
+    const c = meta.courses.find((x) => x.slug === slug);
+    return c ? `${c.degree} ${c.name}` : slug;
+  };
+  const listed = (what: string, names: string[]) => (names.length > 2 ? `${what}: ${names.length} selected` : names.join(", "));
   const chips = [
     // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
     ...(profile?.maxFeeLakh != null && tp.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: L.with(PATH, { maxfee: "any", page: null }) }] : []),
     ...(profile?.maxBondYears != null && tp.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: L.with(PATH, { bondyrs: "any", page: null }) }] : []),
     ...(f.q ? [{ label: `“${f.q}”`, href: L.with(PATH, { q: null, page: null }) }] : []),
-    ...(f.state ? [{ label: f.state, href: L.with(PATH, { state: null, page: null }) }] : []),
-    ...(course ? [{ label: `${course.degree} ${course.name}`, href: L.with(PATH, { course: null, page: null }) }] : []),
+    ...(f.state?.length ? [{ label: listed("States", f.state), href: L.with(PATH, { state: null, page: null }) }] : []),
+    ...(f.course?.length ? [{ label: listed("Courses", f.course.map(courseLabel)), href: L.with(PATH, { course: null, page: null }) }] : []),
     ...termChips(tp).map((c) => ({ label: c.label, href: L.with(PATH, { [c.key]: null, page: null }) })),
   ];
   const clear = L.with(PATH, { q: null, state: null, course: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
@@ -193,8 +198,8 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
           </label>
         }
       >
-        <Field label="State"><Select name="state" value={f.state} all="All states" options={meta.states.map((s) => ({ value: s, label: s }))} /></Field>
-        <Field label="Course"><Select name="course" value={f.course} all="Any course" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
+        <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.state ?? []} none="All states" noneNote="None ticked means every state. Tick one or more." />
+        <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={f.course ?? []} none="Any course" noneNote="None ticked means any course. Tick one or more." />
         <Field label="Sort"><Select name="sort" value={f.sort} options={[...sorts]} /></Field>
         <TermFilterControls f={tp} caps={profile} />
       </FilterBar>
