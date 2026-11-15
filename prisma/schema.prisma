@@ -450,6 +450,7 @@ model User {
   lockedUntil  DateTime?
   createdAt    DateTime  @default(now())
   sessions     Session[]
+  requests     FeatureRequest[]
 }
 
 /// Login sessions. Only a SHA-256 hash of the cookie token is stored.
@@ -460,5 +461,26 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
+  @@index([userId])
+}
+
+/// "Request a feature" (src/features/requests): a feature, a customization, a data correction or anything else. Plain text,
+/// read by the owner (SEATORA_OWNER_EMAILS). kind and status are the lists in src/features/requests/validations.ts.
+model FeatureRequest {
+  id        String   @id @default(cuid())
+  kind      String
+  message   String
+  /// Where to reply: the signed-in user's email by default, required from anyone signed out.
+  email     String?
+  /// SetNull: deleting an account keeps its requests, unlinked.
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Where it was sent from, e.g. "/decide/options".
+  page      String?
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
   @@index([userId])
 }

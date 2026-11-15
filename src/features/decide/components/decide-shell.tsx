@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, IndianRupee, LayoutDashboard, LayoutGrid, ListOrdered, Route, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -45,6 +46,7 @@ const sections = [
       { href: "/decide/fees", label: "Fees & bond", icon: IndianRupee },
     ],
   },
+  { title: "Help", items: [{ href: "/decide/requests", label: "Request a feature", icon: MessageCircle }] },
 ];
 // Phones: the round's working screens first, in the sidebar's order; the fourth slot is the Compare tray when it has items.
 const bottom = [
