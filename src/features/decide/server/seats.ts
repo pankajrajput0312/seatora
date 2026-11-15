@@ -3,14 +3,13 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { PageQuery, Paged } from "../service";
 import { optionId, rounds, seatKinds, type College, type Course, type MccNotice, type Round, type SeatKind, type SeatList } from "../types";
-import { getCatalog, type Catalog } from "./catalog";
+import { getCatalog, perImport, type Catalog } from "./catalog";
 
 // MCC seat lists (SeatSource + SeatCount, prisma/import-mcc.ts). Each list is one kind of one round as its PDF printed
 // it; kinds overlap, so everything here works on one kind at a time and never adds kinds together.
 
 /** Every seat list PDF: newest year and round first, then kind (clear, virtual, new), then newest PDF. */
-export async function seatLists(): Promise<SeatList[]> {
-  await getCatalog(); // same availability as the rest of Decide
+export const seatLists: () => Promise<SeatList[]> = perImport(async () => {
   const rows = await db.seatSource.findMany({ select: { year: true, round: true, kind: true, total: true, source: { select: { key: true, name: true, url: true, publishedAt: true } } } });
   return rows
     .map(({ source: s, ...l }) => ({ key: s.key, name: s.name, url: s.url, year: l.year, round: l.round as Round, kind: l.kind as SeatKind, publishedAt: s.publishedAt?.toISOString().slice(0, 10) ?? null, seats: l.total }))
@@ -22,7 +21,7 @@ export async function seatLists(): Promise<SeatList[]> {
         (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "") ||
         a.key.localeCompare(b.key),
     );
-}
+});
 
 /**
  * The lists a filter means: `list` (a SeatList key) exactly; else one kind (default clear vacancy) of the newest
@@ -140,15 +139,24 @@ export async function listSeats(f: SeatFilters = {}, pg?: PageQuery): Promise<Pa
   if (!lists.length) return { rows: [], total: 0, page: 1, pageSize: pg?.pageSize ?? 1, lists, seats: {} };
   const where = Prisma.join([Prisma.sql`d.key = ANY(${lists.map((l) => l.key)})`, ...rowWhere(f)], " AND ");
   const from = Prisma.sql`FROM "SeatCount" x JOIN "DataSource" d ON d.id = x."seatSourceId" JOIN "College" c ON c.id = x."collegeId" LEFT JOIN "Specialty" sp ON sp.id = x."specialtyId" WHERE ${where}`;
-  const per = await db.$queryRaw<{ key: string; n: number; seats: number }[]>`SELECT d.key, COUNT(*)::int AS n, SUM(x.seats)::int AS seats ${from} GROUP BY 1`;
-  const total = per.reduce((a, r) => a + r.n, 0);
-  const pageSize = pg?.pageSize ?? Math.max(1, total);
-  const page = pg ? Math.min(Math.max(1, pg.page), Math.max(1, Math.ceil(total / pg.pageSize))) : 1;
-  const found = await db.$queryRaw<{ l: string; k: string; dg: string; sc: string; slug: string | null; name: string | null; q: string | null; c: string; n: number; cs: string | null }[]>`
+  const rowsAt = (limit?: { size: number; page: number }) => db.$queryRaw<{ l: string; k: string; dg: string; sc: string; slug: string | null; name: string | null; q: string | null; c: string; n: number; cs: string | null }[]>`
     SELECT d.key AS l, c.key AS k, x.degree AS dg, x.code AS sc, sp.slug, sp.name, x.quota AS q, x.category AS c, x.seats AS n, x."collegeSpecialtyId" AS cs
     ${from}
     ORDER BY c.name, c.key, x.degree, COALESCE(sp.name, x.code), x.quota NULLS FIRST, array_position(${categoryOrder}::text[], x.category), d.key, x.id
-    ${pg ? Prisma.sql`LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}` : Prisma.empty}`;
+    ${limit ? Prisma.sql`LIMIT ${limit.size} OFFSET ${(limit.page - 1) * limit.size}` : Prisma.empty}`;
+  // Every row (no page): the totals come from the rows themselves, one read. One page: the totals beside it, in parallel
+  // on the page asked for; a page past the end reads the last one again.
+  const asked = Math.max(1, pg?.page ?? 1);
+  const [all, first, counted] = await Promise.all([
+    pg ? null : rowsAt(),
+    pg ? rowsAt({ size: pg.pageSize, page: asked }) : null,
+    pg ? db.$queryRaw<{ key: string; n: number; seats: number }[]>`SELECT d.key, COUNT(*)::int AS n, SUM(x.seats)::int AS seats ${from} GROUP BY 1` : null,
+  ]);
+  const per = counted ?? [...Map.groupBy(all!, (r) => r.l)].map(([key, xs]) => ({ key, n: xs.length, seats: xs.reduce((a, r) => a + r.n, 0) }));
+  const total = per.reduce((a, r) => a + r.n, 0);
+  const pageSize = pg?.pageSize ?? Math.max(1, total);
+  const page = pg ? Math.min(asked, Math.max(1, Math.ceil(total / pg.pageSize))) : 1;
+  const found = all ?? (page === asked ? first! : await rowsAt({ size: pageSize, page }));
   const rows = found.flatMap((r): SeatRow[] => {
     const college = cat.collegeByKey.get(r.k);
     if (!college) return [];

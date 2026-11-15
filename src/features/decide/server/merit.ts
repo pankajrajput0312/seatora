@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import type { SourceType } from "@/types/provenance";
-import { getCatalog } from "./catalog";
+import { perImport } from "./catalog";
 
 // NBEMS result aggregates (MeritList, ScoreRank, MeritPosition; prisma/import-mcc.ts). History of one year's exam, never
 // a prediction: say "In NEET PG 2025, a score of X was rank A–B". Scores of different years are out of different totals
@@ -29,18 +29,15 @@ type ListRow = { year: number; maxMarks: number; candidates: number; coverage: s
 const toSource = ({ source: s, step, ...l }: ListRow): MeritSource => ({ ...s, ...l, hasCategories: step != null });
 
 /** Years with NBEMS aggregates, newest first. */
-export async function meritLists(): Promise<MeritSource[]> {
-  await getCatalog(); // same availability as the rest of Decide
-  return (await db.meritList.findMany({ select: listSelect, orderBy: { year: "desc" } })).map(toSource);
-}
+export const meritLists: () => Promise<MeritSource[]> = perImport(async () => (await db.meritList.findMany({ select: listSelect, orderBy: { year: "desc" } })).map(toSource));
 
-async function listOf(year: number) {
-  await getCatalog();
-  const l = await db.meritList.findUnique({ where: { year }, select: { ...listSelect, qualified: true } });
+const listOf = (year: number) => listOnce(String(year));
+const listOnce = perImport(async (key) => {
+  const l = await db.meritList.findUnique({ where: { year: Number(key) }, select: { ...listSelect, qualified: true } });
   if (!l) return null;
   const { qualified, ...rest } = l;
   return { source: toSource(rest), qualified: (qualified ?? null) as Record<string, number> | null };
-}
+});
 
 /** Rank range of one score: best/worst = lowest/highest rank among candidates with that score. */
 export type ScoreRankRow = { score: number; bestRank: number; worstRank: number; count: number };
