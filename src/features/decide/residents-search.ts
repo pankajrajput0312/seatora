@@ -12,9 +12,9 @@ export const residentsQuery = z.object({
   name: z.array(z.string().trim().min(1).max(80)).max(20).optional(), // exact names picked from the search dropdown (any case)
   college: z.array(z.string().max(120)).max(20).optional(), // College.slug; empty/absent = all colleges
   cq: z.string().trim().max(60).optional(), // college name search (the College filter's box without JS)
-  state: z.string().max(60).optional(),
+  state: z.array(z.string().max(60)).max(40).optional(), // one or more
   course: z.array(z.string().max(80)).max(20).optional(), // Specialty.slug; empty/absent = all courses
-  year: z.coerce.number().int().min(2023).max(2030).optional(),
+  year: z.array(z.coerce.number().int().min(2023).max(2030)).max(10).optional(), // one or more
   quota: z.string().max(60).optional(), // MCC quota label, e.g. "All India"
   sort: z.enum(["year", "name", "college"]).default("year"), // year: newest first, then college, then name
   page: z.coerce.number().int().min(1).max(10_000).default(1),

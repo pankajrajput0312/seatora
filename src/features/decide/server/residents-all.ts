@@ -39,9 +39,9 @@ function residentsWhere(q: ResidentsQuery): Prisma.ResidentWhereInput {
   const cq = tokens(q.cq);
   return {
     hidden: false,
-    year: q.year,
+    year: q.year?.length ? { in: q.year } : undefined,
     quota: q.quota && (q.quota === MINORITY || RELIGIOUS.includes(q.quota)) ? { in: RELIGIOUS } : q.quota,
-    college: q.college?.length || q.state || cq.length ? { slug: q.college?.length ? { in: q.college } : undefined, state: q.state, AND: cq.length ? cq.map((name) => ({ name })) : undefined } : undefined,
+    college: q.college?.length || q.state || cq.length ? { slug: q.college?.length ? { in: q.college } : undefined, state: q.state?.length ? { in: q.state } : undefined, AND: cq.length ? cq.map((name) => ({ name })) : undefined } : undefined,
     specialty: q.course?.length ? { slug: { in: q.course } } : undefined,
     AND: [
       ...tokens(q.q).map((t) => ({ OR: [{ name: t }, { college: { name: t } }, { college: { city: t } }] })),
@@ -57,6 +57,14 @@ export const residentYears = async () =>
 /** Up to `take` distinct resident names (not hidden) with every token of `q`, by name: the search dropdown's names. */
 export const residentNames = async (q: string, take = 10) =>
   (await db.resident.findMany({ where: { hidden: false, AND: tokens(q).map((name) => ({ name })) }, select: { name: true }, distinct: ["name"], orderBy: { name: "asc" }, take })).map((r) => r.name);
+
+/** Every college with residents (not hidden): the search box's list before she types. Government first (govt, central, ESIC, municipal, armed forces, railway, PSU), then the others, each by name. */
+const PUBLIC = new Set(["govt", "central", "esic", "municipal", "armed_forces", "railway", "psu"]);
+export async function allResidentColleges() {
+  const rows = await db.college.findMany({ where: { residents: { some: { hidden: false } } }, select: { slug: true, name: true, state: true, type: true }, orderBy: { name: "asc" } });
+  const gov = (t: string | null) => (t && PUBLIC.has(t) ? 0 : 1);
+  return rows.sort((a, b) => gov(a.type) - gov(b.type)).map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name, group: gov(c.type) ? "Other hospitals" : "Government hospitals" }));
+}
 
 /** Colleges with residents (not hidden) whose name has every token of `q` (or, by `slugs`, those colleges), by name: the College filter's choices. Names of colleges only. */
 export const residentColleges = (by: { q: string } | { slugs: string[] }, take = 20) =>

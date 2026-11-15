@@ -19,7 +19,7 @@ import { listResidentsAll, RESIDENTS_MAX_PAGE, residentColleges, residentQuota, 
 import { chosenView } from "@/features/decide/server/view";
 import { getDecideData, getMeta } from "@/features/decide/service";
 import { hideResidentAction } from "../institutes/[slug]/actions";
-import { findResidentColleges, findResidentNames } from "./actions";
+import { findResidentColleges, findResidentNames, listResidentColleges } from "./actions";
 
 // People's names: never indexed.
 export const metadata: Metadata = { title: "Residents", robots: { index: false, follow: false } };
@@ -81,8 +81,8 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     query.cq && { label: `College: “${query.cq}”`, href: here({ cq: null }) },
     // Her courses are the default: a chip for them too, "All courses" lifts it.
     allCourses ? { label: "All courses", href: here({ course: null }) } : typedCourses.length ? { label: listed("Courses", typedCourses.map(courseName)), href: here({ course: null }) } : yours && { label: `Your courses (${yours.length})`, href: here({ course: "all" }) },
-    query.state && { label: query.state, href: here({ state: null }) },
-    query.year && { label: String(query.year), href: here({ year: null }) },
+    (query.state?.length ?? 0) > 0 && { label: listed("States", query.state!), href: here({ state: null }) },
+    (query.year?.length ?? 0) > 0 && { label: listed("Years", query.year!.map(String)), href: here({ year: null }) },
     query.quota && { label: residentQuota(query.quota), href: here({ rq: null }) },
     query.sort !== "year" && { label: `Sorted by ${sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`, href: here({ sort: null }) },
   ].filter((x) => !!x);
@@ -104,12 +104,12 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         active={chips.length}
         clear={clear}
         search={
-          <ResidentsSearch q={query.q} colleges={pickedColleges.map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name }))} names={query.name ?? []} findColleges={findResidentColleges} findNames={findResidentNames} />
+          <ResidentsSearch q={query.q} colleges={pickedColleges.map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name }))} names={query.name ?? []} findColleges={findResidentColleges} findNames={findResidentNames} listColleges={listResidentColleges} />
         }
       >
         <FilterDropdown label="Course (branch)" name="course" search options={courseChoices} selected={allCourses ? ["all"] : typedCourses} none={yours ? `Your courses (${yours.length})` : "All courses"} noneNote={yours ? "None ticked means your courses. Tick All courses for every one." : "None ticked means every course."} />
-        <Field label="State"><Select name="state" value={query.state} all="All states" options={meta.states.map((s) => ({ value: s, label: s }))} /></Field>
-        <Field label="Year"><Select name="year" value={query.year ? String(query.year) : undefined} all="All years" options={years.map((y) => ({ value: String(y), label: String(y) }))} /></Field>
+        <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={query.state ?? []} none="All states" noneNote="None ticked means every state. Tick one or more." />
+        <FilterDropdown label="Year" name="year" options={years.map((y) => ({ value: String(y), label: String(y) }))} selected={(query.year ?? []).map(String)} none="All years" noneNote="None ticked means every year. Tick one or more." />
         <Field label="Sort by"><Select name="sort" value={query.sort} options={sorts} /></Field>
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />

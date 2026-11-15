@@ -77,12 +77,12 @@ const anyOf = (t: object) => ({ OR: [{ name: t }, { college: { name: t } }, { co
 
 describe("query", () => {
   it("filters: name tokens, colleges, state, courses, year, quota; never hidden, never by rank", async () => {
-    await list({ q: " aB  cD ", college: ["x-college", "y-college"], state: "Kerala", course: ["md-paediatrics", "ms-obg"], year: 2025, quota: "All India", rankFrom: 10, hasRank: "1" });
+    await list({ q: " aB  cD ", college: ["x-college", "y-college"], state: ["Kerala"], course: ["md-paediatrics", "ms-obg"], year: [2025], quota: "All India", rankFrom: 10, hasRank: "1" });
     expect(where()).toEqual({
       hidden: false,
-      year: 2025,
+      year: { in: [2025] },
       quota: "All India",
-      college: { slug: { in: ["x-college", "y-college"] }, state: "Kerala" },
+      college: { slug: { in: ["x-college", "y-college"] }, state: { in: ["Kerala"] } },
       specialty: { slug: { in: ["md-paediatrics", "ms-obg"] } },
       AND: ["aB", "cD"].map((t) => anyOf({ contains: t, mode: "insensitive" })),
     });
@@ -93,8 +93,8 @@ describe("query", () => {
     expect(where().AND).toEqual([anyOf({ contains: "50\\%\\_a\\\\", mode: "insensitive" })]);
     await list();
     expect([where().college, where().specialty, where().AND]).toEqual([undefined, undefined, []]);
-    await list({ state: "Kerala" });
-    expect(where().college).toEqual({ slug: undefined, state: "Kerala" });
+    await list({ state: ["Kerala"] });
+    expect(where().college).toEqual({ slug: undefined, state: { in: ["Kerala"] } });
   });
 
   it("the minority quotas: shown as one Minority; either label (or Minority) filters both", async () => {

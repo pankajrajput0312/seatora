@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { control } from "./ui";
 
-type Opt = { value: string; label: string };
+type Opt = { value: string; label: string; group?: string };
 type Find = (q: string) => Promise<Opt[] | null>;
 
 /**
@@ -12,7 +12,7 @@ type Find = (q: string) => Promise<Opt[] | null>;
  * box; ticking several keeps them as chips (hidden `college` / `name` inputs) until Search. Enter searches the typed
  * text (`q`) when nothing is ticked. Without JS it is the plain `q` box.
  */
-export function ResidentsSearch({ q, colleges, names, findColleges, findNames }: { q?: string; colleges: Opt[]; names: string[]; findColleges: Find; findNames: Find }) {
+export function ResidentsSearch({ q, colleges, names, findColleges, findNames, listColleges }: { q?: string; colleges: Opt[]; names: string[]; findColleges: Find; findNames: Find; listColleges: () => Promise<Opt[] | null> }) {
   const id = useId();
   const box = useRef<HTMLDivElement>(null);
   const [typed, setTyped] = useState(q ?? "");
@@ -20,14 +20,25 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames }:
   const [found, setFound] = useState<{ colleges: Opt[]; names: Opt[] }>({ colleges: [], names: [] });
   const [pickedColleges, setPickedColleges] = useState<Opt[]>(colleges);
   const [pickedNames, setPickedNames] = useState<string[]>(names);
+  // Every hospital with residents (Government first), loaded once when the box is first opened: scroll and tick.
+  const [all, setAll] = useState<Opt[] | null>(null);
+  const loadAll = () => {
+    if (all === null) {
+      setAll([]);
+      listColleges().then((r) => setAll(r ?? []));
+    }
+  };
 
   useEffect(() => {
     const t = typed.trim();
     if (t.length < 2) return setFound({ colleges: [], names: [] });
+    // Hospitals: from the full list when it is here (instant), else the server.
+    const local = all?.length ? all.filter((o) => t.toLowerCase().split(/\s+/).every((w) => o.label.toLowerCase().includes(w))).slice(0, 50) : null;
     let live = true;
     // Each list shows as soon as it arrives: names search more rows and come back later.
     const timer = setTimeout(() => {
-      findColleges(t).then((c) => live && setFound((f) => ({ ...f, colleges: c ?? [] })));
+      if (local) setFound((f) => ({ ...f, colleges: local }));
+      else findColleges(t).then((c) => live && setFound((f) => ({ ...f, colleges: c ?? [] })));
       if (t.length >= 3) findNames(t).then((n) => live && setFound((f) => ({ ...f, names: n ?? [] })));
       else setFound((f) => ({ ...f, names: [] }));
     }, 250);
@@ -35,7 +46,7 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames }:
       live = false;
       clearTimeout(timer);
     };
-  }, [typed, findColleges, findNames]);
+  }, [typed, findColleges, findNames, all]);
 
   useEffect(() => {
     const close = (e: MouseEvent) => box.current && !box.current.contains(e.target as Node) && setOpen(false);
@@ -45,7 +56,9 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames }:
 
   const toggleCollege = (o: Opt) => setPickedColleges((p) => (p.some((x) => x.value === o.value) ? p.filter((x) => x.value !== o.value) : [...p, o]));
   const toggleName = (n: string) => setPickedNames((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p, n]));
-  const any = found.colleges.length + found.names.length > 0;
+  const browsing = typed.trim().length < 2;
+  const shownColleges = browsing ? all ?? [] : found.colleges;
+  const any = shownColleges.length + (browsing ? 0 : found.names.length) > 0 || (browsing && all !== null);
   const tick = "flex min-h-10 w-full cursor-pointer items-center gap-2 rounded px-2 text-left text-sm hover:bg-muted";
 
   return (
@@ -67,7 +80,10 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames }:
             setTyped(e.target.value);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setOpen(true);
+            loadAll();
+          }}
         />
       </label>
       {pickedColleges.map((c) => <input key={c.value} type="hidden" name="college" value={c.value} />)}
@@ -84,21 +100,25 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames }:
       )}
       {open && any && (
         <div id={`${id}-list`} role="group" aria-label="Matches" className="absolute inset-x-0 top-12 z-40 max-h-80 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg">
-          {found.colleges.length > 0 && <p className="px-2 pt-1 pb-0.5 text-xs font-semibold text-muted-foreground">Hospitals</p>}
-          {found.colleges.map((o) => (
-            <label key={o.value} className={tick}>
-              <input type="checkbox" checked={pickedColleges.some((x) => x.value === o.value)} onChange={() => toggleCollege(o)} className="size-4" />
-              <span className="truncate">{o.label}</span>
-            </label>
+          {browsing && all !== null && all.length === 0 && <p className="px-2 py-2 text-sm text-muted-foreground">Loading hospitals…</p>}
+          {!browsing && shownColleges.length > 0 && <p className="px-2 pt-1 pb-0.5 text-xs font-semibold text-muted-foreground">Hospitals</p>}
+          {shownColleges.map((o, i) => (
+            <div key={o.value}>
+              {browsing && o.group && o.group !== shownColleges[i - 1]?.group && <p className="sticky top-0 z-10 bg-popover px-2 pt-2 pb-0.5 text-xs font-semibold text-muted-foreground">{o.group}</p>}
+              <label className={tick}>
+                <input type="checkbox" checked={pickedColleges.some((x) => x.value === o.value)} onChange={() => toggleCollege(o)} className="size-4" />
+                <span className="truncate">{o.label}</span>
+              </label>
+            </div>
           ))}
-          {found.names.length > 0 && <p className="px-2 pt-2 pb-0.5 text-xs font-semibold text-muted-foreground">Names</p>}
-          {found.names.map((o) => (
+          {!browsing && found.names.length > 0 && <p className="px-2 pt-2 pb-0.5 text-xs font-semibold text-muted-foreground">Names</p>}
+          {!browsing && found.names.map((o) => (
             <label key={o.value} className={tick}>
               <input type="checkbox" checked={pickedNames.includes(o.value)} onChange={() => toggleName(o.value)} className="size-4" />
               <span className="truncate">{o.label}</span>
             </label>
           ))}
-          <p className="px-2 py-1 text-xs text-muted-foreground">Tick one or more, then Search.</p>
+          <p className="sticky bottom-0 bg-popover px-2 py-1 text-xs text-muted-foreground">{browsing ? "Scroll and tick hospitals, or type a name or hospital." : "Tick one or more, then Search."}</p>
         </div>
       )}
     </div>

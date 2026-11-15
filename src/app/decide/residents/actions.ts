@@ -2,7 +2,18 @@
 
 import { z } from "zod";
 import { canSeeResidents } from "@/features/decide/server/residents";
-import { residentColleges, residentNames } from "@/features/decide/server/residents-all";
+import { allResidentColleges, residentColleges, residentNames } from "@/features/decide/server/residents-all";
+
+/** Every college with residents, Government first: the search box's list before she types. Null without access. */
+export async function listResidentColleges() {
+  try {
+    if (!(await canSeeResidents())) return null;
+    return await allResidentColleges();
+  } catch (e) {
+    console.error("[residents] all colleges", e);
+    return null;
+  }
+}
 
 /** The search dropdown's names: up to 10 distinct resident names with what she typed. Null without access. */
 export async function findResidentNames(q: string) {
