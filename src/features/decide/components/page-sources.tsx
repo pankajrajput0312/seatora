@@ -7,8 +7,11 @@ import { cn } from "@/lib/cn";
 import type { SourceType } from "@/types/provenance";
 
 // One "Sources (N)" footer per page (AppPage renders it last): every block registers the documents it draws on, each
-// document once (deduped by key), numbered in the order blocks first cite them. A numbered ref (SourceRef, SourceRefs)
-// links #source-n and opens the footer there. Provenance stays one click away without a source line under every block.
+// document once (deduped by key), numbered in the order blocks first cite them (the page's own MCC documents first:
+// `first`). A numbered ref (SourceRef, SourceRefs) links #source-n and opens the footer there. Provenance stays one
+// click away without a source line under every block. Before hydration (and without JS) each ref is its document's own
+// link instead, and there is no footer: the server streams the page, so it renders the footer before blocks still on
+// their way (async server components, client modules loading) and could not list them.
 
 /** A file under one entry (a year's MCC result PDFs: one link per round). `order` sorts links merged from several blocks. */
 export type SourceLink = { label: string; url: string | null; title?: string; provisional?: boolean; order?: number };
@@ -28,46 +31,64 @@ function merge(key: string, ds: SourceDoc[], n: number): NumberedDoc {
 }
 
 /**
- * The page's registry: documents in the order the page first cited them, each with the blocks (`id`) citing it; a
- * document's number is its place among those still cited, so numbers stay 1…N with no gaps when a block goes away, and
- * a block that re-registers (its filter changed) keeps its documents' places.
+ * The page's registry: documents in the order the page first cited them (`first` ones before the rest), each with the
+ * blocks (`id`) citing it; a document's number is its place among those still cited, so numbers stay 1…N with no gaps
+ * when a block goes away, and a block that re-registers (its filter changed) keeps its documents' places. Changes in one
+ * commit (hundreds of refs mounting) rebuild once and tell subscribers once, in a microtask.
  */
 export function createSourceStore() {
   const docs = new Map<string, Map<string, SourceDoc>>();
   const seen = new Map<string, number>();
+  let next = 0;
   let list: NumberedDoc[] = [];
   let numbers = new Map<string, number>();
+  let dirty = false;
+  let queued = false;
   const subs = new Set<() => void>();
-  const rebuild = () => {
+  const fresh = () => {
+    if (!dirty) return;
+    dirty = false;
     const keys = [...docs.keys()].sort((a, b) => seen.get(a)! - seen.get(b)!);
     list = keys.map((key, i) => merge(key, [...docs.get(key)!.values()], i + 1));
     numbers = new Map(list.map((d) => [d.key, d.n]));
-    subs.forEach((f) => f());
+  };
+  const changed = () => {
+    dirty = true;
+    if (queued) return;
+    queued = true;
+    queueMicrotask(() => {
+      queued = false;
+      subs.forEach((f) => f());
+    });
   };
   return {
-    add(id: string, ds: SourceDoc[]) {
+    add(id: string, ds: SourceDoc[], first = false) {
       for (const d of ds) {
         const k = docKey(d);
-        if (!seen.has(k)) seen.set(k, seen.size);
+        const at = seen.get(k);
+        // A `first` document goes ahead of every other one, even one a block cited before it.
+        if (at === undefined || (first && at >= 0)) seen.set(k, next++ - (first ? 1e9 : 0));
         (docs.get(k) ?? docs.set(k, new Map()).get(k)!).set(id, d);
       }
-      rebuild();
+      changed();
     },
     remove(id: string) {
       for (const [k, by] of docs) if (by.delete(id) && !by.size) docs.delete(k);
-      rebuild();
+      changed();
     },
     subscribe(f: () => void) {
       subs.add(f);
       return () => void subs.delete(f);
     },
-    list: () => list,
-    number: (key: string) => numbers.get(key) ?? null,
+    list: () => (fresh(), list),
+    number: (key: string) => (fresh(), numbers.get(key) ?? null),
   };
 }
 type Store = ReturnType<typeof createSourceStore>;
 
 const Ctx = createContext<Store | null>(null);
+/** False inside a view pane that is not on show (ViewPanes): its refs still read their numbers but register nothing. */
+const On = createContext(true);
 const EMPTY: NumberedDoc[] = [];
 const noop = () => () => {};
 
@@ -77,16 +98,25 @@ export function PageSources({ children }: { children: React.ReactNode }) {
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }
 
-/** Registers `docs` for as long as the caller is mounted; returns their page numbers (null before hydration or outside PageSources). */
-export function useSources(docs: SourceDoc[]): (number | null)[] {
+/** `on={false}`: the blocks inside (a hidden view pane) cite nothing in the page's Sources. */
+export function SourcesOn({ on, children }: { on: boolean; children: React.ReactNode }) {
+  return <On.Provider value={on}>{children}</On.Provider>;
+}
+
+/**
+ * Registers `docs` for as long as the caller is mounted; returns their page numbers (null before hydration or outside
+ * PageSources). `first`: the page's main documents (its MCC result PDFs, its seat list), numbered before the rest.
+ */
+export function useSources(docs: SourceDoc[], first = false): (number | null)[] {
   const store = useContext(Ctx);
+  const on = useContext(On);
   const id = useId();
   const sig = JSON.stringify(docs);
   useLayoutEffect(() => {
-    if (!store) return;
-    store.add(id, JSON.parse(sig) as SourceDoc[]);
+    if (!store || !on) return;
+    store.add(id, JSON.parse(sig) as SourceDoc[], first);
     return () => store.remove(id);
-  }, [store, id, sig]);
+  }, [store, on, id, sig, first]);
   const nums = useSyncExternalStore(store?.subscribe ?? noop, () => (store ? docs.map((d) => store.number(docKey(d))).join(",") : ""), () => "");
   return docs.map((_, i) => {
     const n = nums.split(",")[i];
@@ -110,8 +140,8 @@ const docName = (d: SourceDoc) => d.name;
 const refClass = "underline decoration-dotted underline-offset-2 hover:text-sky";
 
 /** A numbered superscript for one document (a figure's source): "Source 3: name", linking the footer entry. */
-export function SourceRef({ doc, className }: { doc: SourceDoc; className?: string }) {
-  const [n] = useSources([doc]);
+export function SourceRef({ doc, first, className }: { doc: SourceDoc; first?: boolean; className?: string }) {
+  const [n] = useSources([doc], first);
   // Outside a page, and before hydration (or without JS: the numbers are the browser's), the document itself.
   if (n == null) return <Fallback docs={[doc]} sup />;
   return (
@@ -125,8 +155,8 @@ export function SourceRef({ doc, className }: { doc: SourceDoc; className?: stri
  * A block's sources as one short line, "Sources 1, 2, 3", each number linking its footer entry; nothing when none.
  * `label`: the word before the numbers.
  */
-export function SourceRefs({ docs, label = "Sources", className }: { docs: SourceDoc[]; label?: string; className?: string }) {
-  const nums = useSources(docs);
+export function SourceRefs({ docs, first, label = "Sources", className }: { docs: SourceDoc[]; first?: boolean; label?: string; className?: string }) {
+  const nums = useSources(docs, first);
   const inPage = useContext(Ctx);
   if (!docs.length) return null;
   if (!inPage) return <Fallback docs={docs} />;
@@ -163,8 +193,8 @@ export function numberRuns(ns: number[]): [number, number][] {
 }
 
 /** Registers documents without showing anything (a list whose figures cite them by SourceRef, or none at all). */
-export function RegisterSources({ docs }: { docs: SourceDoc[] }) {
-  useSources(docs);
+export function RegisterSources({ docs, first }: { docs: SourceDoc[]; first?: boolean }) {
+  useSources(docs, first);
   return null;
 }
 

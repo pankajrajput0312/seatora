@@ -1,10 +1,13 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { paneClass, parseView, viewHref, ViewPanes, ViewToggle } from "./view-toggle";
+import { FilterBar } from "./ui";
+import { paneClass, parseView, VIEW_PARAM, viewHref, ViewField, ViewPanes, ViewToggle } from "./view-toggle";
 
 let query = "";
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(query) }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(query), useRouter: () => ({ refresh() {}, replace() {} }) }));
+vi.mock("next/form", () => ({ default: (p: React.ComponentProps<"form">) => createElement("form", p) }));
 
 describe("view toggle", () => {
   it("accepts only the two views", () => {
@@ -40,6 +43,26 @@ describe("view toggle", () => {
     expect(html).not.toContain("aria-current");
     expect(html).toContain("max-md:text-sky");
     expect(html).toContain("md:text-sky");
+  });
+
+  it("the server can read the param: view-toggle.tsx is not a client module (its exports would be references there)", () => {
+    expect(readFileSync(new URL("./view-toggle.tsx", import.meta.url), "utf8")).not.toMatch(/^\s*["']use client["']/);
+    expect(VIEW_PARAM).toBe("layout");
+  });
+
+  it("panes: the page's known choice renders that pane alone (the other is fetched when she picks it)", () => {
+    query = "layout=table";
+    expect(renderToStaticMarkup(createElement(ViewPanes, { page: "test", view: "table", cards: "C", table: "T" }))).toBe('<div data-view-pane="table">T</div>');
+    expect(renderToStaticMarkup(createElement(ViewPanes, { page: "test", view: null, cards: "C", table: "T" }))).toContain("C</div>");
+  });
+
+  it("Apply keeps the address's choice, without JS too: FilterBar carries it, nothing else does", () => {
+    query = "rank=1&layout=cards&view=all";
+    expect(renderToStaticMarkup(createElement(ViewField))).toBe('<input type="hidden" name="layout" value="cards"/>');
+    const form = renderToStaticMarkup(createElement(FilterBar, { action: "/decide/fees", params: new URLSearchParams(query) } as React.ComponentProps<typeof FilterBar>));
+    expect(form.match(/type="hidden" name="[^"]+" value="[^"]*"/g)).toEqual(['type="hidden" name="rank" value="1"', 'type="hidden" name="layout" value="cards"']);
+    query = "layout=list";
+    expect(renderToStaticMarkup(createElement(ViewField))).toBe("");
   });
 
   it("panes: both rendered, the address picks one", () => {

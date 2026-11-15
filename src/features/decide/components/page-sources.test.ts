@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { createSourceStore, docKey, numberRuns, PageSources, SourceRef, SourceRefs, type SourceDoc } from "./page-sources";
+import { createSourceStore, docKey, numberRuns, PageSources, PageSourcesFooter, RegisterSources, SourceRef, SourceRefs, SourcesOn, type SourceDoc } from "./page-sources";
 
 const a: SourceDoc = { name: "MCC profile A", url: "https://mcc.example/a", type: "OFFICIAL" };
 const b: SourceDoc = { name: "MCC profile B", url: "https://mcc.example/b", type: "OFFICIAL" };
@@ -55,16 +55,32 @@ describe("createSourceStore", () => {
     expect(nums(s)).toEqual(["1:MCC profile A", "2:MCC profile B"]);
   });
 
-  it("tells subscribers on every change and stops after unsubscribe", () => {
+  it("tells subscribers once per batch of changes (hundreds of refs mounting in one commit) and stops after unsubscribe", async () => {
     const s = createSourceStore();
     let calls = 0;
     const off = s.subscribe(() => calls++);
     s.add("1", [a]);
-    s.remove("1");
-    off();
     s.add("2", [b]);
+    s.remove("1");
+    expect(nums(s)).toEqual(["1:MCC profile B"]); // read at once, told later
+    await Promise.resolve();
+    expect(calls).toBe(1);
+    s.add("3", [c]);
+    await Promise.resolve();
+    expect(calls).toBe(2);
+    off();
+    s.add("4", [a]);
+    await Promise.resolve();
     expect(calls).toBe(2);
   });
+
+  it("numbers the page's main documents (`first`) before the rest, wherever they are cited", () => {
+    const s = createSourceStore();
+    s.add("card", [b, c]);
+    s.add("data-source", [{ key: "mcc|2025", name: "MCC results 2025" }, b], true);
+    expect(nums(s)).toEqual(["1:MCC results 2025", "2:MCC profile B", "3:NBEMS notice"]);
+  });
+
 });
 
 describe("numberRuns", () => {
@@ -80,6 +96,15 @@ describe("SourceRefs outside a page", () => {
     expect(html).toContain('href="https://mcc.example/a"');
     expect(html).toContain('href="https://mcc.example/r1"');
     expect(html).toContain("MCC results 2025");
+  });
+
+  it("on the server: no footer (the page streams; blocks still on their way would be missing), each ref its own link", () => {
+    const page = (...kids: React.ReactNode[]) => renderToStaticMarkup(createElement(PageSources, null, ...kids, createElement(PageSourcesFooter)));
+    const html = page(createElement(SourceRef, { doc: a }), createElement(RegisterSources, { docs: [c], first: true }));
+    expect(html).not.toContain("page-sources");
+    expect(html).toContain('href="https://mcc.example/a" target="_blank"');
+    // A pane not on show (ViewPanes) still links its documents where it cites them.
+    expect(page(createElement(SourcesOn, { on: false } as React.ComponentProps<typeof SourcesOn>, createElement(SourceRef, { doc: a })))).toContain('href="https://mcc.example/a"');
   });
 
   it("inside a page, before hydration (no numbers yet), still links each document", () => {

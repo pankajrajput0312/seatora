@@ -48,7 +48,8 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
         const fee = statCells(p)[0];
         if (numbers && p.years[0].fee) {
           expect(fee.full, at).toContain(inrFull(p.years[0].fee.inr));
-          if (p.years[0].fee.atAdmission) expect(fee.marker, at).toBe("at admission");
+          // Above the NBEMS maximum: that warning first.
+          if (p.years[0].fee.atAdmission) expect(fee.marker, at).toBe(p.years[0].fee.above ? "above NBEMS max" : p.years[0].fee.declared != null ? "at admission · GST removed" : "at admission");
         } else expect(fee.full, at).not.toContain("₹");
         n[!r ? "none" : numbers ? "numbers" : "verbatim"]++;
       }
@@ -65,7 +66,7 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
         const urls = new Set(
           own.flatMap((t) => [
             t.source.url,
-            ...(!t.details ? [] : "items" in t.details ? t.details.items.map((i) => i.source_url) : "records" in t.details ? t.details.records.flatMap((r) => r.sources.map((s) => s.url)) : [...(t.details.by_course ?? []).map((x) => x.src_url), t.details.doc_url]),
+            ...(!t.details ? [] : "items" in t.details ? t.details.items.map((i) => i.source_url) : "records" in t.details ? t.details.records.flatMap((r) => [...r.sources.map((s) => s.url), r.fee_text_src?.url]) : [...(t.details.by_course ?? []).map((x) => x.src_url), t.details.doc_url, t.details.state_rule?.source?.url]),
           ]),
         );
         for (const s of p.sources) expect(urls.has(s.url), `${c.name} ${p.programme}: ${s.url}`).toBe(true);
@@ -114,7 +115,12 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
     // A state rule beside the document: its years (Tezpur 2, not the 2012 form's 10; Latur 1; IGMC Shimla 2).
     expect(["TEZPURMEDICALCOLLEGE", "GOVERNMENTMEDICALCOLLEGELATUR", "INDIRAGANDHIMEDICALCOLLEGESHIMLA"].map((k) => of(k, "MD/MS").bond.years)).toEqual([2, 1, 2]);
     // No bond with a caveat: Karnataka's compulsory service (years unknown), a hospital taken as private from its name.
-    expect(of("KASTURBAMEDICALCOLLEGEMANIPAL", "MD/MS").bond).toMatchObject({ status: "none", years: null, caveat: expect.stringMatching(/Karnataka law/) });
+    // (never "none": the cells say Unknown, the filters count it as not declared, the CSV has no ₹0).
+    expect(of("KASTURBAMEDICALCOLLEGEMANIPAL", "MD/MS").bond).toMatchObject({ status: "not_declared", years: null, caveat: expect.stringMatching(/Karnataka law/) });
+    // Kidwai: the KEA rule's years (3 + 1) and its ₹50 L (diploma ₹25 L), not the 2023 form's ₹5 L. Bankura: ₹10 L per defaulting year × 3.
+    expect(of("KIDWAIMEMORIALINSTITUTE", "MD/MS").bond).toMatchObject({ years: 4, amount: { max: 5000000 } });
+    expect(of("KIDWAIMEMORIALINSTITUTE", "Diploma").bond.amount.max).toBe(2500000);
+    expect(of("BANKURASAMMILANIMEDICALCOLLEGE", "MD/MS").bond.amount).toMatchObject({ max: 3000000, perYear: 1000000 });
     // CNMC Diploma: ₹10 L per unserved year × 2, the document's words kept.
     expect(of("CALCUTTANATIONALMEDICALCOLLEGE", "Diploma").bond).toMatchObject({ years: 2, amount: { max: 2000000, perYear: 1000000 }, quote: expect.any(String) });
     // DY Patil Pune: the fee by subject is in the profile's words only (no figure); ESIC Udyogmandal: the unknown bond with no document, its words kept.
@@ -139,5 +145,9 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
     const snmc = byName("Dr. Sampurnanand Medical College (SNMC)");
     expect(of("Dr. Sampurnanand Medical College (SNMC)", "MD/MS").bond.amount).toMatchObject({ min: 2500000, max: 15000000, varies: true });
     expect(courseTerms(cat, snmc, "MD", "ANAESTHESIOLOGY").bond.amount).toMatchObject({ min: 5000000, max: 5000000, varies: false });
+    // Agartala's course: MD Anaesthesiology the clinical ₹50 L (leaving ₹35 L), MD Anatomy the pre/para-clinical ₹35 L.
+    const agartala = cat.colleges.find((c) => c.key.startsWith("AGARTALAGOVERNMENTMEDICALCOLLE"))!.key;
+    expect(courseTerms(cat, agartala, "MD", "ANAESTHESIOLOGY").bond).toMatchObject({ amount: { min: 5000000, max: 5000000 }, leavingAmount: { max: 3500000 } });
+    expect(courseTerms(cat, agartala, "MD", "ANATOMY").bond.amount).toMatchObject({ min: 3500000, max: 3500000 });
   });
 });

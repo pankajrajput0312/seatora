@@ -5,6 +5,7 @@ import { notFound, permanentRedirect, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { AppPage } from "@/features/decide/components/app-page";
+import { toolbarRow } from "@/features/decide/components/csv-link";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Closing, Dash, HistoryNote, PageHead, Provisional, ReachBadge } from "@/features/decide/components/bits";
@@ -25,7 +26,7 @@ import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
-import { ViewField } from "@/app/decide/fees/view-field";
+import { chosenView } from "@/features/decide/server/view";
 import { fmtDay } from "@/features/decide/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -108,16 +109,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const newOnOptions = profile && optionsView(undefined, inst.seatList ? [inst.seatList] : [], meta.sources) === "round" ? L.options({ reach: "new", q: college.name.slice(0, 100) }) : undefined;
   // One note per list of the round with such seats (clear, virtual, newly added: they overlap, so never added).
   const unlisted = unlistedBy.filter((u) => u.seats > 0);
-  // One line; the explanation and the links fold under it.
+  // One line per list; the why behind each one's (i).
   const unlistedNote = unlisted.length > 0 && (
-    <details className="text-sm">
-      <summary className="flex min-h-11 cursor-pointer items-center text-muted-foreground">
-        <span><span className="numeric font-semibold text-foreground">{formatRank(unlisted[0].seats)}</span> {listTitle(unlisted[0].list)} {unlisted[0].seats === 1 ? "seat has" : "seats have"} no past allotments{unlisted.length > 1 && " (and other lists)"}</span>
-      </summary>
-      <div className="grid gap-1 pb-2">
-        {unlisted.map((u) => <UnlistedSeats key={u.list.key} u={u} profile={!!profile} here href={L.to("/decide/seats", { view: "list", list: u.list.key, inst: slug, nohist: "1" })} options={newOnOptions} />)}
-      </div>
-    </details>
+    <div className="grid">
+      {unlisted.map((u) => <UnlistedSeats key={u.list.key} u={u} profile={!!profile} here href={L.to("/decide/seats", { view: "list", list: u.list.key, inst: slug, nohist: "1" })} options={newOnOptions} />)}
+    </div>
   );
   // The newest round's seat lists here (Courses columns, Seats tab), each separate; the header's totals from them there,
   // else from one grouped sum; allotments by quota and seat category (Overview).
@@ -346,10 +342,10 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         <section aria-labelledby="courses-h" className="grid grid-cols-1 gap-3">
           <h2 id="courses-h" className="sr-only">Courses</h2>
           {unlistedNote}
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className={toolbarRow}>
             {mine && round.length > 0 && options.length > 0 ? (
               <CategoryToggle mine={mine} all={!seatCats} href={(all) => L.with(`/decide/institutes/${slug}`, { scat: all ? "all" : null })} />
-            ) : <span />}
+            ) : <span className="max-md:hidden" />}
             {options.length > 0 && <ViewToggle page="institute-courses" />}
           </div>
           {options.length === 0 ? (
@@ -357,6 +353,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           ) : (
             <ViewPanes
               page="institute-courses"
+              view={await chosenView(sp, "institute-courses")}
               cards={
                 <ul className="grid gap-3 lg:grid-cols-2">
                   {options.map((r) => {
@@ -485,11 +482,10 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           <h2 id="allot-h" className="sr-only">Allotments</h2>
           <FilterBar action={`/decide/institutes/${slug}`} params={sp} cols="md:grid-cols-[1fr_1fr_auto]">
             <input type="hidden" name="tab" value="allotments" />
-            <ViewField />
             <Field label="Year"><Select name="year" value={allotYear ? String(allotYear) : undefined} all="All years" options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
             <Field label="Course"><Select name="course" value={allotCourse} all="All courses" options={courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
           </FilterBar>
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className={toolbarRow}>
             <p id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
               <span><span className="numeric font-semibold text-foreground">{rangeLabel(allot)}</span> allotments</span>
               <InfoTip label="allotments here">Newest first. Ranks only, never names. Select a rank to scan the allotments around it that year.</InfoTip>
@@ -502,6 +498,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           ) : (
             <ViewPanes
               page="institute-allotments"
+              view={await chosenView(sp, "institute-allotments")}
               cards={
                 <ul className="grid gap-3 lg:grid-cols-2">
                   {allot.rows.map((a, i) => (

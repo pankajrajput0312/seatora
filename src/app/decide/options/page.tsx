@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Fragment } from "react";
-import { Download } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { CSV_MAX_ROWS } from "@/features/decide/api";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
+import { CsvLink } from "@/features/decide/components/csv-link";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { termDocs } from "@/features/decide/components/fees";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm } from "@/features/decide/components/filter-form";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { OptionsResults } from "@/features/decide/components/option-actions";
+import { ViewField } from "@/features/decide/components/view-toggle";
 import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
@@ -142,7 +142,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <span>{n(sum.options)} with {round} seats:</span>
             <span>{n(sum.clear)} clear,</span>
             <span>{n(sum.virtualOnly)} virtual only{sum.newOnly > 0 && <>, {n(sum.newOnly)} only newly added</>},</span>
-            {sum.fresh > 0 ? <Link href={here({ reach: "new", seats: null, q: null })} className="text-sky underline">{n(sum.fresh)} new<span className="sr-only">: no past allotment</span></Link> : <span>none new</span>}
+            {sum.fresh > 0 ? <Link href={here({ reach: "new", seats: null, q: null })} aria-label={`${formatRank(sum.fresh)} new: no past allotment`} className="text-sky underline">{n(sum.fresh)} new<span className="sr-only">: no past allotment</span></Link> : <span>none new</span>}
             <InfoTip label={`${round} seats`}>
               {formatRank(sum.options)} {sum.options === 1 ? "option has" : "options have"} {roundWords} seats in your courses: {formatRank(sum.clear)} in the clear vacancy list,{" "}
               {formatRank(sum.virtualOnly)} virtual only (seats there fall vacant only if their holder upgrades or leaves){sum.newOnly > 0 && `, ${formatRank(sum.newOnly)} only newly added`};{" "}
@@ -182,6 +182,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         {f.reach && <input type="hidden" name="reach" value={f.reach} />}
         {f.closed && <input type="hidden" name="closed" value={f.closed} />}
         {f.view && <input type="hidden" name="view" value={f.view} />}
+        <ViewField />
         <Fragment key={params.toString()}>
           <label className="min-w-56 flex-1">
             <span className="sr-only">Search institute, state or course</span>
@@ -279,15 +280,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           query={api.toString()}
           caption={caption}
           firstPageHref={r.page > 1 ? here({}) : undefined}
-          tools={
-            r.total > CSV_MAX_ROWS ? (
-              <span className="text-xs text-muted-foreground">CSV: narrow to <span className="numeric">{formatRank(CSV_MAX_ROWS)}</span> or fewer</span>
-            ) : (
-              <Button asChild variant="secondary">
-                <a href={`/api/v1/options/export?${api}`} download><Download className="size-4" aria-hidden />CSV<span className="sr-only">: download these {formatRank(r.total)} options</span></a>
-              </Button>
-            )
-          }
+          tools={<CsvLink href={`/api/v1/options/export?${api}`} what={`these ${formatRank(r.total)} options`} total={r.total} />}
           latestYear={LATEST_YEAR}
           pastYears={PAST_YEARS}
           includeLatest={!f.prov}

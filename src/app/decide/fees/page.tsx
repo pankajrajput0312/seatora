@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
+import { CsvLink, toolbarRow } from "@/features/decide/components/csv-link";
 import { NotDeclared, programmeTitle } from "@/features/decide/components/fees";
 import { feeDefaults, feesFilters, feesParamsSchema } from "@/features/decide/components/fees-view";
 import { InfoTip } from "@/features/decide/components/info-tip";
@@ -15,7 +15,7 @@ import { TermFilterControls } from "@/features/decide/components/term-filter-con
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, FilterBar, Pager, rangeLabel, Select, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
-import { ViewField } from "./view-field";
+import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { statKeys, statLabel, type StatKey } from "@/features/decide/lib/stat-format";
@@ -82,7 +82,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             key={`${r.college.key}-${t.programme}`}
             title={r.college.name}
             href={years(r)}
-            external={h?.mccProfileUrl ? { href: h.mccProfileUrl, label: `${r.college.name} on MCC` } : undefined}
+            external={h?.mccProfileUrl ? { href: h.mccProfileUrl, label: `MCC profile: ${r.college.name}` } : undefined}
             subtitle={programmeTitle(t)}
             meta={[
               r.college.state ?? "State not listed",
@@ -119,8 +119,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                     {type && <TypeBadge type={type} of={r.college.name} />}
                   </span>
                 </th>
-                {/* Values may wrap (a range after its dash), so the five cells fit a 1366px window. */}
-                <TermStatCells t={t} variant="table" of={of(r)} tdClassName="text-[15px] [&>span]:whitespace-normal" />
+                <TermStatCells t={t} variant="table" of={of(r)} tdClassName="text-[15px]" />
               </tr>
             );
           })}
@@ -146,7 +145,8 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             each institute&apos;s Fees tab.
             <br />&quot;—&quot;: not in Seatora&apos;s MCC data, never zero or &quot;no bond&quot;. &quot;No bond&quot; only where the
             college&apos;s document or the NBEMS rule says so; &quot;Unknown&quot; where Seatora&apos;s check found no clear answer.
-            Filters count &quot;No bond&quot; where a state law&apos;s service may still apply as not declared.
+            &quot;Unknown · state law may apply&quot;: the college&apos;s document says no bond, but a state law&apos;s service may apply
+            (the filters count it as not declared).
             <br />Sorting: — and &quot;See text&quot; go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
           </>
         }
@@ -171,7 +171,6 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           <input name="q" type="search" defaultValue={f.q ?? ""} placeholder="Institute or state" className={control} />
         </label>
         <TermFilterControls f={f} caps={d} more={more} />
-        <ViewField />
         <label className={`${bare} ${more}`}>
           <span className="sr-only">Sort by</span>
           <Select name="sort" value={f.sort} options={(Object.keys(sortLabel) as FeeSort[]).map((k) => ({ value: k, label: `Sort: ${sortLabel[k]}` }))} />
@@ -184,7 +183,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       </FilterBar>
       <ActiveFilters items={chips} clear={L.to("/decide/fees")} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className={toolbarRow}>
         <h2 id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm font-normal text-muted-foreground">
           <span><span className="numeric font-semibold text-foreground">{rangeLabel(res)}</span> programmes</span>
           {res.undeclared > 0 && <InfoTip label="these programmes"><span className="numeric">{formatRank(res.undeclared)}</span> of them have nothing in Seatora&apos;s MCC data (every figure is —).</InfoTip>}
@@ -195,16 +194,18 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             </span>
           )}
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <ViewToggle page="fees" />
-          <Button asChild variant="secondary"><a href={`/api/v1/fees/export?${params}`} download>Download CSV</a></Button>
-        </div>
+        {res.total > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <ViewToggle page="fees" />
+            <CsvLink href={`/api/v1/fees/export?${params}`} what={`these ${formatRank(res.total)} programmes`} />
+          </div>
+        )}
       </div>
 
       {res.total === 0 ? (
         <EmptyState title="Nothing matches these filters." href={L.to("/decide/fees", { program: "all", state: "all", maxfee: "any", bondyrs: "any" })} />
       ) : (
-        <div><ViewPanes page="fees" cards={cards} table={table} /></div>
+        <div><ViewPanes page="fees" view={await chosenView(params, "fees")} cards={cards} table={table} /></div>
       )}
       <Pager page={res.page} pageSize={res.pageSize} total={res.total} href={(n) => L.page("/decide/fees", n)} focusId="results" label="Fees" />
     </AppPage>

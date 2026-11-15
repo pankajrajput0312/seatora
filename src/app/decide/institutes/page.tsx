@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
+import { toolbarRow } from "@/features/decide/components/csv-link";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HistoryNote, PageHead, ReachBadge } from "@/features/decide/components/bits";
@@ -14,10 +15,10 @@ import { TermFilterControls } from "@/features/decide/components/term-filter-con
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
-import { ViewField } from "@/app/decide/fees/view-field";
+import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { readTermFilters, termChips, termMoreOpen } from "@/features/decide/lib/term-filters";
+import { readTermFilters, termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, LATEST_YEAR, listInstitutes, PAST_YEARS } from "@/features/decide/service";
 
@@ -43,7 +44,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const profile = profileFromParams(params);
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
-  const { params: tp, filters: tf } = readTermFilters(params);
+  const { params: tp, filters: tf } = readTermFilters(params, profile);
   const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort === "beds" ? ("name" as const) : f.sort };
   const pg = { page: f.page, pageSize: PAGE_SIZE };
   const [meta, info, byTerms] = await Promise.all([getMeta(), hospitalInfo(), institutesByTerms(tf, f.course)]);
@@ -63,6 +64,9 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
 
   const course = meta.courses.find((c) => c.slug === f.course);
   const chips = [
+    // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
+    ...(profile?.maxFeeLakh != null && tp.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: L.with(PATH, { maxfee: "any", page: null }) }] : []),
+    ...(profile?.maxBondYears != null && tp.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: L.with(PATH, { bondyrs: "any", page: null }) }] : []),
     ...(f.q ? [{ label: `“${f.q}”`, href: L.with(PATH, { q: null, page: null }) }] : []),
     ...(f.state ? [{ label: f.state, href: L.with(PATH, { state: null, page: null }) }] : []),
     ...(course ? [{ label: `${course.degree} ${course.name}`, href: L.with(PATH, { course: null, page: null }) }] : []),
@@ -96,7 +100,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
               level={2}
               title={r.college.name}
               href={L.institute(r.college.slug)}
-              external={h?.mccProfileUrl ? { href: h.mccProfileUrl, label: "Official MCC profile" } : undefined}
+              external={h?.mccProfileUrl ? { href: h.mccProfileUrl, label: `MCC profile: ${r.college.name}` } : undefined}
               subtitle={bestOf(r)}
               meta={[
                 r.college.state,
@@ -178,12 +182,11 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         <Field label="State"><Select name="state" value={f.state} all="All states" options={meta.states.map((s) => ({ value: s, label: s }))} /></Field>
         <Field label="Course"><Select name="course" value={f.course} all="Any course" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
         <Field label="Sort"><Select name="sort" value={f.sort} options={[...sorts]} /></Field>
-        <TermFilterControls f={tp} />
-        <ViewField />
+        <TermFilterControls f={tp} caps={profile} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={toolbarRow}>
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
           <span className="numeric font-semibold text-foreground">{rangeLabel(res)}</span> institutes
           {unknown > 0 && (
@@ -196,7 +199,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         {res.total > 0 && <ViewToggle page="institutes" />}
       </div>
 
-      {res.total === 0 ? <EmptyState title="No institutes match these filters." href={L.to(PATH)} /> : <ViewPanes page="institutes" cards={cards} table={table} />}
+      {res.total === 0 ? <EmptyState title="No institutes match these filters." href={L.to(PATH, { maxfee: "any", bondyrs: "any" })} /> : <ViewPanes page="institutes" view={await chosenView(params, "institutes")} cards={cards} table={table} />}
 
       <Pager page={res.page} pageSize={res.pageSize} total={res.total} href={(n) => L.page(PATH, n)} focusId="results" label="Institutes" />
 

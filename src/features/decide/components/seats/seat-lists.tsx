@@ -64,20 +64,25 @@ export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; cu
 }
 
 /**
- * The seats of a list in her profile whose course and quota has no past allotments (service.ts unlistedOf), named on
- * Options and institute pages with a link to them on Seats. `here`: at one institute. `options`: while Options' round
- * view lists them as new options, the link to them there (else they are no option).
+ * The seats of a list in her profile whose course and quota has no past allotments (service.ts unlistedOf), on Options
+ * and institute pages: one line, the why behind its (i), and a link to them on Seats. `here`: at one institute.
+ * `options`: while Options' round view lists them as new options, the link to them there (else they are no option).
  */
 export function UnlistedSeats({ u, profile, here, href, options }: { u: { list: SeatList; options: number; seats: number } | null; profile: boolean; here?: boolean; href: string; options?: string }) {
   if (!u || u.seats <= 0) return null;
   const one = u.options === 1;
+  const them = u.seats === 1 ? "it" : "them";
   return (
-    <p className="text-sm text-muted-foreground">
-      <span className="numeric">{formatRank(u.seats)}</span> {u.seats === 1 ? "seat" : "seats"}{here && " here"} in <span className="numeric">{formatRank(u.options)}</span>{" "}
-      {one ? "course and quota" : "courses and quotas"} of the {listTitle(u.list)} list {profile ? "match your courses, quotas, states and seat categories but have" : "have"} no
-      past MCC allotments, so there is no closing rank to compare
-      {options ? <>: Options lists {one ? "it" : "them"} as &ldquo;New: no past allotment&rdquo;.{" "}<Link href={options} className={`${smallLink} text-sky`}>See {one ? "it" : "them"} on Options</Link>{" "}</> : <> and {one ? "it is not an option" : "they are not options"} here.{" "}</>}
-      <Link href={href} className={`${smallLink} text-sky`}>See {u.seats === 1 ? "this seat" : "these seats"}</Link>
+    <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+      {/* "2026 R2 clear vacancy seats", "2026 R2 newly added seats" (that list's name already says seats). */}
+      <span><span className="numeric">{formatRank(u.seats)}</span> {u.list.kind === "new" ? `${u.list.year} ${roundLabel[u.list.round]} newly added` : listTitle(u.list)} {u.seats === 1 ? "seat" : "seats"}{here && " here"} with no past allotment</span>
+      <InfoTip label={`${listTitle(u.list)} seats with no past allotment`}>
+        {u.seats === 1 ? "It is" : "They are"} in <span className="numeric">{formatRank(u.options)}</span> {one ? "course and quota" : "courses and quotas"}
+        {profile ? " that match your courses, quotas, states and seat categories" : ""} with no past MCC allotments, so there is no closing rank to
+        compare{options ? `: Options lists ${one ? "it" : "them"} as “New: no past allotment”.` : `, and ${one ? "it is not an option" : "they are not options"} here.`}
+      </InfoTip>
+      {options && <Link href={options} className={`${smallLink} text-sky sm:ml-2`}>See {one ? "it" : "them"} on Options</Link>}
+      <Link href={href} className={`${smallLink} text-sky sm:ml-2`}>See {them} on Seats</Link>
     </p>
   );
 }

@@ -1,7 +1,8 @@
 import { expect, it } from "vitest";
 import type { FeeTableRecord, Term } from "../types";
 import type { BondDetails, PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
-import { bucketOfDegree, groupOf, normalizeProgramme, parseFee, parseStipend, programmeOfDegree, programmesOf, termQuality } from "./terms";
+import type { Catalog } from "./catalog";
+import { bucketOfDegree, courseTerms, groupOf, normalizeProgramme, parseFee, parseStipend, programmeOfDegree, programmesOf, termQuality } from "./terms";
 
 // Fee and stipend texts exactly as they are in CollegeTerm (the MCC import), one per shape; bonds and penalties as their records.
 const MCC = (id: number) => ({ name: "MCC institute profile (college declaration)", url: `https://mcc.admissions.nic.in/Counseling/Handler/ViewInstituteProfileDetailsDynamic.ashx?boardId=140012521&InstituteId=${id}`, type: "OFFICIAL" as const });
@@ -23,6 +24,13 @@ const TRIPURA = bond("MD", "Service bond: 1 year · ₹50 L clinical · ₹35 L 
   ],
   applies_to: "MD/MS/PG Diploma in Tripura govt institutions.",
   quote: "he/she has to pay an amount of Rs. 35.00 lakhs",
+});
+const AGARTALA_PENALTY = penalty("MD", "Seat-leaving penalty: ₹35 L clinical · ₹25 L pre/para-clinical · ₹10 L diploma", {
+  items: [
+    { kind: "leaving_penalty", applies_to: "PG degree, clinical subjects", inr: 3500000, when: "discontinues PG course (Discontinuation Bond)", quote: null, source_url: PROFILE.url },
+    { kind: "leaving_penalty", applies_to: "PG degree, pre/para-clinical subjects", inr: 2500000, when: "discontinues PG course (Discontinuation Bond)", quote: null, source_url: PROFILE.url },
+    { kind: "leaving_penalty", applies_to: "PG diploma", inr: 1000000, when: "discontinues PG course (Discontinuation Bond)", quote: null, source_url: PROFILE.url },
+  ],
 });
 const TRIPURA_PENALTY = penalty("MD", "Seat-leaving penalty: ₹35,00,000 (PG degree, clinical subjects) · ₹10,00,000 (PG diploma)", {
   items: [
@@ -295,6 +303,7 @@ it("who a row is for: DNB is a degree, NBEMS Diploma the diploma; DNB/Diploma an
     ["DNB/Diploma", "all"], ["DNB, NBEMS Diploma", "all"], ["All India quota DNB/Diploma", "all"], ["DNB / Diploma / DrNB at Karnataka State Govt hospital", "all"],
     ["All PG (MD/MS/DM/MCh) on Government seats, RajMES", "all"], ["PG Diploma/DNB/DrNB/MD/MS/MDS/DM/MCh", "all"], ["DM/MCh", "super"],
     ["PG Degree (non-WB-in-service), per defaulting year of the 3-year bond", "degree"], ["MD/MS in-service candidates", "inservice"], ["MCC counselling", "all"],
+    ["PG degree trainees other than WB-sponsored in-service doctors, per defaulting year of the 3-year service", "degree"], ["Non-in-service MD/MS (rural service bond)", "degree"],
   ];
   expect(cases.map(([s]) => [s, groupOf(s)])).toEqual(cases);
   // SBLS-like: the All India DNB/Diploma row, not the state one; the "DNB / Diploma" leaving item applies to DNB too.
@@ -339,8 +348,55 @@ it("an additional leaving item adds to the others (Maharashtra: ₹10 L + ₹10 
 it("no bond with what the record is unsure of: a private status from the name, a state law's service that may apply (years unknown)", () => {
   const nbems = bond("DNB", "No bond (NBEMS rule for private DNB hospitals)", 0, { status: "no_bond_rule", confidence: "medium: private status inferred from name" }, NBEMS);
   expect(normalizeProgramme("DNB", [nbems]).bond).toMatchObject({ status: "none", years: 0, caveat: "private status inferred from name" });
+  // "No bond" only where nothing may still bind: a state law's service that may apply makes it unknown, never "none".
   const ka = bond("MD", "No service bond (per the college's MCC bond document); Karnataka law: 1 yr compulsory govt service may apply", 0, { status: "no" });
-  expect(normalizeProgramme("MD/MS", [ka]).bond).toMatchObject({ status: "none", years: null, caveat: "Karnataka law: 1 yr compulsory govt service may apply" });
+  expect(normalizeProgramme("MD/MS", [ka]).bond).toMatchObject({ status: "not_declared", basis: null, years: null, caveat: "Karnataka law: 1 yr compulsory govt service may apply", text: expect.stringMatching(/^No service bond/) });
+});
+
+it("a per defaulting year amount 'other than in-service doctors' is for everyone else: × the years (Bankura)", () => {
+  const bankura = bond("MD", "Service bond: 3 years · ₹10 L per unserved year · sponsored in-service doctors exempt", 3000000, {
+    status: "yes",
+    years: "3",
+    amounts: [{ applies_to: "PG degree trainees other than WB-sponsored in-service doctors, per defaulting year of the 3-year service", inr: 1000000 }],
+  });
+  expect(normalizeProgramme("MD/MS", [bankura]).bond).toMatchObject({ years: 3, amount: { state: "figure", min: 3000000, max: 3000000, perYear: 1000000 } });
+});
+
+it("a state rule that gives the years gives the amount too, citing the rule, not the older college form (Kidwai)", () => {
+  const ruleUrl = "https://cetonline.karnataka.gov.in/x/PGET_2026_e_brochure.pdf";
+  const kidwai = bond("MD", "Service bond: 1 year + 1 yr compulsory govt service (Karnataka law) · ₹5 L · AIQ included; state rule (KEA PGET-2026 bulletin): 3 yrs if Govt needs, ₹50 L (diploma ₹25 L), plus 1 yr compulsory service", 500000, {
+    status: "yes",
+    years: "1 (para 3); para 2 of the same form says minimum 3 years",
+    amounts: [{ applies_to: "PG degree and diploma, Govt seats (AIQ/State)", inr: 500000 }],
+    by_subject: { ANAESTHESIOLOGY: 500000 },
+    state_rule: {
+      status: "state_rule",
+      years: "3 years if Government desires, plus 1 year of compulsory service",
+      amounts: [{ applies_to: "MD/MS", inr: 5000000 }, { applies_to: "Diploma", inr: 2500000 }],
+      source: { title: "KEA, PGET-2026 bulletin", url: ruleUrl, date: "2026-08-14" },
+      text: "State bond: 3 yrs if Govt needs, ₹50 L (diploma ₹25 L), plus 1 yr compulsory service; AIQ included (KEA PGET-2026 bulletin)",
+    },
+  });
+  const md = normalizeProgramme("MD/MS", [kidwai]);
+  expect(md.bond).toMatchObject({ basis: "document", years: 4, yearsSum: "3 + 1", amount: { state: "figure", min: 5000000, max: 5000000, varies: false } });
+  expect(md.bond.amounts).toEqual([{ text: "₹50,00,000 (MD/MS)", inr: 5000000, group: "degree", src: 2, rule: true }]);
+  expect(md.sources[1]).toMatchObject({ n: 2, label: "KEA, PGET-2026 bulletin (2026-08-14)", url: ruleUrl });
+  expect(normalizeProgramme("Diploma", [kidwai]).bond.amount).toMatchObject({ min: 2500000, max: 2500000 });
+  // The document's by_subject figure is not the rule's: never applied over it.
+  const cat = { pairs: new Map([["p", { cs: "X|MD|ANAESTHESIOLOGY", college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY" }]]), terms: [kidwai] } as unknown as Catalog;
+  expect(courseTerms(cat, "X", "MD", "ANAESTHESIOLOGY").bond.amount.max).toBe(5000000);
+});
+
+it("a bond or leaving penalty priced by subject group is the course's own figure where its group is sure (Agartala)", () => {
+  const cat = { pairs: new Map(["ANAESTHESIOLOGY", "ANATOMY", "PATHOLOGY"].map((sp) => [sp, { cs: `X|MD|${sp}`, college: "X", degree: "MD", specialty: sp }])), terms: [TRIPURA, AGARTALA_PENALTY] } as unknown as Catalog;
+  const of = (sp: string) => courseTerms(cat, "X", "MD", sp).bond;
+  expect([of("ANAESTHESIOLOGY").amount, of("ANAESTHESIOLOGY").leavingAmount]).toMatchObject([{ min: 5000000, max: 5000000 }, { min: 3500000, max: 3500000 }]);
+  expect([of("ANATOMY").amount, of("ANATOMY").leavingAmount]).toMatchObject([{ min: 3500000, max: 3500000 }, { min: 2500000, max: 2500000 }]);
+  // Pathology is para-clinical in some states' lists, not in others: the range, as the programme's.
+  expect([of("PATHOLOGY").amount, of("PATHOLOGY").leavingAmount]).toMatchObject([{ min: 3500000, max: 5000000 }, { min: 2500000, max: 3500000 }]);
+  // The record's rows stay listed (the (i)); Diploma's own row is one figure already.
+  expect(of("ANAESTHESIOLOGY").amounts).toHaveLength(2);
+  expect(courseTerms(cat, "X", "Diploma", "ANAESTHESIOLOGY").bond.amount).toMatchObject({ min: 1500000, max: 1500000 });
 });
 
 it("by_course: a per-year amount stays per year, the document's words and years as written are kept", () => {

@@ -1,28 +1,24 @@
-"use client";
-
-import { useSyncExternalStore } from "react";
-import { useSearchParams } from "next/navigation";
-import { LayoutGrid, Table2 } from "lucide-react";
-import { cn } from "@/lib/cn";
-import { useLocal } from "../lib/local-store";
+import { ViewPanesClient } from "./view-toggle-client";
 
 // Cards | Table for a results page. The choice is `layout=cards|table` in the address (works without JS: two links;
 // `layout`, not `view`: Options' and Seats' `view` is their own list view), and
-// with JS it is saved per page on the device, so it survives Apply and paging. Nothing chosen: cards below md, the table
+// with JS it is saved per page on the device (and in a cookie the server reads: server/view.ts), so it survives Apply,
+// paging and the nav links. Nothing chosen: cards below md, the table
 // from md up (CSS only, so the first paint is right on every screen).
+// No "use client" here: the server reads VIEW_PARAM and parseView too (a client module's exports are only references
+// there), and ViewPanes drops the pane not shown before it reaches the client. The hooks and buttons are in
+// view-toggle-client.tsx.
 
 export type View = "cards" | "table";
-const VIEWS = [
-  { v: "cards", label: "Cards", Icon: LayoutGrid },
-  { v: "table", label: "Table", Icon: Table2 },
-] as const;
 
-const storeKey = (page: string) => `medpath.view.${page}`;
 /** The address param of the choice. */
 export const VIEW_PARAM = "layout";
 
 /** A `layout` value from the address or the device (untrusted): only the two views, else null. */
 export const parseView = (v: unknown): View | null => (v === "cards" || v === "table" ? v : null);
+
+/** The cookie that tells the server the choice saved on the device (chosenView), so a return visit gets one pane. */
+export const viewCookie = (page: string) => `medpath.view.${page}`;
 
 /** This page's address with `layout` set, every other param kept (relative: "?…"). */
 export const viewHref = (params: URLSearchParams | null, v: View) => {
@@ -35,67 +31,15 @@ export const viewHref = (params: URLSearchParams | null, v: View) => {
 export const paneClass = (chosen: View | null, pane: View) =>
   chosen ? (chosen === pane ? undefined : "hidden") : pane === "cards" ? "md:hidden" : "max-md:hidden";
 
-/** The view she chose for `page`: the address first, then the device; null = not chosen (the breakpoint default). */
-export function useView(page: string): View | null {
-  const sp = useSearchParams();
-  const [saved] = useLocal<unknown>(storeKey(page), null);
-  return parseView(sp?.get(VIEW_PARAM)) ?? parseView(saved);
-}
-
-const WIDE = "(min-width: 48rem)"; // Tailwind md
-const onWide = (cb: () => void) => {
-  const m = window.matchMedia(WIDE);
-  m.addEventListener("change", cb);
-  return () => m.removeEventListener("change", cb);
-};
-
-const item = "inline-flex min-h-11 items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground first:rounded-l-md last:rounded-r-md";
-const ON = "bg-sky/10 font-semibold text-sky hover:text-sky";
-// Before JS nothing says which view the breakpoint picked, so the links mark it with CSS.
-const ON_NARROW = "max-md:bg-sky/10 max-md:font-semibold max-md:text-sky";
-const ON_WIDE = "md:bg-sky/10 md:font-semibold md:text-sky";
-
-/**
- * The Cards | Table control for `page` (a short stable name, e.g. "allotments"; the same one as its ViewPanes). Before
- * hydration (or without JS) two links to `?layout=…`, the chosen one `aria-current`; after, two buttons with
- * `aria-pressed` that switch at once (the address is updated in place, no reload) and save the choice on the device.
- */
-export function ViewToggle({ page, className }: { page: string; className?: string }) {
-  const sp = useSearchParams();
-  const [saved, save, hydrated] = useLocal<unknown>(storeKey(page), null);
-  const chosen = parseView(sp?.get(VIEW_PARAM)) ?? parseView(saved);
-  const wide = useSyncExternalStore(onWide, () => window.matchMedia(WIDE).matches, () => false);
-  const shown = chosen ?? (wide ? "table" : "cards");
-  const pick = (v: View) => {
-    save(v);
-    window.history.replaceState(null, "", viewHref(sp, v));
-  };
-  return (
-    <div role="group" aria-label="View as" className={cn("inline-flex shrink-0 divide-x divide-input rounded-md border border-input bg-card", className)}>
-      {VIEWS.map(({ v, label, Icon }) => {
-        const body = <><Icon className="size-4" strokeWidth={1.75} aria-hidden />{label}</>;
-        return hydrated ? (
-          <button key={v} type="button" aria-pressed={shown === v} onClick={() => pick(v)} className={cn(item, shown === v && ON)}>{body}</button>
-        ) : (
-          <a key={v} href={viewHref(sp, v)} aria-current={chosen === v ? "true" : undefined} className={cn(item, chosen ? chosen === v && ON : v === "cards" ? ON_NARROW : ON_WIDE)}>{body}</a>
-        );
-      })}
-    </div>
-  );
-}
+export { useView, ViewField, ViewToggle } from "./view-toggle-client";
 
 /**
  * Both views of the same results, one shown (`paneClass`): pages render `cards` and `table` from the same rows, so the
  * toggle switches without a round trip. Give ids (a Pager focus target) to elements outside the panes, never inside.
+ * `view`: the choice the address names, when the page knows it (`parseView(params.get(VIEW_PARAM))`): only that pane
+ * is rendered (half the HTML: every row's (i) tips once, not twice), and the toggle fetches the page again for the
+ * other. Only the pane on show cites its documents in the page's Sources.
  */
-export function ViewPanes({ page, cards, table }: { page: string; cards: React.ReactNode; table: React.ReactNode }) {
-  const chosen = useView(page);
-  // ponytail: a device-saved choice that differs from the breakpoint default applies after hydration (one repaint);
-  // a cookie read on the server would remove it if that ever shows.
-  return (
-    <>
-      <div data-view-pane="cards" className={paneClass(chosen, "cards")}>{cards}</div>
-      <div data-view-pane="table" className={paneClass(chosen, "table")}>{table}</div>
-    </>
-  );
+export function ViewPanes({ page, view, cards, table }: { page: string; view?: View | null; cards: React.ReactNode; table: React.ReactNode }) {
+  return view ? <ViewPanesClient page={page} only={view}>{view === "cards" ? cards : table}</ViewPanesClient> : <ViewPanesClient page={page} cards={cards} table={table} />;
 }

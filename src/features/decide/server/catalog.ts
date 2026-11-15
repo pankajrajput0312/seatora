@@ -151,7 +151,7 @@ async function loadCatalog(): Promise<Catalog> {
     db.$queryRaw<(FeeTableRecord & { collegeId: string })[]>`
       SELECT "collegeId", programme, string_to_array("quotaGroup", '+') AS seat_groups, data->'fee_display' AS fee_display, data->'fee_per_year' AS fee_per_year,
         data->'fee_whole_course' AS fee_whole_course, data->'stipend_per_month' AS stipend_per_month, data->'counselling_forfeit' AS counselling_forfeit, data->'sources' AS sources, data->'quotas' AS quotas,
-        data->>'fee_text' AS fee_text, data->'fee_text_src' AS fee_text_src
+        data->>'fee_text' AS fee_text, data->'fee_text_src' AS fee_text_src, data->'stipend_nbems_minimum' AS stipend_nbems_minimum
       FROM "FeesStructured"`,
   ]);
   const detailsOf = new Map(details.map((d) => [d.id, d.details]));

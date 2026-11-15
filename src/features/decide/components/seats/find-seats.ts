@@ -329,7 +329,8 @@ export async function seatsView(f: SeatsParams, profile: Profile | null, pageSiz
       compare: f.view === "list" ? false : f.view === "matrix" && f.rounds ? "all" : true,
       has: f.view === "matrix" ? f.has : undefined,
       reachFor: profile && mine && { rank: profile.rank, categories: mine },
-      terms: termFilters(f),
+      // An absent fee / bond cap is her profile's, as on Options.
+      terms: termFilters(f, profile),
     },
     pageSize ? { page: f.page, pageSize } : undefined,
   );

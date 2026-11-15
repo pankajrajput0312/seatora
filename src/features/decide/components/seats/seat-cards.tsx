@@ -56,17 +56,17 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails }: {
               `${own.year} · ${roundLabel[own.round]}`,
               r.quota ?? "Quota not printed",
               r.quota != null && !openQuotas.includes(r.quota) && <Badge tone="warning">Restricted</Badge>,
-              r.category,
+              `${r.category} seat`,
             ]}
             actions={onDetails && (
-              <Button type="button" variant="ghost" className="px-3 text-sky" data-row={k} onClick={() => onDetails(k)} aria-haspopup="dialog">
-                Details<span className="sr-only">: {name}</span>
+              <Button type="button" variant="ghost" className="px-3 text-sky" data-row={k} onClick={() => onDetails(k)} aria-haspopup="dialog" aria-label={`Details: ${name}`}>
+                Details
               </Button>
             )}
             stat={{ label: lists.length > 1 ? shortKind[own.kind] : "Seats", value: n != null ? formatRank(n) : <Dash /> }}
             title={r.college.name}
             href={L.institute(r.college.slug)}
-            external={r.hospital?.mccProfileUrl ? { href: r.hospital.mccProfileUrl, label: `${r.college.name} on MCC` } : undefined}
+            external={r.hospital?.mccProfileUrl ? { href: r.hospital.mccProfileUrl, label: `MCC profile: ${r.college.name}` } : undefined}
             subtitle={
               <>
                 {seatCourse(r)}

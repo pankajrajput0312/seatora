@@ -1,36 +1,30 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { CSV_MAX_ROWS } from "@/features/decide/api";
 import { Beds, PrevSeatCell } from "@/features/decide/components/allotments/allotment-cells";
-import { AllotmentsDisplay, AllotmentsPane } from "@/features/decide/components/allotments/allotments-display";
+import { AllotmentsDisplay } from "@/features/decide/components/allotments/allotments-display";
 import { allotmentCategories, allotmentsView, statusLabel, type AllotmentRow } from "@/features/decide/components/allotments/allotments-view";
 import { AppPage } from "@/features/decide/components/app-page";
+import { CsvLink, toolbarRow } from "@/features/decide/components/csv-link";
 import { Dash, PageHead, Provisional } from "@/features/decide/components/bits";
 import { DataSource } from "@/features/decide/components/data-source";
 import { termDocs } from "@/features/decide/components/fees";
-import { InfoTip } from "@/features/decide/components/info-tip";
 import { ResultCard, ResultCards } from "@/features/decide/components/result-card";
-import { TermStatCells } from "@/features/decide/components/stat-cells";
+import { StatHead, TermStatCells } from "@/features/decide/components/stat-cells";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
-import { VIEW_PARAM, ViewToggle } from "@/features/decide/components/view-toggle";
+import { VIEW_PARAM, ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
-import { termChips, termMoreOpen } from "@/features/decide/lib/term-filters";
-import { toURLSearchParams } from "@/features/decide/profile";
+import { termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
+import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { roundLabel, rounds } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Allotments" };
 const PAGE_SIZE = 50;
-/** The view she last saw here (AllotmentsPane sets it): the server renders that one pane when the address names none. */
-const VIEW_COOKIE = "medpath.view.allotments";
-const asView = (v: string | null | undefined) => (v === "cards" || v === "table" ? v : null);
 // Columns the Display menu can hide (rank, round and institute always show), in table order: the numbers first.
 const cols = [
   ...statKeys.map((k) => ({ key: k, label: statLabel[k] })),
@@ -66,10 +60,8 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   if (!v) notFound();
   const { f, meta, inst, typed, rankError, latest, filters } = v;
   const { rows, total, page, unknownTerms } = v.r;
-  // One pane, not both: the address's view, else the one she last saw here, else cards on every screen (the table's
-  // five number columns fit beside the institute only from about 1920 px; the cards show them at any width).
-  const urlView = asView(params.get(VIEW_PARAM));
-  const shown = urlView ?? asView((await cookies()).get(VIEW_COOKIE)?.value) ?? "cards";
+  // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers: allotmentsView).
+  const caps = profileFromParams(params);
   const rankInput = (name: "from" | "to") => ({
     name,
     inputMode: "numeric" as const,
@@ -96,10 +88,12 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
     filters.category && { label: `${filters.category} seats`, href: here({ acat: null }) },
     filters.state && { label: `State: ${filters.state}`, href: here({ state: null }) },
     ranks && { label: ranks, href: here({ from: null, to: null }) },
+    caps?.maxFeeLakh != null && f.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(caps.maxFeeLakh)}`, href: here({ maxfee: "any" }) },
+    caps?.maxBondYears != null && f.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(caps.maxBondYears)}`, href: here({ bondyrs: "any" }) },
     ...termChips(f).map((c) => ({ label: c.label, href: here({ [c.key]: null }) })),
   ].filter((x) => !!x);
   const of = (a: AllotmentRow) => `${a.college.name}, ${a.courseName}`;
-  // State • type badge • beds: the card's meta line and the table's line under the course.
+  // State • type badge • beds: the card's meta line (the table's line under the course has the same).
   const instMeta = (a: AllotmentRow) => [
     a.college.state,
     a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.college.name} />,
@@ -127,7 +121,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
           chips={[
             <span key="r" className="inline-flex items-center gap-1.5"><span className="numeric">{a.year} · {roundLabel[a.round]}</span><Provisional when={a.provisional} /></span>,
             a.quota,
-            a.category,
+            `${a.category} seat`,
             // Only when it differs from the seat's (the PDF prints an Open candidate as "General").
             a.candidateCategory && a.candidateCategory.replace(/^General\b/, "Open") !== a.category && `${a.candidateCategory} candidate`,
             a.status !== "allotted" && (statusLabel[a.status] ?? a.status),
@@ -144,7 +138,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
           }}
           title={a.college.name}
           href={L.institute(a.college.slug)}
-          external={a.mccProfileUrl ? { href: a.mccProfileUrl, label: `MCC institute profile of ${a.college.name}` } : undefined}
+          external={a.mccProfileUrl ? { href: a.mccProfileUrl, label: `MCC profile: ${a.college.name}` } : undefined}
           subtitle={courseLink(a)}
           meta={instMeta(a)}
           // The previous seat below the allotted institute's meta line (state, type, beds are this seat's, not that one's).
@@ -159,8 +153,6 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
               <TermStatCells t={a.fees} of={of(a)} className="border-t-0" />
             </>
           }
-          // Cards in a row share a height: the stat cells sit at the bottom of each.
-          className="[&>:last-child]:mt-auto"
         />
       ))}
     </ResultCards>
@@ -175,7 +167,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
           <th scope="col" className={th}>Round</th>
           <th scope="col" className={th}>Institute</th>
           {/* The five numbers right after the institute, before what the card's header row has (quota, category). */}
-          {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={`${th} text-right`}>{statLabel[k]}</th>)}
+          {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={`${th} text-right whitespace-nowrap`}><StatHead k={k} /></th>)}
           <th scope="col" data-col="quota" className={th}>Quota</th>
           <th scope="col" data-col="seat" className={th}>Seat category</th>
           <th scope="col" data-col="cand" className={th}>Candidate category</th>
@@ -198,9 +190,17 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
               <td className={`${td} min-w-52`}>
                 <Link href={L.institute(a.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{a.college.name}</Link>
                 <span className="block text-xs">{courseLink(a)}</span>
-                <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">{instMeta(a).map((n, j) => n && <span key={j}>{n}</span>)}</span>
+                {/* Type and beds share a line: wrapped one above the other, the lower (i)'s 44px target covered the upper. */}
+                <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                  <span>{a.college.state}</span>
+                  <span className="inline-flex items-center gap-x-2 whitespace-nowrap">
+                    {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.college.name} />}
+                    {a.hospital?.beds && <Beds beds={a.hospital.beds} of={a.college.name} />}
+                  </span>
+                </span>
               </td>
-              <TermStatCells t={a.fees} variant="table" short of={of(a)} tdClassName="px-3 py-2" />
+              {/* Compact: one (i) a column (its header), not 250 a page; each card's (i)s have the exact words. */}
+              <TermStatCells t={a.fees} variant="compact" of={of(a)} tdClassName="px-3 py-2" />
               <td data-col="quota" className={short}>{a.quota}</td>
               <td data-col="seat" className={short}>{a.category}</td>
               <td data-col="cand" className={short}>{a.candidateCategory ?? <Dash />}</td>
@@ -227,8 +227,6 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
 
       <FilterBar action="/decide/allotments" params={params} cols="grid-cols-2 md:grid-cols-4 xl:grid-cols-6 [&>label]:min-w-0" more={!!(f.round || f.aq || f.acat) || termMoreOpen(f)}>
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
-        {/* Apply keeps the view the address names (FilterBar keeps only the profile; without JS there is no cookie). */}
-        {urlView && <input type="hidden" name={VIEW_PARAM} value={urlView} />}
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
         <Field label="Round" className="more-filter"><Select name="round" value={filters.round} all="All rounds" options={rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
         <Field label="Course" className="col-span-2 md:col-span-1"><Select name="course" value={f.course} all="All courses" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
@@ -237,12 +235,12 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <Field label="Rank from"><input {...rankInput("from")} /></Field>
         <Field label="Rank to"><input {...rankInput("to")} /></Field>
         {/* Type, fee and bond years always; stipend, bond ₹, leaving and "Include not declared" fold on phones (MoreFilters), as on every filter bar. */}
-        <TermFilterControls f={f} />
+        <TermFilterControls f={f} caps={caps} />
       </FilterBar>
       <ActiveFilters items={active} clear={L.to("/decide/allotments", { inst: inst?.slug })} />
       {rankError && <p id="rank-error" role="alert" className="text-sm text-ember">{rankError}</p>}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className={toolbarRow}>
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
           <span className="numeric font-semibold text-foreground">{rangeLabel({ rows, total, page, pageSize: PAGE_SIZE })}</span> allotments
           {/* The default view (no filter: the latest round) is what Year and Round show; say it for screen readers. */}
@@ -251,23 +249,8 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         {total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle page="allotments" />
-            {total > CSV_MAX_ROWS ? (
-              <p className="flex items-center gap-0.5">
-                <span aria-disabled="true" className="inline-flex h-11 items-center gap-2 rounded-md border border-input px-3 text-sm text-muted-foreground">
-                  <Download className="size-4" aria-hidden />CSV
-                </span>
-                <InfoTip label="the CSV download">
-                  These <span className="numeric">{formatRank(total)}</span> rows are more than one CSV download holds (<span className="numeric">{formatRank(CSV_MAX_ROWS)}</span>): narrow the filters to download them.
-                </InfoTip>
-              </p>
-            ) : (
-              <Button asChild variant="secondary">
-                <a href={L.with("/api/v1/allotments/export", { page: null, [VIEW_PARAM]: null })} download>
-                  <Download className="size-4" aria-hidden /><span className="sr-only">Download </span>CSV<span className="sr-only"> of these {formatRank(total)} allotments</span>
-                </a>
-              </Button>
-            )}
-            {shown === "table" && <AllotmentsDisplay cols={cols} />}
+            <CsvLink href={L.with("/api/v1/allotments/export", { page: null, [VIEW_PARAM]: null })} what={`these ${formatRank(total)} allotments`} total={total} />
+            <AllotmentsDisplay cols={cols} />
           </div>
         )}
       </div>
@@ -279,9 +262,9 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         </p>
       )}
       {total === 0 ? (
-        <EmptyState title="No allotments match these filters." href={L.to("/decide/allotments", { inst: inst?.slug })} />
+        <EmptyState title="No allotments match these filters." href={L.to("/decide/allotments", { inst: inst?.slug, maxfee: "any", bondyrs: "any" })} />
       ) : (
-        <AllotmentsPane shown={shown} cookie={VIEW_COOKIE}>{shown === "cards" ? cards : table}</AllotmentsPane>
+        <ViewPanes page="allotments" view={await chosenView(params, "allotments")} cards={cards} table={table} />
       )}
       <Pager page={page} pageSize={PAGE_SIZE} total={total} href={(n) => L.page("/decide/allotments", n)} focusId="results" label="Allotments" />
       <DataSource

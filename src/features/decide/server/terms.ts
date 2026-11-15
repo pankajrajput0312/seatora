@@ -42,9 +42,15 @@ export const bucketOfDegree = (degree: string): Term["program"] => programmes[pr
 export type FigureKind = "declared" | "maximum" | "minimum" | "nmc" | "published";
 /**
  * `src`: number of the source in ProgrammeTerms.sources. `min`: a range (by subject): `inr` is its highest figure.
- * `atAdmission`: the profile's amount paid at admission (year 1), not an annual fee.
+ * `atAdmission`: the profile's amount paid at admission (year 1), not an annual fee. `above` / `below`: a declared fee
+ * above the NBEMS maximum, a declared stipend below the NBEMS minimum. `plusDa`: declared as this plus DA. `note`: the
+ * record's words on how the figure was read (a GST taken off), citing `noteSrc`. `declared`: the college's own figure when
+ * `inr` is Seatora's reading of it (GST taken off). `nbems`: the NBEMS minimum a `below` stipend is under, with its source.
  */
-export type Figure = { inr: number; kind: FigureKind; src: number; min?: number; atAdmission?: true };
+export type Figure = {
+  inr: number; kind: FigureKind; src: number; min?: number; atAdmission?: true; above?: true; below?: true; plusDa?: true; note?: string; noteSrc?: number;
+  declared?: number; nbems?: { inr: number; src: number };
+};
 /**
  * `mccId`: the MCC institute profile the figure was read from. `sharedBy`: how many institutes in our data cite that
  * profile (more than 1: it may be another institute's).
@@ -62,6 +68,8 @@ export type TermPart = {
   src?: number;
   /** Owed on top of the others ("lapse of the PG seat (additional)"), not instead of them. */
   extra?: boolean;
+  /** From the state rule beside the college's document (the rule gives the years too), not the document. */
+  rule?: true;
 };
 type Group = "degree" | "diploma" | "super" | "inservice" | "all";
 
@@ -78,18 +86,17 @@ export type Bond = {
   /**
    * declared: a bond applies (the college's document, or a state rule: `basis`); none: no bond (the college's document,
    * or the NBEMS rule for private DNB hospitals); not_declared: no bond term, or one whose status is unknown (`text` says
-   * why: not checked, not declared on MCC, no clear terms); other_course: the record's bond is for other courses only
-   * (an MCh reading a record for PG seats).
+   * why: not checked, not declared on MCC, no clear terms; or, with `caveat`, a no-bond document adding that a state
+   * law's service may apply); other_course: the record's bond is for other courses only (an MCh reading a record for PG seats).
    */
   status: "declared" | "none" | "not_declared" | "other_course";
   /** What says so (verified records only): the college's own document (or an official prospectus), a state rule, or the NBEMS rule. */
   basis: "document" | "state_rule" | "nbems_rule" | null;
   /** The college's own document says no bond (or a bond), and a state rule also covers the seat: its summary. */
   stateRule: string | null;
-  /**
-   * Years of service for this programme (All India figure first; added up where the record joins them, `yearsSum`);
-   * 0 = no bond; null when not stated, or no bond where a state law's service may still apply (`caveat`).
-   */
+  /** The years are the state rule's (`stateRule`), not the college's own document's. */
+  yearsFrom?: "state_rule";
+  /** Years of service for this programme (All India figure first; added up where the record joins them, `yearsSum`); 0 = no bond; null when not stated. */
   years: number | null;
   /** The years added up, as "1 + 3" (Karnataka: compulsory service + the undertaking); null when one figure. */
   yearsSum: string | null;
@@ -110,7 +117,7 @@ export type Bond = {
   text: string | null;
   /** The bond document's own words, where the record quotes them. */
   quote: string | null;
-  /** What the record says it is unsure of beside "no bond" (a private status inferred from the name; a state law's service that may apply). */
+  /** What the record says it is unsure of beside "no bond": a private status inferred from the name (none), a state law's service that may apply (not_declared). */
   caveat: string | null;
   src: number | null;
   /** The college's own MCC document a status stands over or that has no clear terms (`details.doc_url`), when not `src`. */
@@ -138,6 +145,8 @@ export type ProgrammeTerms = {
   unread: { kind: Term["kind"]; text: string; src: number }[];
   /** Plain sentences about figures left out for this programme. */
   notes: string[];
+  /** The page the notes are about (the MCC profile read for a fee's words), when known. */
+  notesSrc?: number;
   sources: TermSource[];
 };
 
@@ -154,7 +163,8 @@ const toInr = (n: string, unit: string | undefined) => {
 /** Who a record row is for, from its label. DNB and DrNB are degrees; "NBEMS Diploma" (or "DNB Diploma") the diploma. */
 export function groupOf(s: string): Group {
   const t = s.toLowerCase();
-  if (/\bin-service\b/.test(t) && !/non[- ](?:[a-z]+-)?in-service/.test(t)) return "inservice"; // not "non-WB-in-service"
+  // Not "non-WB-in-service", "other than WB-sponsored in-service doctors".
+  if (/\bin-service\b/.test(t) && !/(?:\bnon[- ]|\bother than )(?:[a-z]+-)?(?:[a-z]+ )?in-service/.test(t)) return "inservice";
   // "All PG (MD/MS/DM/MCh)", "PG Diploma/DNB/…/DM/MCh": PG seats too.
   if (/super[- ]?speciali|\bdm\b|\bmch\b/.test(t)) return /\b(md|ms|pg|dnb|drnb)\b|diploma|degree/.test(t) ? "all" : "super";
   // "PG (MD/MS/Diploma)", "PG diploma/degree", "DNB/Diploma", "DNB, NBEMS Diploma": both; "PG diploma / MDS", "NBEMS Diploma": the diploma's.
@@ -189,7 +199,8 @@ function amountOf(parts: TermPart[], years: number | null): Amount {
   const base = parts.some((p) => !p.extra) ? parts.filter((p) => !p.extra) : parts;
   const extra = base === parts ? 0 : parts.reduce((s, p) => s + (p.extra ? (p.inr ?? 0) : 0), 0);
   const per = years != null ? base.find((p) => p.inr != null && PER_YEAR.test(p.text)) : undefined;
-  const varies = parts.some((p) => BY_SPECIALTY.test(p.text));
+  // Priced by specialty, or by clinical vs pre/para-clinical subject (a course in neither list keeps the range).
+  const varies = parts.some((p) => BY_SPECIALTY.test(p.text)) || ofGroup(parts, "clinical") != null;
   const xs = base.flatMap((p) => (p.inr == null ? [] : [p === per ? p.inr * years! : p.inr]));
   return {
     state: xs.length ? "figure" : "words",
@@ -328,20 +339,26 @@ function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url
   // A state rule's applies_to is the checker's research note; its text already says whom the rule binds.
   const appliesTo = st.basis === "state_rule" ? null : (d.applies_to ?? null);
   const base = { ...notDeclared(), ...st, stateRule: d.state_rule?.text ?? null, appliesTo, text, quote: d.quote || null, caveat, src: own, doc };
-  if (st.status === "none") return { ...base, years: mayApply ? null : 0 };
+  // "No bond" only where nothing may still bind: one where a state law's service may apply is unknown (cells, filters, CSV).
+  if (st.status === "none") return mayApply ? { ...base, status: "not_declared", basis: null } : { ...base, years: 0 };
   if (unknown) return base;
   const rule = d.state_rule?.text ? bondYearsOf(d.state_rule.text, null, kind) : null;
+  // The rule's years: its amounts too (same basis), citing the rule; else the document's rows.
+  const ruleRows = rule && d.state_rule?.amounts?.length ? d.state_rule.amounts : null;
+  const ruleSrc = ruleRows && d.state_rule?.source ? src(d.state_rule.source.url) : own;
   const ys = yearsOf(rule ?? bondYearsOf(text, course ? null : d.years, kind));
   const yearsText = (rule ? d.state_rule?.years : typeof d.years === "string" ? d.years : null) ?? null;
   if (course) {
     // Its own entry: one figure; "₹10 L per unserved year" × the years (computed).
     const per = course.amount_inr && ys.years && PER_YEAR.test(course.text) ? course.amount_inr / ys.years : null;
     const amount: Amount = course.amount_inr ? { ...NONE, state: "figure", min: course.amount_inr, max: course.amount_inr, perYear: per } : { ...NONE, state: "words" };
-    return { ...base, ...ys, yearsText, amount };
+    return { ...base, ...ys, ...(rule && { yearsFrom: "state_rule" as const }), yearsText, amount };
   }
   // Priced by subject (details.by_subject): a row with no ₹ figure is the subject-priced one; the range is over the subjects.
-  const subjects = Object.values(d.by_subject ?? {}).filter((x): x is number => x != null);
-  const all = (d.amounts ?? []).map((a) => recordPart(a.applies_to, a.inr)).filter((p) => !subjects.length || p.inr != null);
+  const subjects = ruleRows ? [] : Object.values(d.by_subject ?? {}).filter((x): x is number => x != null);
+  const all = ruleRows
+    ? ruleRows.map((a): TermPart => ({ ...recordPart(a.applies_to, a.inr), src: ruleSrc, rule: true }))
+    : (d.amounts ?? []).map((a) => recordPart(a.applies_to, a.inr)).filter((p) => !subjects.length || p.inr != null);
   const amounts = aiqFirst(forKind(all, kind));
   // MCh: a record whose rows are all for PG (MD/MS, Diploma) seats is not its bond.
   if (kind === "super" && all.length && !amounts.length) return { ...base, status: "other_course", basis: null, otherAmounts: true };
@@ -352,7 +369,7 @@ function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url
     : t.amountInr == null || a.state === "words" ? { ...NONE, state: "words" }
     : a.state === "figure" ? a
     : { ...NONE, state: "figure", min: t.amountInr, max: t.amountInr };
-  return { ...base, ...ys, yearsText, amounts, otherAmounts: amounts.length < all.length, amount };
+  return { ...base, ...ys, ...(rule && { yearsFrom: "state_rule" as const }), yearsText, amounts, otherAmounts: amounts.length < all.length, amount };
 }
 
 /** An item owed on top of another ("lapse of the PG seat (additional)", "in addition to Rs 20 lakh"), not "in addition to fees". */
@@ -375,7 +392,9 @@ function penaltiesFromRecord(d: PenaltyDetails, kind: Kind) {
         kind,
       ),
     );
-  return { leaving: of("leaving_penalty"), other: of("other"), forfeit: of("counselling_forfeit") };
+  // A forfeit item with neither figure nor quote says only who and when (`bare`).
+  const bare = d.items.some((i) => i.kind === "counselling_forfeit" && i.inr == null && !i.quote);
+  return { leaving: of("leaving_penalty"), other: of("other"), forfeit: of("counselling_forfeit"), bare };
 }
 
 /**
@@ -411,19 +430,38 @@ function fromRecords(r: FeeTableRecord | undefined, src: (s: FeeTableRecord["sou
   const numbers = r.fee_display === "numbers";
   const fee = r.fee_per_year.map((f): Figure | null =>
     numbers && f?.amount != null && f.currency === "INR"
-      ? { inr: f.amount_max ?? f.amount, kind: f.maximum ? "maximum" : "declared", src: at(f.src), ...(f.amount_max != null && f.amount_max !== f.amount && { min: f.amount }), ...(f.kind === "amount_at_admission" && { atAdmission: true as const }) }
+      ? {
+          inr: f.amount_max ?? f.amount,
+          kind: f.maximum ? "maximum" : "declared",
+          src: at(f.src),
+          ...(f.amount_max != null && f.amount_max !== f.amount && { min: f.amount }),
+          ...(f.kind === "amount_at_admission" && { atAdmission: true as const }),
+          ...(f.above_nbems_ceiling && { above: true as const }),
+          ...(f.note && { note: f.note, noteSrc: f.gst_src != null ? at(f.gst_src) : at(f.src) }),
+          ...(f.declared_amount != null && f.declared_amount !== (f.amount_max ?? f.amount) && { declared: f.declared_amount }),
+        }
       : null,
   );
-  const stipend = r.stipend_per_month.map((s): Figure | null => s && { inr: s.inr, kind: s.minimum ? "minimum" : s.kind === "nmc_list" ? "nmc" : "declared", src: at(s.src) });
+  const stipend = r.stipend_per_month.map((s, i): Figure | null => {
+    if (!s) return null;
+    const nb = s.below_nbems_minimum ? r.stipend_nbems_minimum?.[i] : undefined;
+    return {
+      inr: s.inr, kind: s.minimum ? "minimum" : s.kind === "nmc_list" ? "nmc" : "declared", src: at(s.src),
+      ...(s.below_nbems_minimum && { below: true as const }), ...(nb && { nbems: { inr: nb.inr, src: at(nb.src) } }), ...(s.plus_da && { plusDa: true as const }),
+    };
+  });
   const w = numbers ? r.fee_whole_course : null;
   const cf = r.counselling_forfeit;
   const forfeit = cf?.forfeited_if_resign_or_not_join_from_round2?.inr;
+  const forfeitWords = cf?.forfeited_if_resign_or_not_join_from_round2?.text;
   return {
     verbatim: !numbers,
     fee,
     stipend,
     whole: w && w.currency === "INR" && w.amount_max == null ? w.amount : null,
     forfeit: cf && forfeit != null ? ({ inr: forfeit, kind: "declared", src: at(cf.src) } satisfies Figure) : null,
+    /** The profile's forfeit in words only (no ₹ figure), verbatim. */
+    forfeitText: cf && forfeit == null && forfeitWords ? { text: forfeitWords, src: at(cf.src) } : null,
   };
 }
 
@@ -453,7 +491,7 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
    * as the record names it (a state order or NBEMS rule: its title and date).
    */
   const docOf = (t: Term) => (url: string | null, label?: string) => {
-    const named = [t.details && "status" in t.details ? t.details.source : undefined].flat().find((x) => x && x.url === (url ?? t.source.url));
+    const named = (t.details && "status" in t.details ? [t.details.source, t.details.state_rule?.source] : []).flat().find((x) => x && x.url === (url ?? t.source.url));
     const name = label ?? (named ? (named.date && !named.title.includes(named.date) ? `${named.title} (${named.date})` : named.title) : null);
     return srcOf(url == null || url === t.source.url ? t : { kind: t.kind, source: { name: termSourceName(url), url, type: "OFFICIAL" } }, null, name);
   };
@@ -469,12 +507,18 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
   const recs = recordsOf(programme, feeT, stT);
   const read = recs ? fromRecords(recordFor(recs, quota), (s) => add({ label: s.label, url: s.url, year: typeof s.year === "number" ? s.year : null, mccId: s.mcc_id ?? null, sharedBy: 1, type: "OFFICIAL" })) : null;
   // A fee in the profile's own words only (verbatim): no figure; the quota's record's words as published ("see terms"),
-  // read from its MCC profile page; none in words: said so.
-  if (read?.verbatim && feeT) {
+  // read from its MCC profile page; none in words: said so (the export may then have no FEE term, only the STIPEND one).
+  let notesSrc: number | undefined;
+  const recT = feeT ?? stT;
+  if (read?.verbatim && recT) {
     const r = recordFor(recs!, quota)!;
     const url = r.fee_text_src?.url;
-    if (r.fee_text) unread.push({ kind: "FEE", text: r.fee_text, src: url ? srcOf({ kind: "FEE", source: { name: termSourceName(url), url, type: "OFFICIAL" } }, null) : srcOf(feeT, null) });
-    else notes.push("The MCC profile gives no fee in words for these seats, so Seatora shows no fee.");
+    const at = url ? srcOf({ kind: "FEE", source: { name: termSourceName(url), url, type: "OFFICIAL" } }, null) : srcOf({ kind: "FEE", source: recT.source }, null);
+    if (r.fee_text) unread.push({ kind: "FEE", text: r.fee_text, src: at });
+    else {
+      notes.push("The MCC profile gives no fee in words for these seats, so Seatora shows no fee.");
+      notesSrc = at;
+    }
   }
 
   const fee = !recs && feeT ? parseFee(feeT.text) : null;
@@ -509,10 +553,13 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     const at = (parts: (TermPart & { url: string | null })[]) => parts.map(({ url, ...x }) => ({ ...x, src: src(url) }));
     bond = { ...bond, leaving: at(p.leaving), leavingAmount: amountOf(p.leaving, null), otherPenalties: at(p.other) };
     const f = p.forfeit.find((x) => x.inr != null);
+    const w = p.forfeit[0];
     if (f) resignForfeit = { inr: f.inr!, kind: "declared", src: src(f.url) };
-    else if (p.forfeit[0]) resignForfeitText = { text: p.forfeit[0].text, src: src(p.forfeit[0].url) };
+    // An item with neither figure nor quote says only who and when: the profile's own words say what is forfeited.
+    else if (w) resignForfeitText = p.bare && read?.forfeitText ? { text: `${w.text}: "${read.forfeitText.text}"`, src: read.forfeitText.src } : { text: w.text, src: src(w.url) };
   } else if (penT) unread.push({ kind: "PENALTY", text: penT.text, src: srcOf(penT, null) });
   resignForfeit ??= read?.forfeit ?? null;
+  if (!resignForfeit && !resignForfeitText && read?.forfeitText) resignForfeitText = read.forfeitText;
 
   return {
     programme,
@@ -526,6 +573,7 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     resignForfeitText,
     unread,
     notes,
+    ...(notesSrc != null && { notesSrc }),
     sources,
   };
 }
@@ -580,7 +628,31 @@ export function courseTerms(cat: Catalog, college: string, degree: string, speci
     t = k ? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy, quota) : (collegeTerms(cat, college).find((x) => x.programme === p) ?? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy));
     if (k) m.byQuota.set(k, t);
   }
-  const d = specialty && t.bond.status === "declared" ? m.terms.get(college)?.find((x) => x.program === programmes[p].bucket && x.kind === "BOND")?.details : undefined;
+  const d = specialty && t.bond.status === "declared" && !t.bond.amounts.some((x) => x.rule) ? m.terms.get(college)?.find((x) => x.program === programmes[p].bucket && x.kind === "BOND")?.details : undefined;
   const own = d && "status" in d ? d.by_subject?.[specialty!] : undefined;
-  return own == null ? t : { ...t, bond: { ...t.bond, amount: { ...t.bond.amount, state: "figure", min: own, max: own, perYear: null, varies: false } } };
+  if (own != null) return { ...t, bond: { ...t.bond, amount: { ...t.bond.amount, state: "figure", min: own, max: own, perYear: null, varies: false } } };
+  // Rows priced by subject group ("PG degree, clinical subjects" / "pre/para-clinical subjects"): this course's group's.
+  const g = specialty ? subjectGroup(specialty) : null;
+  if (!g) return t;
+  const b = t.bond;
+  const amount = b.status === "declared" && b.amount.state === "figure" ? ofGroup(b.amounts, g) : null;
+  const leaving = b.leavingAmount.state === "figure" ? ofGroup(b.leaving, g) : null;
+  if (!amount && !leaving) return t;
+  return { ...t, bond: { ...b, ...(amount && { amount: amountOf(amount, b.years) }), ...(leaving && { leavingAmount: amountOf(leaving, null) }) } };
+}
+
+// Subjects every state counts the same way (Gujarat's pre/para-clinical list leaves out Pathology and Microbiology,
+// so those two, and any other, keep the range).
+const PRE_PARA_SUBJECTS = new Set(["ANATOMY", "PHYSIOLOGY", "BIOCHEMISTRY", "PHARMACOLOGY", "FORENSICMEDICINE", "COMMUNITYMEDICINE"]);
+const CLINICAL_SUBJECTS = new Set([
+  "ANAESTHESIOLOGY", "DERMATOLOGY", "EMERGENCYMEDICINE", "ENT", "FAMILYMEDICINE", "GENERALMEDICINE", "GENERALSURGERY", "GERIATRICMEDICINE", "OBG",
+  "OPHTHALMOLOGY", "ORTHOPAEDICS", "PAEDIATRICS", "PSYCHIATRY", "RADIODIAGNOSIS", "RADIATIONONCOLOGY", "RESPIRATORYMEDICINE",
+]);
+const subjectGroup = (s: string) => (PRE_PARA_SUBJECTS.has(s) ? "prePara" : CLINICAL_SUBJECTS.has(s) ? "clinical" : null);
+const PRE_PARA = /\b(?:pre|para)(?:\b|clinical)/i;
+/** The parts for a subject group, when the record prices both groups apart (else null: one figure or range for all). */
+function ofGroup<T extends { text: string }>(parts: T[], g: "prePara" | "clinical"): T[] | null {
+  const pp = parts.filter((x) => /clinical/i.test(x.text) && PRE_PARA.test(x.text));
+  const cl = parts.filter((x) => /\bclinical\b/i.test(x.text) && !PRE_PARA.test(x.text));
+  return pp.length && cl.length ? parts.filter((x) => !(g === "prePara" ? cl : pp).includes(x)) : null;
 }

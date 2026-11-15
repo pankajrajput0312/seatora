@@ -2,23 +2,25 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
+import { toolbarRow } from "@/features/decide/components/csv-link";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { PageHead, Provisional } from "@/features/decide/components/bits";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { cardMeta, subLink, termCol, withRowInfo, youMarks } from "@/features/decide/components/ranks/rank-cards";
 import { ResultCard } from "@/features/decide/components/result-card";
-import { TermStatCells } from "@/features/decide/components/stat-cells";
+import { StatHead, TermStatCells } from "@/features/decide/components/stat-cells";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankValue } from "@/features/decide/lib/params";
-import { readTermFilters, splitByTerms, termChips, termMoreOpen } from "@/features/decide/lib/term-filters";
+import { readTermFilters, splitByTerms, termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankScan } from "@/features/decide/service";
-import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
+import { statKeys } from "@/features/decide/lib/stat-format";
 import { roundLabel, rounds } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Rank scan" };
@@ -37,10 +39,11 @@ const schema = z.object({
 
 export default async function RankScanPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
+  const view = await chosenView(params, VIEW);
   const profile = profileFromParams(params);
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
-  const tp = readTermFilters(params);
+  const tp = readTermFilters(params, profile);
   const meta = await getMeta();
   const typed = params.get("scan")?.trim() || null;
   const invalid = typed != null && f.scan == null;
@@ -59,7 +62,12 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const groups = rounds.map((rd) => ({ round: rd, rows: rows.filter((a) => a.round === rd) })).filter((g) => g.rows.length);
   const courseOf = new Map(meta.courses.map((c) => [`${c.degree}|${c.specialty}`, c]));
   const provisional = (rd: string) => meta.sources.some((s) => s.year === year?.year && s.round === rd && s.provisional);
-  const chips = termChips(tp.params).map((c) => ({ label: c.label, href: L.with("/decide/rank-scan", { [c.key]: null, page: null }) }));
+  const chips = [
+    // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
+    ...(profile?.maxFeeLakh != null && tp.params.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: L.with("/decide/rank-scan", { maxfee: "any", page: null }) }] : []),
+    ...(profile?.maxBondYears != null && tp.params.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: L.with("/decide/rank-scan", { bondyrs: "any", page: null }) }] : []),
+    ...termChips(tp.params).map((c) => ({ label: c.label, href: L.with("/decide/rank-scan", { [c.key]: null, page: null }) })),
+  ];
   const clear = L.with("/decide/rank-scan", { ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
   const course = (a: Row) => courseOf.get(`${a.degree}|${a.specialty}`);
   const courseName = (a: Row) => `${a.degree} ${course(a)?.name ?? a.specialty}`;
@@ -79,7 +87,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         <Field label="Year"><Select name="year" value={year ? String(year.year) : undefined} options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
         <Field label="Range"><Select name="w" value={f.w} options={windows.map((w) => ({ value: w, label: `± ${formatRank(Number(w))}` }))} /></Field>
         <Field label="Round" className="more-filter"><Select name="round" value={round} all="All rounds" options={(year?.rounds ?? []).map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
-        <TermFilterControls f={tp.params} />
+        <TermFilterControls f={tp.params} caps={profile} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
 
@@ -89,7 +97,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         <EmptyState title="Enter a rank to scan" description="Type an All India Rank above, or set your rank, to see the allotments made to ranks around it." />
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className={toolbarRow}>
             {/* The results' sources here, before the panes: the MCC result is numbered first (the term (i)s come after). */}
             <div className="grid gap-0.5">
               <p id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
@@ -121,6 +129,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                 </h2>
                 <ViewPanes
                   page={VIEW}
+                  view={view}
                   cards={
                     <div role="region" aria-label={label}>
                       <ul role="list" className="grid gap-3 lg:grid-cols-2">
@@ -128,7 +137,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                           ...(you.has(a) ? [<li key="you" className="rounded-md bg-sky/10 px-4 py-1.5 text-xs font-semibold text-sky lg:col-span-2">{youText}</li>] : []),
                           <li key={i} className="grid min-w-0">
                             <ResultCard
-                              chips={[a.quota, <span key="c"><span className="sr-only">Seat category: </span>{a.category}</span>, a.remark]}
+                              chips={[a.quota, `${a.category} seat`, a.remark]}
                               stat={{
                                 label: "Rank",
                                 value: <Link href={journey(a)} title={`This rank's seat in every ${year.year} round`} className="numeric inline-flex min-h-11 items-center hover:text-sky hover:underline">{formatRank(a.rank)}</Link>,
@@ -154,7 +163,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                             <th scope="col" className={`${tbl.th} text-right`}>Rank</th>
                             <th scope="col" className={tbl.th}>Seat category</th>
                             <th scope="col" className={tbl.th}>Institute and course</th>
-                            {statKeys.map((k) => <th key={k} scope="col" className={termCol.th(k)}>{statLabel[k]}</th>)}
+                            {statKeys.map((k) => <th key={k} scope="col" className={`${termCol.th(k)} whitespace-nowrap`}><StatHead k={k} /></th>)}
                           </tr>
                         </thead>
                         <tbody>
@@ -171,7 +180,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                                   <span>{a.quota}{a.remark && ` · ${a.remark}`}</span>
                                 </span>
                               </td>
-                              <TermStatCells t={a.fees} variant="table" of={of(a)} tdClassName={termCol.td} />
+                              <TermStatCells t={a.fees} variant="compact" of={of(a)} tdClassName={termCol.td} />
                             </tr>,
                           ])}
                         </tbody>

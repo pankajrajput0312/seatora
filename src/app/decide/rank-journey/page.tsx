@@ -5,6 +5,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { PrevSeatCell } from "@/features/decide/components/allotments/allotment-cells";
 import { statusLabel } from "@/features/decide/components/allotments/allotments-view";
 import { AppPage } from "@/features/decide/components/app-page";
+import { toolbarRow } from "@/features/decide/components/csv-link";
 import { Dash, PageHead, Provisional } from "@/features/decide/components/bits";
 import { DataSource } from "@/features/decide/components/data-source";
 import { InfoTip } from "@/features/decide/components/info-tip";
@@ -14,6 +15,7 @@ import { TermStatCells } from "@/features/decide/components/stat-cells";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { control, EmptyState, Field, FilterBar, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams, rankValue } from "@/features/decide/lib/params";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
@@ -50,8 +52,6 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
   const key = (a: Row) => `${a.round}|${a.college}|${a.degree}|${a.specialty}|${a.quota}`;
   const courseLink = (a: Row) => L.allotments({ course: courseOf.get(`${a.degree}|${a.specialty}`)?.slug, inst: a.collegeSlug || undefined, year: year!.year, round: a.round });
   const of = (a: Row) => `${a.collegeName}, ${a.courseName}, ${roundLabel[a.round]}`;
-  // The seat's category, named for screen readers: the card also shows the candidate's own ("Candidate: General").
-  const seatCat = (a: Row) => <span key="c"><span className="sr-only">Seat category: </span>{a.category}</span>;
 
   return (
     <AppPage className="grid grid-cols-1 gap-6">
@@ -85,24 +85,34 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className={toolbarRow}>
             <div className="grid gap-0.5">
-              <p aria-live="polite" className="text-sm text-muted-foreground">
-                Seat in <span className="numeric font-semibold text-foreground">{rows.length}</span> of {year.rounds.length} rounds{" "}
-                <Link href={L.rankScan(rank, year.year)} className={`${smallLink} ml-2 text-sky`}>Scan nearby</Link>
-              </p>
+              {/* The (i) beside the count, outside the live region (opening it is not news). */}
+              <div className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+                <p aria-live="polite">
+                  Seat in <span className="numeric font-semibold text-foreground">{rows.length}</span> of {year.rounds.length} rounds
+                  {none.length > 0 && <>; none in {none.map((r) => roundLabel[r]).join(", ")}</>}
+                </p>
+                <InfoTip label="rounds without a seat">
+                  In R2 and later the results list only new or upgraded seats, so a round without a row may mean a seat from an
+                  earlier round was kept. Seat category is the seat&apos;s, candidate category the candidate&apos;s own; choice no.
+                  and the previous seat (the seat held one round back, with the remark printed beside it) are printed in R2 and R3 results only.
+                </InfoTip>
+                <Link href={L.rankScan(rank, year.year)} className={`${smallLink} text-sky sm:ml-2`}>Scan nearby</Link>
+              </div>
               {source}
             </div>
             <ViewToggle page={VIEW} />
           </div>
           <ViewPanes
             page={VIEW}
+            view={await chosenView(params, VIEW)}
             cards={
               <ResultCards title={`Rank ${formatRank(rank)}: its seat in each ${year.year} round`} hideTitle>
                 {rows.map((a) => (
                   <ResultCard
                     key={key(a)}
-                    chips={[<span key="r" className="inline-flex items-center gap-1"><span className="numeric">{year.year}</span> · {roundLabel[a.round]}<Provisional when={provisional(a.round)} /></span>, a.quota, seatCat(a), statusLabel[a.status] ?? a.status]}
+                    chips={[<span key="r" className="inline-flex items-center gap-1"><span className="numeric">{year.year}</span> · {roundLabel[a.round]}<Provisional when={provisional(a.round)} /></span>, a.quota, `${a.category} seat`, statusLabel[a.status] ?? a.status]}
                     stat={{ label: "Choice no.", value: a.optionNo != null ? <span className="numeric">{formatRank(a.optionNo)}</span> : <Dash /> }}
                     title={a.collegeName}
                     href={a.collegeSlug ? L.institute(a.collegeSlug) : undefined}
@@ -170,14 +180,6 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
               </div>
             }
           />
-          <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
-            {none.length > 0 && <span>No allotment to this rank in the {none.map((r) => roundLabel[r]).join(", ")} result{none.length > 1 ? "s" : ""}.</span>}
-            <InfoTip label="rounds without a seat">
-              In R2 and later the results list only new or upgraded seats, so a round without a row may mean a seat from an
-              earlier round was kept. Seat category is the seat&apos;s, candidate category the candidate&apos;s own; choice no.
-              and the previous seat (the seat held one round back, with the remark printed beside it) are printed in R2 and R3 results only.
-            </InfoTip>
-          </p>
         </>
       )}
     </AppPage>

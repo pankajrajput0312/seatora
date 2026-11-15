@@ -2,25 +2,10 @@ import { Badge } from "@/components/ui/badge";
 import type { MccClinicalFacts } from "@/features/cutoffs/lib/import-schema";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { fmtDay } from "../../lib/format";
-import { collegeTypeLabel, inferred, typeNote, type CollegeType } from "./college-type";
 
 // Bundle schema 2 college bits the institute page (server) and the Seats matrix (client) both render, so client-safe:
-// the college type badge (college-type.ts) and a clinical value's source line (ClinicalFacts values_meta: every value
-// self-reported by the institution).
-
-/** "Private", with how it was inferred as its tooltip (and for screen readers). `note`: also say so in visible text. */
-export function TypeBadge({ type, note }: { type: CollegeType; note?: boolean }) {
-  const why = typeNote(type);
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
-      <Badge title={why}>
-        {collegeTypeLabel[type.value]}
-        <span className="sr-only">: {why}</span>
-      </Badge>
-      {note && <span aria-hidden className="text-xs text-muted-foreground">{inferred(type) ? "inferred from name and quota" : "from Seatora's research"}</span>}
-    </span>
-  );
-}
+// a clinical value's source line (ClinicalFacts values_meta: every value self-reported by the institution). The college
+// type badge is components/type-badge.tsx.
 
 /** One clinical value's provenance: source kind and URL, the period as printed, when Seatora checked it, flags. */
 export type ValueMeta = NonNullable<MccClinicalFacts["values_meta"]>[string];

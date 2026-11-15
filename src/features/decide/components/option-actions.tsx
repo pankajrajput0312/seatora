@@ -137,7 +137,7 @@ function OptionCard({ r, L, n, latestYear, pastYears, includeLatest, seatLists, 
         }}
         title={r.college.name}
         href={L.institute(r.college.slug)}
-        external={mcc ? { href: mcc, label: `${r.college.name} on MCC` } : undefined}
+        external={mcc ? { href: mcc, label: `MCC profile: ${r.college.name}` } : undefined}
         subtitle={courseName(r)}
         meta={[r.college.state ?? "State not listed", r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />, r.hospital?.beds && <Beds b={r.hospital.beds} inst={r.college.name} unit />]}
         footer={
@@ -202,7 +202,7 @@ function OptionsList({ rows, caption, start, L, latestYear, pastYears, includeLa
         <thead className={tbl.head}>
           {/* Fee…Leaving sit right after Reach (tight px-2 cells), so they are in view from 1280px wide; the seat lists and closings follow. */}
           <tr className="text-left text-xs font-semibold text-muted-foreground">
-            <th scope="col" className={cn(stick, "w-12 px-2 py-3")}><span className="sr-only">Add to choices</span></th>
+            <th scope="col" className={cn(stick, "w-12 px-2 py-3 print:hidden")}><span className="sr-only">Add to choices</span></th>
             <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course</th>
             <th scope="col" className="px-3 py-3">Reach</th>
             {statKeys.map((k) => <th key={k} scope="col" data-col={k} className="px-2 py-3 text-right">{statLabel[k]}</th>)}
@@ -210,14 +210,15 @@ function OptionsList({ rows, caption, start, L, latestYear, pastYears, includeLa
             <th scope="col" className="px-3 py-3 text-right">{latestYear} R1 closing</th>
             <th scope="col" className="px-3 py-3 text-right">{last} deepest</th>
             <th scope="col" className="hidden px-3 py-3 text-right xl:table-cell">{older} deepest</th>
-            <th scope="col" className="px-3 py-3">Details</th>
-            <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Compare</span></th>
+            {/* Controls, not data: not on paper. */}
+            <th scope="col" className="px-3 py-3 print:hidden">Details</th>
+            <th scope="col" className="w-12 px-2 py-3 print:hidden"><span className="sr-only">Compare</span></th>
           </tr>
         </thead>
         <tbody>
           {rows.flatMap((r, i) => [
             <tr key={r.id} data-item={start + i + 1} tabIndex={-1} className="border-t border-border align-top hover:bg-muted/40">
-              <td className={cn(stick, "px-2 py-2")}><ChoiceStar item={toChoiceItem(r)} /></td>
+              <td className={cn(stick, "px-2 py-2 print:hidden")}><ChoiceStar item={toChoiceItem(r)} /></td>
               {/* Row header: only what names the option, so it reads short for every cell. */}
               <th scope="row" className={cn(stickName, "px-3 py-3 text-left font-normal")}>
                 <Link href={L.institute(r.college.slug)} className="font-semibold hover:text-sky hover:underline">{r.college.name}</Link>
@@ -230,7 +231,7 @@ function OptionsList({ rows, caption, start, L, latestYear, pastYears, includeLa
               <td className="px-3 py-3 text-right"><ClosingCell d={r.latest} /></td>
               <td className="px-3 py-3 text-right"><ClosingCell d={r.byYear[last]} /></td>
               <td className="hidden px-3 py-3 text-right xl:table-cell"><ClosingCell d={r.byYear[older]} /></td>
-              <td className="px-3 py-1 text-xs">
+              <td className="px-3 py-1 text-xs print:hidden">
                 <span className="flex min-w-[10rem] flex-wrap items-center gap-x-4">
                   {/* Opens the grid in the full-width row below, so this row stays narrow. */}
                   <details open={open.has(r.id)} onToggle={(e) => toggle(r.id, e.currentTarget.open)}>
@@ -239,7 +240,7 @@ function OptionsList({ rows, caption, start, L, latestYear, pastYears, includeLa
                   <Related r={r} L={L} />
                 </span>
               </td>
-              <td className="px-2 py-2"><CompareToggle id={r.id} label={rowLabel(r)} /></td>
+              <td className="px-2 py-2 print:hidden"><CompareToggle id={r.id} label={rowLabel(r)} /></td>
             </tr>,
             open.has(r.id) && (
               <tr key={`${r.id}-rounds`} className="bg-muted/30">
@@ -263,7 +264,7 @@ function OptionsList({ rows, caption, start, L, latestYear, pastYears, includeLa
 /**
  * One server-rendered page of options; "Show more" appends the next page from /api/v1/options (`query` = the same
  * profile and filters) and moves focus to the first new row. The page never holds more rows than she asked to see.
- * `tools`: page links beside the count and the Cards | Table toggle (the CSV download). `historyMore`: what the closing
+ * `tools`: after the Cards | Table toggle beside the count (the CSV download). `historyMore`: what the closing
  * ranks count, behind the history note's (i).
  */
 export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, tools, historyMore, latestYear, pastYears, includeLatest, seatLists }: {
@@ -303,7 +304,8 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      {/* csv-link.tsx toolbarRow (that module is server-only): the tools under the count on a phone. */}
+      <div className="grid justify-items-start gap-2 md:flex md:flex-wrap md:items-center md:justify-between md:gap-x-4">
         <div className="grid">
           <p id="options-count" aria-live="polite" className="text-sm text-muted-foreground">
             Showing <span className="numeric font-semibold text-foreground">{formatRank(start + 1)}–{formatRank(shown)}</span> of <span className="numeric">{formatRank(total)}</span> options
@@ -312,8 +314,8 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
           <HistoryNote more={historyMore} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {tools}
           <ViewToggle page="options" />
+          {tools}
         </div>
       </div>
       <OptionsList rows={rows} caption={caption} start={start} L={L} latestYear={latestYear} pastYears={pastYears} includeLatest={includeLatest} seatLists={seatLists} />

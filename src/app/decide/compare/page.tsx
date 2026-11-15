@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Fragment } from "react";
 import Link from "next/link";
 import { z } from "zod";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -10,7 +9,7 @@ import { Dash, HistoryNote, PageHead, ReachBadge } from "@/features/decide/compo
 import { CompareFromDevice, RemoveFromCompare } from "@/features/decide/components/compare-controls";
 import { ClosingCell, courseName, RoundGrid } from "@/features/decide/components/options-view";
 import { Beds } from "@/features/decide/components/pages/beds";
-import { TermStatCells } from "@/features/decide/components/stat-cells";
+import { StatCellView } from "@/features/decide/components/stat-cells";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { EmptyState, smallLink, tbl } from "@/features/decide/components/ui";
 import { MAX_COMPARE } from "@/features/decide/lib/choices";
@@ -18,7 +17,7 @@ import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
+import { statCells, statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { currentOptionIds, getMeta, getOptionsByIds, LATEST_YEAR, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
 
 export const metadata: Metadata = { title: "Compare" };
@@ -38,13 +37,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const L = decideLinks(params);
   const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
   const [older, last] = PAST_YEARS;
-  // Each option's stat cells (one <td> per stat key, statKeys order), each placed in its key's row; left-aligned like
-  // the column's other rows (`!`: the cell says text-right). ponytail: called as a function to split its <td>s across
-  // rows; a one-cell export from stat-cells.tsx would replace it.
-  const terms = new Map(options.map((r) => [r.id, TermStatCells({ t: r.fees, variant: "table", of: `${r.college.name}, ${courseName(r)}, ${r.quota}`, tdClassName: "p-3! text-left!" }) as React.ReactElement[]]));
-
-  // `td`: a row whose cells come whole (the stat cells), else `cell`, the content of a plain cell.
-  const rows: { label: string; cell?: (r: OptionRow) => React.ReactNode; td?: (r: OptionRow) => React.ReactElement }[] = [
+  // Each option's stat cells (statKeys order), one per row.
+  const terms = new Map(options.map((r) => [r.id, statCells(r.fees)]));
+  const rows: { label: string; cell: (r: OptionRow) => React.ReactNode }[] = [
     { label: "Quota", cell: (r) => r.quota },
     { label: "State", cell: (r) => r.college.state ?? <Dash /> },
     { label: "Type", cell: (r) => (r.hospital?.type ? <TypeBadge type={r.hospital.type} of={r.college.name} /> : <Dash />) },
@@ -58,7 +53,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           <Link href={L.with("/decide/compare", { editProfile: "1" })} className={`${smallLink} text-sky`}>Set your rank to see</Link>
         ),
     },
-    ...statKeys.map((k, i) => ({ label: statLabel[k], td: (r: OptionRow) => terms.get(r.id)![i] })),
+    ...statKeys.map((k, i) => ({ label: statLabel[k], cell: (r: OptionRow) => <StatCellView c={terms.get(r.id)![i]} t={r.fees} of={`${r.college.name}, ${courseName(r)}, ${r.quota}`} /> })),
     { label: `${LATEST_YEAR} R1 closing`, cell: (r) => <ClosingCell d={r.latest} /> },
     { label: `${last} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[last]} /> },
     { label: `${older} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[older]} /> },
@@ -101,7 +96,8 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         />
       ) : (
         <div role="region" aria-label="Comparison" tabIndex={0} className={`relative mt-8 rounded-xl border border-border bg-card [scroll-padding-inline-start:11rem] ${tbl.scroll}`}>
-          <table className="w-full text-sm">
+          {/* Fixed columns, 12rem at least: four options fit beside the labels from 1280px (a wide grid scrolls in its cell). */}
+          <table className="w-full table-fixed text-sm" style={{ minWidth: `${11 + options.length * 12}rem` }}>
             <caption className="sr-only">Comparison of {options.length} {options.length === 1 ? "option" : "options"}</caption>
             <thead className={tbl.head}>
               <tr className="align-top">
@@ -124,7 +120,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
               {rows.map((s) => (
                 <tr key={s.label} className="border-b border-border align-top last:border-0">
                   <th scope="row" className="sticky left-0 z-[1] bg-card p-3 text-left text-xs font-normal text-muted-foreground">{s.label}</th>
-                  {options.map((r) => (s.td ? <Fragment key={r.id}>{s.td(r)}</Fragment> : <td key={r.id} className="numeric p-3">{s.cell?.(r)}</td>))}
+                  {options.map((r) => <td key={r.id} className="numeric p-3">{s.cell(r)}</td>)}
                 </tr>
               ))}
             </tbody>

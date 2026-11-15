@@ -12,8 +12,9 @@ import type { ProgrammeTerms } from "../server/terms";
 // Unknown values (not declared, in words only, a bond whose status is unknown, years not stated) never pass a filter
 // silently: a row whose filtered value is unknown is left out (and counted: `unknownTerms` on the lists) unless the
 // "Include not declared" box is ticked (nd=keep). "No bond" (bondyrs=0) only ever lists a record that says no bond (one
-// adding that a state law's service may apply counts as unknown), and a type filter never lists a college with no type
-// in the data, ticked or not.
+// adding that a state law's service may apply is unknown, as its cells say: listed with nd=keep), and a type filter
+// never lists a college with no type in the data, ticked or not. An NBEMS maximum fee or minimum stipend is not the
+// college's figure: inside the cap it passes, outside it the figure is unknown (as a "+ DA" basic stipend under a floor).
 
 export type TypeValue = CollegeType["value"];
 export const typeValues = Object.keys(collegeTypeLabel) as [TypeValue, ...TypeValue[]];
@@ -93,7 +94,7 @@ export const feeValue = {
   /** 0 = no bond on record, null = not declared or not stated (or "no bond" where a state law's service may still apply). */
   bondyrs: (t: ProgrammeTerms) => t.bond.years,
   /** 0 = no bond on record (as bondyrs). */
-  bond: (t: ProgrammeTerms) => (t.bond.status === "none" ? (t.bond.years === 0 ? 0 : null) : t.bond.status === "declared" ? t.bond.amount.max : null),
+  bond: (t: ProgrammeTerms) => (t.bond.status === "none" ? 0 : t.bond.status === "declared" ? t.bond.amount.max : null),
   leave: (t: ProgrammeTerms) => t.bond.leavingAmount.max,
 };
 
@@ -102,13 +103,18 @@ export type TermVerdict = "pass" | "fail" | "unknown";
 
 export function termVerdict(t: ProgrammeTerms, type: TypeValue | null | undefined, f: TermFilters): TermVerdict {
   if (f.types?.length && (type == null || !f.types.includes(type))) return "fail";
-  // "No bond": a record saying so. One that adds a state law's service may apply (years unknown) is unknown, not a fail.
-  if (f.maxBondYears === 0 && t.bond.years !== 0 && t.bond.status !== "none") return "fail";
+  // "No bond": a record saying so. One that adds a state law's service may apply (`caveat`, years unknown) is unknown, not a fail.
+  if (f.maxBondYears === 0 && t.bond.years !== 0 && t.bond.status !== "none" && !t.bond.caveat) return "fail";
+  const fee = t.years[0]?.fee;
   const s = t.years[0]?.stipend;
-  // A stipend range (by subject): its lowest figure meets a floor; a fee range's highest a cap (feeValue).
+  // A stipend range (by subject): its lowest figure meets a floor; a fee range's highest a cap (feeValue). An NBEMS
+  // maximum over the cap, or minimum under the floor, says nothing of the college's own figure: unknown. So too a basic
+  // stipend "+ DA" under the floor, and a fee whose GST Seatora took off (`declared`) when the cap lies between the two.
+  const feeUnsure = f.maxFee != null && !!fee && ((fee.kind === "maximum" && fee.inr > f.maxFee) || (fee.declared != null && fee.inr <= f.maxFee && f.maxFee < fee.declared));
+  const stipUnsure = f.minStipend != null && !!s && (s.kind === "minimum" || !!s.plusDa) && s.inr < f.minStipend;
   const checks: [number | null | undefined, number | null, (v: number, cap: number) => boolean][] = [
-    [f.maxFee, feeValue.fee1(t), (v, cap) => v <= cap],
-    [f.minStipend, s ? (s.min ?? s.inr) : null, (v, cap) => v >= cap],
+    [f.maxFee, feeUnsure ? null : feeValue.fee1(t), (v, cap) => v <= cap],
+    [f.minStipend, !s || stipUnsure ? null : (s.min ?? s.inr), (v, cap) => v >= cap],
     [f.maxBondYears, feeValue.bondyrs(t), (v, cap) => v <= cap],
     [f.maxBondInr, feeValue.bond(t), (v, cap) => v <= cap],
     [f.maxLeavingInr, feeValue.leave(t), (v, cap) => v <= cap],

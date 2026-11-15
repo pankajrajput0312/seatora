@@ -144,6 +144,27 @@ test("options, the round view by default: her options with 2026 R2 seats, new on
 });
 const formatN = (n: number) => n.toLocaleString("en-IN");
 
+test("Cards | Table writes `layout`, keeps the page's own `view`, and the choice survives a reload", async ({ page }) => {
+  // Options' view=all and Seats' view=list are their own list views: the toggle must never overwrite them.
+  for (const [path, view] of [[`/decide/options?${PROFILE}&view=all`, "all"], [`/decide/seats?${PROFILE}&view=list`, "list"]]) {
+    await page.goto(path);
+    const toggle = page.getByRole("group", { name: "View as" });
+    for (const v of ["Cards", "Table"]) {
+      await toggle.getByRole("button", { name: v, exact: true }).click(); // a button once hydrated (a link before)
+      await expect(toggle.getByRole("button", { name: v, exact: true }), path).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(() => new URL(page.url()).searchParams.get("layout"), path).toBe(v.toLowerCase());
+      expect(new URL(page.url()).searchParams.get("view"), path).toBe(view);
+    }
+    await page.reload();
+    expect(new URL(page.url()).searchParams.get("view"), path).toBe(view);
+    await expect(page.locator('[data-view-pane="table"]').first(), path).toBeVisible();
+    await expect(page.locator('[data-view-pane="cards"]').first(), path).toBeHidden();
+  }
+  await expect(page.getByRole("link", { name: "One list" })).toHaveAttribute("aria-current", "true");
+  await page.goto(`/decide/options?${PROFILE}&view=all&layout=cards`);
+  await expect(page.locator("#options-count")).toContainText("of 641 options");
+});
+
 test("options, the view of every option with past allotments: her 641 options in the open quotas (25 at a time), Show more focuses the first new row, two ticked states both apply", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto(`/decide/options?${PROFILE}&view=all`);
@@ -258,7 +279,8 @@ test("saved ids under a retired college key move to the key the college has now,
     localStorage.setItem("medpath.compare", JSON.stringify([oldId]));
   }, oldId);
   await page.reload();
-  await expect(page.getByRole("status").filter({ hasText: "1 saved option was renamed after MCC's college names were cleaned up." })).toBeVisible();
+  // (The first /api/v1/retired-keys of a fresh server reads the database cold: allow it time.)
+  await expect(page.getByRole("status").filter({ hasText: "1 saved option was renamed after MCC's college names were cleaned up." })).toBeVisible({ timeout: 15_000 });
   const stored = await page.evaluate(() => [JSON.parse(localStorage.getItem("medpath.choices")!), JSON.parse(localStorage.getItem("medpath.compare")!)]);
   expect([stored[0].lists[0].items[0].id, stored[0].lists[0].typedIds, stored[1]]).toEqual([newId, [newId], [newId]]);
   expect(stored[0].lists[0].items[0].slug).toBe(await slugOf("AMRIHOSPITALSWESTBENGALAMRIHOSPITALSMUKU#700099"));
@@ -337,19 +359,21 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
 test("rank journey: 2023 rank 23 in R1 at LTMMC, upgraded in R2 to Seth GS on choice 1; Allotments' new columns, CSV and links", async ({ page }) => {
   await page.goto(`/decide/rank-journey?${PROFILE}`);
   await expect(page.getByLabel("All India Rank")).toHaveValue("42284"); // her rank, the newest year
-  await expect(page.getByLabel("Year")).toHaveValue("2026");
+  await expect(page.locator('select[name="year"]')).toHaveValue("2026"); // (getByLabel("Year") would also find a "… per year" filter)
 
   await page.goto(`/decide/rank-journey?${PROFILE}&air=23&year=2023&layout=table`); // phones open on cards
   const journey = page.getByRole("region", { name: "Rank 23, 2023" });
   await expect(journey.getByRole("row", { name: /^2023 R1/ })).toContainText("Allotted");
   const r2 = journey.getByRole("row", { name: /^2023 R2/ });
   for (const v of ["Seth Gordhandas Sunderdas Medical College", "Upgraded", "General", "LOKMANYA TILAK MEDICAL COLLEGE MUMBAI", "MD General Medicine · All India · reported"]) await expect(r2).toContainText(v);
-  await expect(page.getByText("No allotment to this rank in the R3,")).toBeVisible();
+  await expect(page.getByText(/^Seat in 2 of \d+ rounds; none in R3\b/)).toBeVisible(); // the rounds with no row, named
 
   // Allotments: candidate category, choice no., status and previous seat; a column hidden under Display; the CSV.
   await page.goto(`/decide/allotments?${PROFILE}&year=2023&round=R2&from=23&to=23&layout=table`); // Allotments opens on cards
   const table = page.getByRole("region", { name: "Allotments", exact: true });
-  await expect(table.getByRole("row").nth(1)).toContainText("All IndiaOpenGeneral1Upgraded");
+  // By column (`data-col`), so the stat cells or a new column between them never break it.
+  const first = table.getByRole("row").nth(1);
+  for (const [col, v] of [["quota", "All India"], ["seat", "Open"], ["cand", "General"], ["option", "1"], ["status", "Upgraded"]]) await expect(first.locator(`[data-col="${col}"]`), col).toHaveText(v);
   await page.getByText("Display").click();
   await page.getByRole("checkbox", { name: "Previous seat" }).uncheck();
   await expect(table.getByRole("columnheader", { name: /Previous seat/ })).toBeHidden();
@@ -377,6 +401,18 @@ test("print: every table box lets all its rows onto paper", async ({ page }) => 
     await expect(boxes.first(), path).toBeAttached();
     for (const b of await boxes.all()) expect(await b.evaluate((e) => e.scrollHeight - e.clientHeight), path).toBeLessThanOrEqual(1);
     await page.emulateMedia({ media: null });
+  }
+  // A4 landscape less its 8mm margins (about 1062px): the tables' last columns stay on the page (Seats' matrix is wider).
+  if (test.info().project.name === "desktop") {
+    for (const path of [`/decide/options?${PROFILE}&layout=table`, `/decide/allotments?${PROFILE}&course=md-anaesthesiology&year=2025&round=R2&layout=table`, `/decide/last-ranks?${PROFILE}&course=dnb-anaesthesiology&layout=table`]) {
+      await page.goto(path);
+      await page.setViewportSize({ width: 1062, height: 1000 });
+      await page.emulateMedia({ media: "print" });
+      const right = await page.locator("table").first().evaluate((t) => Math.max(...[...t.querySelectorAll("thead th")].map((x) => x.getBoundingClientRect().right)));
+      expect(right, path).toBeLessThanOrEqual(1062 + 1);
+      await page.emulateMedia({ media: null });
+      await page.setViewportSize({ width: 1280, height: 720 });
+    }
   }
   // The college's name and address print above its tabs.
   await page.goto(`/decide/institutes/${KOKILA_NM}?${PROFILE}&tab=fees`);
@@ -489,7 +525,7 @@ test("seat trends and rank scan on the final 2026 R1", async ({ page }) => {
 test("related data is linked: institute → course last ranks → allotments → rank scan", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto(`/decide/institutes?${PROFILE}&q=Seth+Gordhandas`);
-  await page.getByRole("link", { name: "Seth Gordhandas Sunderdas Medical College" }).click();
+  await page.getByRole("link", { name: "Seth Gordhandas Sunderdas Medical College", exact: true }).click(); // (not "MCC profile: …")
   await expect(h1(page)).toHaveText("Seth Gordhandas Sunderdas Medical College");
   await expect(page).toHaveURL(/rank=42284/);
 
@@ -502,7 +538,7 @@ test("related data is linked: institute → course last ranks → allotments →
   await expect(h1(page)).toHaveText("Allotments");
   await expect(page.getByText("Showing allotments at")).toBeVisible();
 
-  await page.getByTitle("Scan ranks around this one").first().click();
+  await page.getByTitle("Scan ranks around this one").filter({ visible: true }).first().click(); // the pane on show
   await expect(h1(page)).toHaveText("Rank scan");
 });
 

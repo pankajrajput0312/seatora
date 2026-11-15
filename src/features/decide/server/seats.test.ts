@@ -57,8 +57,9 @@ describe("without a database", () => {
 //   set -a; . ~/.config/seatora/db.env; set +a; npx vitest run src/features/decide/server/seats.test.ts
 const dir = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
 type FileSeat = { year: number; round: string; kind: string; ikey: string; degree: string; specialty: string; quota: string | null; category: string; seats: number; src: string };
+// A skipped suite's body still runs (vitest collects its tests): read the bundle only when it is there.
+const read = (f: string) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8") : "[]");
 describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "seats.ndjson")))("seat lists on the real import", { timeout: 60_000 }, () => {
-  const read = (f: string) => readFileSync(join(dir, f), "utf8");
   const file: FileSeat[] = read("seats.ndjson").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   const sources: { key: string; url: string; kind: string }[] = JSON.parse(read("seat_sources.json"));
   const notices: { url: string; date: string }[] = JSON.parse(read("notices.json"));
