@@ -13,6 +13,7 @@ import { InfoTip } from "@/features/decide/components/info-tip";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
 import { flagShort, reportedCount, SELF_REPORTED, ValueSource } from "@/features/decide/components/institute/hospital-bits";
+import { Rank } from "@/features/decide/components/residents-results";
 import { allotmentMixAt, clinicalAt, headerLists, hospitalInfo, optionSeats, roundSeatsAt, roundSeatTotals, websiteUrl } from "@/features/decide/components/institute/institute-data";
 import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, HospitalFacts } from "@/features/decide/components/institute/institute-parts";
 import { courseName, RoundGrid, SeatsBelowNote, seatKindShort, toChoiceItem } from "@/features/decide/components/options-view";
@@ -590,7 +591,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.institute(slug, "courses")} action="See the courses here" />
       )}
       {residentsAccess === "limited" && (
-        <EmptyState title="Too many requests" description="Residents were opened too many times from this network. Try again in an hour." href={L.institute(slug, "courses")} action="See the courses here" />
+        <EmptyState title="Too many requests" description="Residents were opened too many times from this network or account. Try again in an hour, or tomorrow." href={L.institute(slug, "courses")} action="See the courses here" />
       )}
       {tab === "residents" && residents && (
         <section aria-labelledby="res-h" className="grid grid-cols-1 gap-4">
@@ -636,7 +637,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       <caption className="sr-only">Residents in {g.course.degree} {g.course.name} at {college.name}, newest year first</caption>
                       <thead><tr className={tbl.headRow}>
                         <th scope="col" className={tbl.th}>Name</th><th scope="col" className={tbl.th}>Year</th><th scope="col" className={tbl.th}>MCC list</th>
-                        <th scope="col" className={`${tbl.th} text-right`}><span className="inline-flex items-center gap-0.5">2025 AIR<InfoTip label="2025 AIR">The All India Rank in NBEMS&apos;s NEET PG 2025 merit list, where known. It is where one person got in, not a closing rank or a prediction.</InfoTip></span></th><th scope="col" className={tbl.th}><span className="sr-only">Hide</span></th>
+                        <th scope="col" className={`${tbl.th} text-right`}><span className="inline-flex items-center gap-0.5">Rank<InfoTip label="Rank">All India Rank from that year&apos;s NBEMS NEET PG result, where known. It is where one person got in, not a closing rank or a prediction.</InfoTip></span></th><th scope="col" className={tbl.th}><span className="sr-only">Hide</span></th>
                       </tr></thead>
                       {g.years.map((y) => (
                         <tbody key={y.year}>
@@ -646,7 +647,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                               <th scope="row" className={`${tbl.td} text-left font-medium`}>{r.name}</th>
                               <td className={`${tbl.td} numeric`}>{r.year}</td>
                               <td className={tbl.td}>{r.list}</td>
-                              <td className={tbl.num}>{r.rank != null ? formatRank(r.rank) : <Dash />}</td>
+                              <td className={tbl.num}><Rank rank={r.rank} year={r.year} /></td>
                             </HideableRow>
                           ))}
                         </tbody>
@@ -657,7 +658,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               ))}
             </>
           )}
-          <SourceRefs docs={residents.sources.map((s) => ({ key: `residents|${s.key}`, name: s.name, url: s.url, type: "OFFICIAL" as const, note: `PG counselling ${s.year ?? "—"}` }))} />
+          <SourceRefs docs={residents.sources.map((s) => ({ key: `residents|${s.key}`, name: s.name, url: s.url, type: "OFFICIAL" as const, note: s.key.startsWith("nbems/") ? `NEET PG ${s.year ?? "—"} rank source` : `PG counselling ${s.year ?? "—"}` }))} />
         </section>
       )}
     </AppPage>

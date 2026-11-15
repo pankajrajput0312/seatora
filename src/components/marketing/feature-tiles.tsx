@@ -213,7 +213,7 @@ export function FeatureTiles() {
       <Tile title="Previous-year ranks" caption="Closing ranks by round, quota and category." className="sm:col-span-2"><RanksChart /></Tile>
       <Tile title="Seat matrix" caption="Seats per specialty and category."><SeatGrid /></Tile>
       <Tile title="Fees, stipend, bond" caption="Dated and sourced, side by side."><MoneyBars /></Tile>
-      <Tile title="Residents" caption="Name, course, year and 2025 AIR, from MCC's lists."><ResidentsMini /></Tile>
+      <Tile title="Residents" caption="Name, course, year and AIR, from MCC's lists."><ResidentsMini /></Tile>
       <Tile title="Compare" caption="Differences highlighted, not buried."><CompareMini /></Tile>
       <Tile title="Institutes" caption="Every PG college, one profile each."><InstituteMini /></Tile>
       <Tile title="Shortlist & choice filling" caption="Order choices with history beside each."><ShortlistMini /></Tile>

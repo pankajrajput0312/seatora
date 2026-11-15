@@ -17,7 +17,7 @@ const faqs = [
   },
   {
     q: "Where do residents' names come from?",
-    a: "From MCC's official admitted-candidates lists, with the 2025 All India Rank from the NBEMS merit list where it is published. Seatora shows a name, course and year only. It holds no contact details, and hides a name if that person asks.",
+    a: "From MCC's official admitted-candidates lists, with the All India Rank from that year's NBEMS NEET PG result where it is known. Seatora shows a name, course and year only. It holds no contact details, and hides a name if that person asks.",
   },
   {
     q: "How do I get access?",

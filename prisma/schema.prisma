@@ -188,7 +188,7 @@ model Resident {
   /// Counselling year of the list.
   year        Int
   name        String
-  /// NEET PG 2025 All India Rank from the NBEMS merit list; null when not known (always for 2023 and 2024).
+  /// All India Rank from that year's NBEMS NEET PG result (2023-2025); null when not known.
   rank        Int?
   /// The list as MCC labels it, e.g. "up to Round 3" or "final list (26 Mar 2025)".
   list        String
@@ -196,9 +196,20 @@ model Resident {
   sourceKey   String
   /// Asked not to be shown: never rendered or returned by the API. Set from HiddenResident on every import.
   hidden      Boolean   @default(false)
+  /// The NBEMS result the rank comes from, of the same year (DataSource.key, e.g. "nbems/2024/published_result.pdf");
+  /// null without a rank.
+  rankBasis   String?
+  /// How the bundle matched rank + college + course to MCC's allotments: "matched" (exactly one row), "no_rank",
+  /// "no_matching_allotment" or "ambiguous"; null from a bundle older than the match.
+  match       String?
+  /// The matched allotment's quota (as Allotment.quota, e.g. "All India") and round ("R1", "R2", "R3", "Stray",
+  /// "Special stray"); only when match = "matched". Never a reservation category: not held.
+  quota       String?
+  round       String?
 
   @@index([collegeId, year])
   @@index([specialtyId])
+  @@index([year, rank])
 }
 
 /// A person who asked not to be shown (the Residents tab "Hide"). Apart from Resident, which the imports replace or
@@ -211,6 +222,16 @@ model HiddenResident {
   createdAt DateTime @default(now())
 
   @@id([name, place])
+}
+
+/// Name reads per account per day (residentsBudget's daily cap), in the database so every server instance counts
+/// them. Written by one raw-SQL upsert; no foreign key (a row per account and day, nothing else).
+model ResidentsRead {
+  userId String
+  day    DateTime @db.Date
+  count  Int      @default(0)
+
+  @@id([userId, day])
 }
 
 /// A college key an MCC import retired (key_aliases.json: merged into another college or given a neutral label), kept
@@ -429,6 +450,7 @@ model User {
   lockedUntil  DateTime?
   createdAt    DateTime  @default(now())
   sessions     Session[]
+  requests     FeatureRequest[]
 }
 
 /// Login sessions. Only a SHA-256 hash of the cookie token is stored.
@@ -439,5 +461,26 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
+  @@index([userId])
+}
+
+/// "Request a feature" (src/features/requests): a feature, a customization, a data correction or anything else. Plain text,
+/// read by the owner (SEATORA_OWNER_EMAILS). kind and status are the lists in src/features/requests/validations.ts.
+model FeatureRequest {
+  id        String   @id @default(cuid())
+  kind      String
+  message   String
+  /// Where to reply: the signed-in user's email by default, required from anyone signed out.
+  email     String?
+  /// SetNull: deleting an account keeps its requests, unlinked.
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Where it was sent from, e.g. "/decide/options".
+  page      String?
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
   @@index([userId])
 }

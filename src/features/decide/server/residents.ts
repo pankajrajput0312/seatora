@@ -1,15 +1,16 @@
 import "server-only";
 import { headers } from "next/headers";
-import { hasSiteAccess } from "@/features/auth/lib/session";
+import { getCurrentUser, hasSiteAccess } from "@/features/auth/lib/session";
 import { db } from "@/lib/db";
 import { allow } from "@/lib/rate-limit";
 import { profileHasCourse, type Profile } from "../profile";
 import type { Course } from "../types";
 
-// Names from MCC's admitted-candidates lists (private import, prisma/import-residents.ts): name, course, year, list and
-// the 2025 rank where known. No contact details exist. Rows marked hidden are never read out of the database.
+// Names from MCC's admitted-candidates lists (private import, prisma/import-residents.ts): name, course, year, list and,
+// where known, the All India Rank from that year's NBEMS NEET PG result (2023-2025; rankBasis = that result), with quota
+// and round from the matching MCC allotment. No contact details or category exist. Hidden rows are never read out.
 
-export type Resident = { id: string; name: string; year: number; list: string; rank: number | null; sourceKey: string; course: Course };
+export type Resident = { id: string; name: string; year: number; list: string; rank: number | null; rankBasis: string | null; sourceKey: string; course: Course };
 export type ResidentSource = { key: string; name: string; url: string | null; year: number | null };
 
 const select = {
@@ -18,13 +19,15 @@ const select = {
   year: true,
   list: true,
   rank: true,
+  rankBasis: true,
   sourceKey: true,
   specialty: { select: { degree: true, code: true, name: true, slug: true } },
 } as const;
 
 /**
  * One institute's residents (by College.key), course by course (degree, name), newest year first, then name. Optional
- * course slug and year filters; `pg` returns one page, without it every row. `sources` = the list PDFs behind the rows.
+ * course slug and year filters; `pg` returns one page, without it every row. `sources` = the list PDFs and NBEMS results
+ * behind the rows.
  */
 export async function listResidents(collegeKey: string, f: { course?: string; year?: number } = {}, pg?: { page: number; pageSize: number }) {
   const where = { college: { key: collegeKey }, hidden: false, year: f.year, specialty: f.course ? { slug: f.course } : undefined };
@@ -40,7 +43,7 @@ export async function listResidents(collegeKey: string, f: { course?: string; ye
   ]);
   const rows: Resident[] = found.map(({ specialty: s, ...r }) => ({ ...r, course: { degree: s.degree, specialty: s.code ?? "", name: s.name, slug: s.slug } }));
   const sources = await db.dataSource.findMany({
-    where: { key: { in: [...new Set(rows.map((r) => r.sourceKey))] } },
+    where: { key: { in: [...new Set(rows.flatMap((r) => (r.rankBasis ? [r.sourceKey, r.rankBasis] : [r.sourceKey])))] } },
     select: { key: true, name: true, url: true, counsellingYear: true },
     orderBy: { key: "desc" },
   });
@@ -60,11 +63,26 @@ export async function listResidents(collegeKey: string, f: { course?: string; ye
  */
 export const canSeeResidents = hasSiteAccess;
 
-/** Per-IP budget for reading or hiding names. False once spent. ponytail: in-memory per instance, as @/lib/rate-limit. */
+/** Name reads per account per (UTC) day, on top of 300 per hour per IP: a copied cookie gets no fresh budget from a new IP. */
+export const RESIDENTS_READS_PER_DAY = 200;
+
+/**
+ * Budget for reading or hiding names. False once spent. Reads: 300 per hour per IP (in memory, per instance, as
+ * @/lib/rate-limit) and RESIDENTS_READS_PER_DAY per account, counted in the database (ResidentsRead), so parallel
+ * instances share it. Hides: 20 per hour per IP.
+ */
 export async function residentsBudget(kind: "read" | "hide") {
   const h = await headers();
   const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  return kind === "read" ? allow(`residents:${ip}`, 300, 60 * 60 * 1000) : allow(`residents-hide:${ip}`, 20, 60 * 60 * 1000);
+  if (kind === "hide") return allow(`residents-hide:${ip}`, 20, 60 * 60 * 1000);
+  if (!allow(`residents:${ip}`, 300, 60 * 60 * 1000)) return false;
+  const user = await getCurrentUser();
+  if (!user) return false;
+  // One atomic upsert (raw SQL, as hideResident): parallel reads can't race past the cap.
+  const [{ count }] = await db.$queryRaw<{ count: number }[]>`
+    INSERT INTO "ResidentsRead" ("userId", "day", "count") VALUES (${user.id}, (now() AT TIME ZONE 'UTC')::date, 1)
+    ON CONFLICT ("userId", "day") DO UPDATE SET "count" = "ResidentsRead"."count" + 1 RETURNING "count"`;
+  return count <= RESIDENTS_READS_PER_DAY;
 }
 
 /**

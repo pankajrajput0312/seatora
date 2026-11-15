@@ -11,6 +11,8 @@ function live(key: string, now: number) {
 export function allow(key: string, limit = 5, windowMs = 60_000, now = Date.now()): boolean {
   const entry = live(key, now);
   if (!entry) {
+    // Full: drop expired windows first; only a flood of live keys resets every budget (the residents daily cap is in the DB).
+    if (hits.size > 10_000) for (const [k, e] of hits) if (e.resetAt <= now) hits.delete(k);
     if (hits.size > 10_000) hits.clear();
     hits.set(key, { count: 1, resetAt: now + windowMs });
     return true;

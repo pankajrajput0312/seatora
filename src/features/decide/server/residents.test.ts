@@ -5,7 +5,7 @@ import type { Profile } from "../profile";
 import { groupResidents, listResidents, type Resident } from "./residents";
 
 const course = (degree: string, specialty: string) => ({ degree, specialty, name: specialty, slug: `${degree}-${specialty}`.toLowerCase() });
-const row = (degree: string, specialty: string, year: number, name: string): Resident => ({ id: name, name, year, list: "up to Round 3", rank: null, sourceKey: "x", course: course(degree, specialty) });
+const row = (degree: string, specialty: string, year: number, name: string): Resident => ({ id: name, name, year, list: "up to Round 3", rank: null, rankBasis: null, sourceKey: "x", course: course(degree, specialty) });
 
 describe("groupResidents", () => {
   // listResidents order: course (degree, name), newest year first, then name
