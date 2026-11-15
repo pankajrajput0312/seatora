@@ -27,5 +27,5 @@ export function CsvLink({ href, what, total }: { href: string; what: string; tot
   );
 }
 
-/** The row of a results count and its tools: the tools on their own line under the count on a phone, at its right from md up. */
-export const toolbarRow = "grid justify-items-start gap-2 md:flex md:flex-wrap md:items-center md:justify-between md:gap-x-4";
+/** The row of a results count and its tools (tools wrap under the count when there is no room). In a .filter-row (globals.css) it fills the row after Filters. */
+export const toolbarRow = "toolbar flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-2";

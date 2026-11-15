@@ -75,7 +75,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const youText = rank ? `Your rank, ${formatRank(rank)}, falls here` : "";
 
   return (
-    <AppPage className="grid grid-cols-1 gap-6">
+    <AppPage className="grid grid-cols-1 gap-4">
       <PageHead
         title="Rank scan"
         about="Allotments to ranks near yours, round by round, in one year's MCC results: every course and seat category. In R2 and later only new or upgraded allotments are listed."

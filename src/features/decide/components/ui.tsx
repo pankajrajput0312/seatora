@@ -18,10 +18,10 @@ export const tbl = {
   wrap: "relative scroll-px-12 overflow-x-auto rounded-xl border border-border bg-card",
   table: "w-full text-sm",
   headRow: "border-b border-border text-left",
-  th: "px-4 py-3 text-xs font-semibold text-muted-foreground",
+  th: "px-3 py-2 text-xs font-semibold text-muted-foreground",
   row: "border-b border-border last:border-0 hover:bg-muted/50",
-  td: "px-4 py-3 align-top",
-  num: "px-4 py-3 text-right align-top text-[15px] font-semibold tabular-nums",
+  td: "px-3 py-2 align-top",
+  num: "px-3 py-2 text-right align-top text-[0.875rem] font-semibold tabular-nums md:text-[15px]",
   /**
    * Wide tables: the box scrolls both ways inside the window's height, so the header row (`head`, on the thead) and a
    * sticky first column stay in view; scroll-pt keeps a focused cell clear of the header. On paper the box lets every
@@ -87,7 +87,7 @@ export function Field({ label, children, className }: { label: string; children:
 export { ActiveFilters } from "./active-filters";
 
 /** Text inputs and selects in filter bars and forms (same focus and invalid states as the Input primitive). */
-export const control = "h-11 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-sky aria-invalid:border-ember";
+export const control = "h-11 max-md:h-[2.375rem] w-full rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-sky aria-invalid:border-ember";
 
 export function Select({ name, value, options, all }: { name: string; value: string | undefined; options: { value: string; label: string }[]; all?: string }) {
   return (
@@ -128,7 +128,7 @@ export function EmptyState({ title, description, icon: Icon, href, action, child
 export function StatCell({ label, value, note, info }: { label: string; value: React.ReactNode; note?: React.ReactNode; info?: React.ReactNode }) {
   return (
     <div className="bg-card p-4 sm:p-5">
-      <dt className="flex items-center gap-1 text-sm text-muted-foreground">{label}{info && <InfoTip label={label}>{info}</InfoTip>}</dt>
+      <dt className="flex items-center gap-1 text-xs text-muted-foreground sm:text-sm">{label}{info && <InfoTip label={label}>{info}</InfoTip>}</dt>
       <dd className="mt-1 text-3xl leading-tight font-bold tracking-tight sm:text-[2.5rem]">{value}</dd>
       {note && <dd className="text-xs text-muted-foreground">{note}</dd>}
     </div>

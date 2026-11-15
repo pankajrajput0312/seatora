@@ -66,10 +66,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} not declared</Link></>;
 
   return (
-    <AppPage className="grid grid-cols-1 gap-6">
-      <PageHead title="Overview" about={`Closing ranks here are on ${seats} seats, the seat categories you can take.`}>
-        AIR <span className="numeric">{formatRank(profile.rank)}</span> · {profile.category}{profile.pwd ? " PwD" : ""}
-      </PageHead>
+    <AppPage className="grid grid-cols-1 gap-4 md:gap-6">
+      <PageHead title="Overview" about={`Closing ranks here are on ${seats} seats, the seat categories you can take.`} />
       <RoundStatusBanner params={params} />
 
       <section aria-labelledby="numbers-h" className="grid gap-2">

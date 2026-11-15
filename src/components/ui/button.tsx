@@ -8,8 +8,9 @@ const variants = {
   danger: "text-ember hover:bg-ember/10",
 } as const;
 
-// md and icon meet the 44px touch target; sm is for dense desktop-only rows.
-const sizes = { sm: "h-9 px-3 text-sm", md: "h-11 px-4 text-sm", lg: "h-12 px-6 text-base", icon: "size-11" } as const;
+// md and icon meet the 44px touch target from md up; on phones md is 38px and icon 35px (the compact phone scale,
+// globals.css); sm is for dense rows.
+const sizes = { sm: "h-9 px-3 text-sm", md: "h-11 px-4 text-sm max-md:h-[2.375rem] max-md:px-3", lg: "h-12 px-6 text-base", icon: "size-11" } as const;
 
 type ButtonProps = React.ComponentProps<"button"> & {
   variant?: keyof typeof variants;
