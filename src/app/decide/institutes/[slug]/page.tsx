@@ -14,13 +14,11 @@ import { InfoTip } from "@/features/decide/components/info-tip";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
 import { flagShort, reportedCount, SELF_REPORTED, ValueSource } from "@/features/decide/components/institute/hospital-bits";
-import { residentDocs } from "@/features/decide/components/residents-results";
 import { allotmentMixAt, clinicalAt, headerLists, hospitalInfo, optionSeats, roundSeatsAt, roundSeatTotals, websiteUrl } from "@/features/decide/components/institute/institute-data";
 import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, HospitalFacts } from "@/features/decide/components/institute/institute-parts";
 import { KeyFacts } from "@/features/decide/components/institute/key-facts";
 import { keyRows } from "@/features/decide/components/institute/key-facts-data";
 import { courseName, RoundGrid, SeatsBelowNote, seatKindShort, toChoiceItem } from "@/features/decide/components/options-view";
-import { SourceRefs } from "@/features/decide/components/page-sources";
 import { ResultCard } from "@/features/decide/components/result-card";
 import { listSeats, listTitle, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { TermStatCells } from "@/features/decide/components/stat-cells";
@@ -650,7 +648,6 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             </>
           )}
           {/* No rank shown, so the NBEMS results it came from are not cited. */}
-          <SourceRefs docs={residentDocs(residents.rows.map((r) => ({ ...r, rankBasis: null })), residents.sources.filter((x) => !residents.rows.some((r) => r.rankBasis === x.key)))} />
         </section>
       )}
     </AppPage>

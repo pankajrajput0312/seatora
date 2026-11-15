@@ -4,8 +4,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
 import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
-import { SourceRefs } from "@/features/decide/components/page-sources";
-import { residentDocs, residentsFilters, ResidentsAbout, ResidentsCards, ResidentsTable, type ResidentTypes } from "@/features/decide/components/residents-results";
+import { residentsFilters, ResidentsAbout, ResidentsCards, ResidentsTable, type ResidentTypes } from "@/features/decide/components/residents-results";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, Select } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
@@ -139,7 +138,6 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
           Only the first <span className="numeric">{formatRank(pages * res.pageSize)}</span> ({pages} pages) are shown: narrow the filters (name, college, course, state or year) to see the others.
         </p>
       )}
-      <SourceRefs docs={residentDocs(rows, res.sources)} />
     </AppPage>
   );
 }
