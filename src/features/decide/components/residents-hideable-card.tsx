@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useSyncExternalStore } from "react";
 import { ResultCard } from "./result-card";
 import { HideableRow } from "./residents/hideable-row";
 
 type Hide = (id: string) => Promise<{ ok: true; data: null } | { ok: false; error: string }>;
-type Step = "idle" | "confirm" | "hidden" | "failed";
 const HIDDEN = "Hidden. This name won't be shown again.";
 
 // Names hidden since this page loaded. The cards and the table are both in the page (ViewPanes), so a name hidden in
@@ -29,55 +27,8 @@ const useHiddenNow = (id: string) => useSyncExternalStore(subscribe, () => hidde
  * ponytail: the card twin of residents/hideable-row.tsx (same steps and focus); share one hook when both can change.
  */
 export function HideableCard({ id, name, hide, ...card }: { id: string; name: string; hide: Hide } & Omit<React.ComponentProps<typeof ResultCard>, "actions">) {
-  const [step, setStep] = useState<Step>("idle");
-  const gone = useHiddenNow(id);
-  const [pending, start] = useTransition();
-  const refs = { idle: useRef<HTMLButtonElement>(null), confirm: useRef<HTMLButtonElement>(null), hidden: useRef<HTMLParagraphElement>(null) };
-  // Focus follows the step the user moved to (Hide → Confirm → done; Cancel → Hide), never on mount.
-  const moved = useRef(false);
-  const go = (s: Step) => {
-    moved.current = true;
-    setStep(s);
-  };
-  useEffect(() => {
-    if (!moved.current) return;
-    moved.current = false;
-    refs[step === "failed" ? "confirm" : step].current?.focus();
-  });
-
-  if (step === "hidden" || gone)
-    return <p ref={refs.hidden} tabIndex={-1} role="status" className="rounded-xl border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">{HIDDEN}</p>;
-  const actions =
-    step === "idle" ? (
-      <Button ref={refs.idle} variant="ghost" onClick={() => go("confirm")} aria-label={`Hide ${name}`}>Hide</Button>
-    ) : (
-      <>
-        <Button
-          ref={refs.confirm}
-          variant="danger"
-          disabled={pending}
-          aria-label={`Confirm: hide ${name}`}
-          onClick={() =>
-            start(async () => {
-              const ok = (await hide(id).catch(() => ({ ok: false }) as const)).ok;
-              go(ok ? "hidden" : "failed");
-              if (ok) markHidden(id);
-            })
-          }
-        >
-          {pending ? "Hiding…" : "Confirm"}
-        </Button>
-        <Button variant="ghost" disabled={pending} onClick={() => go("idle")}>Cancel</Button>
-      </>
-    );
-  return (
-    <ResultCard
-      {...card}
-      actions={actions}
-      // Below the card, not in its header: the header has no room for it beside Confirm and Cancel at 390px.
-      footer={step === "failed" ? <p role="alert" className="px-4 py-2 text-xs text-ember">Couldn&apos;t hide. Try again.</p> : card.footer}
-    />
-  );
+  void id; void name; void hide; // Hide control taken out (owner, 15 Nov 2026); names are hidden on request by email.
+  return <ResultCard {...card} />;
 }
 
 /** HideableRow for the Residents page: hides with its card (the other view), and shows as hidden when the card was. */

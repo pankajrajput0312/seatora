@@ -634,7 +634,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       <caption className="sr-only">Residents in {g.course.degree} {g.course.name} at {college.name}, newest year first</caption>
                       <thead><tr className={tbl.headRow}>
                         <th scope="col" className={tbl.th}>Name</th><th scope="col" className={tbl.th}>Year</th><th scope="col" className={tbl.th}>MCC list</th>
-                        <th scope="col" className={`${tbl.th} text-right`}><span className="inline-flex items-center gap-0.5">Rank<InfoTip label="Rank">All India Rank from that year&apos;s NBEMS NEET PG result, where known. It is where one person got in, not a closing rank or a prediction. It can be looked up in MCC&apos;s public allotment results (Rank journey, Allotments), which list each rank&apos;s seat and candidate category, PwD included.</InfoTip></span></th><th scope="col" className={tbl.th}><span className="sr-only">Hide</span></th>
+                        <th scope="col" className={`${tbl.th} text-right`}><span className="inline-flex items-center gap-0.5">Rank<InfoTip label="Rank">All India Rank from that year&apos;s NBEMS NEET PG result, where known. It is where one person got in, not a closing rank or a prediction. It can be looked up in MCC&apos;s public allotment results (Allotments), which list each rank&apos;s seat and candidate category, PwD included.</InfoTip></span></th>
                       </tr></thead>
                       {g.years.map((y) => (
                         <tbody key={y.year}>

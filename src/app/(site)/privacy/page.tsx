@@ -78,8 +78,7 @@ export default function PrivacyPage() {
               allotment results, which Seatora also shows and which list each rank&apos;s seat and candidate category, PwD included.
             </p>
             <p className="mt-2">
-              If your name is listed and you want it hidden, email us{mail && <> at {mail}</>} with your name and college, or use
-              {" "}<strong>Hide</strong> beside it on the Residents pages. We will hide it from the site for every year and course at that
+              If your name is listed and you want it hidden, email us{mail && <> at {mail}</>} with your name and college. We will hide it from the site for every year and course at that
               college and keep it hidden when the lists are refreshed.
             </p>
           </section>

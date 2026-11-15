@@ -64,12 +64,12 @@ describe("Residents views", () => {
   it("table: caption, column and row headers, Hide, the college's Residents tab and type; never a category", () => {
     const html = renderToStaticMarkup(createElement(ResidentsTable, { rows: [row(), row({ id: "r2", rank: null, rankBasis: null, quota: null, round: null })], L, hide, caption: "Residents, page 1", types }));
     expect(html).toContain("<caption");
-    expect(html.match(/scope="col"/g)).toHaveLength(9);
+    expect(html.match(/scope="col"/g)).toHaveLength(8);
     expect(html.match(/scope="row"/g)).toHaveLength(2);
     expect(html).toContain("/decide/institutes/some-college?rank=40000&amp;cat=Open&amp;tab=residents");
     expect(html).toContain("AIR 41,234");
     expect(html).toContain(" · 2025");
-    expect(html).toContain('aria-label="Hide Test Resident A"');
+    expect(html).not.toContain("Hide"); // Hide control taken out (owner, 15 Nov 2026)
     expect(html).toContain("Government");
     expect(html).not.toMatch(/categor/i);
   });
@@ -81,7 +81,7 @@ describe("Residents views", () => {
     expect(html).toContain('href="/decide/institutes/some-college?rank=40000&amp;cat=Open&amp;tab=residents"');
     for (const s of ["Test Resident A", "AIR 41,234", "NEET PG 2025", "MD Anaesthesiology", "2025 · R2", "MCC list: up to Round 3", "All India", "Kerala", "Government"]) expect(html).toContain(s);
     expect(html.match(/Government/g)).toHaveLength(2); // the first card's badge and its (i) only: none for the other college
-    expect(html).toContain('aria-label="Hide Test Resident A"');
+    expect(html).not.toContain("Hide"); // Hide control taken out (owner, 15 Nov 2026)
     expect(html).not.toMatch(/categor/i);
   });
 

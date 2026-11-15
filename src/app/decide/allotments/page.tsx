@@ -104,11 +104,6 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       {formatRank(a.rank)}<span className="sr-only">: scan the ranks around it in {a.year}</span>
     </Link>
   );
-  const journey = (a: AllotmentRow, className: string) => (
-    <Link href={L.rankJourney(a.rank, a.year)} className={className} title={`This rank's seat in every ${a.year} round`}>
-      Journey<span className="sr-only"> of rank {formatRank(a.rank)} in {a.year}</span>
-    </Link>
-  );
   const courseLink = (a: AllotmentRow) => (
     <Link href={L.lastRanks(a.courseSlug, { inst: a.college.slug })} className="inline-flex min-h-6 items-center hover:text-sky hover:underline">{a.courseName}</Link>
   );
@@ -132,7 +127,6 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
             value: (
               <>
                 {rankLink(a, "numeric hover:text-sky hover:underline")}
-                {journey(a, "flex min-h-8 items-center text-xs font-normal tracking-normal text-muted-foreground hover:text-sky hover:underline")}
               </>
             ),
           }}
@@ -181,7 +175,6 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
               <td className={`${td} ${stick} text-right`}>
                 {rankLink(a, "numeric inline-flex min-h-6 min-w-6 items-center justify-end text-[15px] font-semibold hover:text-sky hover:underline")}
                 {/* Two stacked targets, each at least 24 × 24 px (WCAG 2.5.8). */}
-                {journey(a, "flex min-h-6 items-center justify-end text-xs text-muted-foreground hover:text-sky hover:underline")}
               </td>
               <td className={short}>
                 <span className="font-medium"><span className="numeric">{a.year}</span> {roundLabel[a.round]}</span>

@@ -77,7 +77,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
     <AppPage className="grid grid-cols-1 gap-6">
       <PageHead
         title="Rank scan"
-        about="Allotments to ranks near yours, round by round, in one year's MCC results: every course and seat category. In R2 and later only new or upgraded allotments are listed. Select a rank for its seat in every round that year (Rank journey)."
+        about="Allotments to ranks near yours, round by round, in one year's MCC results: every course and seat category. In R2 and later only new or upgraded allotments are listed."
       />
 
       <FilterBar action="/decide/rank-scan" params={params} cols="md:grid-cols-4 [&>label]:min-w-0" more={!!round || termMoreOpen(tp.params)}>
@@ -120,7 +120,6 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
           {groups.map((g) => {
             const label = `${year.year} ${roundLabel[g.round]} allotments`;
             const courseLink = (a: Row) => L.allotments({ course: course(a)?.slug, inst: a.collegeSlug, year: year.year, round: g.round });
-            const journey = (a: Row) => L.rankJourney(a.rank, year.year);
             const of = (a: Row) => `${a.collegeName}, ${courseName(a)}, rank ${formatRank(a.rank)}`;
             return (
               <section key={g.round} aria-labelledby={`r-${g.round}`} className="grid grid-cols-1 gap-3">
@@ -140,7 +139,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                               chips={[a.quota, `${a.category} seat`, a.remark]}
                               stat={{
                                 label: "Rank",
-                                value: <Link href={journey(a)} title={`This rank's seat in every ${year.year} round`} className="numeric inline-flex min-h-11 items-center hover:text-sky hover:underline">{formatRank(a.rank)}</Link>,
+                                value: <span className="numeric inline-flex min-h-11 items-center">{formatRank(a.rank)}</span>,
                               }}
                               title={a.collegeName}
                               href={a.collegeSlug ? L.institute(a.collegeSlug) : undefined}
@@ -170,7 +169,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                           {g.rows.flatMap((a, i) => [
                             ...(you.has(a) ? [<tr key="you" className="bg-sky/10"><td colSpan={3 + statKeys.length} className="px-4 py-1.5 text-xs font-semibold text-sky">{youText}</td></tr>] : []),
                             <tr key={i} className={tbl.row}>
-                              <td className={tbl.num}><Link href={journey(a)} className="hover:text-sky hover:underline" title={`This rank's seat in every ${year.year} round`}>{formatRank(a.rank)}</Link></td>
+                              <td className={tbl.num}>{formatRank(a.rank)}</td>
                               <td className={tbl.td}>{a.category}</td>
                               <td className={`${tbl.td} min-w-52`}>
                                 <Link href={L.institute(a.collegeSlug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{a.collegeName}</Link>

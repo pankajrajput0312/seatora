@@ -88,7 +88,6 @@ export function ResidentsTable({ rows, L, hide, caption, types }: { rows: Reside
           <th scope="col" className={th}>List</th>
           <th scope="col" className={th}>Quota</th>
           <th scope="col" className={th}>Round</th>
-          <th scope="col" className={th}><span className="sr-only">Hide</span></th>
         </tr></thead>
         <tbody>
           {rows.map((r) => {
@@ -182,10 +181,9 @@ export function ResidentsAbout({ rows }: { rows: ResidentRow[] }) {
       <br /><br />
       <strong>Quota and round</strong> come from the matching MCC allotment of that year, shown only where exactly one matched the resident&apos;s rank, college and course; otherwise a dash. Minority quotas show as &ldquo;Minority&rdquo;.
       <br /><br />
-      Seat and candidate category are not held or shown here. But a rank shown here can be looked up in MCC&apos;s public allotment results, which Rank journey and Allotments show: they list each rank&apos;s seat and candidate category, PwD included.
+      Seat and candidate category are not held or shown here. But a rank shown here can be looked up in MCC&apos;s public allotment results, which Allotments shows: they list each rank&apos;s seat and candidate category, PwD included.
       <br /><br />
-      To have a name hidden, use <strong>Hide</strong> beside it: it is hidden for every year and course at that college and stays hidden after updates
-      {email ? <>, or write to <a href={`mailto:${email}`} className="text-sky underline">{email}</a></> : null}.
+      To have a name hidden, write to us{email ? <> at <a href={`mailto:${email}`} className="text-sky underline">{email}</a></> : null}: it is hidden for every year and course at that college and stays hidden after updates.
       <br /><br />
       MCC publishes the admitted lists on its {ext(MCC_PG, "PG counselling site")}, NBEMS the NEET PG results on {ext("https://natboard.edu.in", "natboard.edu.in")}: the documents behind this page are in its Sources.
     </>
