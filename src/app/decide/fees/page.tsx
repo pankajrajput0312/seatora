@@ -143,21 +143,20 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         title="Fees, stipend and bond"
         about={
           <>
-            <strong>Fee</strong>: a year, from the college&apos;s MCC profile (the table: years 1 to 3). &quot;≤ ₹1.25 L · NBEMS
-            max&quot;: a DNB hospital that declared none; the most NBEMS lets it charge (no GST, paid to the hospital), not its own
-            fee. &quot;see text&quot;: read from the profile&apos;s own fee words (quoted in the (i)). &quot;In words&quot;: the profile
-            gives no one figure for these seats. The whole-course fee is in the Fee (i).
-            <br /><strong>Stipend</strong>: a month, before tax. &quot;min&quot;: the NBEMS floor; the pay may be higher.
+            <strong>Fee</strong>: a year, from the college&apos;s MCC profile (the table: years 1 to 3). &quot;Up to ₹1.25 L&quot;: a DNB
+            hospital that declared none; the most NBEMS lets it charge (no GST, paid to the hospital), not its own fee. &quot;Varies by
+            subject&quot;, &quot;On college website&quot;, &quot;Ask college&quot;: the profile gives no one figure for these seats; its
+            words are in the (i). The whole-course fee is in the Fee (i).
+            <br /><strong>Stipend</strong>: a month, before tax. &quot;From ₹…&quot;: the NBEMS floor; the pay may be higher.
             <br /><strong>Bond period</strong>: years to serve after the course; <strong>Bond penalty</strong>: what you pay if you don&apos;t serve
-            it (a range where it varies by specialty; sorting and filters use the highest). &quot;state rule&quot;: the state&apos;s rule,
-            not the college&apos;s own document.
+            it (a range where it varies by specialty; sorting and filters use the highest).
             <br /><strong>Leaving penalty</strong>: the penalty for leaving the seat or course after joining. MCC&apos;s Round 2 forfeit is on
             each institute&apos;s Fees tab.
             <br />&quot;—&quot;: not in Seatora&apos;s MCC data, never zero or &quot;no bond&quot;. &quot;No bond&quot; only where the
-            college&apos;s document or the NBEMS rule says so; &quot;Unknown&quot; where Seatora&apos;s check found no clear answer.
-            &quot;Unknown · state law may apply&quot;: the college&apos;s document says no bond, but a state law&apos;s service may apply
-            (the filters count it as not declared).
-            <br />Sorting: —, &quot;In words&quot; and &quot;See text&quot; go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
+            college&apos;s document or the NBEMS rule says so; &quot;Not published&quot; where Seatora&apos;s check found no clear answer.
+            &quot;state law may apply&quot;: the college&apos;s document says no bond, but a state law&apos;s service may apply
+            (the filters count it as not published).
+            <br />Sorting: — and figures without a number go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
           </>
         }
       >

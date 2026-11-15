@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { seatGroups, type MccFeesStructured } from "@/features/cutoffs/lib/import-schema";
 import { db } from "@/lib/db";
-import { inrFull, statCells } from "../lib/stat-format";
+import { feeRange, statCells } from "../lib/stat-format";
 import { getCatalog } from "./catalog";
 import { collegeTerms, courseTerms, programmes, termQuality, type Quality } from "./terms";
 
@@ -47,9 +47,10 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
         // The fee cell itself: a verbatim fee shows no ₹ figure; a numbers one its year-1 figure, "at admission" where it is that.
         const fee = statCells(p)[0];
         if (numbers && p.years[0].fee) {
-          expect(fee.full, at).toContain(inrFull(p.years[0].fee.inr));
-          // Above the NBEMS maximum: that warning first.
-          if (p.years[0].fee.atAdmission) expect(fee.marker, at).toBe(p.years[0].fee.above ? "above NBEMS max" : p.years[0].fee.declared != null ? "at admission · GST removed" : "at admission");
+          expect(fee.full, at).toContain(feeRange(p.years[0].fee.min, p.years[0].fee.inr));
+          // No marker: what the figure leaves out is in the (i).
+          expect(fee.marker, at).toBeNull();
+          if (p.years[0].fee.atAdmission) expect(fee.full, at).toMatch(/ at admission$/);
         } else expect(fee.full, at).not.toContain("₹");
         n[!r ? "none" : numbers ? "numbers" : "verbatim"]++;
       }

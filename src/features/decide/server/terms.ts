@@ -169,6 +169,8 @@ export type ProgrammeTerms = {
   /** The page the notes are about (the MCC profile read for a fee's words), when known. */
   notesSrc?: number;
   sources: TermSource[];
+  /** The college's website as declared on its MCC profile (a fee in words pointing to it links it). */
+  website?: string | null;
 };
 
 export type Quality = "full" | "partial" | "none";
@@ -807,7 +809,8 @@ export function collegeTerms(cat: Catalog, college: string): ProgrammeTerms[] {
   let out = m.out.get(college);
   if (!out) {
     const terms = m.terms.get(college) ?? [];
-    out = programmesOf(m.degrees.get(college) ?? []).map((p) => normalizeProgramme(p, terms, m.sharedBy));
+    const website = cat.collegeByKey?.get(college)?.website ?? null;
+    out = programmesOf(m.degrees.get(college) ?? []).map((p) => ({ ...normalizeProgramme(p, terms, m.sharedBy), website }));
     m.out.set(college, out);
   }
   return out;
@@ -824,6 +827,7 @@ export function courseTerms(cat: Catalog, college: string, degree: string, speci
   let t = k ? m.byQuota.get(k) : undefined;
   if (!t) {
     t = k ? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy, quota) : (collegeTerms(cat, college).find((x) => x.programme === p) ?? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy));
+    if (t.website === undefined) t = { ...t, website: cat.collegeByKey?.get(college)?.website ?? null };
     if (k) m.byQuota.set(k, t);
   }
   const d = specialty && t.bond.status === "declared" && !t.bond.amounts.some((x) => x.rule) ? m.terms.get(college)?.find((x) => x.program === programmes[p].bucket && x.kind === "BOND")?.details : undefined;

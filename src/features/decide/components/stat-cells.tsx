@@ -20,7 +20,7 @@ function CellTip({ c, t, of }: { c: StatCell; t: ProgrammeTerms; of?: string }) 
         const d = l.src != null ? doc(l.src) : undefined;
         return (
           <span key={i} className={cn("mt-1 block", l.warn && "text-sun", l.quote && "border-l-2 border-border pl-2 text-muted-foreground")}>
-            {l.text}
+            {l.href ? <a href={l.href} target="_blank" rel="noopener noreferrer" className="text-sky underline">{l.text}<span className="sr-only"> (opens in a new tab)</span></a> : l.text}
             {d && <SourceRef doc={d} />}
             {l.rules && NBEMS_BOND_RULES.map((r) => <SourceRef key={r.url} doc={{ name: r.label, url: r.url, type: "OFFICIAL" }} />)}
           </span>
@@ -38,6 +38,12 @@ function Value({ c, full, nb }: { c: StatCell; full?: boolean; nb?: boolean }) {
   const raw = full ? c.full : c.short;
   // "₹1.5 Cr" never splits from its unit; in a table nothing splits but a range ("₹10 L–₹20 L" wraps after its dash).
   const v = nb ? raw.replace(/ /g, "\u00a0") : raw.replace(/ (L|Cr)\b/g, "\u00a0$1");
+  if (c.href)
+    return (
+      <a href={c.href} target="_blank" rel="noopener noreferrer" className="text-sky hover:underline">
+        {raw}<span className="sr-only"> (opens in a new tab)</span>
+      </a>
+    );
   return (
     <span className={cn("numeric", c.tone === "muted" && !c.level ? "text-muted-foreground" : "font-semibold", c.level ? levelClass[c.level] : c.tone === "bond" && "text-sun")}>
       {/* A short value ("₹50 L") is read out in full ("₹50,00,000"). */}
@@ -50,7 +56,7 @@ function Value({ c, full, nb }: { c: StatCell; full?: boolean; nb?: boolean }) {
 }
 
 /**
- * "max", "state rule": beside the value on a card (under it when there is no room), on its own line in a table
+ * "below NBEMS min", "state law may apply" (the only two): beside the value on a card (under it when there is no room), on its own line in a table
  * (`block`: the column stays narrow). A long one ("state law may apply") wraps inside its cell, never past its rule.
  */
 const Marker = ({ c, block }: { c: StatCell; block?: boolean }) =>
@@ -74,11 +80,11 @@ export function StatCellView({ c, t, of, short, tip = true }: { c: StatCell; t: 
 
 /** A compact table's column notes (its header (i)): what the values and markers mean. */
 const columnNote: Record<StatKey, string> = {
-  fee: "Year 1 fee a year for this course and quota. ≤ … NBEMS max: no fee declared; the most NBEMS lets a DNB hospital charge, not the college's own fee. above NBEMS max: the hospital declared more than that. GST removed: the college's figure less the 18% GST NBEMS withdrew. at admission: paid when joining. see text: read from the MCC profile's own fee words, which the (i) quotes. In words: the profile gives no one figure for this seat type (its words are in the (i)). —: not in Seatora's data. Colour: green a low fee, red a high one, for the course type (" + feeBandText + ").",
-  stipend: "Year 1 stipend a month. min: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. + DA: plus dearness allowance. NMC list: one figure for every PG year. As published: in words only. —: not in Seatora's data. Colour: amber below the NBEMS minimum.",
-  bond: "Service bond years (1Y: one year). Yes: a bond, years not stated. state rule: the years are the state's rule, not the college's own document's. + state rule: a state rule applies as well. NBEMS rule: no bond at a private DNB hospital. caveat: no bond, with a doubt in the (i). Unknown · state law may apply: the document says no bond, but a state law's service may apply. Unknown or —: not declared or not checked, never read as no bond. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey unknown.",
-  bondInr: "What you pay if you do not serve the bond. state rule: the state rule's amount. by specialty: a range over the subjects. computed: by Seatora, per year × years, or the record's own formula (a stipend refund, the course fee) over this seat's own figures; ≤ at most, ≥ at least. A short phrase (Refund stipend, Rest of course fee, No ₹ figure…): in words only, the words in the (i). incl. additional: an amount owed on top included. + words: part in words only. None: no bond. Unknown or —: not known. Colour: red ₹25 L or more, amber below that, green none.",
-  leaving: "The college's or state's penalty for leaving the seat or course after joining. by specialty, computed, ≤, ≥, + words and the short phrases (Per state rule, No money penalty…): as for Bond penalty. —: not in Seatora's data. Colour: red ₹25 L or more.",
+  fee: "Year 1 fee a year for this course and quota. Up to / ≤ ₹1.25 L: a DNB hospital that declared none; the most NBEMS lets it charge. Varies by subject, On college website, Ask college: the profile gives no one figure for these seats (its words are in the institute's Fees tab). —: not in Seatora's data. Colour: green a low fee, red a high one, for the course type (" + feeBandText + ").",
+  stipend: "Year 1 stipend a month. From / ≥: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. Ask college: no figure published. —: not in Seatora's data. Colour: amber below the NBEMS minimum.",
+  bond: "Service bond years (1Y: one year). Yes: a bond, years not stated. Not published: no bond declared, or no clear answer; never read as no bond. state law may apply: the document says no bond, but a state law's service may apply. —: not checked. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey not published.",
+  bondInr: "What you pay if you do not serve the bond. ≤ at most, ≥ at least; a range where it varies by specialty; + more conditions. A short phrase (Refund stipend, Rest of course fee, Ask college…): no ₹ figure. None: no bond. Colour: red ₹25 L or more, amber below that, green none.",
+  leaving: "The college's or state's penalty for leaving the seat or course after joining. ≤, ≥, + and the short phrases (Per state rule, No money penalty…): as for Bond penalty. —: not in Seatora's data. Colour: red ₹25 L or more.",
 };
 
 /** Year 2 or 3's fee or stipend in a table column: the full figure, its marker under it; a 2-year course's year 3 says so. */

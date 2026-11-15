@@ -29,6 +29,33 @@ export function inrApprox(inr: number): string {
   return `₹${Number(v.toFixed(1))} ${u}`;
 }
 
+/** ₹ in lakh or crore to two decimals, cut not rounded ("₹1.71 L", "₹19.8 L", never "₹1.25 L" for ₹1,24,999); under ₹1 L in full. */
+export function inrL(inr: number): string {
+  const [v, u] = inr >= 1e7 ? [inr / 1e7, "Cr"] : inr >= 1e5 ? [inr / 1e5, "L"] : [0, ""];
+  return u ? `₹${Math.floor(v * 100 + 1e-9) / 100} ${u}` : formatINR(inr);
+}
+/** A card's ₹: "₹10k" for whole thousands under ₹1 L, else inrL. */
+export const inrCard = (inr: number) => (inr > 0 && inr < 1e5 && inr % 1e3 === 0 ? `₹${inr / 1e3}k` : inrL(inr));
+/** A fee range: "₹15–25 L" when both are lakh, else "₹50,000–₹1.5 L". */
+export function feeRange(min: number | null | undefined, max: number): string {
+  if (min == null || min === max) return inrL(max);
+  const [a, b] = [inrL(min), inrL(max)];
+  return a.endsWith(" L") && b.endsWith(" L") ? `${a.slice(0, -2)}–${b.slice(1)}` : `${a}–${b}`;
+}
+/**
+ * A website as a link: "www.x.in" gets http:// (browsers upgrade it); null for anything that isn't an http(s) address.
+ */
+export function websiteUrl(w: string | null | undefined): string | null {
+  if (!w) return null;
+  const u = /^[a-z][a-z\d+.-]*:/i.test(w) ? w : `http://${w}`;
+  try {
+    const p = new URL(u);
+    return p.protocol === "http:" || p.protocol === "https:" ? p.href : null;
+  } catch {
+    return null;
+  }
+}
+
 /** "₹35 L–₹50 L", or one figure when min is absent or the same. */
 export const inrRange = (min: number | null | undefined, max: number, short = true) => {
   const f = short ? inrShort : inrFull;
@@ -40,7 +67,7 @@ export type StatKey = "fee" | "stipend" | "bond" | "bondInr" | "leaving";
 export const statLabel: Record<StatKey, string> = { fee: "Fee", stipend: "Stipend", bond: "Bond period", bondInr: "Bond penalty", leaving: "Leaving penalty" };
 export const statKeys = Object.keys(statLabel) as StatKey[];
 /** One line behind a cell's (i): exact words, the source number it cites. `rules`: cite the NBEMS bond rules. */
-export type TipLine = { text: string; src?: number | null; warn?: true; quote?: true; rules?: true };
+export type TipLine = { text: string; src?: number | null; warn?: true; quote?: true; rules?: true; href?: string };
 export type StatCell = {
   key: StatKey;
   /** Column / cell label: "Fee". */
@@ -49,9 +76,14 @@ export type StatCell = {
   about: string;
   short: string;
   full: string;
-  /** Tiny text beside the value: "max", "min", "state rule", "by specialty"… */
+  /**
+   * Tiny warning beside the value, only two: "below NBEMS min" (stipend), "state law may apply" (bond not published).
+   * Everything else a value leaves out is said in its (i), never in the cell.
+   */
   marker: string | null;
-  /** bond: a bond applies (orange); muted: "—", "Not declared", a phrase for words ("Refund stipend"); warn: the marker is a caveat. */
+  /** The value is a link (a fee "On college website ↗"). */
+  href?: string;
+  /** bond: a bond applies (orange); muted: "—", "Not published", a short reason ("Refund stipend", "Ask college"); warn: the marker is a warning. */
   tone: "bond" | "muted" | null;
   markerWarn?: true;
   /** "—": not in the data (screen readers hear it). */
@@ -135,38 +167,54 @@ function textLines(t: ProgrammeTerms, u: ReturnType<typeof unread>): TipLine[] {
   ];
 }
 
+/**
+ * A fee in words only, as a short reason: "Varies by subject" (words saying it depends on the subject), "On college
+ * website ↗" (words pointing to the college's site: the link is the words' own address, else the college's MCC
+ * website), else "Ask college". The words are in the (i).
+ */
+function feeWords(text: string, website: string | null | undefined): { label: string; href?: string } {
+  const url = websiteUrl(text.match(/\b(?:https?:\/\/|www\.)[^\s,;()<>"']+[^\s,;()<>"'.]/i)?.[0]);
+  if (/\b(?:by|per|depend\w* on)\b[^.|]{0,20}?\b(?:subject|speciality|specialty|branch|discipline)|(?:subject|speciality|specialty|branch|course)[- ]?wise|var(?:y|ies)|differ/i.test(text))
+    return { label: "Varies by subject", ...(url && { href: url }) };
+  const href = url ?? (/website|web ?site|\bsite\b|portal|online/i.test(text) ? websiteUrl(website) : null);
+  return href ? { label: "On college website ↗", href } : { label: "Ask college" };
+}
+
 function feeCell(t: ProgrammeTerms): StatCell {
   const c = { key: "fee", label: statLabel.fee, about: "fee" } as const;
   const f = t.years[0]?.fee;
   const u = unread(t, "FEE");
   if (!t.years.some((y) => y.fee)) {
-    if (u) return words(c, [{ text: "The MCC profile gives this fee in words only (no one figure for this course and seat type), so Seatora shows no figure. Its words:" }, asQuote(u), ...hostelLines(t)], "In words");
+    if (u) {
+      const w = feeWords(u.text, t.website);
+      const link: TipLine[] = w.href ? [{ text: w.href.replace(/^https?:\/\/|\/$/g, ""), href: w.href }] : [];
+      return { ...words(c, [{ text: "The MCC profile gives this fee in words only (no one figure for this course and seat type), so Seatora shows no figure. Its words:" }, asQuote(u), ...link, ...hostelLines(t)], w.label), ...(w.href && { href: w.href }) };
+    }
     return dash(c, t.notes.length ? t.notes.map((text) => ({ text, ...(t.notesSrc != null && { src: t.notesSrc }) })) : [{ text: NOT_IN_DATA }]);
   }
   const max = t.years.some((y) => y.fee?.kind === "maximum");
   const tip: TipLine[] = [
-    ...(f?.kind === "maximum" ? [{ text: `Up to ${inrFull(f.inr)} a year: ${NBEMS_MAX}.`, src: f.src }] : []),
+    ...(f?.kind === "maximum" ? [{ text: "NBEMS limit; hospital declared none." }, { text: `Up to ${inrFull(f.inr)} a year: ${NBEMS_MAX}.`, src: f.src }] : []),
     ...(f?.above ? [{ text: ABOVE_MAX, warn: true as const }] : []),
     ...yearLines(t, "fee", " a year"),
     ...(t.wholeCourseFee != null ? [{ text: `Whole course: ${max ? "up to " : ""}${inrFull(t.wholeCourseFee)} total (${t.durationYears} yrs)${max ? " (NBEMS maximum)" : ""}` }] : []),
     ...(f?.min != null ? [{ text: "A range: the fee depends on the subject." }] : []),
+    ...(f?.atAdmission ? [{ text: "Paid at admission, not a yearly fee." }] : []),
+    ...(f?.declared != null ? [{ text: `GST removed: the college declared ${inrFull(f.declared)}.`, warn: true as const }] : []),
     ...hostelLines(t),
     ...figureNotes(t),
     ...(t.feeNote ? [{ text: t.feeNote }] : []),
     ...textLines(t, u),
   ];
   if (!f) return { ...dash(c, tip), tip: [{ text: "Year 1's fee is not stated." }, ...tip] };
-  const own = [f.atAdmission && "at admission", f.declared != null && "GST removed", f.fromText && "see text"].filter(Boolean).join(" · ") || null;
-  const marker = f.above ? ["above NBEMS max", f.fromText && "see text"].filter(Boolean).join(" · ") : f.kind === "maximum" ? "NBEMS max" : own;
-  const warn = f.above || f.declared != null;
-  // "₹1,71,462/yr" (a sum paid at admission has its marker instead); the NBEMS ceiling "≤ ₹1,25,000/yr", never the college's own.
-  const bound = f.kind === "maximum" ? "≤ " : "";
-  const unit = f.atAdmission ? "" : "/yr";
+  // "₹1.71 L/yr", "₹15–25 L/yr", a sum paid at admission "₹5 L at admission" (cards too); the NBEMS ceiling "Up to ₹1.25 L" (cards
+  // "≤ ₹1.25 L"), never the college's own. No marker: what a figure leaves out is in the (i).
+  const v = feeRange(f.min, f.inr);
   const cell: StatCell = {
     ...c,
-    short: bound + (f.min != null ? inrRange(f.min, f.inr) : inrApprox(f.inr)),
-    full: `${bound}${inrRange(f.min, f.inr, false)}${unit}`,
-    marker, ...(warn && { markerWarn: true as const }), tone: null, tip,
+    short: (f.kind === "maximum" ? "≤ " : "") + v + (f.atAdmission ? " at admission" : ""),
+    full: f.kind === "maximum" ? `Up to ${v}` : f.atAdmission ? `${v} at admission` : `${v}/yr`,
+    marker: null, tone: null, tip,
   };
   const [low, high] = FEE_BANDS[t.programme as keyof typeof FEE_BANDS] ?? [];
   if (f.kind === "maximum" || f.atAdmission || low == null) return cell;
@@ -181,7 +229,7 @@ function stipendCell(t: ProgrammeTerms): StatCell {
   const s = t.years[0]?.stipend;
   const u = unread(t, "STIPEND");
   if (!s) {
-    if (u) return words(c, [{ text: "The stipend as published:" }, asQuote(u)], "As published");
+    if (u) return words(c, [{ text: "The stipend is published in words only:" }, asQuote(u)], "Ask college");
     return dash(c, [{ text: t.years.some((y) => y.stipend) ? "Year 1's stipend is not stated." : NOT_IN_DATA }, ...(t.years.some((y) => y.stipend) ? yearLines(t, "stipend", " a month") : [])]);
   }
   const below = t.years.find((y) => y.stipend?.below)?.stipend;
@@ -191,26 +239,26 @@ function stipendCell(t: ProgrammeTerms): StatCell {
     ...(s.plusDa ? [{ text: "Plus DA (dearness allowance), as the college declared." }] : []),
     ...(s.kind === "minimum" ? [{ text: NBEMS_MIN }] : s.kind === "nmc" ? [{ text: NMC }] : []),
   ];
-  const marker = s.below ? "below NBEMS min" : s.kind === "minimum" ? "min" : s.kind === "nmc" ? "NMC list" : s.plusDa ? "+ DA" : null;
-  return levelOf({ ...c, short: inrShort(s.inr), full: inrFull(s.inr), marker, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
+  const min = s.kind === "minimum";
+  return levelOf({ ...c, short: min ? `≥ ${inrCard(s.inr)}` : inrShort(s.inr), full: min ? `From ${inrFull(s.inr)}` : inrFull(s.inr), marker: s.below ? "below NBEMS min" : null, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
 }
 
-/** A bond that is not declared: why ("Not declared": the record's words; "—": no record, or a record for other courses). */
+/** A bond that is not declared: why ("Not published": the record's words; "—": no record, or a record for other courses). */
 function bondMissing(t: ProgrammeTerms, c: Pick<StatCell, "key" | "label" | "about">): StatCell {
   const b = t.bond;
   const doc: TipLine[] = b.doc != null ? [{ text: "The college's own bond document on MCC", src: b.doc }] : [];
   const rules: TipLine[] = isDnb(t) ? [{ text: DNB_RULE, rules: true }] : [{ text: STATE_CAUTION }];
-  if (b.status === "other_course") return dash(c, [{ text: `Not declared for ${t.programme}: the bond on the college's MCC profile is for other courses.`, src: b.src }, ...rules]);
+  if (b.status === "other_course") return dash(c, [{ text: `Not published for ${t.programme}: the bond on the college's MCC profile is for other courses.`, src: b.src }, ...rules]);
   if (b.text) {
     // A no-bond document where a state law's service may apply (`caveat`): the Bond cell marks it.
     const law = b.caveat && c.key === "bond";
     return {
-      ...c, short: "Not declared", full: "Not declared", marker: law ? "state law may apply" : null, ...(law && { markerWarn: true as const }), tone: "muted",
+      ...c, short: "Not published", full: "Not published", marker: law ? "state law may apply" : null, ...(law && { markerWarn: true as const }), tone: "muted",
       tip: [...(b.caveat ? [{ text: MAY_APPLY, warn: true as const }] : []), { text: b.text, src: b.src }, ...doc, ...(isDnb(t) ? rules.map((r) => ({ ...r, text: "NBEMS bond rules" })) : [])],
     };
   }
   const u = unread(t, "BOND");
-  if (u) return words(c, [{ text: "The bond as published (no verified record yet):" }, asQuote(u)], "As published");
+  if (u) return words(c, [{ text: "The bond as the MCC profile words it (no verified record yet):" }, asQuote(u)], "Not verified");
   return dash(c, [{ text: NOT_CHECKED }, ...rules]);
 }
 
@@ -230,8 +278,7 @@ function bondCell(t: ProgrammeTerms): StatCell {
   const b = t.bond;
   if (b.status === "none") {
     const caveat = !!(b.caveat || b.stateRule);
-    const marker = caveat ? "caveat" : b.basis === "nbems_rule" ? "NBEMS rule" : null;
-    return levelOf({ ...c, short: "No bond", full: "No bond", marker, ...(caveat && { markerWarn: true as const }), tone: null, tip: noBondTip(t) }, caveat ? undefined : "good", undefined);
+    return levelOf({ ...c, short: "No bond", full: "No bond", marker: null, tone: null, tip: noBondTip(t) }, caveat ? undefined : "good", undefined);
   }
   if (b.status !== "declared") return bondMissing(t, c);
   const full = b.years == null ? "Years not stated" : b.yearsSum ? `${b.yearsSum} = ${yrs(b.years)}` : yrs(b.years);
@@ -244,7 +291,7 @@ function bondCell(t: ProgrammeTerms): StatCell {
     levelWord: long ? "a bond of 3 years or more" : b.years == null ? "a bond, years not stated" : "a bond of 1 to 2 years",
     short: b.years == null ? "Yes" : `${b.years}Y`,
     full,
-    marker: b.basis === "state_rule" || b.yearsFrom || summaryYears ? "state rule" : b.stateRule ? "+ state rule" : null,
+    marker: null,
     tone: "bond",
     tip: [
       { text: b.text ?? `Service bond: ${full}.`, src: b.src },
@@ -272,8 +319,8 @@ function phrase(a: Amount, texts: (string | null | undefined)[]): string {
   if (/^State rule/.test(t)) return /\bno money penalty\b/i.test(t) ? "No money penalty" : "Per state rule";
   if (/by subject|by specialt/i.test(t)) return "Varies by subject";
   if (/left blank|_{3,}/i.test(t)) return "Amount left blank";
-  if (/as per (?:the )?policy|as applicable/i.test(t)) return "As per policy";
-  return "No ₹ figure";
+  if (/as per (?:the )?policy|as applicable/i.test(t)) return "As per college policy";
+  return "Ask college";
 }
 
 /** What a figure leaves out: "₹10,00,000 per year × 3 years, computed", "incl. ₹10,00,000 additional". */
@@ -288,9 +335,14 @@ function amountLines(a: Amount, years: number | null, src: number | null = null)
 }
 // A computed formula's bound: "≤ ₹3.75 L" (at most), "≥ ₹18 L" (at least).
 const BOUND = { upTo: "≤ ", atLeast: "≥ " } as const;
-// A range (₹10 L plus a stipend received by the date of leaving: "₹10 L–₹38 L") says its own bounds.
-const amountValue = (a: Amount, short: boolean) => `${a.perYear ? "up to " : a.formula?.bound && (a.min == null || a.min === a.max) ? BOUND[a.formula.bound] : ""}${inrRange(a.min, a.max!, short)}`;
-const amountMarker = (a: Amount) => (a.varies ? "by specialty" : a.perYear || a.formula ? "computed" : a.extra ? "incl. additional" : a.more ? "+ words" : null);
+// A range (₹10 L plus a stipend received by the date of leaving: "₹10 L–₹38 L") says its own bounds. Conditions in
+// words beside a figure: "₹10,000+" (cards "₹10k+"). No marker: the working and the words are in the (i).
+// `exact` (the (i)): full Indian grouping, "up to".
+const amountValue = (a: Amount, short: boolean, exact = false) => {
+  const f = exact ? inrFull : short ? inrCard : inrL;
+  const v = a.min != null && a.min !== a.max ? `${f(a.min)}–${f(a.max!)}` : f(a.max!);
+  return `${a.perYear ? (exact ? "up to " : "≤ ") : a.formula?.bound && (a.min == null || a.min === a.max) ? BOUND[a.formula.bound] : ""}${v}${a.more && !exact ? "+" : ""}`;
+};
 const partLines = (parts: TermPart[], src: number | null): TipLine[] => parts.map((p) => ({ text: p.text, src: p.src ?? src }));
 
 function bondInrCell(t: ProgrammeTerms): StatCell {
@@ -308,9 +360,9 @@ function bondInrCell(t: ProgrammeTerms): StatCell {
   if (a.state === "figure" && a.max != null) {
     const high = a.max >= HIGH_PENALTY;
     return {
-      ...c, short: amountValue(a, true), full: amountValue(a, false), marker: amountMarker(a) ?? (rule ? "state rule" : null), tone: "bond",
+      ...c, short: amountValue(a, true), full: amountValue(a, false), marker: null, tone: "bond",
       level: high ? "heavy" : "caution", levelWord: high ? "₹25 L or more" : "a bond amount",
-      tip: [head, { text: `${amountValue(a, false)} for this course.`, src: rule?.src ?? b.src }, ...ruleLine, ...amountLines(a, b.years, b.src), ...parts, ...other],
+      tip: [head, { text: `${amountValue(a, false, true)} for this course.`, src: rule?.src ?? b.src }, ...ruleLine, ...amountLines(a, b.years, b.src), ...parts, ...other],
     };
   }
   const quote: TipLine[] = b.quote ? [{ text: b.quote, src: b.src, quote: true }] : [];
@@ -333,12 +385,12 @@ function leavingCell(t: ProgrammeTerms): StatCell {
   if (!b.leaving.length) {
     // A PENALTY term without its record (an older import), as published; a record's forfeit in words is not this.
     const u = unread(t, "PENALTY");
-    if (u) return words(c, [head, { text: "As published:" }, asQuote(u), ...forfeit], "As published");
+    if (u) return words(c, [head, { text: "The MCC profile's words:" }, asQuote(u), ...forfeit], "Ask college");
     return dash(c, [head, { text: NOT_IN_DATA }, ...other, ...forfeit]);
   }
   const tip = [head, ...partLines(b.leaving, b.src), ...amountLines(a, null, b.leaving[0]?.src ?? b.src), ...other, ...forfeit];
   if (a.state !== "figure" || a.max == null) return words(c, tip, phrase(a, b.leaving.map((p) => p.text)));
-  return levelOf({ ...c, short: amountValue(a, true), full: amountValue(a, false), marker: amountMarker(a), tone: null, tip }, a.max >= HIGH_PENALTY ? "heavy" : undefined, "₹25 L or more");
+  return levelOf({ ...c, short: amountValue(a, true), full: amountValue(a, false), marker: null, tone: null, tip }, a.max >= HIGH_PENALTY ? "heavy" : undefined, "₹25 L or more");
 }
 
 /**
@@ -349,8 +401,7 @@ export function yearValue(t: ProgrammeTerms, pick: "fee" | "stipend", year: numb
   if (year > t.durationYears) return null;
   const f = t.years[year - 1]?.[pick];
   if (!f) return { text: "—", marker: null };
-  const marker = f.kind === "maximum" ? "NBEMS max" : f.kind === "minimum" ? "min" : f.atAdmission ? "at admission" : f.fromText ? "see text" : f.above ? "above NBEMS max" : null;
-  return { text: `${f.kind === "maximum" ? "≤ " : ""}${inrRange(f.min, f.inr, false)}`, marker };
+  return { text: `${f.kind === "maximum" ? "≤ " : f.kind === "minimum" ? "≥ " : ""}${pick === "fee" ? feeRange(f.min, f.inr) : inrRange(f.min, f.inr, false)}`, marker: f.below ? "below NBEMS min" : null };
 }
 
 /** The five cells of one course's terms, in order: Fee, Stipend, Bond, Bond ₹, Leaving. */

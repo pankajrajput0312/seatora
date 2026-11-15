@@ -20,7 +20,7 @@ describe("TermFilterControls", () => {
     expect(checked(html, "ctype", "esic")).toBe(false);
     expect(checked(html, "nd", "keep")).toBe(true);
     expect(html).toContain(">No bond<");
-    expect(html).toContain('aria-label="About not declared"');
+    expect(html).toContain('aria-label="About not published"');
   });
 
   it("nothing applied: any, include-not-declared unticked", () => {

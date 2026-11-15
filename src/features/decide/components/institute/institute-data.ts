@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { websiteUrl } from "../../lib/stat-format";
 import { anyTermFilter, termVerdict, type TermFilters, type TermVerdict } from "../../lib/term-filters";
 import { profileHasCourse, type Profile } from "../../profile";
 import { getCatalog, type Catalog, type YearInfo } from "../../server/catalog";
@@ -133,20 +134,8 @@ export async function hospitalInfo(): Promise<Map<string, HospitalInfo>> {
   return m;
 }
 
-/**
- * The website as declared on the college's MCC profile, as a link: "www.x.in" gets http:// (browsers upgrade it);
- * null for anything that isn't an http(s) address (another scheme, or not a URL).
- */
-export function websiteUrl(w: string | null): string | null {
-  if (!w) return null;
-  const u = /^[a-z][a-z\d+.-]*:/i.test(w) ? w : `http://${w}`;
-  try {
-    const p = new URL(u);
-    return p.protocol === "http:" || p.protocol === "https:" ? p.href : null;
-  } catch {
-    return null;
-  }
-}
+/** The website as declared on the college's MCC profile, as a link (lib/stat-format.ts). */
+export { websiteUrl };
 
 /**
  * A college's clinical facts (server/facts.ts) with its course rows in her profile first (`mine`; only when she ticked

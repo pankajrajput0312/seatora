@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BondDetails, PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
 import { normalizeProgramme, type Programme } from "../server/terms";
 import type { FeeTableRecord, Term } from "../types";
-import { inrApprox, inrFull, inrRange, inrShort, statCells, yearValue, type StatCell, type StatKey } from "./stat-format";
+import { feeRange, inrApprox, inrCard, inrFull, inrL, inrRange, inrShort, statCells, yearValue, type StatCell, type StatKey } from "./stat-format";
 
 // Terms shaped as the bundle has them (server/terms.test.ts), through the real normalizer, then the cells.
 const MCC = { name: "MCC institute profile (college declaration)", url: "https://mcc.admissions.nic.in/Counseling/Handler/ViewInstituteProfileDetailsDynamic.ashx?boardId=140012521&InstituteId=700359", type: "OFFICIAL" as const };
@@ -64,12 +64,13 @@ describe("fee and stipend cells", () => {
       fee_whole_course: { amount: 375000, currency: "INR", maximum: true },
       stipend_per_month: [43000, 45000, 47000].map((v) => ({ inr: v, kind: "nbems_minimum" as const, minimum: true as const, src: 2 })),
     })]));
-    expect(shown(c.fee)).toEqual(["≤ ₹1.25 L", "≤ ₹1,25,000/yr", "NBEMS max", null]);
-    expect(c.fee.tip[0]).toMatchObject({ text: expect.stringMatching(/^Up to ₹1,25,000 a year: the most NBEMS lets a DNB hospital charge .*not the college's own fee\.$/), src: 1 });
+    expect(shown(c.fee)).toEqual(["≤ ₹1.25 L", "Up to ₹1.25 L", null, null]);
+    expect(c.fee.tip[0]).toEqual({ text: "NBEMS limit; hospital declared none." });
+    expect(c.fee.tip[1]).toMatchObject({ text: expect.stringMatching(/^Up to ₹1,25,000 a year: the most NBEMS lets a DNB hospital charge .*not the college's own fee\.$/), src: 1 });
     // Every line says it is a ceiling, the whole course too.
     expect(tip(c.fee)).toContain("Year 2: up to ₹1,25,000 a year");
     expect(tip(c.fee)).toContain("Whole course: up to ₹3,75,000 total (3 yrs) (NBEMS maximum)");
-    expect(shown(c.stipend)).toEqual(["₹43,000", "₹43,000", "min", null]);
+    expect(shown(c.stipend)).toEqual(["≥ ₹43k", "From ₹43,000", null, null]);
     expect(tip(c.stipend)).toMatch(/Year 2: at least ₹45,000 a month .*NBEMS minimum: the hospital must pay at least this/);
   });
 
@@ -79,7 +80,7 @@ describe("fee and stipend cells", () => {
       fee_per_year: [{ ...fee(145000), above_nbems_ceiling: true }, { ...fee(125000), declared_amount: 147500, gst_src: 2, note: "declared ₹1,47,500 = ₹1,25,000 + 18% GST; NBEMS withdrew the GST on 17-11-2023, so ₹1,25,000 is shown" }, null],
       stipend_per_month: [{ inr: 35000, kind: "declared", src: 1, below_nbems_minimum: true }, null, null],
     })]));
-    expect([...shown(c.fee), c.fee.markerWarn]).toEqual(["₹1.45 L", "₹1,45,000/yr", "above NBEMS max", null, true]);
+    expect([...shown(c.fee), c.fee.markerWarn]).toEqual(["₹1.45 L", "₹1.45 L/yr", null, null, undefined]);
     expect(c.fee.tip).toContainEqual({ text: "Above the NBEMS maximum: the hospital declared more than NBEMS lets a DNB hospital charge.", warn: true });
     expect(c.fee.tip).toContainEqual({ text: "Declared ₹1,47,500 = ₹1,25,000 + 18% GST; NBEMS withdrew the GST on 17-11-2023, so ₹1,25,000 is shown", src: 2 });
     expect([...shown(c.stipend), c.stipend.markerWarn]).toEqual(["₹35,000", "₹35,000", "below NBEMS min", null, true]);
@@ -89,10 +90,11 @@ describe("fee and stipend cells", () => {
     expect(nb.stipend.tip).toContainEqual({ text: "Below the NBEMS minimum: the college declared less than NBEMS's minimum stipend of ₹43,000 a month.", warn: true, src: 2 });
     // A figure Seatora took the GST off: marked, the declared figure on its year line.
     const gst = cells("DNB", fees("DNB", [rec("DNB", { fee_per_year: [{ ...fee(125000), declared_amount: 147500, gst_src: 2, note: "declared ₹1,47,500 = ₹1,25,000 + 18% GST" }, null, null] })]));
-    expect([...shown(gst.fee), gst.fee.markerWarn]).toEqual(["₹1.25 L", "₹1,25,000/yr", "GST removed", null, true]);
+    expect([...shown(gst.fee), gst.fee.markerWarn]).toEqual(["₹1.25 L", "₹1.25 L/yr", null, null, undefined]);
+    expect(gst.fee.tip).toContainEqual({ text: "GST removed: the college declared ₹1,47,500.", warn: true });
     expect(gst.fee.tip).toContainEqual({ text: "Year 1: ₹1,25,000 a year (declared ₹1,47,500; see below)", src: 1 });
     const da = cells("MD/MS", fees("MD", [rec("MD/MS", { stipend_per_month: [{ inr: 55200, kind: "declared", src: 1, plus_da: true }, null, null] })]));
-    expect(shown(da.stipend)).toEqual(["₹55,200", "₹55,200", "+ DA", null]);
+    expect(shown(da.stipend)).toEqual(["₹55,200", "₹55,200", null, null]);
     expect(tip(da.stipend)).toContain("Plus DA (dearness allowance), as the college declared.");
   });
 
@@ -100,8 +102,16 @@ describe("fee and stipend cells", () => {
     const words = "Annual fees: Fee Min: 100000 to Max: 7000000";
     const verbatim = rec("MD/MS", { seat_groups: ["Deemed/Paid"], fee_display: "verbatim", fee_per_year: [null, null, null], fee_text: words, fee_text_src: { url: MCC.url, date: "2026-10-01" } });
     const c = cells("MD/MS", fees("MD", [verbatim], "Seatora's summary, not the profile's words"));
-    expect(shown(c.fee)).toEqual(["In words", "In words", null, "muted"]);
+    expect(shown(c.fee)).toEqual(["Ask college", "Ask college", null, "muted"]);
     expect(c.fee.tip[1]).toMatchObject({ text: words, quote: true });
+    // Words saying it varies by subject; words pointing to the college's website (their own address, else its MCC one).
+    const said = (fee_text: string) => cells("MD/MS", fees("MD", [{ ...verbatim, fee_text }])).fee;
+    const varies = said("FEES VARIES WITH SPECAILITIES. Visit www.sbmch.ac.in for further Information");
+    expect([varies.short, varies.href]).toEqual(["Varies by subject", "http://www.sbmch.ac.in/"]);
+    expect(said("For details of Course fee visit website.").short).toBe("Ask college");
+    expect(said("Tuition fee ranges from Rs.3,00,000/- to Rs.48,00,000/- per annum as per the opted speciality by student").short).toBe("Varies by subject");
+    const site = { ...normalizeProgramme("MD/MS", fees("MD", [{ ...verbatim, fee_text: "For details of Course fee visit website." }])), website: "www.x.ac.in" };
+    expect([statCells(site)[0].short, statCells(site)[0].href]).toEqual(["On college website ↗", "http://www.x.ac.in/"]);
     // No words for these seats: "—", saying so.
     const none = cells("MD/MS", fees("MD", [{ ...verbatim, fee_text: null }]));
     expect(shown(none.fee)).toEqual(["—", "—", null, "muted"]);
@@ -123,7 +133,7 @@ describe("fee and stipend cells", () => {
     };
     const v = rec("DNB", { seat_groups: ["DNB Quota"], fee_display: "verbatim", fee_text: text, fee_text_src: { url: MCC.url, date: "2026-11-14" }, fee_parsed: parsed });
     const c = cells("DNB", fees("DNB", [v]));
-    expect(shown(c.fee)).toEqual(["₹1.25 L", "₹1,25,000/yr", "see text", null]);
+    expect(shown(c.fee)).toEqual(["₹1.25 L", "₹1.25 L/yr", null, null]);
     expect(c.fee.tip).toContainEqual({ text: "At admission / Year 1 / Year 2 / Year 3: 125000", src: 1, quote: true });
     expect(tip(c.fee)).toContain("At admission: ₹50,000 (as the profile states it).");
     expect(tip(c.fee)).toContain("Annual fee: ₹1,05,000 a year (as the profile states it).");
@@ -131,17 +141,23 @@ describe("fee and stipend cells", () => {
     expect(c.fee.tip.at(-1)).toMatchObject({ text, quote: true });
     // Only a sum at admission: year 1, marked; a DNB figure above the NBEMS ₹1,25,000 warned.
     const adm = cells("MD/MS", fees("MD", [rec("MD/MS", { fee_display: "verbatim", fee_text: "At admission: 40476", fee_parsed: { basis: parsed.basis, src: 1, per_year: [null, null, null], at_admission: { amount: 40476, currency: "INR", quote: "At admission: 40476" } } })]));
-    expect(shown(adm.fee)).toEqual(["₹40,476", "₹40,476", "at admission · see text", null]);
+    expect(shown(adm.fee)).toEqual(["₹40,476 at admission", "₹40,476 at admission", null, null]);
     const above = cells("DNB", fees("DNB", [{ ...v, fee_parsed: { ...parsed, per_year: [1, 2, 3].map(() => fig(150000, "Year 1", y.quote)) } }]));
-    expect([above.fee.marker, above.fee.markerWarn]).toEqual(["above NBEMS max · see text", true]);
+    expect([above.fee.marker, above.fee.markerWarn]).toEqual([null, undefined]);
     const usd = cells("MD/MS", fees("MD", [rec("MD/MS", { seat_groups: ["NRI"], fee_display: "verbatim", fee_text: "NRI year 1 (US$ field): 42000", fee_parsed: { basis: parsed.basis, src: 1, per_year: [{ amount: 42000, currency: "USD", quote: "NRI year 1 (US$ field): 42000" }, null, null] } })]));
-    expect(usd.fee.short).toBe("In words");
+    expect(usd.fee.short).toBe("Ask college");
   });
 
   it("year columns: each year's full figure and marker, — when not stated, none past the course", () => {
     const ceil = { amount: 125000, currency: "INR" as const, kind: "nbems_ceiling" as const, maximum: true as const, src: 2 };
     const t = normalizeProgramme("NBEMS Diploma", fees("DNB", [rec("NBEMS Diploma", { seat_groups: ["DNB Quota"], fee_per_year: [ceil, ceil], stipend_per_month: [{ inr: 43000, kind: "nbems_minimum", minimum: true, src: 2 }, null] })]));
-    expect([yearValue(t, "fee", 2), yearValue(t, "stipend", 2), yearValue(t, "fee", 3)]).toEqual([{ text: "≤ ₹1,25,000", marker: "NBEMS max" }, { text: "—", marker: null }, null]);
+    expect([yearValue(t, "fee", 2), yearValue(t, "stipend", 2), yearValue(t, "fee", 3)]).toEqual([{ text: "≤ ₹1.25 L", marker: null }, { text: "—", marker: null }, null]);
+  });
+
+  it("inrL cuts to two decimals of a lakh or crore; inrCard writes whole thousands as k; feeRange shares the unit", () => {
+    expect([171462, 124999, 1980000, 41000, 12345678].map(inrL)).toEqual(["₹1.71 L", "₹1.24 L", "₹19.8 L", "₹41,000", "₹1.23 Cr"]);
+    expect([43000, 10000, 43500, 150000].map(inrCard)).toEqual(["₹43k", "₹10k", "₹43,500", "₹1.5 L"]);
+    expect([feeRange(1500000, 2500000), feeRange(50000, 150000), feeRange(null, 171462)]).toEqual(["₹15–25 L", "₹50,000–₹1.5 L", "₹1.71 L"]);
   });
 
   it("cards round a fee to one decimal of a lakh; exact short forms stay", () => {
@@ -150,10 +166,10 @@ describe("fee and stipend cells", () => {
 
   it("a fee paid at admission is marked so; a range by subject shows both ends", () => {
     const goa = cells("MD/MS", fees("MD", [rec("MD/MS", { fee_per_year: [{ ...fee(70324), kind: "amount_at_admission" }, null, null] })]));
-    expect(shown(goa.fee)).toEqual(["₹70,324", "₹70,324", "at admission", null]);
+    expect(shown(goa.fee)).toEqual(["₹70,324 at admission", "₹70,324 at admission", null, null]);
     expect(goa.fee.tip[0].text).toBe("Year 1: ₹70,324 paid at admission");
     const range = cells("MD/MS", fees("MD", [rec("MD/MS", { fee_per_year: [{ ...fee(100000), amount_max: 6800000 }, null, null] })]));
-    expect(shown(range.fee).slice(0, 2)).toEqual(["₹1 L–₹68 L", "₹1,00,000–₹68,00,000/yr"]);
+    expect(shown(range.fee).slice(0, 2)).toEqual(["₹1–68 L", "₹1–68 L/yr"]);
   });
 
   it("missing is '—' (not in Seatora's data), never 0", () => {
@@ -173,23 +189,23 @@ describe("bond cells, by record status", () => {
     expect(shown(c.bond)).toEqual(["1Y", "1 year", null, "bond"]);
     expect(c.bond.tip[0]).toEqual({ text: "Service bond: 1 year · ₹50 L clinical · ₹15 L diploma", src: 1 });
     expect(tip(c.bond)).toContain("Years as written: 1 (extendable up to 2 more years)");
-    expect(shown(c.bondInr)).toEqual(["₹50 L", "₹50,00,000", null, "bond"]);
+    expect(shown(c.bondInr)).toEqual(["₹50 L", "₹50 L", null, "bond"]);
     expect(c.bondInr.tip[1]).toEqual({ text: "₹50,00,000 for this course.", src: 1 });
-    expect(shown(cells("Diploma", [tripura]).bondInr).slice(0, 2)).toEqual(["₹15 L", "₹15,00,000"]);
+    expect(shown(cells("Diploma", [tripura]).bondInr).slice(0, 2)).toEqual(["₹15 L", "₹15 L"]);
   });
 
   it("documented, priced by subject: the range, marked by specialty; added-up years in full", () => {
     const raj = bond("MD", "Service bond: 1 + 3 years · ₹25 L–₹1.5 Cr by subject", 15000000, { status: "documented", years: "1 + 3", by_subject: { ANAESTHESIOLOGY: 5000000, PATHOLOGY: 2500000, GENERALSURGERY: 15000000 } });
     const c = cells("MD/MS", [raj]);
     expect(shown(c.bond)).toEqual(["4Y", "1 + 3 = 4 years", null, "bond"]);
-    expect(shown(c.bondInr)).toEqual(["₹25 L–₹1.5 Cr", "₹25,00,000–₹1,50,00,000", "by specialty", "bond"]);
+    expect(shown(c.bondInr)).toEqual(["₹25 L–₹1.5 Cr", "₹25 L–₹1.5 Cr", null, "bond"]);
     expect(c.bondInr.tip).toContainEqual({ text: "The amount varies by specialty: this is the range over the subjects.", warn: true });
   });
 
   it("a per defaulting year amount: 'up to', computed, with the published amount behind the (i)", () => {
     const wb = bond("MD", "Service bond: 3 years (diploma 2) · ₹10 L per unserved year", 3000000, { status: "yes", years: "3 (PG Degree); 2 (PG Diploma)", amounts: [{ applies_to: "MD / MS, per defaulting year", inr: 1000000 }] });
     const c = cells("MD/MS", [wb]);
-    expect(shown(c.bondInr)).toEqual(["up to ₹30 L", "up to ₹30,00,000", "computed", "bond"]);
+    expect(shown(c.bondInr)).toEqual(["≤ ₹30 L", "≤ ₹30 L", null, "bond"]);
     expect(tip(c.bondInr)).toContain("₹10,00,000 per year × 3 years, computed by Seatora.");
   });
 
@@ -200,14 +216,14 @@ describe("bond cells, by record status", () => {
       amounts: [{ applies_to: "MD/MS", inr: 3000000 }, { applies_to: "Diploma", inr: 2000000 }],
     });
     const c = cells("MD/MS", [wb]);
-    expect(shown(c.bond)).toEqual(["3Y", "3 years", "state rule", "bond"]);
+    expect(shown(c.bond)).toEqual(["3Y", "3 years", null, "bond"]);
     expect(c.bond.tip).toContainEqual({ text: "From the state's rule (its order is the source), not the college's own bond document.", warn: true });
-    expect(shown(c.bondInr).slice(0, 2)).toEqual(["₹30 L", "₹30,00,000"]);
+    expect(shown(c.bondInr).slice(0, 2)).toEqual(["₹30 L", "₹30 L"]);
   });
 
   it("a document's bond whose years its summary marks '(state rule)' is marked state rule (Rajasthan)", () => {
     const sms = bond("MD", "Service bond: 2 years (state rule) · ₹25 L–₹1.5 Cr by subject (Anaesthesia ₹50 L) · AIQ included", null, { status: "yes", years: "not stated in the document", by_subject: { ANAESTHESIOLOGY: 5000000, OBG: 15000000 } });
-    expect(shown(cells("MD/MS", [sms]).bond)).toEqual(["2Y", "2 years", "state rule", "bond"]);
+    expect(shown(cells("MD/MS", [sms]).bond)).toEqual(["2Y", "2 years", null, "bond"]);
     // No rule record behind the years: the (i) says the document does not state them.
     expect(cells("MD/MS", [sms]).bond.tip).toContainEqual({ text: "The years are the state's rule as Seatora's summary gives them; the college's own document does not state them.", warn: true });
   });
@@ -221,17 +237,17 @@ describe("bond cells, by record status", () => {
     });
     const c = cells("MD/MS", [kidwai]);
     // The 4 years are the rule's, not the document's 1: marked "state rule" (not "+ state rule"), with a warning line.
-    expect(shown(c.bond)).toEqual(["4Y", "3 + 1 = 4 years", "state rule", "bond"]);
+    expect(shown(c.bond)).toEqual(["4Y", "3 + 1 = 4 years", null, "bond"]);
     expect(c.bond.tip).toContainEqual({ text: "Years from the state's rule (its order is the source), not the college's own document.", warn: true, src: 2 });
-    expect(shown(c.bondInr)).toEqual(["₹50 L", "₹50,00,000", "state rule", "bond"]);
+    expect(shown(c.bondInr)).toEqual(["₹50 L", "₹50 L", null, "bond"]);
     expect(c.bondInr.tip.slice(1, 3)).toEqual([{ text: "₹50,00,000 for this course.", src: 2 }, { text: "From the state's rule, as the bond years are, not the college's own bond document.", src: 2, warn: true }]);
-    expect(shown(cells("Diploma", [kidwai]).bondInr).slice(0, 2)).toEqual(["₹25 L", "₹25,00,000"]);
+    expect(shown(cells("Diploma", [kidwai]).bondInr).slice(0, 2)).toEqual(["₹25 L", "₹25 L"]);
   });
 
   it("documented with a state rule beside it: '+ state rule'", () => {
     const b = bond("MD", "Service bond: 2 years · ₹20 L", 2000000, { status: "documented", years: 2, state_rule: { status: "state_rule", years: "1 year", amounts: [], text: "1 yr in Delhi Govt hospitals, ₹20 L" } });
     const c = cells("MD/MS", [b]);
-    expect(c.bond.marker).toBe("+ state rule");
+    expect(c.bond.marker).toBeNull();
     expect(tip(c.bond)).toContain("State rule as well: 1 yr in Delhi Govt hospitals, ₹20 L");
   });
 
@@ -241,7 +257,7 @@ describe("bond cells, by record status", () => {
       state_rule: { status: "state_rule", years: "1 year", amounts: [{ applies_to: "MD/MS", inr: 2000000 }], text: "1 yr in Delhi Govt hospitals, ₹20 L" },
     });
     const c = cells("MD/MS", [delhi]);
-    expect([...shown(c.bond), c.bond.markerWarn]).toEqual(["No bond", "No bond", "caveat", null, true]);
+    expect([...shown(c.bond), c.bond.markerWarn]).toEqual(["No bond", "No bond", null, null, undefined]);
     expect(c.bond.tip[0]).toEqual({ text: "No bond (the college's own document).", src: 1 });
     expect(c.bond.tip).toContainEqual({ text: "A state rule may apply: 1 yr in Delhi Govt hospitals, ₹20 L", warn: true });
     expect(shown(c.bondInr)).toEqual(["None", "None", null, "muted"]);
@@ -251,22 +267,22 @@ describe("bond cells, by record status", () => {
 
   it("no bond, but a state law's service may apply: 'Unknown' (never 'No bond'), marked, as the filters read it", () => {
     const ka = cells("MD/MS", [bond("MD", "No bond per the college's MCC bond document; Karnataka law: 1 yr compulsory govt service may apply", null, { status: "no_bond_verified" })]);
-    expect([...shown(ka.bond), ka.bond.markerWarn]).toEqual(["Not declared", "Not declared", "state law may apply", "muted", true]);
+    expect([...shown(ka.bond), ka.bond.markerWarn]).toEqual(["Not published", "Not published", "state law may apply", "muted", true]);
     expect(ka.bond.tip.slice(0, 2)).toEqual([
       { text: "The college's own document says no bond, but a state law's service may apply, so Seatora counts it as unknown.", warn: true },
       { text: "No bond per the college's MCC bond document; Karnataka law: 1 yr compulsory govt service may apply", src: 1 },
     ]);
-    expect(shown(ka.bondInr)).toEqual(["Not declared", "Not declared", null, "muted"]);
+    expect(shown(ka.bondInr)).toEqual(["Not published", "Not published", null, "muted"]);
     expect(ka.bondInr.tip[0]).toMatchObject({ warn: true });
   });
 
   it("no_bond_rule: 'No bond', marked NBEMS rule and citing the NBEMS rules; an inferred private status is a caveat", () => {
     const rule = bond("DNB", "No bond (NBEMS rule for private DNB hospitals)", 0, { status: "no_bond_rule" }, NBEMS);
     const c = cells("DNB", [rule]);
-    expect(shown(c.bond)).toEqual(["No bond", "No bond", "NBEMS rule", null]);
+    expect(shown(c.bond)).toEqual(["No bond", "No bond", null, null]);
     expect(c.bond.tip[0]).toMatchObject({ text: "No bond (NBEMS rule).", rules: true });
     const unsure = cells("DNB", [bond("DNB", "No bond (NBEMS rule for private DNB hospitals)", 0, { status: "no_bond_rule", confidence: "medium: private status inferred from name" }, NBEMS)]);
-    expect([unsure.bond.marker, unsure.bond.markerWarn]).toEqual(["caveat", true]);
+    expect([unsure.bond.marker, unsure.bond.markerWarn]).toEqual([null, undefined]);
     expect(unsure.bond.tip).toContainEqual({ text: "Seatora's check: private status inferred from name.", warn: true });
   });
 
@@ -274,7 +290,7 @@ describe("bond cells, by record status", () => {
     const unknown = bond("MD", "MCC bond document has no clear terms — check with the college", null, { status: "unknown", reason: "mcc_document_unclear" });
     const c = cells("MD/MS", [unknown]);
     for (const k of ["bond", "bondInr"] as const) {
-      expect(shown(c[k])).toEqual(["Not declared", "Not declared", null, "muted"]);
+      expect(shown(c[k])).toEqual(["Not published", "Not published", null, "muted"]);
       expect(c[k].tip[0]).toEqual({ text: "MCC bond document has no clear terms — check with the college", src: 1 });
     }
   });
@@ -304,7 +320,7 @@ describe("leaving cell", () => {
       ],
     });
     const c = cells("MD/MS", [p]);
-    expect(shown(c.leaving)).toEqual(["₹35 L", "₹35,00,000", null, null]);
+    expect(shown(c.leaving)).toEqual(["₹35 L", "₹35 L", null, null]);
     expect(c.leaving.tip[1]).toEqual({ text: "₹35,00,000: PG degree, clinical subjects, discontinues PG course", src: 1 });
     expect(c.leaving.tip.at(-1)).toEqual({ text: "Separate from it: MCC lets the college keep ₹2,00,000 if you resign or don't join from Round 2.", src: 1 });
   });
@@ -325,7 +341,7 @@ describe("leaving cell", () => {
     const ag = bond("MD", "Service bond: 1 year · ₹50 L clinical · ₹35 L pre/para-clinical", 5000000, {
       status: "yes", years: 1, amounts: [{ applies_to: "PG degree, clinical subjects", inr: 5000000 }, { applies_to: "PG degree, pre/para-clinical subjects", inr: 3500000 }],
     });
-    expect(shown(cells("MD/MS", [ag]).bondInr)).toEqual(["₹35 L–₹50 L", "₹35,00,000–₹50,00,000", "by specialty", "bond"]);
+    expect(shown(cells("MD/MS", [ag]).bondInr)).toEqual(["₹35 L–₹50 L", "₹35 L–₹50 L", null, "bond"]);
   });
 
   it("an additional item owed on top is included and marked; words only is a short phrase", () => {
@@ -335,7 +351,7 @@ describe("leaving cell", () => {
         { kind: "leaving_penalty", applies_to: "PG at Govt seats", inr: 1000000, when: "lapse of PG seat (additional)", quote: null, source_url: MCC.url },
       ],
     });
-    expect(shown(cells("MD/MS", [mh]).leaving)).toEqual(["₹10 L–₹20 L", "₹10,00,000–₹20,00,000", "incl. additional", null]);
+    expect(shown(cells("MD/MS", [mh]).leaving)).toEqual(["₹10 L–₹20 L", "₹10 L–₹20 L", null, null]);
     const words = penalty("DNB", { items: [{ kind: "leaving_penalty", applies_to: "DNB / Diploma", inr: null, when: "leaving the course", quote: "balance fee for the entire course", source_url: MCC.url }] });
     expect(shown(cells("DNB", [words]).leaving)).toEqual(["Rest of course fee", "Rest of course fee", null, "muted"]);
     expect(tip(cells("DNB", [words]).leaving)).toContain("In words only (no ₹ figure).");
@@ -364,7 +380,7 @@ describe("formula amounts: computed from the record's words over the row's own f
 
   it("N years' stipend: years 1..N, ₹/month × 12, marked computed with the formula in the (i) (Sri Devaraj Urs)", () => {
     const c = cells("MD/MS", [...sdu, ...verbatim([50000, 55000, 60000])]);
-    expect(shown(c.bondInr)).toEqual(["₹19.8 L", "₹19,80,000", "computed", "bond"]);
+    expect(shown(c.bondInr)).toEqual(["₹19.8 L", "₹19.8 L", null, "bond"]);
     expect(tip(c.bondInr)).toContain("refund 3 years' stipend, if not served");
     expect(tip(c.bondInr)).toContain("3 years' stipend: (₹50,000 + ₹55,000 + ₹60,000) a month × 12 = ₹19,80,000.");
     // The leaving words: the balance of the course fee, which is in words for this seat: a phrase, never "See text".
@@ -372,8 +388,8 @@ describe("formula amounts: computed from the record's words over the row's own f
     expect(tip(c.leaving)).toContain("balance tuition and other fees for the entire course (discontinuing the course)");
     // With fee figures: at most the whole course's (a balance).
     const fig = cells("MD/MS", [...sdu, ...fees("MD", [rec("MD/MS", { fee_per_year: [fee(500000), fee(500000), fee(500000)], stipend_per_month: stip(50000, 50000, 50000) })])]);
-    expect(shown(fig.bondInr).slice(0, 3)).toEqual(["₹18 L", "₹18,00,000", "computed"]);
-    expect(shown(fig.leaving).slice(0, 3)).toEqual(["≤ ₹15 L", "≤ ₹15,00,000", "computed"]);
+    expect(shown(fig.bondInr).slice(0, 3)).toEqual(["₹18 L", "₹18 L", null]);
+    expect(shown(fig.leaving).slice(0, 3)).toEqual(["≤ ₹15 L", "≤ ₹15 L", null]);
     expect(tip(fig.leaving)).toMatch(/Whole course fee: ₹5,00,000 a year × 3 years = ₹15,00,000\. At most this: a balance is what is still unpaid when you leave\./);
   });
 
@@ -383,11 +399,11 @@ describe("formula amounts: computed from the record's words over the row's own f
       quote: "Monetary Penalty for defaulters (for not serving in state for two years after completion of course) shall be double the amount of stipend/salary received during study period. Candidates leaving the course before completion of the course leading to lapse of a seat shall be liable for monetary penalty of Rs. 10 lakh and the amount of stipend / salary received by the date of such leaving the course.",
     });
     const c = cells("MD/MS", [od, ...fees("MD", [rec("MD/MS", { stipend_per_month: stip(74456, 78001, 81547) })])]);
-    expect(shown(c.bondInr).slice(0, 3)).toEqual(["₹56,16,096", "₹56,16,096", "computed"]);
+    expect(shown(c.bondInr).slice(0, 3)).toEqual(["₹56.16 L", "₹56.16 L", null]);
     expect(c.bondInr.level).toBe("heavy");
     const rule = bond("DNB", "State bond: 2 yrs, repay double the stipend; leaving ₹10 L + stipend; applied to DNB in practice (Odisha resolution 29-01-2024)", null, { status: "state_rule", amounts: [{ applies_to: "NBEMS Diploma", inr: null }] });
     const nb = cells("NBEMS Diploma", [rule, ...fees("DNB", [rec("NBEMS Diploma", { stipend_per_month: [43000, 45000, null].map((v) => (v ? { inr: v, kind: "nbems_minimum" as const, minimum: true as const, src: 2 } : null)) })])]);
-    expect(shown(nb.bondInr).slice(0, 3)).toEqual(["≥ ₹21.12 L", "≥ ₹21,12,000", "computed"]);
+    expect(shown(nb.bondInr).slice(0, 3)).toEqual(["≥ ₹21.12 L", "≥ ₹21.12 L", null]);
     expect(tip(nb.bondInr)).toContain("At least this: the stipend is the NBEMS minimum.");
   });
 
@@ -396,13 +412,13 @@ describe("formula amounts: computed from the record's words over the row's own f
       items: [leave("PG medical course", "discontinuing the course for any reason", "undertake to pay Institutional fees to Kalinga Institute of Medical Sciences payable for the entire course")],
     });
     const c = cells("MD/MS", [kims, ...fees("MD", [rec("MD/MS", { fee_per_year: [fee(2900000), fee(2900000), fee(2900000)] })])]);
-    expect(shown(c.leaving)).toEqual(["₹87 L", "₹87,00,000", "computed", null]);
+    expect(shown(c.leaving)).toEqual(["₹87 L", "₹87 L", null, null]);
     expect(c.leaving.level).toBe("heavy");
     const dnb = penaltyText("DNB", "Seat-leaving penalty: balance fee for the whole course (the institute may ask for a bond / bank guarantee) (leaving the institute / course midway)", {
       items: [leave("DNB / Diploma", "leaving the institute / course midway", "liable to pay the balance fee for the whole course even if they leave the institute/course midway")],
     });
     const max = fees("DNB", [rec("DNB", { seat_groups: ["DNB Quota"], fee_per_year: [1, 2, 3].map(() => ({ amount: 125000, currency: "INR" as const, kind: "nbems_ceiling" as const, maximum: true as const, src: 2 })) })]);
-    expect(shown(cells("DNB", [dnb, ...max]).leaving).slice(0, 3)).toEqual(["≤ ₹3.75 L", "≤ ₹3,75,000", "computed"]);
+    expect(shown(cells("DNB", [dnb, ...max]).leaving).slice(0, 3)).toEqual(["≤ ₹3.75 L", "≤ ₹3.75 L", null]);
     // The fee in words only: what it is, no number.
     expect(cells("MD/MS", [kims, ...verbatim([])]).leaving.short).toBe("Whole course fee");
   });
@@ -413,12 +429,12 @@ describe("formula amounts: computed from the record's words over the row's own f
     });
     const st = fees("MD", [rec("MD/MS", { stipend_per_month: stip(74456, 78001, 81547) })]);
     const c = cells("MD/MS", [od, ...st]);
-    expect(shown(c.leaving).slice(0, 3)).toEqual(["₹10 L–₹38,08,048", "₹10,00,000–₹38,08,048", "computed"]);
+    expect(shown(c.leaving).slice(0, 3)).toEqual(["₹10 L–₹38.08 L", "₹10 L–₹38.08 L", null]);
     expect(tip(c.leaving)).toContain("₹10,00,000 as stated; total ₹38,08,048. At most this: the stipend received by the date you leave.");
     const bhav = penaltyText("MD", "Seat-leaving penalty: ₹5,00,000", {
       items: [leave("MD/MS/Diploma in pre/para-clinical subjects", "leaving the course midway for any reason: the lesser of total stipend paid to that day or ₹5 lakh, paid to MK Bhavnagar University", null, 500000)],
     });
-    expect(shown(cells("MD/MS", [bhav, ...st]).leaving).slice(0, 3)).toEqual(["₹5 L", "₹5,00,000", null]);
+    expect(shown(cells("MD/MS", [bhav, ...st]).leaving).slice(0, 3)).toEqual(["₹5 L", "₹5 L", null]);
   });
 
   it("fees + stipend received, combined; a part with no figure (a blank fee, interest) is a phrase, never a number", () => {
@@ -426,7 +442,7 @@ describe("formula amounts: computed from the record's words over the row's own f
       items: [leave("MCC-allotted PG (All India [Management] & NRI)", "surrender/resignation after MCC schedule or abandoning mid-course: no refund, pay entire course fee (3 years) + stipend received")],
     });
     const c = cells("MD/MS", [both, ...fees("MD", [rec("MD/MS", { fee_per_year: [fee(1000000), fee(1000000), fee(1000000)], stipend_per_month: stip(45000, 50000, 55000) })])]);
-    expect(shown(c.leaving).slice(0, 3)).toEqual(["≤ ₹48 L", "≤ ₹48,00,000", "computed"]);
+    expect(shown(c.leaving).slice(0, 3)).toEqual(["≤ ₹48 L", "≤ ₹48 L", null]);
     expect(cells("MD/MS", [both, ...verbatim([45000, 50000, 55000])]).leaving.short).toBe("Fees + stipend");
     const em = penaltyText("MD", "Seat-leaving penalty: x", {
       items: [leave("MD Emergency Medicine (PG degree, MD/MS), all candidates", "discontinues the course before completion: repay entire stipend received plus a discontinuation fee (amount left blank in form) with interest at Govt loan rate")],
@@ -438,7 +454,7 @@ describe("formula amounts: computed from the record's words over the row's own f
 
   it("N months' stipend: year 1's ₹/month × N (no bundle record words it so yet)", () => {
     const m = bond("MD", "Service bond: 1 year · refund 6 months' stipend, if not served", null, { status: "yes", years: 1, amounts: [] });
-    expect(shown(cells("MD/MS", [m, ...fees("MD", [rec("MD/MS", { stipend_per_month: stip(50000, 55000, 60000) })])]).bondInr).slice(0, 3)).toEqual(["₹3 L", "₹3,00,000", "computed"]);
+    expect(shown(cells("MD/MS", [m, ...fees("MD", [rec("MD/MS", { stipend_per_month: stip(50000, 55000, 60000) })])]).bondInr).slice(0, 3)).toEqual(["₹3 L", "₹3 L", null]);
   });
 
   it("no formula: a phrase saying what it is (a state rule, no money penalty, no ₹ figure), never 'See text'", () => {
@@ -446,12 +462,12 @@ describe("formula amounts: computed from the record's words over the row's own f
     expect(cells("MD/MS", [rule("Uttar Pradesh", "No money penalty. Under government order I/676928/2024 dated 26-06-2024, a candidate who leaves a government-college seat after the final counselling round and before finishing the course is barred from the next academic session's admission.")]).leaving.short).toBe("No money penalty");
     expect(cells("MD/MS", [rule("Punjab", "A candidate who drops out and seeks fresh admission must deposit the full course fee (3 years for degree).")]).leaving.short).toBe("Per state rule");
     const plain = penaltyText("MD", "Seat-leaving penalty: x", { items: [leave("MD/MS", "leaving the course")] });
-    expect(cells("MD/MS", [plain]).leaving.short).toBe("No ₹ figure");
+    expect(cells("MD/MS", [plain]).leaving.short).toBe("Ask college");
     const policy = bond("MD", "Service bond: no period or amount stated", null, { status: "yes", amounts: [], quote: "I shall be liable to pay the Bond money (as applicable) as per the Policy" });
-    expect(cells("MD/MS", [policy]).bondInr.short).toBe("As per policy");
-    // Older imports without a record: "As published".
-    expect(cells("MD/MS", [term("MD", "PENALTY", "Leaving: as per the college's rules")]).leaving.short).toBe("As published");
-    for (const c of Object.values(cells("MD/MS", [...sdu, plain]))) expect(c.short).not.toBe("See text");
+    expect(cells("MD/MS", [policy]).bondInr.short).toBe("As per college policy");
+    // Older imports without a record: "Ask college".
+    expect(cells("MD/MS", [term("MD", "PENALTY", "Leaving: as per the college's rules")]).leaving.short).toBe("Ask college");
+    for (const c of Object.values(cells("MD/MS", [...sdu, plain]))) expect(c.short).not.toMatch(/See text|In words|As published|No ₹ figure/);
   });
 });
 
