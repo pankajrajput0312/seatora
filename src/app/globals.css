@@ -86,6 +86,50 @@
     color: var(--color-foreground);
   }
   .app h1, .app h2, .app h3, .app h4 { color: var(--color-foreground); letter-spacing: -0.01em; }
+  /* Black-and-white variant of the case sheet (the /v2 home): neutral greys, no chart-ink blue. Signal colours stay. */
+  .app.mono {
+    --color-background: #f5f5f5;
+    --color-muted: #efefef;
+    --color-raised: #ebebeb;
+    --color-mist: #ebebeb;
+    --color-foreground: #000000;
+    --color-primary: #000000;
+    --color-muted-foreground: #555555;
+    --color-border: #e2e2e2;
+    --color-input: #8a8a8a;
+    --color-ring: #000000;
+    --color-sky: #000000;
+    --color-mark: #000000;
+    --color-wash: #efefef;
+    --color-wash-line: #e2e2e2;
+    --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.1);
+  }
+  /* Its dark version: white on black. The /v2 default; the header toggle switches to the light one above. */
+  .app.mono.dark {
+    color-scheme: dark;
+    --color-background: #111111;
+    --color-card: #000000;
+    --color-popover: #000000;
+    --color-secondary: #000000;
+    --color-muted: #1c1c1c;
+    --color-raised: #161616;
+    --color-mist: #1c1c1c;
+    --color-foreground: #ffffff;
+    --color-primary: #ffffff;
+    --color-primary-foreground: #000000;
+    --color-muted-foreground: #a3a3a3;
+    --color-border: #2a2a2a;
+    --color-input: #737373;
+    --color-ring: #ffffff;
+    --color-sky: #ffffff;
+    --color-mark: #ffffff;
+    --color-wash: #1c1c1c;
+    --color-wash-line: #2a2a2a;
+    --color-leaf: #5cc85c;
+    --color-sun: #e0a83a;
+    --color-ember: #ff6b6b;
+    --shadow-overlay: 0 0 0 1px #2a2a2a;
+  }
   /* Faint ECG-style grid paper behind the hero chart */
   .app .chart-paper {
     background-image:

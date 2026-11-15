@@ -19,6 +19,8 @@ Scoped by the `.app` wrapper and by `.app [data-astryx-theme]`, both in `src/app
 | Chart-ink blue (marks) | `#2a78d6` | `--color-mark` |
 | Good / warning / critical (text-safe) | `#0a7a0a` / `#8a5a00` / `#c03030` | `text-leaf` / `text-sun` / `text-ember` |
 
+Black and white: the `/v2` home adds `mono` to the wrapper (`.app.mono`, globals.css). It's the same system in neutral greys, with black for ink, links and marks; signal colours keep their meaning. Its dark version (`.app.mono.dark`: white on black, lighter signal colours so they stay readable) is the default there, and a header button switches between the two.
+
 Fonts: `--font-app`, which is Atkinson Hyperlegible Next, used for body, headings and numbers alike. There's no pixel or monospace face inside the app.
 
 ## Layout

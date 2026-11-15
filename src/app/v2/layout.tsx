@@ -5,10 +5,10 @@ import { Atkinson_Hyperlegible_Next } from "next/font/google";
 const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { absolute: "Seatora · Your NEET PG rank, turned into a plan" },
+  title: { absolute: "Seatora: see who's training where, then choose your PG seat" },
   robots: { index: false }, // alternative home page while both versions are compared
 };
 
 export default function HomeV2Layout({ children }: { children: React.ReactNode }) {
-  return <div className={`app ${app.variable} min-h-screen bg-card`}>{children}</div>;
+  return <div className={`app mono dark ${app.variable} min-h-screen bg-card`}>{children}</div>;
 }

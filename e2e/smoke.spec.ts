@@ -204,7 +204,7 @@ test("parallel wrong guesses still trigger the lock", async ({ page, browser }) 
 
 test("v2 home: rank card opens the planner with that rank", async ({ page }) => {
   await page.goto("/v2");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Your NEET PG rank, turned into a plan.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Choose your PG seat knowing who's already there.");
   await page.getByRole("button", { name: "Show my colleges" }).click();
   await expect(page.getByText("Enter a rank between 1 and 3,00,000.")).toBeVisible();
   await page.getByLabel("Your All India Rank").fill("42,284");
