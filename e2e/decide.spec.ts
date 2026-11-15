@@ -465,7 +465,7 @@ test("fees: a fee in the profile's own words shows no figure anywhere; MCC's Rou
   const slug = await slugOf("CHETTINADSUPERSPECIALITYHOSPITALTAMILNAD#603103");
   await page.goto(`/decide/institutes/${slug}?${PROFILE}`);
   const fee1 = (h: string) => page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: h, exact: true }) }).getByRole("definition").first();
-  await expect(fee1("MD/MS")).toHaveText("See text"); // the Overview's Fee cell: words only, no ₹
+  await expect(fee1("MD/MS")).toHaveText("In words"); // the Overview's Fee cell: words only, no ₹
   await page.goto(`/decide/institutes/${slug}?${PROFILE}&tab=fees`);
   const group = page.getByRole("region", { name: "MD/MS", exact: true }).getByRole("region", { name: "Deemed/Paid seats" });
   await expect(group).toContainText("Seatora shows no fee figure here");
@@ -510,9 +510,9 @@ test("seats matrix: a row's Details drawer has the course's terms and the beds a
   await expect(matrix.getByRole("row", { name: /Bombay Hospital/ })).toContainText("270+");
   await matrix.getByRole("button", { name: /^Details ?: DNB Anaesthesiology/ }).click();
   const drawer = page.getByRole("dialog", { name: "Bombay Hospital" });
-  // The row's own stat cells: Fee ₹1.25 L max (NBEMS), Bond "No bond", NBEMS rule.
+  // The row's own stat cells: Fee ≤ ₹1.25 L, NBEMS max, Bond "No bond", NBEMS rule.
   await expect(drawer.getByRole("heading", { name: /: DNB$/ })).toBeVisible();
-  for (const v of ["₹1.25 L", "max", "No bond", "NBEMS rule"]) await expect(drawer).toContainText(v);
+  for (const v of ["≤ ₹1.25 L", "NBEMS max", "No bond", "NBEMS rule"]) await expect(drawer).toContainText(v);
   await expect(drawer.getByText("270+", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();

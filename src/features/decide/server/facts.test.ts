@@ -23,7 +23,7 @@ describe("feeGroup", () => {
   it("never shows figures of a verbatim record, or of one without fee_display (an older export)", () => {
     for (const fee_display of ["verbatim", undefined] as const) {
       const g = feeGroup("All India", { ...rec, fee_display });
-      expect(g.fee).toEqual({ display: "verbatim", text: "Year 1: 1,50,000", src: rec.fee_text_src });
+      expect(g.fee).toEqual({ display: "verbatim", text: "Year 1: 1,50,000", src: rec.fee_text_src, parsed: null });
       expect(g.stipendPerMonth).toEqual(rec.stipend_per_month);
     }
   });

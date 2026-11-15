@@ -334,6 +334,19 @@ const otherFee = z
     src,
   })
   .strict();
+/** A figure tools/parse_fee_text.py read out of a verbatim record's own fee words: `quote` is the exact span of fee_text. */
+const parsedFee = z.object({ amount: money, currency, quote: z.string().min(1), field: z.string().min(1).optional() }).strict();
+const feeParsed = z
+  .object({
+    basis: z.literal("parsed from MCC profile text"),
+    src,
+    per_year: z.array(parsedFee.nullable()).min(1).max(6),
+    at_admission: parsedFee.optional(),
+    annual_fee: parsedFee.optional(),
+    hostel: parsedFee.extend({ period: z.enum(["per_year", "per_month"]) }).optional(),
+    includes_hostel: z.enum(["yes", "no"]).optional(),
+  })
+  .strict();
 const feeVariant = z.object({ applies_to: z.string().min(1), per_year: z.array(z.object({ amount: money, amount_max: money.optional(), currency }).strict().nullable()), src }).strict();
 const stipendEntry = z
   .object({
@@ -393,6 +406,8 @@ export const mccFeesStructuredSchema = z
       .partial()
       .strict()
       .optional(),
+    /** Verbatim records only: figures its fee words state explicitly for this programme and seat type, each with its quote. */
+    fee_parsed: feeParsed.optional(),
     hostel_available: z.object({ male: hostelFlag, female: hostelFlag }).strict().optional(),
     stipend_per_month: z.array(stipendEntry.nullable()).min(1).max(6),
     stipend_nbems_minimum: z.array(stipendEntry).optional(),
@@ -449,7 +464,16 @@ export const mccFeesStructuredSchema = z
   })
   .strict()
   .refine((r) => r.id === `${r.key}|${r.programme}|${r.seat_groups.join("+")}`, { message: "id is not key|programme|seat groups", path: ["id"] })
-  .refine((r) => r.fee_display !== "verbatim" || r.fee_per_year.every((f) => f == null), { message: "a verbatim record has no fee figures", path: ["fee_per_year"] });
+  .refine((r) => r.fee_display !== "verbatim" || r.fee_per_year.every((f) => f == null), { message: "a verbatim record has no fee figures", path: ["fee_per_year"] })
+  .refine(
+    (r) => {
+      const p = r.fee_parsed;
+      if (!p) return true;
+      const figs = [...p.per_year, p.at_admission, p.annual_fee, p.hostel];
+      return r.fee_display !== "numbers" && p.per_year.length === r.duration_years && figs.every((f) => !f || (r.fee_text ?? "").includes(f.quote));
+    },
+    { message: "fee_parsed: a verbatim record's, one entry per course year, every quote in its fee_text", path: ["fee_parsed"] },
+  );
 export type MccFeesStructured = z.infer<typeof mccFeesStructuredSchema>;
 
 /** Every `src` / `gst_src` number a record cites (each must be an `n` of its sources). */

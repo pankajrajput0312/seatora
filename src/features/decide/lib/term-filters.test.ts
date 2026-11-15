@@ -11,7 +11,7 @@ const bond = (b: Partial<Bond>): Bond => ({
 });
 const terms = (fee: Figure | null, stipend: Figure | null, b: Partial<Bond> = {}): ProgrammeTerms => ({
   programme: "MD/MS", durationYears: 3, years: [{ year: 1, fee, stipend }, { year: 2, fee: null, stipend: null }, { year: 3, fee: null, stipend: null }],
-  feeNote: null, wholeCourseFee: null, bond: bond(b), resignForfeit: null, unread: [], notes: [], sources: [],
+  feeNote: null, wholeCourseFee: null, hostelFee: null, feeExtras: [], bond: bond(b), resignForfeit: null, unread: [], notes: [], sources: [],
 });
 
 // A government college with a declared ₹2 L fee, ₹1 L stipend, a 1-year ₹20 L bond and a ₹5 L leaving penalty.

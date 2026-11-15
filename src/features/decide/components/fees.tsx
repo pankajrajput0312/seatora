@@ -57,7 +57,7 @@ export function Money({ f, sources }: { f: Figure | null | undefined; sources: T
   if (!f) return <NotDeclared />;
   return (
     <span className="whitespace-nowrap">
-      {f.min != null && `${formatINR(f.min)}–`}{formatINR(f.inr)}
+      {f.kind === "maximum" && "≤ "}{f.min != null && `${formatINR(f.min)}–`}{formatINR(f.inr)}
       <Sup n={f.src} sources={sources} />
       {f.kind === "minimum" && <Badge className="ml-1.5">minimum</Badge>}
       {f.kind === "maximum" && <Badge className="ml-1.5">NBEMS maximum</Badge>}
@@ -157,7 +157,7 @@ function FeeCell({ f, at }: { f: FeeEntry | null; at: At }) {
   if (!f) return <NotDeclared what="not stated" />;
   return (
     <span className="whitespace-nowrap">
-      {f.amount != null ? feeMoney({ amount: f.amount, amount_max: f.amount_max, currency: f.currency }) : f.text}
+      {f.maximum && "≤ "}{f.amount != null ? feeMoney({ amount: f.amount, amount_max: f.amount_max, currency: f.currency }) : f.text}
       {at(f.src)}
       {f.maximum && <Badge className="ml-1.5">NBEMS maximum</Badge>}
       {f.above_nbems_ceiling && <Badge tone="warning" className="ml-1.5">above NBEMS maximum</Badge>}
@@ -165,6 +165,20 @@ function FeeCell({ f, at }: { f: FeeEntry | null; at: At }) {
     </span>
   );
 }
+
+type Parsed = NonNullable<Extract<FeeQuotaGroup["fee"], { display: "verbatim" }>["parsed"]>;
+/** A figure read out of the profile's own fee words (its exact words are listed under the table). */
+function ParsedCell({ x, adm, at, src }: { x: Parsed["per_year"][number] | undefined; adm?: boolean; at: At; src: number }) {
+  if (!x) return <NotDeclared what="not stated" />;
+  return (
+    <span className="whitespace-nowrap">
+      {feeMoney(x)}
+      {at(src)}
+      <span className="block text-xs font-normal text-muted-foreground">{adm ? "paid at admission · " : ""}from the profile&apos;s words</span>
+    </span>
+  );
+}
+const perOf = { per_year: "a year", per_month: "a month" } as const;
 
 function StipendCell({ s, at }: { s: StipendEntry | null; at: At }) {
   if (!s) return <NotDeclared what="not stated" />;
@@ -202,6 +216,10 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
   const sources = groupSources(g, off);
   const at: At = (x) => <Sup n={x == null ? x : x + off} sources={sources} />;
   const n = g.fee.display === "numbers" ? g.fee : null;
+  // A verbatim record's figures its words state for these seats: a fee column beside the words, each figure quoted.
+  const p = g.fee.display === "verbatim" ? g.fee.parsed : null;
+  const pYear = (i: number) => p?.per_year[i] ?? (i === 0 ? p?.at_admission : undefined);
+  const feeCol = !!n || Array.from({ length: g.years }, (_, i) => pYear(i)).some(Boolean);
   const name = `${g.groups.join(" + ")} seats`;
   const fees = n?.perYear ?? [];
   const st = g.stipendPerMonth;
@@ -244,6 +262,10 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
         {at(cf.src)}
       </>
     ),
+    p?.per_year[0] && p.at_admission && <>At admission: {feeMoney(p.at_admission)} (from the profile&apos;s words){at(p.src)}</>,
+    p?.annual_fee && <>Annual fee: {feeMoney(p.annual_fee)} a year (from the profile&apos;s words){at(p.src)}</>,
+    p?.hostel && <>Hostel: {feeMoney(p.hostel)} {perOf[p.hostel.period]} (from the profile&apos;s words){at(p.src)}</>,
+    p?.includes_hostel && (p.includes_hostel === "yes" ? "The profile says the fee includes hostel." : "The profile says the fee does not include hostel."),
     g.hostel && (g.hostel.male || g.hostel.female) && `Hostel (MCC profile): men ${g.hostel.male === "Y" ? "yes" : g.hostel.male === "N" ? "no" : "not stated"}, women ${g.hostel.female === "Y" ? "yes" : g.hostel.female === "N" ? "no" : "not stated"}.`,
     ...g.notes,
   ].filter(Boolean);
@@ -256,16 +278,20 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
       </h4>
       {!n && (
         <div className="grid gap-1 text-sm">
-          <p className="text-xs text-muted-foreground">Fee in the MCC profile&apos;s own words: it is not one clearly labelled amount per year, so Seatora shows no fee figure here.</p>
+          <p className="text-xs text-muted-foreground">
+            {feeCol
+              ? "Fee in the MCC profile's own words. The figures in the table are the ones these words state for these seats (each year, or at admission); a year they give no clear figure for is —."
+              : "Fee in the MCC profile's own words: it is not one clearly labelled amount per year, so Seatora shows no fee figure here."}
+          </p>
           <FeeWords fee={g.fee} />
         </div>
       )}
       <table className="w-full max-w-xl text-sm">
-        <caption className="sr-only">{title}, {name}: {n ? "fee and stipend" : "stipend"} by year of the course</caption>
+        <caption className="sr-only">{title}, {name}: {feeCol ? "fee and stipend" : "stipend"} by year of the course</caption>
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
             <th scope="col" className="py-2 pr-3 font-semibold">Year</th>
-            {n && <th scope="col" className="px-3 py-2 text-right font-semibold">Fee that year</th>}
+            {feeCol && <th scope="col" className="px-3 py-2 text-right font-semibold">Fee that year</th>}
             <th scope="col" className="py-2 pl-3 text-right font-semibold">Stipend per month</th>
           </tr>
         </thead>
@@ -274,6 +300,7 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
             <tr key={i} className="border-b border-border">
               <th scope="row" className="py-2 pr-3 text-left font-normal text-muted-foreground">Year {i + 1}</th>
               {n && <td className="numeric px-3 py-2 text-right font-semibold"><FeeCell f={fees[i] ?? null} at={at} /></td>}
+              {p && feeCol && <td className="numeric px-3 py-2 text-right font-semibold"><ParsedCell x={pYear(i)} adm={!p.per_year[i] && i === 0} at={at} src={p.src} /></td>}
               <td className="numeric py-2 pl-3 text-right font-semibold"><StipendCell s={st[i] ?? null} at={at} /></td>
             </tr>
           ))}
@@ -281,7 +308,7 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
             <tr>
               <th scope="row" className="py-2 pr-3 text-left font-normal text-muted-foreground">Whole course</th>
               <td className="numeric px-3 py-2 text-right font-semibold">
-                <span className="whitespace-nowrap">{feeMoney(n.wholeCourse)}{n.wholeCourse.maximum && <Badge className="ml-1.5">NBEMS maximum</Badge>}</span>
+                <span className="whitespace-nowrap">{n.wholeCourse.maximum && "≤ "}{feeMoney(n.wholeCourse)} total ({g.years} yrs){n.wholeCourse.maximum && <Badge className="ml-1.5">NBEMS maximum</Badge>}</span>
               </td>
               <td />
             </tr>

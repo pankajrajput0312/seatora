@@ -68,6 +68,10 @@ export type FeeTableRecord = Pick<MccFeesStructured, "programme" | "seat_groups"
   stipend_nbems_minimum?: MccFeesStructured["stipend_nbems_minimum"] | null;
   /** The MCC quotas the record covers; absent in an older import (then every record stands for the programme). */
   quotas?: string[];
+  /** A verbatim record's figures read out of its own fee words (each with its quote); absent in an older import. */
+  fee_parsed?: MccFeesStructured["fee_parsed"] | null;
+  /** Fee heads apart from the year figures (a hostel fee); absent in an older import. */
+  other_fees?: MccFeesStructured["other_fees"] | null;
 };
 /**
  * PENALTY holds the college's or state's penalty for leaving the seat or course and MCC's forfeit if you resign or

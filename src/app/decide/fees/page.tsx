@@ -97,10 +97,21 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const table = (
     <div role="region" aria-label="Fees, stipend and bond table" tabIndex={0} className={`${tbl.wrap} ${tbl.scroll}`}>
       <table className={tbl.table}>
-        <caption className="sr-only">Fees, stipend, service bond and leaving penalty by institute and programme, page {res.page}. The whole-course fee is in each Fee (i).</caption>
+        <caption className="sr-only">Fees a year and stipend a month for years 1 to 3, service bond and leaving penalty by institute and programme, page {res.page}. The whole-course fee is in each Fee (i).</caption>
         <thead className={tbl.head}><tr className={tbl.headRow}>
           {sortTh("name", "Institute", "sticky left-0 z-10 bg-card text-left")}
-          {statKeys.map((k) => sortTh(sortOf[k], statLabel[k]))}
+          {statKeys.flatMap((k) =>
+            k === "fee" || k === "stipend"
+              ? [
+                  sortTh(sortOf[k], `${statLabel[k]} Y1`),
+                  ...[2, 3].map((y) => (
+                    <th key={`${k}${y}`} scope="col" className={`${tbl.th} text-right`}>
+                      Y{y}<span className="sr-only"> {statLabel[k].toLowerCase()}{k === "fee" ? " a year" : " a month"}</span>
+                    </th>
+                  )),
+                ]
+              : [sortTh(sortOf[k], statLabel[k])],
+          )}
         </tr></thead>
         <tbody>
           {rows.map((r) => {
@@ -117,7 +128,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                     {type && <TypeBadge type={type} of={r.college.name} />}
                   </span>
                 </th>
-                <TermStatCells t={t} variant="table" of={of(r)} tdClassName="text-[15px]" />
+                <TermStatCells t={t} variant="table" years of={of(r)} tdClassName="text-[15px]" />
               </tr>
             );
           })}
@@ -132,9 +143,10 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         title="Fees, stipend and bond"
         about={
           <>
-            <strong>Fee</strong>: year 1, from the college&apos;s MCC profile. &quot;max&quot;: the NBEMS maximum for a DNB hospital
-            that declared none (no GST, paid to the hospital), not its own fee. &quot;See text&quot;: given only in words. The
-            whole-course fee is in the Fee (i).
+            <strong>Fee</strong>: a year, from the college&apos;s MCC profile (the table: years 1 to 3). &quot;≤ ₹1.25 L · NBEMS
+            max&quot;: a DNB hospital that declared none; the most NBEMS lets it charge (no GST, paid to the hospital), not its own
+            fee. &quot;see text&quot;: read from the profile&apos;s own fee words (quoted in the (i)). &quot;In words&quot;: the profile
+            gives no one figure for these seats. The whole-course fee is in the Fee (i).
             <br /><strong>Stipend</strong>: a month, before tax. &quot;min&quot;: the NBEMS floor; the pay may be higher.
             <br /><strong>Bond</strong>: years to serve after the course; <strong>Bond ₹</strong>: what you pay if you don&apos;t serve
             it (a range where it varies by specialty; sorting and filters use the highest). &quot;state rule&quot;: the state&apos;s rule,
@@ -145,7 +157,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             college&apos;s document or the NBEMS rule says so; &quot;Unknown&quot; where Seatora&apos;s check found no clear answer.
             &quot;Unknown · state law may apply&quot;: the college&apos;s document says no bond, but a state law&apos;s service may apply
             (the filters count it as not declared).
-            <br />Sorting: — and &quot;See text&quot; go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
+            <br />Sorting: —, &quot;In words&quot; and &quot;See text&quot; go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
           </>
         }
       >
