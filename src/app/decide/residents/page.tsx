@@ -66,7 +66,6 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   if (!rows.length && total) redirect(L.page("/decide/residents", pages));
   const keyOf = new Map(colleges.map((c) => [c.slug, c.key]));
   const types: ResidentTypes = new Map(rows.map((r) => [r.college.slug, info.get(keyOf.get(r.college.slug) ?? "")?.type ?? null]));
-  const quotas = [...new Set(meta.quotas.map(residentQuota))];
   const courseName = (slug: string) => {
     const c = meta.courses.find((x) => x.slug === slug);
     return c ? `${c.degree} ${c.name}` : slug;
@@ -108,7 +107,6 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         <FilterDropdown label="Course (branch)" name="course" search options={courseChoices} selected={allCourses ? ["all"] : typedCourses} none={yours ? `Your courses (${yours.length})` : "All courses"} noneNote={yours ? "None ticked means your courses. Tick All courses for every one." : "None ticked means every course."} />
         <Field label="State"><Select name="state" value={query.state} all="All states" options={meta.states.map((s) => ({ value: s, label: s }))} /></Field>
         <Field label="Year"><Select name="year" value={query.year ? String(query.year) : undefined} all="All years" options={years.map((y) => ({ value: String(y), label: String(y) }))} /></Field>
-        <Field label="Quota"><Select name="rq" value={query.quota && residentQuota(query.quota)} all="All quotas" options={quotas.map((q) => ({ value: q, label: q }))} /></Field>
         <Field label="Sort by"><Select name="sort" value={query.sort} options={sorts} /></Field>
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />

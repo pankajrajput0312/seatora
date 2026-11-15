@@ -627,16 +627,15 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     <table className={tbl.table}>
                       <caption className="sr-only">Residents in {g.course.degree} {g.course.name} at {college.name}, newest year first</caption>
                       <thead><tr className={tbl.headRow}>
-                        <th scope="col" className={tbl.th}>Name</th><th scope="col" className={tbl.th}>Year</th><th scope="col" className={tbl.th}>MCC list</th>
+                        <th scope="col" className={tbl.th}>Name</th><th scope="col" className={tbl.th}>Year</th>
                       </tr></thead>
                       {g.years.map((y) => (
                         <tbody key={y.year}>
-                          <tr className="border-b border-border bg-muted/40"><th scope="rowgroup" colSpan={3} className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground"><span className="numeric">{y.year}</span> · {formatRank(y.rows.length)}</th></tr>
+                          <tr className="border-b border-border bg-muted/40"><th scope="rowgroup" colSpan={2} className="px-4 py-1.5 text-left text-xs font-semibold text-muted-foreground"><span className="numeric">{y.year}</span> · {formatRank(y.rows.length)}</th></tr>
                           {y.rows.map((r) => (
-                            <HideableRow key={r.id} id={r.id} name={r.name} hide={hideResidentAction} colSpan={3} className={tbl.row}>
+                            <HideableRow key={r.id} id={r.id} name={r.name} hide={hideResidentAction} colSpan={2} className={tbl.row}>
                               <th scope="row" className={`${tbl.td} text-left font-medium`}>{r.name}</th>
                               <td className={`${tbl.td} numeric`}>{r.year}</td>
-                              <td className={tbl.td}>{r.list}</td>
                             </HideableRow>
                           ))}
                         </tbody>

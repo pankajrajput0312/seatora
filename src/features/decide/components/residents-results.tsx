@@ -6,7 +6,7 @@ import { parseSearchParams } from "../lib/params";
 import { profileHasCourse, type Profile } from "../profile";
 import { residentsQuery, type ResidentRow, type ResidentsQuery } from "../residents-search";
 import type { ResidentSource } from "../server/residents";
-import { roundLabel, type Course, type Round } from "../types";
+import type { Course } from "../types";
 import { Dash } from "./bits";
 import type { CollegeType } from "./institute/college-type";
 import type { SourceDoc } from "./page-sources";
@@ -42,13 +42,12 @@ export function residentsFilters(params: URLSearchParams, profile: Profile | nul
   return { query, yours: yours ? mine : null, allCourses };
 }
 
-const roundName = (r: string) => roundLabel[r as Round] ?? r;
 const courseName = (r: ResidentRow) => `${r.course.degree} ${r.course.name}`;
 const tabHref = (L: DecideLinks, r: ResidentRow) => L.to(`/decide/institutes/${r.college.slug}`, { tab: "residents" });
 const collegeLink = "inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline";
 
 const th = `${tbl.th} px-3`;
-const td = "px-3 py-2 align-top";
+const td = "px-3 py-1.5 align-top";
 
 /** One page of residents as a table; the College cell opens that institute's Residents tab. */
 export function ResidentsTable({ rows, L, hide, caption, types }: { rows: ResidentRow[]; L: DecideLinks; hide: Hide; caption: string; types?: ResidentTypes }) {
@@ -61,29 +60,22 @@ export function ResidentsTable({ rows, L, hide, caption, types }: { rows: Reside
           <th scope="col" className={th}>College</th>
           <th scope="col" className={th}>Course</th>
           <th scope="col" className={th}>Year</th>
-          <th scope="col" className={th}>List</th>
-          <th scope="col" className={th}>Quota</th>
-          <th scope="col" className={th}>Round</th>
         </tr></thead>
         <tbody>
           {rows.map((r) => {
             const type = types?.get(r.college.slug);
             return (
-              <SyncedHideableRow key={r.id} id={r.id} name={r.name} hide={hide} colSpan={8} className={tbl.row}>
+              <SyncedHideableRow key={r.id} id={r.id} name={r.name} hide={hide} colSpan={4} className={tbl.row}>
                 <th scope="row" className={`${td} min-w-36 text-left font-medium`}>{r.name}</th>
                 <td className={`${td} min-w-48`}>
                   <Link href={tabHref(L, r)} className={collegeLink}>{r.college.name}<span className="sr-only">: its residents</span></Link>
-                  <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                  <span className="ml-2 inline-flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                     {r.college.state ?? <Dash />}
                     {type && <TypeBadge type={type} of={r.college.name} />}
                   </span>
                 </td>
                 <td className={`${td} min-w-32`}>{courseName(r)}</td>
                 <td className={`${td} numeric`}>{r.year}</td>
-                {/* Wraps to fit 1366px, never between "Round" and its number. */}
-                <td className={`${td} min-w-24`}>{r.list.replace(/ (\d)/g, "\u00a0$1")}</td>
-                <td className={td}>{r.quota ?? <Dash />}</td>
-                <td className={`${td} whitespace-nowrap`}>{r.round ? roundName(r.round) : <Dash />}</td>
               </SyncedHideableRow>
             );
           })}
@@ -108,13 +100,8 @@ export function ResidentsCards({ rows, L, hide, types }: { rows: ResidentRow[]; 
             id={r.id}
             name={r.name}
             hide={hide}
-            chips={[
-              <span key="n" className="text-sm font-semibold text-foreground">{r.name}</span>,
-              `MCC list: ${r.list}`,
-              r.quota,
-            ]}
-            // Year and round as Allotments' cards show them ("2025 · R2"): the round is that year's matched allotment.
-            stat={{ label: "Year", value: <span className="numeric whitespace-nowrap">{r.year}{r.round && <span className="block text-xs font-normal tracking-normal text-muted-foreground"><span className="sr-only"> · </span>{roundName(r.round)}</span>}</span> }}
+            chips={[<span key="n" className="text-sm font-semibold text-foreground">{r.name}</span>]}
+            stat={{ label: "Year", value: <span className="numeric whitespace-nowrap">{r.year}</span> }}
             title={r.college.name}
             href={tabHref(L, r)}
             subtitle={courseName(r)}
@@ -137,9 +124,7 @@ export function ResidentsAbout() {
     <>
       <strong>Names</strong> are as printed in MCC&apos;s official admitted-candidates lists (each row names its list), which MCC publishes. Any signed-in member can see them; visitors who are not signed in and search engines cannot. No contact details are held.
       <br /><br />
-      <strong>Quota and round</strong> come from the matching MCC allotment of that year, shown only where exactly one matched the resident&apos;s college and course; otherwise a dash. Minority quotas show as &ldquo;Minority&rdquo;.
-      <br /><br />
-      No rank, seat category or candidate category is shown here.
+      No rank, quota, round, seat category or candidate category is shown here.
       <br /><br />
       Filter by <strong>college</strong> (the hospital) or by <strong>course</strong> (the branch), or both: type in either list to find one, and tick one or more.
       <br /><br />
