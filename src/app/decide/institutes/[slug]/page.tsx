@@ -101,7 +101,6 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const residentsAccess = tab !== "residents" ? null : !(await canSeeResidents()) ? "locked" : !(await residentsBudget("read")) ? "limited" : "ok";
   const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
   const residentGroups = residents ? groupResidents(residents.rows, profile) : [];
-  const residentYears = [...new Set(residents?.rows.map((r) => r.year))].sort((a, b) => b - a);
   // Seats here with no past allotments: not in the lists below; Seats shows them, and while Options opens in the round
   // view, Options lists those in her profile as new options (search: this institute's name, within its 100 characters).
   const newOnOptions = profile && optionsView(undefined, inst.seatList ? [inst.seatList] : [], meta.sources) === "round" ? L.options({ reach: "new", q: college.name.slice(0, 100) }) : undefined;
@@ -584,36 +583,10 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       {tab === "residents" && residents && (
         <section aria-labelledby="res-h" className="grid grid-cols-1 gap-4">
           <h2 id="res-h" className="sr-only">Residents</h2>
-          <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
-            Contact people respectfully; ask to be hidden and we will.
-            <InfoTip label="residents">From MCC&apos;s official admitted-candidates lists, shown for choosing a college. Names only: no contact details are held.</InfoTip>
-          </p>
           {residents.total === 0 ? (
             <EmptyState title="No residents listed here" description="MCC's admitted-candidates lists have no names at this institute, or they were hidden." href={L.institute(slug, "courses")} action="See the courses here" />
           ) : (
             <>
-              <div role="region" aria-label="Residents by course and year" tabIndex={0} className={tbl.wrap}>
-                <table className={tbl.table}>
-                  <caption className="sr-only">Residents at {college.name} by course and year</caption>
-                  <thead><tr className={tbl.headRow}>
-                    <th scope="col" className={tbl.th}>Course</th>
-                    {residentYears.map((y) => <th key={y} scope="col" className={`${tbl.th} text-right`}>{y}</th>)}
-                    <th scope="col" className={`${tbl.th} text-right`}>Total</th>
-                  </tr></thead>
-                  <tbody>
-                    {residentGroups.map((g) => (
-                      <tr key={g.course.slug} className={tbl.row}>
-                        <th scope="row" className={`${tbl.td} text-left font-medium`}><a href={`#res-${g.course.slug}`} className="hover:text-sky hover:underline">{g.course.degree} {g.course.name}</a></th>
-                        {residentYears.map((y) => {
-                          const n = g.years.find((x) => x.year === y)?.rows.length;
-                          return <td key={y} className={tbl.num}>{n ? formatRank(n) : <Dash />}</td>;
-                        })}
-                        <td className={tbl.num}>{formatRank(g.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
               {residentGroups.map((g) => (
                 <section key={g.course.slug} aria-labelledby={`res-${g.course.slug}`} className="grid gap-2">
                   <h3 id={`res-${g.course.slug}`} tabIndex={-1} className="flex flex-wrap items-center gap-2 text-base font-semibold">
