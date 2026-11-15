@@ -8,6 +8,7 @@ import { ChoicesStat, TopChoices } from "@/features/decide/components/dashboard-
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { RoundStatusBanner } from "@/features/decide/components/round-status";
+import { HomeHub } from "@/features/decide/components/home-hub";
 import { EmptyState, smallLink, StatStrip } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
@@ -42,7 +43,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     return (
       <AppPage>
         <PageHead title="Overview" />
-        <div className="mt-6"><RoundStatusBanner params={params} /></div>
+        <div className="mt-3"><HomeHub L={decideLinks(params)} /></div>
+        <div className="mt-3"><RoundStatusBanner params={params} /></div>
         <SetRankPrompt path="/decide" />
       </AppPage>
     );
@@ -68,6 +70,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   return (
     <AppPage className="grid grid-cols-1 gap-3 md:gap-4">
       <PageHead title="Overview" about={`Closing ranks here are on ${seats} seats, the seat categories you can take.`} />
+      <HomeHub L={L} />
       <RoundStatusBanner params={params} />
 
       <section aria-labelledby="numbers-h" className="grid gap-2">
