@@ -51,17 +51,17 @@ export function InstallPrompt() {
   // Above the planner's bottom bar on /decide.
   const bottom = pathname.startsWith("/decide") ? "bottom-[calc(4rem+env(safe-area-inset-bottom))]" : "bottom-[calc(0.75rem+env(safe-area-inset-bottom))]";
   return (
-    <div role="dialog" aria-label="Install Seatora" className={`fixed inset-x-3 ${bottom} z-50 flex items-center gap-3 rounded-xl border border-border bg-card p-3 text-sm text-foreground shadow-lg md:hidden print:hidden`}>
+    <div role="dialog" aria-label="Install Seatora" className={`fixed inset-x-3 ${bottom} z-50 flex items-center gap-3 rounded-xl border border-[#1f2a33] bg-[#0b0e12] p-3 text-sm text-[#f1f4f7] shadow-lg md:hidden print:hidden`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/icons/icon-192.png" alt="" width={36} height={36} className="size-9 shrink-0 rounded-lg" />
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">Add Seatora to your home screen</p>
+        <p className="font-semibold" style={{ color: "#f1f4f7" }}>Add Seatora to your home screen</p>
         {ios && !event ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-[#a3abb3]">
             Tap <Share className="inline size-3.5 align-text-bottom" aria-label="Share" /> then &ldquo;Add to Home Screen&rdquo;.
           </p>
         ) : (
-          <p className="text-xs text-muted-foreground">Opens like an app, full screen.</p>
+          <p className="text-xs text-[#a3abb3]">Opens like an app, full screen.</p>
         )}
       </div>
       {event && (
@@ -73,12 +73,12 @@ export function InstallPrompt() {
             setEvent(null);
             setShow(false);
           }}
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground"
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-[#5ccfe6] px-3 text-xs font-semibold text-[#0b0e12]"
         >
           <Download className="size-4" aria-hidden /> Install
         </button>
       )}
-      <button type="button" onClick={close} aria-label="Close" className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted">
+      <button type="button" onClick={close} aria-label="Close" className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-[#a3abb3] hover:bg-[#1f2a33]">
         <X className="size-4" aria-hidden />
       </button>
     </div>
