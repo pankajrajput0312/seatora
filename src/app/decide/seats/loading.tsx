@@ -4,7 +4,7 @@ import { LoadingPage, SkChips, SkFilters, SkHead, SkTable, SkToolbar, Skeleton }
 export default function Loading() {
   return (
     <LoadingPage className="grid grid-cols-1 gap-6">
-      <SkHead w="w-40" />
+      <SkHead text="Seats" />
       <SkChips n={2} tabs />
       <SkChips n={4} />
       <SkChips n={5} />
