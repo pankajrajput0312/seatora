@@ -28,7 +28,18 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
 
   return (
     <AppPage className="grid grid-cols-1 gap-8">
-      <PageHead title="Request a feature">Ask for a new feature, a change for your own use, a data correction or anything else. We read every request and reply by email.</PageHead>
+      <PageHead
+        title="Request a feature"
+        about={
+          <>
+            A new feature, a change for your own use, a data correction or anything else. We read every request and reply by email
+            to your account&apos;s address within 2 working days. Your requests are listed below with their status: new,
+            planned, done or declined.
+          </>
+        }
+      >
+        Ask for a feature, a change or a data fix.
+      </PageHead>
 
       <section aria-label="New request" className="max-w-2xl rounded-xl border border-border bg-card p-4 sm:p-6">
         <RequestForm email={user?.email} page={PATH} />

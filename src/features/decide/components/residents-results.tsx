@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { Info } from "lucide-react";
-import { SourceLabel } from "@/components/ui/source-label";
 import { siteConfig } from "@/config/site";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
@@ -11,16 +9,20 @@ import { residentsQuery, type ResidentRow, type ResidentsQuery } from "../reside
 import type { ResidentSource } from "../server/residents";
 import { roundLabel, type Course, type Round } from "../types";
 import { Dash } from "./bits";
-import { ClosingDetails } from "./closing-details";
+import type { CollegeType } from "./institute/college-type";
+import type { SourceDoc } from "./page-sources";
 import { MCC_PG } from "./pages/mcc-link";
-import { HideableRow } from "./residents/hideable-row";
-import { HideableCard } from "./residents-hideable-card";
+import { ResultCards } from "./result-card";
+import { HideableCard, SyncedHideableRow } from "./residents-hideable-card";
+import { TypeBadge } from "./type-badge";
 import { tbl } from "./ui";
 
-// The Residents tab across colleges (/decide/residents): its URL params, table, cards, info and sources.
+// The Residents tab across colleges (/decide/residents): its URL params, table, cards, (i) and sources.
 // Never shows a reservation category (seat or candidate): ResidentRow carries none.
 
-type Hide = React.ComponentProps<typeof HideableRow>["hide"];
+type Hide = React.ComponentProps<typeof SyncedHideableRow>["hide"];
+/** College type by College.slug (hospitalInfo); a college missing here shows none. */
+export type ResidentTypes = Map<string, CollegeType | null>;
 
 /** Around her rank: ±20%. */
 export const rankAround = (rank: number) => ({ rankFrom: Math.max(1, Math.round(rank * 0.8)), rankTo: Math.round(rank * 1.2) });
@@ -72,9 +74,9 @@ const th = `${tbl.th} px-3`;
 const td = "px-3 py-2 align-top";
 
 /** One page of residents as a table; the College cell opens that institute's Residents tab. */
-export function ResidentsTable({ rows, L, hide, caption, className }: { rows: ResidentRow[]; L: DecideLinks; hide: Hide; caption: string; className?: string }) {
+export function ResidentsTable({ rows, L, hide, caption, types }: { rows: ResidentRow[]; L: DecideLinks; hide: Hide; caption: string; types?: ResidentTypes }) {
   return (
-    <div role="region" aria-label="Residents table" tabIndex={0} className={cn(tbl.wrap, tbl.scroll, className)}>
+    <div role="region" aria-label="Residents table" tabIndex={0} className={cn(tbl.wrap, tbl.scroll)}>
       <table className={tbl.table}>
         <caption className="sr-only">{caption}</caption>
         <thead className={tbl.head}><tr className="text-left">
@@ -89,101 +91,120 @@ export function ResidentsTable({ rows, L, hide, caption, className }: { rows: Re
           <th scope="col" className={th}><span className="sr-only">Hide</span></th>
         </tr></thead>
         <tbody>
-          {rows.map((r) => (
-            <HideableRow key={r.id} id={r.id} name={r.name} hide={hide} colSpan={9} className={tbl.row}>
-              <th scope="row" className={`${td} min-w-36 text-left font-medium`}>{r.name}</th>
-              <td className={`${td} text-right`}><Rank rank={r.rank} year={r.year} /></td>
-              <td className={`${td} min-w-48`}>
-                <Link href={tabHref(L, r)} className={collegeLink}>{r.college.name}<span className="sr-only">: its residents</span></Link>
-                <span className="block text-xs text-muted-foreground">{r.college.state ?? <Dash />}</span>
-              </td>
-              <td className={`${td} min-w-32`}>{courseName(r)}</td>
-              <td className={`${td} numeric`}>{r.year}</td>
-              <td className={`${td} whitespace-nowrap`}>{r.list}</td>
-              <td className={td}>{r.quota ?? <Dash />}</td>
-              <td className={`${td} whitespace-nowrap`}>{r.round ? roundName(r.round) : <Dash />}</td>
-            </HideableRow>
-          ))}
+          {rows.map((r) => {
+            const type = types?.get(r.college.slug);
+            return (
+              <SyncedHideableRow key={r.id} id={r.id} name={r.name} hide={hide} colSpan={9} className={tbl.row}>
+                <th scope="row" className={`${td} min-w-36 text-left font-medium`}>{r.name}</th>
+                <td className={`${td} text-right`}><Rank rank={r.rank} year={r.year} /></td>
+                <td className={`${td} min-w-48`}>
+                  <Link href={tabHref(L, r)} className={collegeLink}>{r.college.name}<span className="sr-only">: its residents</span></Link>
+                  <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                    {r.college.state ?? <Dash />}
+                    {type && <TypeBadge type={type} of={r.college.name} />}
+                  </span>
+                </td>
+                <td className={`${td} min-w-32`}>{courseName(r)}</td>
+                <td className={`${td} numeric`}>{r.year}</td>
+                {/* Wraps to fit 1366px, never between "Round" and its number. */}
+                <td className={`${td} min-w-24`}>{r.list.replace(/ (\d)/g, "\u00a0$1")}</td>
+                <td className={td}>{r.quota ?? <Dash />}</td>
+                <td className={`${td} whitespace-nowrap`}>{r.round ? roundName(r.round) : <Dash />}</td>
+              </SyncedHideableRow>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-/** The same page as cards (the Options cards' style), for phones. */
-export function ResidentsCards({ rows, L, hide, className }: { rows: ResidentRow[]; L: DecideLinks; hide: Hide; className?: string }) {
+/**
+ * The same page as ResultCards: the rank big on the left, the college (its Residents tab) and course, state and type;
+ * the name, year and round, MCC list and quota in the header row, with Hide.
+ */
+export function ResidentsCards({ rows, L, hide, types }: { rows: ResidentRow[]; L: DecideLinks; hide: Hide; types?: ResidentTypes }) {
   return (
-    <ul aria-label="Residents" className={cn("grid gap-3 lg:grid-cols-2", className)}>
-      {rows.map((r) => (
-        <HideableCard key={r.id} id={r.id} name={r.name} hide={hide}>
-          <h2 className="font-medium">{r.name}</h2>
-          <p><Link href={tabHref(L, r)} className={cn(collegeLink, "min-h-11 text-sm")}>{r.college.name}<span className="sr-only">: its residents</span></Link></p>
-          <p className="text-xs text-muted-foreground">{courseName(r)} · {r.college.state ?? "state not listed"}</p>
-          <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
-            <div><dt className="text-xs text-muted-foreground">Rank</dt><dd><Rank rank={r.rank} year={r.year} /></dd></div>
-            <div><dt className="text-xs text-muted-foreground">Year</dt><dd className="numeric">{r.year}</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Quota, round</dt><dd>{r.quota ?? <Dash />}{r.round && `, ${roundName(r.round)}`}</dd></div>
-          </dl>
-          <p className="mt-2 text-xs text-muted-foreground">MCC list: {r.list}</p>
-        </HideableCard>
-      ))}
-    </ul>
+    <ResultCards title="Residents" hideTitle>
+      {rows.map((r) => {
+        const type = types?.get(r.college.slug);
+        return (
+          <HideableCard
+            key={r.id}
+            id={r.id}
+            name={r.name}
+            hide={hide}
+            chips={[
+              <span key="n" className="text-sm font-semibold text-foreground">{r.name}</span>,
+              // Year and round as Allotments' cards show them ("2025 · R2"): the round is that year's matched allotment.
+              <span key="y" className="numeric">{r.year}{r.round && ` · ${roundName(r.round)}`}</span>,
+              `MCC list: ${r.list}`,
+              r.quota,
+            ]}
+            stat={{
+              label: "Rank",
+              value:
+                r.rank == null ? (
+                  <Dash />
+                ) : (
+                  <span className="numeric whitespace-nowrap">
+                    AIR {formatRank(r.rank)}
+                    {/* Under the number, so the college keeps its width at 390px. */}
+                    <span className="block text-xs font-normal tracking-normal text-muted-foreground"><span className="sr-only"> · </span>NEET PG {r.year}</span>
+                  </span>
+                ),
+            }}
+            title={r.college.name}
+            href={tabHref(L, r)}
+            subtitle={courseName(r)}
+            meta={[r.college.state, type && <TypeBadge type={type} of={r.college.name} />]}
+          />
+        );
+      })}
+    </ResultCards>
   );
 }
 
-/** The (i): where names, ranks, quota and round come from, and how to have a name hidden. Native <details>. */
-export function ResidentsInfo({ rows }: { rows: ResidentRow[] }) {
+const ext = (href: string, text: string) => (
+  <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky underline">{text}<span className="sr-only"> (opens in a new tab)</span></a>
+);
+
+/** The page's (i) (PageHead `about`): where names, ranks, quota and round come from, and how to have a name hidden. */
+export function ResidentsAbout({ rows }: { rows: ResidentRow[] }) {
   const years = [...new Set(rows.filter((r) => r.rank != null).map((r) => r.year))].sort();
   const email = siteConfig.contactEmail;
   return (
-    // The panel spans the nearest positioned box (the summary line), so it fits a 390 px screen. It covers the first rows
-    // while open: Escape, a click outside or Tab away closes it.
-    <ClosingDetails className="text-sm">
-      <summary className="inline-flex size-11 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
-        <Info className="size-4" aria-hidden /><span className="sr-only">About this data</span>
-      </summary>
-      <div tabIndex={-1} className="absolute inset-x-0 top-full z-10 mt-1 grid max-w-2xl gap-2 rounded-lg border border-border bg-card p-4 text-muted-foreground shadow-overlay outline-none">
-        <p><strong className="text-foreground">Names</strong> are as printed in MCC&apos;s official admitted-candidates lists (the List column names which one). No contact details are held.</p>
-        <p>
-          <strong className="text-foreground">Ranks</strong> are All India Ranks from that year&apos;s NBEMS NEET PG result
-          {years.length ? ` (on this page: ${years.join(", ")})` : " (none on this page has one)"}, where one could be matched; a dash where none is known. A rank is where one person got in, not a closing rank or a prediction.
-        </p>
-        <p><strong className="text-foreground">Quota and round</strong> come from the matching MCC allotment of that year, shown only where exactly one matched the resident&apos;s rank, college and course; otherwise a dash. Minority quotas show as &ldquo;Minority&rdquo;.</p>
-        <p>Seat and candidate category are not held or shown here. MCC&apos;s public allotment results, which Rank journey and Allotments show, do list a category for each rank; Seatora never joins them to names.</p>
-        <p>
-          To have a name hidden, use <strong className="text-foreground">Hide</strong> beside it: it is hidden for every year and course at that college and stays hidden after updates
-          {email ? <>, or write to <a href={`mailto:${email}`} className="text-sky underline">{email}</a></> : null}.
-        </p>
-      </div>
-    </ClosingDetails>
+    <>
+      <strong>Names</strong> are as printed in MCC&apos;s official admitted-candidates lists (each row names its list). No contact details are held.
+      <br /><br />
+      <strong>Ranks</strong> are All India Ranks from that year&apos;s NBEMS NEET PG result
+      {years.length ? ` (on this page: ${years.join(", ")})` : " (none on this page has one)"}, where one could be matched; a dash where none is known. A rank is where one person got in, not a closing rank or a prediction.
+      <br /><br />
+      <strong>Quota and round</strong> come from the matching MCC allotment of that year, shown only where exactly one matched the resident&apos;s rank, college and course; otherwise a dash. Minority quotas show as &ldquo;Minority&rdquo;.
+      <br /><br />
+      Seat and candidate category are not held or shown here. But a rank shown here can be looked up in MCC&apos;s public allotment results, which Rank journey and Allotments show: they list each rank&apos;s seat and candidate category, PwD included.
+      <br /><br />
+      To have a name hidden, use <strong>Hide</strong> beside it: it is hidden for every year and course at that college and stays hidden after updates
+      {email ? <>, or write to <a href={`mailto:${email}`} className="text-sky underline">{email}</a></> : null}.
+      <br /><br />
+      MCC publishes the admitted lists on its {ext(MCC_PG, "PG counselling site")}, NBEMS the NEET PG results on {ext("https://natboard.edu.in", "natboard.edu.in")}: the documents behind this page are in its Sources.
+    </>
   );
 }
 
 /**
- * The documents behind these rows, collapsed: the MCC admitted lists, then the NBEMS NEET PG results the ranks come from.
- * `sources` as the search returns them (DataSource: names and links); a row's document missing there is named from the
- * row, without a link.
+ * The documents behind these rows, for the page's Sources footer: the MCC admitted lists, then the NBEMS NEET PG results
+ * the ranks come from. `sources` as the search returns them (names and links); a row's document missing there is named
+ * from the row, without a link. Keys as the institute's Residents tab gives them, so each document is one entry.
  */
-export function ResidentsSources({ rows, sources }: { rows: Pick<ResidentRow, "sourceKey" | "list" | "year" | "rankBasis">[]; sources: ResidentSource[] }) {
+export function residentDocs(rows: Pick<ResidentRow, "sourceKey" | "list" | "year" | "rankBasis">[], sources: ResidentSource[]): SourceDoc[] {
   const docs = new Map(sources.map((s) => [s.key, s]));
   for (const r of rows) {
     if (!docs.has(r.sourceKey)) docs.set(r.sourceKey, { key: r.sourceKey, name: `MCC admitted candidates list (${r.list})`, url: null, year: r.year });
     if (r.rankBasis && !docs.has(r.rankBasis)) docs.set(r.rankBasis, { key: r.rankBasis, name: `NBEMS NEET PG ${r.year} result`, url: null, year: r.year });
   }
   const merit = (s: ResidentSource) => s.key.startsWith("nbems/");
-  const list = [...docs.values()].sort((a, b) => Number(merit(a)) - Number(merit(b)) || b.key.localeCompare(a.key));
-  return (
-    <details className="text-xs text-muted-foreground">
-      <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky">Sources on this page (<span className="numeric">{list.length}</span>)</summary>
-      <ul className="grid gap-1">
-        {list.map((s) => (
-          <li key={s.key}><SourceLabel provenance={{ sourceName: s.name, sourceUrl: s.url, sourceType: "OFFICIAL", academicYear: `${merit(s) ? "NEET PG" : "PG counselling"} ${s.year ?? "—"}` }} /></li>
-        ))}
-      </ul>
-      <p className="mt-1">
-        MCC publishes the admitted lists on its <a href={MCC_PG} target="_blank" rel="noopener noreferrer" className="underline hover:text-sky">PG counselling site<span className="sr-only"> (opens in a new tab)</span></a>, NBEMS the NEET PG results on{" "}
-        <a href="https://natboard.edu.in" target="_blank" rel="noopener noreferrer" className="underline hover:text-sky">natboard.edu.in<span className="sr-only"> (opens in a new tab)</span></a>.
-      </p>
-    </details>
-  );
+  return [...docs.values()]
+    .sort((a, b) => Number(merit(a)) - Number(merit(b)) || b.key.localeCompare(a.key))
+    .map((s) => ({ key: `residents|${s.key}`, name: s.name, url: s.url, type: "OFFICIAL", note: merit(s) ? `NEET PG ${s.year ?? "—"} rank source` : `PG counselling ${s.year ?? "—"}` }));
 }

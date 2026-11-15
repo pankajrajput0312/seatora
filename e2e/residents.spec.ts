@@ -23,7 +23,7 @@ test("residents: her courses around her rank, filters, pages and views match the
     test.skip(!def, "needs the residents import (npm run db:import-residents)");
     const results = page.locator("#results");
     const table = page.getByRole("table");
-    const cards = page.getByRole("list", { name: "Residents" }).getByRole("listitem");
+    const cards = page.getByRole("region", { name: "Residents", exact: true }).getByRole("listitem");
     const pager = page.getByRole("navigation", { name: "Residents, pages" });
 
     // Default: her 5 courses, ranks ±20%, rank order; the table from md up, cards on phones.
@@ -37,21 +37,24 @@ test("residents: her courses around her rank, filters, pages and views match the
     const shown = isMobile ? cards : table.locator("tbody tr");
     await expect(shown).toHaveCount(Math.min(50, def));
     const first = await db.resident.findFirstOrThrow({ where: { hidden: false, ...hers, rank: AROUND }, orderBy: [{ rank: "asc" }, { name: "asc" }, { id: "asc" }], select: { rank: true } });
-    await expect(isMobile ? shown.first().locator("dd").first() : shown.first().locator("td").first()).toContainText(n(first.rank!)); // the rank cell only
+    await expect(isMobile ? shown.first().getByText(/^AIR /) : shown.first().locator("td").first()).toContainText(n(first.rank!)); // the rank only
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
-    // The nav says which view this width shows (no `view` in the URL).
-    await expect(page.locator('nav[aria-label="Show residents as"]:visible a[aria-current="true"]')).toHaveText(isMobile ? "Cards" : "Table");
+    // Cards | Table says which view this width shows (no `layout` in the URL).
+    await expect(page.getByRole("group", { name: "View as" }).getByRole("button", { pressed: true })).toHaveText(isMobile ? "Cards" : "Table");
 
-    // The (i) closes on Escape (focus back on it) and on a click outside it.
-    const info = page.locator("details", { has: page.getByText("About this data") });
-    await info.locator("summary").click();
-    await expect(info).toHaveAttribute("open", "");
+    // The (i) beside the title closes on Escape (focus back on it) and on a click outside it.
+    const info = page.getByRole("button", { name: "About Residents" });
+    const tip = page.getByRole("dialog", { name: "Residents" });
+    await info.click();
+    await expect(tip).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(info).not.toHaveAttribute("open");
-    await expect(info.locator("summary")).toBeFocused();
-    await info.locator("summary").click();
+    await expect(tip).toBeHidden();
+    await expect(info).toBeFocused();
+    await info.click();
     await page.getByRole("heading", { level: 1 }).click();
-    await expect(info).not.toHaveAttribute("open");
+    await expect(tip).toBeHidden();
+    // The admitted lists and NBEMS results are in the page's one Sources footer.
+    await expect(page.locator("#page-sources summary")).toContainText(/Sources \(\d+\)/);
     // Quotas naming a religion are one "Minority", in the filter too.
     await expect(page.locator('select[name="rq"] option', { hasText: /Muslim Minority|Jain Minority/ })).toHaveCount(0);
 
@@ -84,7 +87,7 @@ test("residents: her courses around her rank, filters, pages and views match the
     await expect(results).toBeFocused();
 
     // The table (forced on phones too): its columns, never a category; year sort starts on the newest list.
-    await page.goto(`/decide/residents?${PROFILE}&ranks=all&sort=year&view=table`);
+    await page.goto(`/decide/residents?${PROFILE}&ranks=all&sort=year&layout=table`);
     await expect(table.getByRole("columnheader")).toHaveText(["Name", "Rank", "College", "Course", "Year", "List", "Quota", "Round", "Hide"]);
     await expect(table.locator("tbody tr").first().locator("td").nth(3)).toHaveText(years[0]);
     await expect(table.locator("tbody tr").first().getByRole("link").first()).toHaveAttribute("href", /^\/decide\/institutes\/[^?]+\?.*tab=residents/);
@@ -97,7 +100,7 @@ test("residents: her courses around her rank, filters, pages and views match the
     await expect(page.getByText(/^Only the first 1,000 \(20 pages\) are shown/)).toHaveCount(all > 1000 ? 1 : 0);
 
     // Cards (forced on desktop too): Hide asks to confirm; Cancel goes back.
-    await page.goto(`/decide/residents?${PROFILE}&view=cards`);
+    await page.goto(`/decide/residents?${PROFILE}&layout=cards`);
     await expect(cards).toHaveCount(Math.min(50, def));
     await cards.first().getByRole("button", { name: /^Hide / }).click();
     await expect(cards.first().getByRole("button", { name: /^Confirm: hide / })).toBeVisible();

@@ -2,10 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { formatRank } from "@/features/cutoffs/lib/format";
+import { ViewField } from "@/app/decide/fees/view-field";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
-import { residentsFilters, ResidentsCards, ResidentsInfo, ResidentsSources, ResidentsTable } from "@/features/decide/components/residents-results";
+import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
+import { SourceRefs } from "@/features/decide/components/page-sources";
+import { residentDocs, residentsFilters, ResidentsAbout, ResidentsCards, ResidentsTable, type ResidentTypes } from "@/features/decide/components/residents-results";
 import { control, EmptyState, Field, FilterBar, Pager, Select, smallLink } from "@/features/decide/components/ui";
+import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { decideLinks } from "@/features/decide/lib/links";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import type { ResidentsQuery } from "@/features/decide/residents-search";
@@ -29,11 +33,13 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
   const here = (changes: Record<string, string | null>) => L.with("/decide/residents", { page: null, ...changes });
-  const head = <PageHead title="Residents">Who got in where: names from MCC&apos;s admitted-candidates lists, across every college, with the rank where known. For choosing a college. Contact people respectfully; ask to be hidden and we will.</PageHead>
+  const head = (about?: React.ReactNode) => (
+    <PageHead title="Residents" about={about}>Who got in where, from MCC&apos;s admitted-candidates lists. Contact people respectfully; ask to be hidden and we will.</PageHead>
+  );
 
   const denied = (why: "locked" | "rate_limited") => (
     <AppPage className="grid grid-cols-1 gap-6">
-      {head}
+      {head()}
       {why === "locked" ? (
         <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.to("/decide/institutes")} action="See the institutes" />
       ) : (
@@ -44,7 +50,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   if (!(await canSeeResidents())) return denied("locked");
 
   const profile = profileFromParams(params);
-  const [meta, { colleges }, years] = await Promise.all([getMeta(), getDecideData(), residentYears()]);
+  const [meta, { colleges }, years, info] = await Promise.all([getMeta(), getDecideData(), residentYears(), hospitalInfo()]);
   const { query, yours, courseValue, around } = residentsFilters(params, profile, meta.courses);
   const college = colleges.find((c) => c.slug === query.college);
   // A college outside the state picked after it: the state wins (Apply keeps the old college field).
@@ -61,8 +67,8 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   // Past the last page (a stale link, a hide) or the deepest one served: the last page there is.
   const pages = Math.min(Math.ceil(total / res.pageSize), RESIDENTS_MAX_PAGE);
   if (!rows.length && total) redirect(L.page("/decide/residents", pages));
-  const asked = params.get("view");
-  const view = asked === "table" || asked === "cards" ? asked : null;
+  const keyOf = new Map(colleges.map((c) => [c.slug, c.key]));
+  const types: ResidentTypes = new Map(rows.map((r) => [r.college.slug, info.get(keyOf.get(r.college.slug) ?? "")?.type ?? null]));
   // Her default range stays a default: empty fields (it shows as their placeholders) and no `ranks=all`, so Apply keeps it.
   const rankInput = (name: "rankFrom" | "rankTo", example: string) => ({
     name,
@@ -74,31 +80,14 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   const { rankFrom: from, rankTo: to } = query;
   const ranks = from != null && to != null ? `${formatRank(from)}–${formatRank(to)}` : from != null ? `from ${formatRank(from)}` : to != null ? `up to ${formatRank(to)}` : null;
   const quotas = [...new Set(meta.quotas.map(residentQuota))];
-  // No `view`: the table from md up, cards on phones, so each width gets its own nav saying which one is shown.
-  const viewNav = (shown: "table" | "cards", className?: string) => (
-    <nav aria-label="Show residents as" className={cn("flex", className)}>
-      {(["table", "cards"] as const).map((v) => (
-        <Link
-          key={v}
-          href={here({ view: v, page: params.get("page") })}
-          scroll={false}
-          aria-current={shown === v ? "true" : undefined}
-          className={cn("inline-flex min-h-11 items-center border-b-2 px-3 text-sm", shown === v ? "border-foreground font-semibold" : "border-transparent text-muted-foreground")}
-        >
-          {v === "table" ? "Table" : "Cards"}
-        </Link>
-      ))}
-    </nav>
-  );
-
   return (
     <AppPage className="grid grid-cols-1 gap-6">
-      {head}
+      {head(<ResidentsAbout rows={rows} />)}
 
       <FilterBar action="/decide/residents" params={params} cols="grid-cols-2 md:grid-cols-4 xl:grid-cols-6" more={!!(query.college || query.year || query.quota || query.hasRank || query.sort !== "rank")}>
         {/* Apply states the rank range (both fields empty then means all ranks), except from her default, which it keeps. */}
         {!around && <input type="hidden" name="ranks" value="all" />}
-        {view && <input type="hidden" name="view" value={view} />}
+        <ViewField />
         <Field label="Name" className="col-span-2"><input type="search" name="q" defaultValue={query.q} maxLength={60} placeholder="Part of a name" className={control} /></Field>
         <Field label="Course" className="col-span-2">
           <Select
@@ -139,14 +128,11 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         </p>
       )}
 
-      <div className="relative flex flex-wrap items-center justify-between gap-x-3">
-        <div className="flex items-center gap-1">
-          <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
-            <span className="numeric font-semibold text-foreground">{formatRank(total)}</span> residents · rank known for <span className="numeric font-semibold text-foreground">{formatRank(withRank)}</span>
-          </p>
-          <ResidentsInfo rows={rows} />
-        </div>
-        {total > 0 && (view ? viewNav(view) : <>{viewNav("table", "max-md:hidden")}{viewNav("cards", "md:hidden")}</>)}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
+          <span className="numeric font-semibold text-foreground">{formatRank(total)}</span> residents · rank known for <span className="numeric font-semibold text-foreground">{formatRank(withRank)}</span>
+        </p>
+        {total > 0 && <ViewToggle page="residents" />}
       </div>
 
       {total === 0 ? (
@@ -157,13 +143,11 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
           action={ranks ? "All ranks" : "Clear filters"}
         />
       ) : (
-        <>
-          {/* No `view`: the table from md up, cards on phones (both in the HTML, one shown). */}
-          {view !== "cards" && (
-            <ResidentsTable rows={rows} L={L} hide={hideResidentAction} caption={`Residents, page ${res.page}, sorted by ${query.sort === "rank" ? "rank, unknown last" : sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`} className={view ? undefined : "hidden md:block"} />
-          )}
-          {view !== "table" && <ResidentsCards rows={rows} L={L} hide={hideResidentAction} className={view ? undefined : "md:hidden"} />}
-        </>
+        <ViewPanes
+          page="residents"
+          cards={<ResidentsCards rows={rows} L={L} hide={hideResidentAction} types={types} />}
+          table={<ResidentsTable rows={rows} L={L} hide={hideResidentAction} types={types} caption={`Residents, page ${res.page}, sorted by ${query.sort === "rank" ? "rank, unknown last" : sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`} />}
+        />
       )}
       <Pager page={res.page} pageSize={res.pageSize} total={Math.min(total, pages * res.pageSize)} href={(n) => L.page("/decide/residents", n)} focusId="results" label="Residents" />
       {total > pages * res.pageSize && (
@@ -171,7 +155,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
           Only the first <span className="numeric">{formatRank(pages * res.pageSize)}</span> ({pages} pages) are shown: narrow the filters (name, course, state, year or rank) to see the others.
         </p>
       )}
-      <ResidentsSources rows={rows} sources={res.sources} />
+      <SourceRefs docs={residentDocs(rows, res.sources)} />
     </AppPage>
   );
 }

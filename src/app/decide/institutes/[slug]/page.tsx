@@ -13,7 +13,7 @@ import { InfoTip } from "@/features/decide/components/info-tip";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
 import { flagShort, reportedCount, SELF_REPORTED, ValueSource } from "@/features/decide/components/institute/hospital-bits";
-import { Rank } from "@/features/decide/components/residents-results";
+import { Rank, residentDocs } from "@/features/decide/components/residents-results";
 import { allotmentMixAt, clinicalAt, headerLists, hospitalInfo, optionSeats, roundSeatsAt, roundSeatTotals, websiteUrl } from "@/features/decide/components/institute/institute-data";
 import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, HospitalFacts } from "@/features/decide/components/institute/institute-parts";
 import { courseName, RoundGrid, SeatsBelowNote, seatKindShort, toChoiceItem } from "@/features/decide/components/options-view";
@@ -637,7 +637,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       <caption className="sr-only">Residents in {g.course.degree} {g.course.name} at {college.name}, newest year first</caption>
                       <thead><tr className={tbl.headRow}>
                         <th scope="col" className={tbl.th}>Name</th><th scope="col" className={tbl.th}>Year</th><th scope="col" className={tbl.th}>MCC list</th>
-                        <th scope="col" className={`${tbl.th} text-right`}><span className="inline-flex items-center gap-0.5">Rank<InfoTip label="Rank">All India Rank from that year&apos;s NBEMS NEET PG result, where known. It is where one person got in, not a closing rank or a prediction.</InfoTip></span></th><th scope="col" className={tbl.th}><span className="sr-only">Hide</span></th>
+                        <th scope="col" className={`${tbl.th} text-right`}><span className="inline-flex items-center gap-0.5">Rank<InfoTip label="Rank">All India Rank from that year&apos;s NBEMS NEET PG result, where known. It is where one person got in, not a closing rank or a prediction. It can be looked up in MCC&apos;s public allotment results (Rank journey, Allotments), which list each rank&apos;s seat and candidate category, PwD included.</InfoTip></span></th><th scope="col" className={tbl.th}><span className="sr-only">Hide</span></th>
                       </tr></thead>
                       {g.years.map((y) => (
                         <tbody key={y.year}>
@@ -658,7 +658,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               ))}
             </>
           )}
-          <SourceRefs docs={residents.sources.map((s) => ({ key: `residents|${s.key}`, name: s.name, url: s.url, type: "OFFICIAL" as const, note: s.key.startsWith("nbems/") ? `NEET PG ${s.year ?? "—"} rank source` : `PG counselling ${s.year ?? "—"}` }))} />
+          <SourceRefs docs={residentDocs(residents.rows, residents.sources)} />
         </section>
       )}
     </AppPage>

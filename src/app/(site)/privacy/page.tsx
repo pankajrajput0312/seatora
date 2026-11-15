@@ -69,7 +69,8 @@ export default function PrivacyPage() {
               Seatora shows the names of residents at each college, with their course, their year and, where NBEMS has published it, their
               NEET PG All India Rank. The names come from MCC&apos;s official admitted-candidates lists and the ranks from that year&apos;s NBEMS
               NEET PG result, both public documents. We hold no contact details for anyone on them. Names are shown only to signed-in accounts that
-              have been given access.
+              have been given access. We never show a category beside a name, but a rank shown with a name can be looked up in MCC&apos;s public
+              allotment results, which Seatora also shows and which list each rank&apos;s seat and candidate category, PwD included.
             </p>
             <p className="mt-2">
               If your name is listed and you want it removed, email us{mail && <> at {mail}</>}. We will hide it from the site and keep it

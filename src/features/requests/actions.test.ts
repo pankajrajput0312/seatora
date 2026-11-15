@@ -173,7 +173,7 @@ describe.skipIf(!dbUrl)("requests on a scratch database", { timeout: 30_000 }, (
     const sent = await db.featureRequest.count({ where: { userId: null } });
     await db.featureRequest.createMany({ data: Array.from({ length: 100 - sent }, () => ({ kind: "other", message: "filler request", email: VISITOR })) });
     as(null);
-    expect(await submitFeatureRequest({ ...ok, email: VISITOR })).toEqual({ ok: false, error: "We've had too many requests today. Please try again tomorrow." });
+    expect(await submitFeatureRequest({ ...ok, email: VISITOR })).toEqual({ ok: false, error: expect.stringMatching(/^We've had too many requests today\. Please try again tomorrow/) }); // then the contact email, when set
     as("owner");
     expect(await submitFeatureRequest(ok)).toEqual({ ok: true }); // signed in: her own cap
   });

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { decideLinks } from "../lib/links";
 import { profileFromParams } from "../profile";
 import type { ResidentRow } from "../residents-search";
-import { residentsFilters, ResidentsCards, ResidentsInfo, ResidentsSources, ResidentsTable } from "./residents-results";
+import { residentDocs, residentsFilters, ResidentsAbout, ResidentsCards, ResidentsTable } from "./residents-results";
 
 const courses = [
   { degree: "MD", specialty: "ANAESTHESIOLOGY", name: "Anaesthesiology", slug: "md-anaesthesiology" },
@@ -59,8 +59,10 @@ describe("residentsFilters", () => {
 });
 
 describe("Residents views", () => {
-  it("table: caption, column and row headers, Hide, the college's Residents tab; never a category", () => {
-    const html = renderToStaticMarkup(createElement(ResidentsTable, { rows: [row(), row({ id: "r2", rank: null, rankBasis: null, quota: null, round: null })], L, hide, caption: "Residents, page 1" }));
+  const types = new Map([["some-college", { value: "govt" as const, basis: "inferred: name" }]]);
+
+  it("table: caption, column and row headers, Hide, the college's Residents tab and type; never a category", () => {
+    const html = renderToStaticMarkup(createElement(ResidentsTable, { rows: [row(), row({ id: "r2", rank: null, rankBasis: null, quota: null, round: null })], L, hide, caption: "Residents, page 1", types }));
     expect(html).toContain("<caption");
     expect(html.match(/scope="col"/g)).toHaveLength(9);
     expect(html.match(/scope="row"/g)).toHaveLength(2);
@@ -68,27 +70,31 @@ describe("Residents views", () => {
     expect(html).toContain("AIR 41,234");
     expect(html).toContain(" · 2025");
     expect(html).toContain('aria-label="Hide Test Resident A"');
+    expect(html).toContain("Government");
     expect(html).not.toMatch(/categor/i);
   });
 
-  it("cards: one list item per resident with its hide button", () => {
-    const html = renderToStaticMarkup(createElement(ResidentsCards, { rows: [row()], L, hide }));
-    expect(html.match(/<li/g)).toHaveLength(1);
-    expect(html).toContain("All India, R2");
+  it("cards: ResultCards, one item per resident; rank, college link, course, chips, state and type; Hide in the header", () => {
+    const html = renderToStaticMarkup(createElement(ResidentsCards, { rows: [row(), row({ id: "r2", rank: null, quota: null, round: null, college: { slug: "other", name: "Other College", state: null } })], L, hide, types }));
+    expect(html.match(/<li/g)).toHaveLength(2);
+    expect(html.match(/<h3/g)).toHaveLength(2); // the college, a heading per card
+    expect(html).toContain('href="/decide/institutes/some-college?rank=40000&amp;cat=Open&amp;tab=residents"');
+    for (const s of ["Test Resident A", "AIR 41,234", "NEET PG 2025", "MD Anaesthesiology", "2025 · R2", "MCC list: up to Round 3", "All India", "Kerala", "Government"]) expect(html).toContain(s);
+    expect(html.match(/Government/g)).toHaveLength(2); // the first card's badge and its (i) only: none for the other college
+    expect(html).toContain('aria-label="Hide Test Resident A"');
+    expect(html).not.toMatch(/categor/i);
   });
 
-  it("info and sources: rank years from the rows, each document once", () => {
+  it("about and sources: rank years from the rows; each document once, the admitted lists first, keyed as the institute tab", () => {
     const y2024 = row({ id: "r3", year: 2024, rankBasis: "nbems/2024/published_result.pdf" });
-    expect(renderToStaticMarkup(createElement(ResidentsInfo, { rows: [row(), y2024, row({ id: "r4", year: 2023, rank: null, rankBasis: null })] }))).toContain("on this page: 2024, 2025");
+    expect(renderToStaticMarkup(createElement(ResidentsAbout, { rows: [row(), y2024, row({ id: "r4", year: 2023, rank: null, rankBasis: null })] }))).toContain("on this page: 2024, 2025");
     const listed = { key: "mcc/2025/up_to_round_3.pdf", name: "MCC admitted candidates list (up to Round 3)", url: "https://mcc.nic.in/x.pdf", year: 2025 };
-    const src = renderToStaticMarkup(createElement(ResidentsSources, { rows: [row(), row({ id: "r2" })], sources: [listed] }));
-    expect(src.match(/<li/g)).toHaveLength(2); // the admitted list (linked), then the NBEMS result named from the row
-    expect(src).toContain('href="https://mcc.nic.in/x.pdf"');
-    expect(src.indexOf("MCC admitted")).toBeLessThan(src.indexOf("NBEMS NEET PG 2025 result"));
-    // An NBEMS result in DataSource: its name and link, as NEET PG of its year.
+    // The admitted list (linked), then the NBEMS result named from the row.
+    expect(residentDocs([row(), row({ id: "r2" })], [listed])).toEqual([
+      { key: "residents|mcc/2025/up_to_round_3.pdf", name: listed.name, url: listed.url, type: "OFFICIAL", note: "PG counselling 2025" },
+      { key: "residents|nbems/2025/merit_list_AIQ50.pdf", name: "NBEMS NEET PG 2025 result", url: null, type: "OFFICIAL", note: "NEET PG 2025 rank source" },
+    ]);
     const nbems = { key: "nbems/2024/published_result.pdf", name: "NBEMS NEET PG 2024 result (23-08-2024)", url: "https://natboard.edu.in/x.pdf", year: 2024 };
-    const two = renderToStaticMarkup(createElement(ResidentsSources, { rows: [y2024], sources: [nbems] }));
-    expect(two).toContain('href="https://natboard.edu.in/x.pdf"');
-    expect(two).toContain("NEET PG 2024");
+    expect(residentDocs([y2024], [nbems]).map((d) => d.name)).toEqual(["MCC admitted candidates list (up to Round 3)", nbems.name]);
   });
 });
