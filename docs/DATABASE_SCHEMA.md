@@ -58,3 +58,6 @@ Source: the PRIVATE neetpg-planner bundle `data/medpath-private/` (`residents.nd
 - Replace-all in one transaction. `hidden` is set from `HiddenResident` by (name, college PIN code), never from the rows being replaced (an MCC import that changes a college key or course cascades those away first and reports them as `removed.residents`), so a name someone asked to hide stays hidden. Unhiding is a manual database change: delete the `HiddenResident` row and re-import.
 - One `DataSource` per list PDF (key = `sourceKey`, official URL from the planner's `data/official_sources.json`, `round` null so the Decide catalog never counts it as an allotment result).
 - Indexes: (collegeId, year) for an institute's tab, (specialtyId).
+
+## Feature requests (`FeatureRequest`)
+One row per request from the in-app page or the public form (`src/features/requests`, see ARCHITECTURE.md "Feature requests"): `kind` and `status` (default `new`) are the lists in `validations.ts`, stored as text; `message` plain text; `email` where to reply; `userId` nullable, `onDelete: SetNull` (deleting an account keeps its requests, unlinked); `page` where it was sent from. No IP (the privacy notice says it isn't stored). Indexes: (createdAt) for the owner's list, (userId) for her own.

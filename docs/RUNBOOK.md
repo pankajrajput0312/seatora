@@ -266,6 +266,10 @@ npx --yes vercel@latest deploy --prod --yes                 # redeploy the live 
 5. Remove `SEATORA_INVITE_CODE` and redeploy. Sign-up is then closed: any attempt gets "That email and invite code don't match an invite."
 6. The old account can still enter a correct password, but gets "This account doesn't have access." and no session. Delete its `User` row if it is no longer wanted (after a backup).
 
+**Delete an account on request.** Deleting a `User` row keeps its feature requests, unlinked (`onDelete: SetNull`), and the privacy notice says they go with the account, so delete them first: `DELETE FROM "FeatureRequest" WHERE "userId" = '<id>' OR lower(email) = lower('<email>')`.
+
+**Set the owner** (`SEATORA_OWNER_EMAILS`, who reads every request and its email on `/decide/requests`): only an address whose account the owner created themselves. Check its `User` row as in step 2 first, and never add an address without an account while `SEATORA_INVITE_CODE` is set: nothing verifies sign-up emails, so whoever holds the code could claim it.
+
 Her profile and choice lists live in her browser, not in the account, so changing the account doesn't move or delete them.
 
 ## 4. What each check means

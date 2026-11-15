@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { ACCESS_COOKIE, ACCESS_MAX_AGE_S, accessCookie, accessCookieUser, isAllowed, siteGate } from "@/lib/site-access";
+import { ACCESS_COOKIE, ACCESS_MAX_AGE_S, accessCookie, accessCookieUser, isAllowed, parseAllowlist, siteGate } from "@/lib/site-access";
 
 const COOKIE = "medpath_session";
 /** Readable by JS so the static header can show "Account". Carries no secret; auth uses COOKIE only. */
@@ -112,4 +112,15 @@ export async function canUseDecide() {
  */
 export async function requireDecideAccess(next = "/decide") {
   if (!(await canUseDecide())) redirect(`/login?${new URLSearchParams({ next })}`);
+}
+
+/**
+ * The owner reads and triages feature requests (features/requests): a signed-in (so allowlisted) user whose email is on
+ * SEATORA_OWNER_EMAILS (comma-separated, read like the allowlist). Unset or empty: nobody.
+ */
+export async function isOwner() {
+  const owners = parseAllowlist(process.env.SEATORA_OWNER_EMAILS);
+  if (!owners.length) return false;
+  const user = await getCurrentUser();
+  return !!user && isAllowed(user.email, owners);
 }

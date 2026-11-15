@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
 import { business } from "@/config/business";
+import { RequestForm } from "@/features/requests/components/request-form";
 
 export const metadata: Metadata = {
   title: "Contact Us",
@@ -41,6 +42,13 @@ export default function ContactPage() {
           )}
           <p>We reply within 2 working days.</p>
         </div>
+        <section aria-labelledby="request-h" className="mt-12 border-t border-border pt-10">
+          <h2 id="request-h" className="text-xl font-semibold tracking-tight">Request a feature or customization</h2>
+          <p className="mt-2 mb-6 text-sm leading-relaxed text-muted-foreground">
+            Ask for a new feature, a change for your own use, a correction to our data or anything else. You don&apos;t need an account.
+          </p>
+          <RequestForm page="/contact" />
+        </section>
       </article>
     </Container>
   );
