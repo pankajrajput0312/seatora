@@ -269,7 +269,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
 
       {unknownTerms > 0 && (
         <p className="text-sm text-muted-foreground">
-          <span className="numeric">{formatRank(unknownTerms)}</span> more allotments have a filtered figure not declared.{" "}
+          <span className="numeric">{formatRank(unknownTerms)}</span> more allotments have no published figure for that filter.{" "}
           <Link href={here({ nd: "keep" })} className={`${smallLink} text-sky`}>Include them</Link>
         </p>
       )}

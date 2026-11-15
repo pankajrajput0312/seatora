@@ -279,7 +279,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
             </InfoTip>
             {unknown > 0 && (
               <Link href={L.with("/decide/last-ranks", { nd: "keep", page: null })} className={`${smallLink} text-sky`}>
-                Include <span className="numeric mx-1">{formatRank(unknown)}</span> not declared
+                Include <span className="numeric mx-1">{formatRank(unknown)}</span> without a published figure
               </Link>
             )}
            <ColourLegend className="ml-1 align-middle" /></p>

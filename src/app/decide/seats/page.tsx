@@ -294,7 +294,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         </div>
         {r.unknownTerms > 0 && f.nd !== "keep" && (
           <p className="text-sm text-muted-foreground">
-            <span className="numeric">{formatRank(r.unknownTerms)}</span> more rows have a filtered figure not declared.{" "}
+            <span className="numeric">{formatRank(r.unknownTerms)}</span> more rows have no published figure for that filter.{" "}
             <Link href={here({ nd: "keep" })} className={`${smallLink} text-sky`}>Include them</Link>
           </p>
         )}

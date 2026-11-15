@@ -117,7 +117,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                 </InfoTip>
                 {unknown.length > 0 && (
                   <Link href={L.with("/decide/rank-scan", { nd: "keep", page: null })} className={`${smallLink} text-sky`}>
-                    Include <span className="numeric mx-1">{formatRank(unknown.length)}</span> not declared
+                    Include <span className="numeric mx-1">{formatRank(unknown.length)}</span> without a published figure
                   </Link>
                 )}
                <ColourLegend className="ml-1 align-middle" /></p>

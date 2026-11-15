@@ -210,7 +210,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
           <span className="numeric font-semibold text-foreground">{rangeLabel(res)}</span> institutes
           {unknown > 0 && (
             <>
-              {" · "}<span className="numeric">{formatRank(unknown)}</span> not declared{" "}
+              {" · "}<span className="numeric">{formatRank(unknown)}</span> without a published figure{" "}
               <Link href={L.with(PATH, { nd: "keep", page: null })} className={`${smallLink} text-sky`}>Include them</Link>
             </>
           )}

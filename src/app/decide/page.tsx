@@ -62,8 +62,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const labelSources = <DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR, round: "R1" }]} />;
   // Her fee / bond caps leave out options whose figure is not declared (in words only, or missing): say so, with the way back.
   const caps = [profile.maxFeeLakh != null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && termValueLabel.bondyrs(profile.maxBondYears)].flatMap((c) => (c ? [c[0].toLowerCase() + c.slice(1)] : [])).join(", ");
-  const leftOut = r.unknownTerms > 0 ? ` Your caps (${caps}) leave out ${formatRank(r.unknownTerms)} more whose figure is not declared (in words only, or not in Seatora's data).` : "";
-  const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} not declared</Link></>;
+  const leftOut = r.unknownTerms > 0 ? ` Your caps (${caps}) leave out ${formatRank(r.unknownTerms)} more without a published figure (in words only, or not in Seatora's data).` : "";
+  const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} without a published figure</Link></>;
 
   return (
     <AppPage className="grid grid-cols-1 gap-3 md:gap-4">

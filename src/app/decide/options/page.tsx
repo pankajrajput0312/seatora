@@ -303,7 +303,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       )}
       {r.unknownTerms > 0 && (
         <p className="text-sm text-muted-foreground">
-          {n(r.unknownTerms)} more left out: a filtered fee, stipend, bond or leaving figure is not declared.{" "}
+          {n(r.unknownTerms)} more left out: no published figure for a filtered fee, stipend, bond or leaving penalty.{" "}
           <Link href={here({ nd: "keep" })} className={`${smallLink} text-sky`}>Include them</Link>
         </p>
       )}

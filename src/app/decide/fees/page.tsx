@@ -208,7 +208,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           {res.undeclared > 0 && <InfoTip label="these programmes"><span className="numeric">{formatRank(res.undeclared)}</span> of them have nothing in Seatora&apos;s MCC data (every figure is —).</InfoTip>}
           {res.unknownTerms > 0 && (
             <span>
-              · <span className="numeric">{formatRank(res.unknownTerms)}</span> not declared left out:{" "}
+              · <span className="numeric">{formatRank(res.unknownTerms)}</span> without a published figure left out:{" "}
               <Link href={L.with("/decide/fees", { nd: "keep", page: null })} className="text-sky underline">include them</Link>
             </span>
           )}
