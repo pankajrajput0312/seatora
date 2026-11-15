@@ -256,6 +256,10 @@ function groupByOption(cutoffs: Cutoff[]) {
 
 // A page may ask for the same options twice in one render; share the read.
 const cutoffsOnce = cache((cat: Catalog, query: string) => findCutoffs(cat, JSON.parse(query) as CutoffQuery));
+// Overview labels the same options twice (dashboard and listOptions' counts): one read.
+type ReachQuery = Parameters<typeof findReachInputs>[1];
+const reachOnce = cache((cat: Catalog, query: string) => findReachInputs(cat, JSON.parse(query) as ReachQuery));
+const reachInputs = (cat: Catalog, q: ReachQuery) => reachOnce(cat, JSON.stringify(q));
 
 /** Cutoffs of the given options only: their CollegeSpecialty ids (and quotas, when few) go into the SQL WHERE. */
 async function rowsFor(cat: Catalog, opts: Opt[], profile: Profile | null, includeProvisional: boolean, narrow = true) {
@@ -293,7 +297,7 @@ type Ranked = { o: Opt; reach: Reach; provisional: boolean; deepest: ReachInput 
  * ticked covers ~11,800 options, and only a page of them is built in full.
  */
 async function rankOptions(cat: Catalog, opts: Opt[], profile: Profile | null, includeProvisional: boolean): Promise<Ranked[]> {
-  const inputs = await findReachInputs(cat, {
+  const inputs = await reachInputs(cat, {
     cs: opts.length < cat.options.length / 2 ? [...new Set(opts.map((o) => o.cs))] : undefined,
     categories: profile ? eligibleCategories(profile.category, profile.pwd) : undefined,
     pastYears: PAST_YEARS,
@@ -720,7 +724,7 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
   let reachOf = new Map<string, { reach: Reach; provisional: boolean }>();
   if (profile) {
     const opts = [...mineOf.values()].flat();
-    const inputs = await findReachInputs(cat, {
+    const inputs = await reachInputs(cat, {
       cs: opts.length < cat.options.length / 2 ? [...new Set(opts.map((o) => o.cs))] : undefined,
       categories: eligibleCategories(profile.category, profile.pwd),
       pastYears: PAST_YEARS,

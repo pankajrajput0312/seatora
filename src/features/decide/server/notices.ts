@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { rounds, roundSteps, type MccNotice, type NoticeKind, type Round, type RoundStepInfo, type RoundStepName, type StepStatus } from "../types";
-import { getCatalog } from "./catalog";
+import { perImport } from "./catalog";
 
 // MCC notices (Announcement) and the round steps derived only from them (RoundStep), as prisma/import-mcc.ts loads
 // notices.json and round_status.json. Each notice is its own official source (title, date, link).
@@ -9,15 +9,18 @@ import { getCatalog } from "./catalog";
 const day = (d: Date) => d.toISOString().slice(0, 10);
 
 /** MCC notices, newest first. Filters: notices.json kind, round (R1, R2, R3, stray), counselling year. */
-export async function listNotices(f: { kind?: NoticeKind; round?: Round; year?: number } = {}): Promise<MccNotice[]> {
-  await getCatalog(); // same availability as the rest of Decide
+export const listNotices = (f: { kind?: NoticeKind; round?: Round; year?: number } = {}) => noticesOnce(JSON.stringify([f.kind, f.round, f.year]));
+
+const noticesOnce = perImport(async (key): Promise<MccNotice[]> => {
+  const [kind, round, year] = JSON.parse(key) as [NoticeKind?, Round?, number?];
+  const f = { kind: kind ?? undefined, round: round ?? undefined, year: year ?? undefined };
   const rows = await db.announcement.findMany({
     where: { category: f.kind, round: f.round, counsellingYear: f.year },
     select: { title: true, authority: true, category: true, counsellingYear: true, round: true, publishedAt: true, officialUrl: true },
     orderBy: [{ publishedAt: "desc" }, { title: "asc" }],
   });
   return rows.map((r) => ({ title: r.title, date: day(r.publishedAt), url: r.officialUrl, authority: r.authority, kind: r.category as NoticeKind, year: r.counsellingYear, round: r.round as Round | null }));
-}
+});
 
 export type RoundStatus = {
   year: number;
@@ -27,8 +30,10 @@ export type RoundStatus = {
 };
 
 /** Round steps of a counselling year, R1 → stray, each seat matrix → final result. Null when none are imported. */
-export async function roundStatus(year: number): Promise<RoundStatus | null> {
-  await getCatalog();
+export const roundStatus = (year: number) => roundStatusOnce(String(year));
+
+const roundStatusOnce = perImport(async (key): Promise<RoundStatus | null> => {
+  const year = Number(key);
   const [rows, schedules] = await Promise.all([
     db.roundStep.findMany({ where: { year } }),
     db.announcement.findMany({ where: { category: "schedule", counsellingYear: year, officialUrl: { not: null } }, select: { title: true, officialUrl: true, round: true }, orderBy: { publishedAt: "desc" } }),
@@ -62,4 +67,4 @@ export async function roundStatus(year: number): Promise<RoundStatus | null> {
       .sort(([a], [b]) => rounds.indexOf(a) - rounds.indexOf(b))
       .map(([round, steps]) => ({ round, steps: steps.sort((a, b) => roundSteps.indexOf(a.step) - roundSteps.indexOf(b.step)) })),
   };
-}
+});

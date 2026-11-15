@@ -8,6 +8,7 @@ import "@astryxdesign/theme-neutral/theme.css";
 import { AppPage } from "@/features/decide/components/app-page";
 import { AstryxProvider } from "@/features/decide/components/astryx-provider";
 import { DecideShell } from "@/features/decide/components/decide-shell";
+import { NavPending } from "@/features/decide/components/nav-pending";
 import type { ProfileMeta } from "@/features/decide/components/profile-dialog";
 import { EmptyState } from "@/features/decide/components/ui";
 import { getMeta } from "@/features/decide/service";
@@ -15,8 +16,10 @@ import { getMeta } from "@/features/decide/service";
 // Inside app uses its own "case sheet" system (docs/APP_DESIGN_SYSTEM.md): light, hyperlegible numerals.
 const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
 
-// Every Decide page reads profile params, so render on request. No Suspense around the shell: nothing useful streams
-// before the data, and a blocking render lets notFound() answer 404 instead of a streamed 200.
+// Every Decide page reads profile params, so render on request. The shell is not suspended (its meta comes from the
+// cached catalog); each route's loading.tsx streams a skeleton of its page inside it until the page's data is in. So a
+// page's notFound() or redirect() now arrives after a 200 has started: the not-found view (noindex) or a client
+// redirect, not a 404 / 307 status. The access redirect stays a real 307 (getMeta, here, before anything streams).
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: { default: "Decide", template: "%s · Decide · Seatora" } };
@@ -37,7 +40,7 @@ export default async function DecideLayout({ children }: { children: React.React
       <AstryxProvider>
         <DecideShell meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (
-            children
+            <NavPending>{children}</NavPending>
           ) : (
             <AppPage>
               <EmptyState

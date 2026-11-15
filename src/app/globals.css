@@ -321,3 +321,14 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
 /* Same for its nav rows, the brand link and the drawer's close button (all 32px); unlayered, so these beat Astryx's layer. */
 .app .astryx-side-nav-item, .app .astryx-top-nav-heading { min-height: 2.75rem; }
 .app .astryx-mobile-nav .astryx-button { min-width: 2.75rem; min-height: 2.75rem; }
+
+/* Loading placeholders (features/decide/components/skeleton.tsx): a soft light sweep over the raised token, the
+   owner-asked loading affordance (not decoration). Static blocks under reduced motion (also the base rule above). */
+.skeleton {
+  background: linear-gradient(90deg, transparent 25%, var(--color-muted) 50%, transparent 75%) 0 0 / 300% 100% no-repeat, var(--color-raised, var(--color-muted));
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+@keyframes shimmer { from { background-position: 100% 0, 0 0; } to { background-position: 0 0, 0 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; background: var(--color-raised, var(--color-muted)); }
+}

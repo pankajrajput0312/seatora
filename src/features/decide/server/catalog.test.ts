@@ -16,7 +16,7 @@ const { db } = vi.hoisted(() => {
 });
 vi.mock("@/lib/db", () => ({ db }));
 
-import { getCatalog } from "./catalog";
+import { getCatalog, perImport } from "./catalog";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -42,4 +42,25 @@ it("reloads the catalog as soon as an import has committed, and only then", asyn
   expect(loads()).toBe(2);
   expect(await getCatalog()).toBe(second);
   expect(loads()).toBe(2);
+});
+
+it("perImport: one read per key per import, shared across requests, re-read once an import commits; failures not kept", async () => {
+  vi.stubEnv("DATABASE_URL", "postgres://test");
+  db.dataSource.findUnique.mockResolvedValue({ createdAt: new Date("2026-11-15T10:00:00Z") });
+  let n = 0;
+  const load = vi.fn(async (key: string) => (key === "bad" && n++ === 0 ? Promise.reject(new Error("down")) : `${key}@${db.dataSource.findUnique.mock.results.length}`));
+  const read = perImport(load);
+
+  const a = await read("x");
+  expect(await read("x")).toBe(a);
+  await read("y");
+  expect(load).toHaveBeenCalledTimes(2);
+
+  await expect(read("bad")).rejects.toThrow("down");
+  await read("bad"); // retried, not the cached failure
+  expect(load).toHaveBeenCalledTimes(4);
+
+  db.dataSource.findUnique.mockResolvedValue({ createdAt: new Date("2026-11-15T10:05:00Z") });
+  expect(await read("x")).not.toBe(a);
+  expect(load).toHaveBeenCalledTimes(5);
 });

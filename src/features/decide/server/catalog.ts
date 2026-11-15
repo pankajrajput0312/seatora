@@ -217,13 +217,35 @@ export async function getCatalog(): Promise<Catalog> {
   // Every Decide page, API route and Server Action reads through here. src/middleware.ts checks only the access cookie's
   // signature, so a copied cookie with no live session is sent to sign-in (pages; the API answers 401 first in handle()).
   // Open while the gate is off (development, unit tests).
-  await access();
+  // Access and version in parallel (one round trip less per request); a redirect from access() still wins.
   // Read before loading: an import committing during the load leaves the old version cached, so the next check reloads.
-  const version = await dataVersion();
+  const [, version] = await Promise.all([access(), dataVersion()]);
   if (cache?.version !== version) {
     const catalog = loadCatalog();
     catalog.catch(() => (cache = null)); // don't keep a failed load
     cache = { version, catalog };
   }
   return cache.catalog;
+}
+
+/**
+ * `load(key)` once per data version per process, shared across requests and users, like the catalog: only for import
+ * data (seat lists, MCC notices), never per-user or resident data. Results are shared: callers must not mutate them.
+ * Tests with an in-memory catalog read through.
+ */
+export function perImport<T>(load: (key: string) => Promise<T>): (key?: string) => Promise<T> {
+  let memo = { version: "", values: new Map<string, Promise<T>>() };
+  return async (key = "") => {
+    await getCatalog(); // same access and availability as the rest of Decide
+    if (testCatalog) return load(key);
+    const version = await dataVersion();
+    if (memo.version !== version) memo = { version, values: new Map() };
+    const { values } = memo;
+    const hit = values.get(key);
+    if (hit) return hit;
+    const p = load(key);
+    values.set(key, p);
+    p.catch(() => values.delete(key)); // don't keep a failed read
+    return p;
+  };
 }
