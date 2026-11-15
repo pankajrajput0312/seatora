@@ -25,6 +25,7 @@ const sections = [
     title: "Plan",
     items: [
       { href: "/decide", label: "Overview", icon: LayoutDashboard },
+      { href: "/decide/residents", label: "Residents", icon: Users, badge: "Premium" },
       { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
       { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
       { href: "/decide/choices", label: "Choices", icon: ListOrdered },
@@ -39,7 +40,6 @@ const sections = [
       { href: "/decide/institutes", label: "Institutes", icon: Building2 },
       { href: "/decide/last-ranks", label: "Last ranks", icon: TrendingUp },
       { href: "/decide/allotments", label: "Allotments", icon: Table2 },
-      { href: "/decide/residents", label: "Residents", icon: Users, badge: "Premium" },
       { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch },
       { href: "/decide/rank-journey", label: "Rank journey", icon: Route },
       { href: "/decide/rank-tools", label: "Score & rank", icon: Calculator },
