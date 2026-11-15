@@ -11,8 +11,9 @@ import { Closing, Dash, HISTORY_CAPTION, PageHead, Provisional, ReachBadge } fro
 import { FeesSection, programmeTitle, termDocs, TermsSummary } from "@/features/decide/components/fees";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
-import { allotmentMixAt, optionSeats, roundSeatsAt } from "@/features/decide/components/institute/institute-data";
-import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, RoundSeatsHead, SeatNumber } from "@/features/decide/components/institute/institute-parts";
+import { TypeBadge } from "@/features/decide/components/institute/hospital-bits";
+import { allotmentMixAt, clinicalAt, hospitalInfo, optionSeats, roundSeatsAt, websiteUrl } from "@/features/decide/components/institute/institute-data";
+import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, HospitalFacts, RoundSeatsHead, SeatNumber } from "@/features/decide/components/institute/institute-parts";
 import { courseName, RoundGrid, SeatsBelowNote, toChoiceItem } from "@/features/decide/components/options-view";
 import { listTitle, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
@@ -22,6 +23,7 @@ import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, optionsView, PAST_YEARS, renamedCollege } from "@/features/decide/service";
+import { feesFor } from "@/features/decide/server/facts";
 import { programmes } from "@/features/decide/server/terms";
 import { canSeeResidents, groupResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
 import { roundLabel, seatKindLabel } from "@/features/decide/types";
@@ -34,7 +36,7 @@ const tabs = [
   { key: "seats", label: "Seats" },
   { key: "allotments", label: "Allotments" },
   { key: "fees", label: "Fees & bond" },
-  { key: "clinical", label: "Clinical data" },
+  { key: "clinical", label: "Hospital facts" },
   { key: "residents", label: "Residents" },
 ] as const;
 const PAGE_SIZE = 50;
@@ -72,7 +74,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
     if (to) permanentRedirect(`/decide/institutes/${to.slug}${sp.size ? `?${sp}` : ""}`);
     notFound();
   }
-  const { college, options, yours, allotmentsByYear, fees, unlisted } = inst;
+  const { college, options, yours, allotmentsByYear, fees, unlistedBy } = inst;
   const tab = f.tab;
   const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
   const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n ?? 0));
@@ -94,12 +96,23 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // Seats here with no past allotments: not in the lists below; Seats shows them, and while Options opens in the round
   // view, Options lists those in her profile as new options (search: this institute's name, within its 100 characters).
   const newOnOptions = profile && optionsView(undefined, inst.seatList ? [inst.seatList] : [], meta.sources) === "round" ? L.options({ reach: "new", q: college.name.slice(0, 100) }) : undefined;
-  const unlistedNote = unlisted && unlisted.seats > 0 && <UnlistedSeats u={unlisted} profile={!!profile} here href={L.to("/decide/seats", { list: unlisted.list.key, inst: slug, nohist: "1" })} options={newOnOptions} />;
+  // One note per list of the round with such seats (clear, virtual, newly added: they overlap, so never added).
+  const unlisted = unlistedBy.filter((u) => u.seats > 0);
+  const unlistedNote = unlisted.length > 0 && (
+    <div className="grid gap-1">
+      {unlisted.map((u) => <UnlistedSeats key={u.list.key} u={u} profile={!!profile} here href={L.to("/decide/seats", { view: "list", list: u.list.key, inst: slug, nohist: "1" })} options={newOnOptions} />)}
+    </div>
+  );
   // The newest round's seat lists here (Courses columns, Seats tab), each separate; allotments by quota and seat category (Overview).
-  const [round, mix] = await Promise.all([
+  // Fees tab: the fee table by seat-type group per programme (none for MCh, MPH); Hospital facts tab: clinical facts.
+  const [round, mix, info, feeGroups, clinical] = await Promise.all([
     tab === "courses" || tab === "seats" ? roundSeatsAt(college.key) : [],
     tab === "overview" ? allotmentMixAt(college.key) : null,
+    hospitalInfo().then((m) => m.get(college.key) ?? null),
+    tab === "fees" ? Promise.all(fees.map((p) => feesFor(college.key, p.programme))) : [],
+    tab === "clinical" ? clinicalAt(college.key, profile) : null,
   ]);
+  const website = websiteUrl(info?.website ?? null);
   const roundLists = round.map((x) => x.list);
   const roundName = round[0] && `${round[0].list.year} ${roundLabel[round[0].list.round]}`;
   const mine = profile ? eligibleCategories(profile.category, profile.pwd) : null;
@@ -116,6 +129,19 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         <p className="mt-2 max-w-3xl text-muted-foreground">
           <span className="text-sm">Address as printed by MCC: </span>{college.address ?? <Dash />}
         </p>
+        {(info?.type || info?.mccProfileUrl || website) && (
+          <p className="mt-1 flex flex-wrap items-center gap-x-4 text-sm">
+            {info?.type && <TypeBadge type={info.type} note />}
+            {info?.mccProfileUrl && (
+              <a href={info.mccProfileUrl} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>Official MCC profile<span className="sr-only"> (opens in a new tab)</span></a>
+            )}
+            {website && (
+              <a href={website} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>
+                Website<span className="sr-only">: {info!.website}, as declared on its MCC profile (opens in a new tab)</span>
+              </a>
+            )}
+          </p>
+        )}
       </div>
 
       <SubTabs label="Institute sections" current={tab} items={tabs.map((t) => ({ key: t.key, label: t.label, href: L.to(`/decide/institutes/${slug}`, { tab: t.key }) }))} />
@@ -251,7 +277,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                         <td key={list.key} className={`${tbl.td} text-right`}>
                           <SeatNumber
                             n={optionSeats(rows, { ...r.course, quota: r.quota }, seatCats)}
-                            href={L.to("/decide/seats", { list: list.key, inst: slug, course: r.course.slug, squota: r.quota, scat: mine && !seatCats ? "all" : undefined })}
+                            href={L.to("/decide/seats", { view: "list", list: list.key, inst: slug, course: r.course.slug, squota: r.quota, scat: mine && !seatCats ? "all" : undefined })}
                             label={`seats in the ${listTitle(list)} list, ${seatCats ? "your seat categories" : "every seat category"}: ${college.name}, ${courseName(r)}, ${r.quota}`}
                           />
                         </td>
@@ -371,29 +397,32 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <EmptyState title="No courses here in the MCC data" description="There is no programme here to show fees, stipend or bond for." href={L.institute(slug, "courses")} action="See the courses here" />
           ) : (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {fees.map((p) => (
+              {fees.map((p, i) => (
                 <div key={p.programme} className="rounded-xl border border-border bg-card p-5">
-                  <FeesSection t={p} id={`fees-${programmes[p.programme].slug}`} />
+                  <FeesSection t={p} groups={feeGroups[i]} id={`fees-${programmes[p.programme].slug}`} />
                 </div>
               ))}
             </div>
           )}
           <p className="max-w-3xl text-xs text-muted-foreground">
-            One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}). Fee that year and stipend per month as declared to MCC; a dash means not in Seatora&apos;s MCC data (not declared in the MCC profile fields we import; the profile may say more), never zero.
+            One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type (All India, Deemed/Paid, NRI, DNB Quota) where the MCC profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead, never a figure. NBEMS maximum and minimum are NBEMS&apos;s limits, not the college&apos;s figures. A dash means not stated (not in the MCC profile fields we import; the profile may say more), never zero.
             Leaving the course after joining is the college&apos;s or state&apos;s penalty from its bond document; resigning from Round 2 is MCC&apos;s separate forfeit.
           </p>
           {college.state && <p className="text-sm"><Link href={L.fees({ state: college.state })} className={`${smallLink} text-sky`}>Compare fees with other institutes in {college.state}</Link></p>}
         </section>
       )}
 
-      {tab === "clinical" && (
-        <EmptyState
-          title="Clinical data not collected yet"
-          description="Outpatient and inpatient numbers, bed occupancy and operating theatres aren't in the data yet. For DNB hospitals they will come from their NBEMS mandatory disclosures."
-          href={L.institute(slug, "courses")}
-          action="See the courses here"
-        />
-      )}
+      {tab === "clinical" &&
+        (clinical ? (
+          <HospitalFacts f={clinical} name={college.name} />
+        ) : (
+          <EmptyState
+            title="No hospital facts found yet"
+            description="Seatora has found no beds, patient numbers or facilities published by this institute, and no NBEMS mandatory disclosure check for it."
+            href={L.institute(slug, "courses")}
+            action="See the courses here"
+          />
+        ))}
       {residentsAccess === "locked" && (
         <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.institute(slug, "courses")} action="See the courses here" />
       )}

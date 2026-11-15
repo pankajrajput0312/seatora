@@ -20,7 +20,7 @@ const her: Profile = { rank: 42284, category: "OBC", pwd: false, specialties: ["
 const optionKey = (c: { college: string; degree: string; specialty: string; quota: string }) => [c.college, c.degree, c.specialty, c.quota].join("~");
 
 it("maps MCC status to the remark and degrees to the fee program", () => {
-  expect([remarkOf("allotted"), remarkOf("fresh"), remarkOf("upgraded")]).toEqual(["Fresh", "Fresh", "Upgraded"]);
+  expect([remarkOf("allotted"), remarkOf("fresh"), remarkOf("upgraded")]).toEqual(["Allotted", "Fresh", "Upgraded"]);
   expect(["MD", "MS", "Diploma", "MCh", "DNB", "DrNB", "NBEMS Diploma"].map((d) => svc.programOf(d))).toEqual(["MD", "MD", "MD", "MD", "DNB", "DNB", "DNB"]);
 });
 

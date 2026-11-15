@@ -84,7 +84,7 @@ export function feesCsv(rows: FeeRow[], notes: string[], siteUrl: string) {
     ...Array.from({ length: yearCols }, (_, i) => `stipend_y${i + 1}`), "stipend_kind", "stipend_source_url", "stipend_source_year",
     "bond_status", "bond_basis", "bond_years", "bond_inr_max", "bond_inr_status", "bond_inr_note", "leaving_inr_max", "leaving_status", "leaving_text",
     "bond_years_text", "bond_applies_to", "bond_text", "bond_source_url",
-    "resign_round2_inr", "mcc_profile_id", "mcc_profile_shared_by", "fee_min", "bond_caveat",
+    "resign_round2_inr", "mcc_profile_id", "mcc_profile_shared_by", "fee_min", "bond_caveat", "fee_y1_at_admission",
   ];
   const body = rows.map(({ college, terms: t }) => {
     const src = (n: number | null | undefined) => t.sources.find((s) => s.n === n);
@@ -101,7 +101,7 @@ export function feesCsv(rows: FeeRow[], notes: string[], siteUrl: string) {
       b.status, b.basis, b.years, none ? 0 : declared ? b.amount.max : null, none ? "figure" : amountStatus(declared, b.amount), declared ? amountNote(b.amount, b.years) : null,
       b.leavingAmount.max, amountStatus(b.leaving.length > 0, b.leavingAmount), b.leaving.map((p) => p.text).join("; ") || null,
       declared ? b.yearsText : null, b.appliesTo, b.text, src(b.src)?.url,
-      t.resignForfeit?.inr, mcc.map(([id]) => id).join(" "), mcc.map(([, n]) => n).join(" "), fee?.min, b.caveat,
+      t.resignForfeit?.inr, mcc.map(([id]) => id).join(" "), mcc.map(([, n]) => n).join(" "), fee?.min, b.caveat, fee?.atAdmission ? "true" : null,
     ];
   });
   return [head, ...body, [], ...notes.map((n) => [n])].map(line).join("\r\n") + "\r\n";

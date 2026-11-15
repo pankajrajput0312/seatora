@@ -22,11 +22,22 @@ test("every route: skip link is the first tab stop, no sideways scroll at 390 px
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
   for (const path of ["/decide", "/decide/options", "/decide/choices", "/decide/compare", "/decide/institutes", "/decide/institutes/government-medical-college-nagpur-440003?tab=courses",
-    "/decide/last-ranks", "/decide/allotments", "/decide/rank-scan", "/decide/fees", "/decide/seats?tab=trends", "/decide/counselling"]) {
+    "/decide/last-ranks", "/decide/allotments", "/decide/rank-scan", "/decide/rank-journey", "/decide/fees", "/decide/seats", "/decide/seats?tab=trends", "/decide/counselling",
+    "/decide/institutes/ssb-heart-and-multispeciality-hospital-121001?tab=clinical"]) {
     await page.goto(`${path}${path.includes("?") ? "&" : "?"}${PROFILE}`);
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Skip to content" }), path).toBeFocused();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), path).toBeLessThanOrEqual(0);
+  }
+  // The Seats matrix's and Allotments' Display menus open on screen, every checkbox visible.
+  for (const path of ["/decide/seats", "/decide/allotments"]) {
+    await page.goto(`${path}?${PROFILE}`);
+    await page.locator("summary", { hasText: "Display" }).click();
+    for (const box of await page.getByRole("group", { name: "Columns shown" }).getByRole("checkbox").all()) {
+      const b = (await box.boundingBox())!;
+      expect(b.x, path).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.width, path).toBeLessThanOrEqual(390);
+    }
   }
 });
 
@@ -268,7 +279,8 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
   await expect(page.locator("#results")).toContainText("1–12 of 12");
   const table = page.getByRole("region", { name: "Allotments", exact: true });
   await expect(table.getByText("Provisional")).toHaveCount(0); // 2026 R1 is final
-  await page.getByLabel("Seat category").selectOption("OBC");
+  // Comboboxes: the Display menu has checkboxes with the same names.
+  await page.getByRole("combobox", { name: "Seat category" }).selectOption("OBC");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/acat=OBC/);
   await expect(table).toContainText("17,213");
@@ -277,7 +289,7 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
   await page.goto(`/decide/allotments?${PROFILE}&from=30,000&to=50,000`);
   await expect(page.getByLabel("Rank from")).toHaveValue("30,000");
   await expect(page.locator("#results")).not.toContainText("2,09,566");
-  await page.getByLabel("Quota").selectOption("All India");
+  await page.getByRole("combobox", { name: "Quota" }).selectOption("All India");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/aq=All\+India/);
   await expect(page).not.toHaveURL(/[?&]quota=/);
@@ -285,16 +297,51 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
   await expect(page.getByText("That range was not applied.")).toBeVisible(); // (Next's route announcer is also role=alert)
 });
 
+test("rank journey: 2023 rank 23 in R1 at LTMMC, upgraded in R2 to Seth GS on choice 1; Allotments' new columns, CSV and links", async ({ page }) => {
+  await page.goto(`/decide/rank-journey?${PROFILE}`);
+  await expect(page.getByLabel("All India Rank")).toHaveValue("42284"); // her rank, the newest year
+  await expect(page.getByLabel("Year")).toHaveValue("2026");
+
+  await page.goto(`/decide/rank-journey?${PROFILE}&air=23&year=2023`);
+  const journey = page.getByRole("region", { name: "Rank 23, 2023" });
+  await expect(journey.getByRole("row", { name: /^2023 R1/ })).toContainText("Allotted");
+  const r2 = journey.getByRole("row", { name: /^2023 R2/ });
+  for (const v of ["Seth Gordhandas Sunderdas Medical College", "Upgraded", "General", "LOKMANYA TILAK MEDICAL COLLEGE MUMBAI", "MD General Medicine · All India · reported"]) await expect(r2).toContainText(v);
+  await expect(page.getByText("No allotment to this rank in the R3,")).toBeVisible();
+
+  // Allotments: candidate category, choice no., status and previous seat; a column hidden under Display; the CSV.
+  await page.goto(`/decide/allotments?${PROFILE}&year=2023&round=R2&from=23&to=23`);
+  const table = page.getByRole("region", { name: "Allotments", exact: true });
+  await expect(table.getByRole("row").nth(1)).toContainText("All IndiaOpenGeneral1Upgraded");
+  await page.getByText("Display").click();
+  await page.getByRole("checkbox", { name: "Previous seat" }).uncheck();
+  await expect(table.getByRole("columnheader", { name: /Previous seat/ })).toBeHidden();
+  await page.getByRole("checkbox", { name: "Previous seat" }).check();
+  const csv = await (await page.request.get(await page.getByRole("link", { name: /Download CSV/ }).getAttribute("href") ?? "")).text();
+  expect(csv).toContain(",Candidate category,Choice no.,Status,");
+  expect(csv).toContain(",All India,Open,General,1,Upgraded,Seth Gordhandas Sunderdas Medical College,");
+  await table.getByRole("link", { name: /^Journey/ }).click();
+  await expect(page).toHaveURL(/air=23&year=2023/);
+
+  await page.goto(`/decide/rank-scan?${PROFILE}&scan=23&year=2023&w=100`);
+  await page.getByRole("region", { name: "2023 R2 allotments" }).getByRole("link", { name: "23", exact: true }).click();
+  await expect(h1(page)).toHaveText("Rank journey");
+});
+
 test("institute page: MCC address, terms with their sources, paginated allotments", async ({ page }) => {
   await page.goto(`/decide/institutes/${KOKILA_NM}?${PROFILE}&tab=fees`);
   await expect(page.getByText(/Navi Mumbai/).first()).toBeVisible();
-  // DNB: the NBEMS fee each year (whole course computed), no stipend in the data, and "No bond" from the NBEMS rule's record.
+  // DNB, the fee table's DNB Quota seats: the NBEMS maximum fee and minimum stipend each year (labelled, never the
+  // college's figures), the whole course, and "No bond" from the NBEMS rule's record; one source numbering for the block.
   const dnb = page.getByRole("region", { name: "DNB", exact: true });
-  await expect(dnb.getByRole("table")).toContainText("₹1,25,000");
-  await expect(dnb).toContainText("₹3,75,000");
-  await expect(dnb).toContainText("Stipend: not in Seatora's MCC data yet.");
+  const quota = dnb.getByRole("region", { name: "DNB Quota seats" });
+  const y1 = quota.getByRole("row", { name: /^Year 1/ });
+  for (const v of ["₹1,25,000", "NBEMS maximum", "₹43,000", "NBEMS minimum"]) await expect(y1).toContainText(v);
+  await expect(quota.getByRole("row", { name: /^Whole course/ })).toContainText("₹3,75,000");
+  await expect(quota.getByRole("link", { name: /^Source 3: NBEMS annual course fee \(ceiling, no GST\)/ }).first()).toHaveAttribute("href", /natboard\.edu\.in/);
   await expect(dnb).toContainText("No bond (NBEMS rule)");
-  await expect(dnb.getByRole("link", { name: /^Source 1: NBEMS fee notice/ }).first()).toHaveAttribute("href", /natboard\.edu\.in/);
+  await expect(dnb).not.toContainText("GST to NBEMS");
+  await expect(dnb.getByRole("list", { name: "Sources, DNB, bond and penalties" }).getByRole("listitem").first()).toHaveText(/^4/);
 
   await page.goto(`/decide/institutes/${SETH_GS}?${PROFILE}&tab=allotments`);
   const results = page.locator("#results");
@@ -303,6 +350,50 @@ test("institute page: MCC address, terms with their sources, paginated allotment
   await expect(page).toHaveURL(/page=2/);
   await expect(results).toContainText("51–100 of 1,001");
   await expect(results).toBeFocused();
+});
+
+test("fees: a fee in the profile's own words shows no figure anywhere; MCC's Round 2 forfeit from the fee table", async ({ page }) => {
+  // Chettinad: the MCC profile gives ₹3 L–₹48 L by specialty, so the fee table is verbatim: words and link, no ₹ fee.
+  await page.goto(`/decide/institutes/chettinad-hospital-research-institute-603103?${PROFILE}`);
+  await expect(page.getByText(/MD\/MS · Fee see terms/)).toBeVisible();
+  await page.goto(`/decide/institutes/chettinad-hospital-research-institute-603103?${PROFILE}&tab=fees`);
+  const group = page.getByRole("region", { name: "MD/MS", exact: true }).getByRole("region", { name: "Deemed/Paid seats" });
+  await expect(group).toContainText("Seatora shows no fee figure here");
+  await expect(group.getByRole("columnheader", { name: "Fee that year" })).toHaveCount(0);
+  await expect(group.getByRole("link", { name: /MCC institute profile, read/ })).toHaveAttribute("href", /mcc\.admissions\.nic\.in/);
+  // Goa MC: ₹70,324 at admission, later years not stated: no whole-course figure; the Round 2 forfeit ₹8,432.
+  await page.goto(`/decide/institutes/goa-medical-college-403202?${PROFILE}`);
+  await expect(page.getByText(/MD\/MS · Fee ₹70,324 at admission, later yrs not stated/)).toBeVisible();
+  await page.goto(`/decide/institutes/goa-medical-college-403202?${PROFILE}&tab=fees`);
+  const md = page.getByRole("region", { name: "MD/MS", exact: true });
+  await expect(md.getByRole("row", { name: /^Whole course/ })).toHaveCount(0);
+  await expect(md).toContainText("₹8,432 forfeited if you resign or don't join from Round 2");
+  await expect(md.getByRole("definition").filter({ hasText: "What MCC lets the college keep" })).toContainText("₹8,432");
+});
+
+test("hospital facts: self-reported values with their sources, the disclosed stipend, block flags said once", async ({ page }) => {
+  await page.goto(`/decide/institutes/ssb-heart-and-multispeciality-hospital-121001?${PROFILE}&tab=clinical`);
+  await expect(page.getByRole("heading", { name: "Hospital facts (as reported)" })).toBeVisible();
+  await expect(page.getByText("NBEMS mandatory disclosure: found on the hospital's site")).toBeVisible();
+  const stipend = page.getByRole("row", { name: /^Stipend disclosed, a month/ });
+  await expect(stipend).toContainText("₹75,000 / ₹77,000 / ₹80,000 (yr 1/2/3)");
+  await expect(stipend).toContainText("the source prints conflicting figures");
+  const course = page.getByRole("region", { name: "DNB Anaesthesiology" });
+  await expect(course.getByText("derived: computed from the source's figures")).toHaveCount(1);
+});
+
+test("seats matrix: a row's Details drawer has the course's terms and the beds as the source prints them", async ({ page }) => {
+  await page.goto(`/decide/seats?${PROFILE}&inst=bombay-hospital-452010&course=dnb-anaesthesiology`);
+  const matrix = page.locator("#seat-matrix");
+  await expect(matrix.getByRole("row", { name: /Bombay Hospital/ })).toContainText("270+");
+  await matrix.getByRole("button", { name: /^Details ?: DNB Anaesthesiology/ }).click();
+  const drawer = page.getByRole("dialog", { name: "Bombay Hospital" });
+  await expect(drawer).toContainText("DNB · Fee up to ₹1.25 L/yr (NBEMS max)");
+  await expect(drawer).toContainText("No bond (NBEMS rule");
+  await expect(drawer.getByText("270+", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  await expect(matrix.getByRole("button", { name: /^Details ?: DNB Anaesthesiology/ })).toBeFocused();
 });
 
 // The Seats matrix (seat lists) and Counselling notices are being rebuilt on the imported 2026 R2 data: assert them there.

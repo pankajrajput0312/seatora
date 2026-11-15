@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { formatRank } from "@/features/cutoffs/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { formatINR, formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import type { SeatRow } from "../../server/seats";
 import type { SeatList } from "../../types";
@@ -7,7 +8,8 @@ import { Dash, Provisional } from "../bits";
 import { SeatsHead } from "../options-view";
 import { fmtDay } from "../seats/seat-lists";
 import { smallLink, tbl } from "../ui";
-import type { AllotmentMix } from "./institute-data";
+import { reportedCount, SELF_REPORTED, ValueSource } from "./hospital-bits";
+import type { AllotmentMix, ClinicalAt, ValueMeta } from "./institute-data";
 
 // Institute page parts (src/app/decide/institutes/[slug]), server-rendered.
 
@@ -116,5 +118,159 @@ export function AllotmentMixTable({ mix, name }: { mix: AllotmentMix; name: stri
         ))}
       </table>
     </div>
+  );
+}
+
+// ---------- Hospital facts (as reported): ClinicalFacts, every value self-reported by the institution ----------
+
+type Facts = NonNullable<ClinicalAt["facts"]>;
+type Said = Facts["blood_bank"];
+/** Yes / No, a count (scanners) or the source's own words. */
+const said = (v: Said) => (v == null ? null : typeof v === "boolean" ? (v ? "Yes" : "No") : typeof v === "number" ? formatRank(v) : v);
+const num = (v: number | undefined, unit = "") => (v == null ? null : `${formatRank(v)}${unit}`);
+
+type Line = { label: string; value: React.ReactNode; note?: string | null; meta: ValueMeta | null | undefined };
+/**
+ * Fact · as reported ("—" when not found) · period as printed · source. `whole`: the source of every row without one of
+ * its own (the record's block-level entry), with its flags, said once above the table instead of on every row.
+ */
+function FactsTable({ caption, lines, whole }: { caption: string; lines: Line[]; whole?: ValueMeta | null }) {
+  return (
+    <>
+      {whole && lines.some((l) => !l.meta && l.value != null && l.value !== "") && (
+        <div className="grid gap-1 text-xs text-muted-foreground">
+          <span>Rows without a source of their own: {whole.period}</span>
+          <ValueSource m={whole} />
+        </div>
+      )}
+      <div role="region" aria-label={caption} tabIndex={0} className={tbl.wrap}>
+        <table className={tbl.table}>
+          <caption className="sr-only">{caption}. {SELF_REPORTED}.</caption>
+          <thead>
+            <tr className={tbl.headRow}>
+              <th scope="col" className={tbl.th}>Fact</th>
+              <th scope="col" className={cn(tbl.th, "text-right")}>As reported</th>
+              <th scope="col" className={tbl.th}>Period</th>
+              <th scope="col" className={tbl.th}>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((l) => {
+              const has = l.value != null && l.value !== "";
+              return (
+                <tr key={l.label} className={tbl.row}>
+                  <th scope="row" className={cn(tbl.td, "text-left font-normal text-muted-foreground")}>{l.label}</th>
+                  <td className={cn(tbl.td, "text-right font-semibold", typeof l.value === "string" && /^[\d,.]+[%+]?$/.test(l.value) && "numeric")}>
+                    {has ? l.value : <Dash />}
+                    {has && l.note && <span className="block text-xs font-normal text-muted-foreground">{l.note}</span>}
+                  </td>
+                  <td className={cn(tbl.td, "max-w-64 text-xs text-muted-foreground")}>{has && l.meta?.period}</td>
+                  <td className={cn(tbl.td, "min-w-48")}>{has && <ValueSource m={l.meta} />}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+const DISCLOSURE: Record<ClinicalAt["disclosure"]["status"], string> = {
+  found: "found on the hospital's site",
+  not_found: "not found on the hospital's site",
+  blocked: "the hospital's site blocks automated checks",
+  na: "not applicable here",
+};
+
+/**
+ * The Hospital facts card: hospital-wide facts, then each course's department record (hers first), every value with its
+ * period, source, check date and flags; the NBEMS mandatory disclosure check. Nothing is filled in: "—" when not found.
+ */
+export function HospitalFacts({ f, name }: { f: ClinicalAt; name: string }) {
+  const d = f.disclosure;
+  const facts: Partial<Facts> = f.facts ?? {};
+  // A value's own source; a block's ("facts", "courses[i]") is shown once above its table (FactsTable `whole`).
+  const meta = (path: string) => f.values_meta?.[path];
+  const fact = (key: keyof Facts, label: string, value: React.ReactNode, note?: string | null): Line => ({ label, value, note, meta: meta(`facts.${key}`) });
+  const sd = f.stipend_disclosed;
+  const sdMeta = meta("stipend_disclosed");
+  const lines: Line[] = [
+    fact("beds_total", "Beds", facts.beds_total != null ? reportedCount({ n: facts.beds_total, meta: meta("facts.beds_total"), own: true }).text : null, facts.beds_kind),
+    fact("icu_beds", "ICU beds", num(facts.icu_beds)),
+    fact("emergency_24x7", "Emergency, 24×7", said(facts.emergency_24x7)),
+    fact("blood_bank", "Blood bank", said(facts.blood_bank)),
+    fact("ct", "CT", said(facts.ct)),
+    fact("mri", "MRI", said(facts.mri)),
+    fact("cath_lab", "Cath lab", said(facts.cath_lab)),
+    fact("hospital_opd_year", "Outpatients (OPD) a year", num(facts.hospital_opd_year)),
+    fact("hospital_opd_day", "Outpatients (OPD) a day", num(facts.hospital_opd_day)),
+    fact("hospital_ipd_year", "Inpatients (IPD) a year", num(facts.hospital_ipd_year)),
+    fact("occupancy_pct", "Bed occupancy", num(facts.occupancy_pct, "%")),
+    fact("operating_theatres", "Operating theatres", num(facts.operating_theatres)),
+    fact("deliveries_year", "Deliveries a year", num(facts.deliveries_year)),
+    fact("accommodation", "Accommodation", said(facts.accommodation)),
+    fact("library", "Library", said(facts.library)),
+    fact("e_library", "E-library", said(facts.e_library)),
+    fact("ethics_committee", "Ethics committee", said(facts.ethics_committee)),
+    {
+      label: "Stipend disclosed, a month",
+      value: sd && `${[sd.y1, sd.y2, ...(sd.y3 != null ? [sd.y3] : [])].map(formatINR).join(" / ")} (yr 1/2${sd.y3 != null ? "/3" : ""})`,
+      note: sd && sd.period !== sdMeta?.period ? sd.period : null,
+      meta: sdMeta,
+    },
+  ];
+  return (
+    <section aria-labelledby="facts-h" className="grid gap-4 rounded-xl border border-border bg-card p-5">
+      <div className="grid gap-1">
+        <h2 id="facts-h" className="text-lg font-semibold">Hospital facts (as reported)</h2>
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          {SELF_REPORTED}: each figure is what the institution published (its website, NIRF data, NMC or NBEMS pages), with the period it covers, where Seatora read it and when.
+          &quot;—&quot; means Seatora did not find it, not zero.
+        </p>
+      </div>
+      <p className="text-sm">
+        <span className="font-semibold">NBEMS mandatory disclosure: </span>
+        {DISCLOSURE[d.status]}
+        {d.checked && <> (as of <span className="numeric">{fmtDay(d.checked)}</span>)</>}
+        {d.url && (
+          <>
+            {" "}
+            <a href={d.url} target="_blank" rel="noopener noreferrer" className={cn(smallLink, "text-sky")}>{d.status === "found" ? "open the disclosure" : "the hospital's site"}<span className="sr-only"> (opens in a new tab)</span></a>
+          </>
+        )}
+      </p>
+      <FactsTable caption={`Hospital facts at ${name}, as reported`} lines={lines} whole={meta("facts")} />
+      {f.courses.length > 0 && (
+        <div className="grid gap-4">
+          <h3 className="text-base font-semibold">By course, as reported</h3>
+          {f.courses.map((c) => {
+            const m = (k: string) => meta(`courses[${c.i}].${k}`);
+            const t = c.trainees;
+            const trainees = t && (["registered", "left", "passed", "failed", "awaited"] as const).filter((k) => t[k] != null).map((k) => `${formatRank(t[k]!)} ${k === "awaited" ? "results awaited" : k}`).join(" · ");
+            return (
+              <section key={c.i} aria-label={c.course} className="grid gap-2">
+                <h4 className="flex flex-wrap items-center gap-2 text-sm font-semibold">{c.course}{c.mine && <Badge tone="info">In your profile</Badge>}</h4>
+                <FactsTable
+                  caption={`${c.course} at ${name}, as reported`}
+                  whole={meta(`courses[${c.i}]`)}
+                  lines={[
+                    { label: "Department beds", value: num(c.dept_beds), meta: m("dept_beds") },
+                    { label: "Outpatients (OPD) a year", value: num(c.opd_year), meta: m("opd_year") },
+                    { label: "Inpatients (IPD) a year", value: num(c.ipd_year), meta: m("ipd_year") },
+                    { label: "Major surgeries", value: num(c.major_surgeries), meta: m("major_surgeries") },
+                    { label: "Minor surgeries", value: num(c.minor_surgeries), meta: m("minor_surgeries") },
+                    { label: "Rotation", value: c.rotation, meta: m("rotation") },
+                    { label: "Trainee record", value: trainees || null, meta: m("trainees") },
+                    { label: "First accredited", value: c.first_accreditation, meta: m("first_accreditation") },
+                    { label: "Accreditation valid up to", value: c.valid_up_to, meta: m("valid_up_to") },
+                  ]}
+                />
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }

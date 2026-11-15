@@ -8,7 +8,7 @@ import { getCollege, getMeta } from "@/features/decide/service";
 import { baseCategories, rounds, seatKinds } from "@/features/decide/types";
 
 const categories = [...baseCategories, ...baseCategories.map((c) => `${c} PwD` as const)] as const;
-const multi = ["specialty", "course", "degree", "quota", "category", "state", "sp", "deg", "c", "st"];
+const multi = ["specialty", "course", "degree", "quota", "category", "state", "sp", "deg", "c", "st", "has"];
 const code = z.string().regex(/^[A-Z0-9]+$/, "Specialty code, e.g. ANAESTHESIOLOGY");
 const seatsQuerySchema = pageSchema.extend({
   /** SeatList key, e.g. mcc/2026/R2_clear_vacancy.pdf; overrides kind/year/round. */
@@ -16,6 +16,14 @@ const seatsQuerySchema = pageSchema.extend({
   kind: z.enum(seatKinds).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
   round: z.enum(rounds).optional(),
+  /**
+   * The Seats page's views: "list" (default: that one list), "compare" (every list of its round, one row per institute,
+   * course, quota and seat category, `byList`) or "matrix" (as compare; `rounds=all` adds every earlier list and the rows
+   * MCC allotted that no list prints; `has` = rows with seats in any of these kinds of the round's lists).
+   */
+  view: z.enum(["list", "compare", "matrix"]).default("list"),
+  rounds: z.literal("all").optional(),
+  has: z.array(z.enum(seatKinds)).default([]),
   specialty: z.array(code).default([]),
   course: z.array(z.string().max(100)).default([]),
   degree: z.array(z.string().max(100)).default([]),
@@ -33,7 +41,8 @@ const seatsQuerySchema = pageSchema.extend({
 });
 
 /**
- * Seats in one MCC seat list (default: the newest round's clear vacancy), as its PDF printed them; paginated. Kinds
+ * Seats in one MCC seat list (default: the newest round's clear vacancy), as its PDF printed them, or the Seats page's
+ * compare and matrix views of its round (`view`); paginated. Each row's `closings` = every round of every year; kinds
  * overlap and are never added: `seats[list key]` sums matching rows within one list. Later MCC add/remove notices are
  * not applied. Each row carries its past closings on its quota and seat category (`rounds`, `deepest`), its terms, and
  * with the optional profile params (rank, cat, pwd) the reach label Options uses, on that seat category (`reach`; null on
@@ -47,7 +56,7 @@ export async function GET(req: Request) {
     const profile = parseOptionalProfile(p);
     if (!q.success || !profile.success) return invalid(q.error, profile.error);
     const me = profile.data;
-    const { page, pageSize, college, specialty, course, degree, quota, category, state, sp, deg, c, st, ...f } = q.data;
+    const { page, pageSize, college, specialty, course, degree, quota, category, state, sp, deg, c, st, view, rounds: all, has, ...f } = q.data;
     const courses = specialty.length || course.length || degree.length ? { specialties: specialty, courses: course, degrees: degree } : profileCourseFilter({ specialties: sp, degrees: deg, pairs: c });
     if (f.list && !(await seatLists()).some((l) => l.key === f.list)) return notFound("No seat list with this key");
     const inst = college ? await getCollege(college) : null;
@@ -55,6 +64,7 @@ export async function GET(req: Request) {
     const r = await findSeats(
       {
         ...f, ...courses, college: inst?.key, quotas: quota, categories: category, states: state.length ? state : st,
+        compare: view === "list" ? false : view === "matrix" && all ? "all" : true, has: view === "matrix" ? has : undefined,
         reachFor: me && { rank: me.rank, categories: eligibleCategories(me.category, me.pwd) },
       },
       { page, pageSize },
@@ -65,7 +75,7 @@ export async function GET(req: Request) {
       { lists: r.lists, seats: r.seats, rows: r.rows },
       {
         page: pageOf(r),
-        sources: [...r.lists.map((l) => ({ key: l.key, name: l.name, url: l.url, year: l.year, round: l.round })), ...sourcesFor(meta.sources, r.rows.flatMap((x) => x.rounds))],
+        sources: [...r.lists.map((l) => ({ key: l.key, name: l.name, url: l.url, year: l.year, round: l.round })), ...sourcesFor(meta.sources, r.rows.flatMap((x) => x.closings))],
       },
     );
   });

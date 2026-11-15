@@ -8,7 +8,7 @@ import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
 import { hasOption, listSeats, optionSeats, pickLists, seatLists, type OptionSeats } from "./server/seats";
 import { bucketOfDegree, collegeTerms, courseTerms, type Programme, type ProgrammeTerms } from "./server/terms";
-import { optionId, rounds, seatKinds, type Category, type College, type Course, type Cutoff, type Notice, type OptionsView, type Round, type SeatKind, type SeatList, type Source, type Term } from "./types";
+import { optionId, rounds, seatKinds, type Allotment, type Category, type College, type Course, type Cutoff, type Notice, type OptionsView, type Round, type SeatKind, type SeatList, type Source, type Term } from "./types";
 
 // Data comes from Postgres (MCC import, prisma/import-mcc.ts) through ./server; the small, slow-changing part (colleges,
 // courses, sources, terms, option list) is a per-process catalog, cutoffs and allotments are filtered in SQL per call.
@@ -488,7 +488,8 @@ const sumYear = (opts: Opt[], year: number) => (opts.some((o) => o.byYear[year] 
 
 /**
  * One institute: every option here (`options`, with `seats` in `seatList` and `seatsBy` per list of its round), the ones
- * in her profile (`yours`), the seats here in her profile that are no option (`unlisted`), allotments per year, terms per program.
+ * in her profile (`yours`), the seats here in her profile that are no option (`unlisted`: in `seatList`; `unlistedBy`:
+ * in each list of its round, never added), allotments per year, terms per program.
  */
 export async function getInstitute(slug: string, profile: Profile | null) {
   const cat = await getCatalog();
@@ -497,14 +498,14 @@ export async function getInstitute(slug: string, profile: Profile | null) {
   const opts = cat.options.filter((o) => o.college === college.key);
   const [built, lists] = await Promise.all([rowsFor(cat, opts, profile, true), roundLists(cat)]);
   const seatList = lists[0] ?? null;
-  const [seats, unlisted] = await Promise.all([seatsOfOpts(lists, opts), unlistedOf(cat, seatList, profile, college.key)]);
+  const [seats, unlistedBy] = await Promise.all([seatsOfOpts(lists, opts), Promise.all(lists.map((l) => unlistedOf(cat, l, profile, college.key)))]);
   const options = withSeats(built, lists, seats, profile);
   const mine = new Set(opts.filter((o) => optMatches(cat, o, profile)).map((o) => o.id));
   const allotmentsByYear = YEARS.map((year) => ({ year, n: sumYear(opts, year) }));
   const terms = { md: termsFor(cat, college.key, "MD"), dnb: termsFor(cat, college.key, "DNB") };
   /** Fees, stipend and bond per programme offered here (server/terms.ts). */
   const fees = collegeTerms(cat, college.key);
-  return { college, options, yours: options.filter((o) => mine.has(o.id)), allotmentsByYear, terms, fees, seatList, unlisted };
+  return { college, options, yours: options.filter((o) => mine.has(o.id)), allotmentsByYear, terms, fees, seatList, unlisted: unlistedBy[0] ?? null, unlistedBy: unlistedBy.filter((u) => !!u) };
 }
 
 export async function rankScan(rank: number, year: number, window = 500) {
@@ -516,6 +517,25 @@ export async function rankScan(rank: number, year: number, window = 500) {
   });
   return rounds.map((round) => ({ round, rows: out.filter((r) => r.round === round) })).filter((g) => g.rows.length);
 }
+
+/**
+ * One NEET PG rank's allotments in a year, round by round (rank = one candidate per year): the seat, MCC's status
+ * (allotted / fresh / upgraded), the candidate's option number (R2 / R3) and own category, and the seat the PDF prints
+ * one round back with its remark. Ranks and seats only, never a name; history, not a prediction.
+ */
+export async function rankJourney(year: number, rank: number) {
+  const cat = await getCatalog();
+  const { rows } = await findAllotments(cat, { year, from: rank, to: rank });
+  return rows.map((a) => ({ ...a, ...seatNames(cat, a), prev: namedPrev(cat, a.prev) }));
+}
+
+/** A seat's institute name and slug (a key not in the catalog: the key, no slug) and course name. */
+function seatNames(cat: Catalog, s: { college: string; degree: string; specialty: string }) {
+  const c = cat.collegeByKey.get(s.college);
+  return { collegeName: c?.name ?? s.college, collegeSlug: c?.slug ?? "", courseName: `${s.degree} ${cat.courseOf.get(`${s.degree}|${s.specialty}`)?.name ?? s.specialty}` };
+}
+/** The seat an allotment held one round back, with its names. */
+const namedPrev = (cat: Catalog, p: Allotment["prev"]) => p && { ...p, ...seatNames(cat, p) };
 
 export type LastRanksFilters = { degree?: string; specialty: string; category?: string; quota?: string; years?: number[]; sort?: { year: number; round: Round; dir: "asc" | "desc" } };
 
@@ -734,6 +754,7 @@ export async function listAllotments(f: AllotmentFilters, pg: PageQuery, college
       return {
         ...a,
         college: cat.collegeByKey.get(a.college)!,
+        prev: namedPrev(cat, a.prev),
         courseName: `${a.degree} ${c?.name ?? a.specialty}`,
         courseSlug: c?.slug ?? "",
         provisional: provisional.has(`${a.year}|${a.round}`),

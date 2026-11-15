@@ -2,15 +2,15 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { ReachInput } from "../lib/reach";
-import { optionId, rounds, type Allotment, type Category, type Cutoff, type Round } from "../types";
+import { optionId, rounds, type Allotment, type Category, type Cutoff, type PrevSeat, type Round } from "../types";
 import type { Catalog } from "./catalog";
 
 /** Filters pushed into SQL. `cs` = CollegeSpecialty ids; undefined means no restriction, [] means nothing. */
 export type CutoffQuery = { cs?: string[]; quotas?: string[]; categories?: string[]; years?: number[] };
 export type AllotmentQuery = { cs?: string[]; year?: number; round?: Round; quota?: string; category?: string; from?: number; to?: number };
 
-/** MCC remark for the UI: R1/stray "allotted" and R2/R3 "fresh" are fresh allotments; "upgraded" moved up a seat. */
-export const remarkOf = (status: string): Allotment["remark"] => (status === "upgraded" ? "Upgraded" : "Fresh");
+/** MCC's remark, from the status: "Allotted" (R1, stray rounds), "Fresh" (a fresh allotment in R2 / R3), "Upgraded" (moved up a seat). */
+export const remarkOf = (status: string): Allotment["remark"] => (status === "upgraded" ? "Upgraded" : status === "fresh" ? "Fresh" : "Allotted");
 
 const roundPos = (r: string) => rounds.indexOf(r as Round);
 const memCs = (c: { college: string; degree: string; specialty: string }) => `${c.college}~${c.degree}~${c.specialty}`;
@@ -132,17 +132,42 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
   ].filter((x): x is Prisma.Sql => !!x);
   const whereSql = where.length ? Prisma.sql`WHERE ${Prisma.join(where, " AND ")}` : Prisma.empty;
   const [rows, total] = await Promise.all([
-    db.$queryRaw<{ cs: string; y: number; r: string; k: number; q: string; c: string; st: string }[]>`
-      SELECT "collegeSpecialtyId" AS cs, "counsellingYear" AS y, round AS r, rank AS k, quota AS q, category AS c, status AS st
-      FROM "Allotment" ${whereSql}
-      ORDER BY "counsellingYear" DESC, array_position(${sqlRounds}::text[], round), rank
-      ${opts.limit == null ? Prisma.empty : Prisma.sql`LIMIT ${opts.limit}`} OFFSET ${offset}`,
+    // Previous seat's college key and course from the joins after the page is cut (the schema 2 columns: raw SQL).
+    db.$queryRaw<
+      { cs: string; y: number; r: string; k: number; q: string; c: string; st: string; cc: string | null; o: number | null; pk: string | null; pd: string | null; psp: string | null; pq: string | null; pr: string | null }[]
+    >`
+      SELECT a.*, pc.key AS pk, ps.degree AS pd, ps.code AS psp
+      FROM (
+        SELECT "collegeSpecialtyId" AS cs, "counsellingYear" AS y, round AS r, rank AS k, quota AS q, category AS c, status AS st,
+          "candidateCategory" AS cc, "optionNo" AS o, "prevCollegeId" AS pci, "prevSpecialtyId" AS psi, "prevQuota" AS pq, "prevRemark" AS pr
+        FROM "Allotment" ${whereSql}
+        ORDER BY "counsellingYear" DESC, array_position(${sqlRounds}::text[], round), rank
+        ${opts.limit == null ? Prisma.empty : Prisma.sql`LIMIT ${opts.limit}`} OFFSET ${offset}
+      ) a LEFT JOIN "College" pc ON pc.id = a.pci LEFT JOIN "Specialty" ps ON ps.id = a.psi
+      ORDER BY a.y DESC, array_position(${sqlRounds}::text[], a.r), a.k`,
     opts.count ? db.$queryRaw<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM "Allotment" ${whereSql}`.then(([r]) => r.n) : Promise.resolve(-1),
   ]);
   const out = rows.flatMap((r) => {
     const pair = cat.pairs.get(r.cs);
     if (!pair) return [];
-    return [{ rank: r.k, category: r.c as Category, college: pair.college, degree: pair.degree, specialty: pair.specialty, year: r.y, round: r.r as Round, quota: r.q, remark: remarkOf(r.st) }];
+    const prev = r.pk && r.pd && r.pq && r.pr ? { college: r.pk, degree: r.pd, specialty: r.psp ?? "", quota: r.pq, remark: r.pr as PrevSeat["remark"] } : null;
+    return [
+      {
+        rank: r.k,
+        category: r.c as Category,
+        college: pair.college,
+        degree: pair.degree,
+        specialty: pair.specialty,
+        year: r.y,
+        round: r.r as Round,
+        quota: r.q,
+        remark: remarkOf(r.st),
+        status: r.st as Allotment["status"],
+        candidateCategory: r.cc,
+        optionNo: r.o,
+        prev,
+      },
+    ];
   });
   return { total: opts.count ? total : out.length + offset, rows: out };
 }

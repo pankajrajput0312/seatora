@@ -1,4 +1,10 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { seatGroups, type MccFeesStructured } from "@/features/cutoffs/lib/import-schema";
+import { db } from "@/lib/db";
+import { TermsSummary } from "../components/fees";
+import { formatInrShort } from "../lib/format";
 import { getCatalog } from "./catalog";
 import { collegeTerms, courseTerms, programmes, termQuality, type Quality } from "./terms";
 
@@ -18,12 +24,51 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
     expect(cat.terms.filter((t) => (t.kind === "BOND" || t.kind === "PENALTY") && !t.details)).toEqual([]);
   });
 
+  it("every summary agrees with the fee table: figures only from a 'numbers' record, each year as stated, never a verbatim one's", async () => {
+    const cat = await getCatalog();
+    const rows = await db.$queryRaw<{ key: string; programme: string; g: string; data: MccFeesStructured }[]>`
+      SELECT c.key, f.programme, f."quotaGroup" AS g, f.data FROM "FeesStructured" f JOIN "College" c ON c.id = f."collegeId"`;
+    if (!rows.length) return; // an import before the fee table (bundle schema 1)
+    const pos = (g: string) => seatGroups.indexOf(g.split("+")[0] as (typeof seatGroups)[number]);
+    const first = new Map<string, MccFeesStructured>();
+    for (const r of rows.sort((a, b) => pos(a.g) - pos(b.g))) if (!first.has(`${r.key}|${r.programme}`)) first.set(`${r.key}|${r.programme}`, r.data);
+    const n = { numbers: 0, verbatim: 0, none: 0 };
+    for (const c of cat.colleges)
+      for (const p of collegeTerms(cat, c.key)) {
+        const r = first.get(`${c.key}|${p.programme}`);
+        const at = `${c.name} ${p.programme}`;
+        const numbers = r?.fee_display === "numbers";
+        const len = p.durationYears;
+        expect(p.years.map((y) => (y.fee ? [y.fee.inr, y.fee.kind, !!y.fee.atAdmission] : null)), at).toEqual(
+          Array.from({ length: len }, (_, i) => {
+            const f = numbers ? r!.fee_per_year[i] : null;
+            return f?.amount != null ? [f.amount, f.maximum ? "maximum" : "declared", f.kind === "amount_at_admission"] : null;
+          }),
+        );
+        expect(p.years.map((y) => y.stipend && [y.stipend.inr, y.stipend.kind === "minimum"]), at).toEqual(Array.from({ length: len }, (_, i) => (r?.stipend_per_month[i] ? [r.stipend_per_month[i]!.inr, !!r.stipend_per_month[i]!.minimum] : null)));
+        expect(p.wholeCourseFee, at).toBe(numbers ? (r!.fee_whole_course?.amount ?? null) : null);
+        // The line itself: a verbatim fee shows no ₹ figure; a numbers one its year-1 figure, "at admission" where it is that.
+        const fee = renderToStaticMarkup(createElement(TermsSummary, { t: p })).replace(/<[^>]+>/g, "").split(" · ")[0];
+        if (numbers && p.years[0].fee) expect(fee, at).toContain(`${formatInrShort(p.years[0].fee.inr)}${p.years[0].fee.atAdmission ? " at admission" : "/yr"}`);
+        else expect(fee, at).not.toContain("₹");
+        n[!r ? "none" : numbers ? "numbers" : "verbatim"]++;
+      }
+    console.log("programmes by fee-table record", JSON.stringify(n));
+    expect(n.numbers).toBeGreaterThan(1000);
+    expect(n.verbatim).toBeGreaterThan(50);
+  });
+
   it("a programme reads only its own bucket's terms, and their documents", async () => {
     const cat = await getCatalog();
     for (const c of cat.colleges) {
       for (const p of collegeTerms(cat, c.key)) {
         const own = cat.terms.filter((t) => t.college === c.key && t.program === programmes[p.programme].bucket);
-        const urls = new Set(own.flatMap((t) => [t.source.url, ...(t.details && "items" in t.details ? t.details.items.map((i) => i.source_url) : [...(t.details?.by_course ?? []).map((x) => x.src_url), t.details?.doc_url])]));
+        const urls = new Set(
+          own.flatMap((t) => [
+            t.source.url,
+            ...(!t.details ? [] : "items" in t.details ? t.details.items.map((i) => i.source_url) : "records" in t.details ? t.details.records.flatMap((r) => r.sources.map((s) => s.url)) : [...(t.details.by_course ?? []).map((x) => x.src_url), t.details.doc_url]),
+          ]),
+        );
         for (const s of p.sources) expect(urls.has(s.url), `${c.name} ${p.programme}: ${s.url}`).toBe(true);
       }
     }
@@ -32,9 +77,10 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
   it("the check colleges", async () => {
     const cat = await getCatalog();
     const of = (prefix: string, programme: string) => collegeTerms(cat, cat.colleges.find((c) => c.key.startsWith(prefix))!.key).find((p) => p.programme === programme)!;
-    // Kokilaben Navi Mumbai DNB: the NBEMS fee each year, no stipend term, and no bond by the NBEMS rule's record.
+    // Kokilaben Navi Mumbai DNB: the NBEMS fee ceiling and stipend floor each year, and no bond by the NBEMS rule's record.
     const kokila = of("KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8", "DNB");
-    expect(kokila.years.map((y) => [y.fee?.inr, y.fee?.kind, y.stipend])).toEqual([[125000, "nbems", null], [125000, "nbems", null], [125000, "nbems", null]]);
+    expect(kokila.years.map((y) => [y.fee?.inr, y.fee?.kind, y.stipend?.inr, y.stipend?.kind])).toEqual([[125000, "maximum", 43000, "minimum"], [125000, "maximum", 45000, "minimum"], [125000, "maximum", 47000, "minimum"]]);
+    expect(kokila.wholeCourseFee).toBe(375000);
     expect(kokila.bond).toMatchObject({ status: "none", basis: "nbems_rule", years: 0 });
     // GMC Nagpur MD/MS: its own document, 1 year, ₹50 L; MCC's Round 2 forfeit ₹1,500; its own MCC profile only.
     const nagpur = of("GOVERNMENTMEDICALCOLLEGENAGPURGOVERNMENT", "MD/MS");
@@ -49,7 +95,8 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
     // BMHRC Bhopal MCh: its MD record's bond rows are for PG seats only, so not the MCh's; no fee or stipend copied.
     const bmhrc = of("BHOPALMEMORIALHOSPITALANDRESEARCHCENTREB", "MCh");
     expect([bmhrc.bond.status, bmhrc.bond.amount.state, bmhrc.years[0].fee]).toEqual(["other_course", "none", null]);
-    expect(seth.wholeCourseFee).toBe(2 * 182128);
+    // Its fee table: ₹1,82,128 in year 1, ₹1,58,100 in year 2, ₹3,40,228 for the course (never year 1 × 2).
+    expect([seth.years.map((y) => y.fee?.inr), seth.wholeCourseFee]).toEqual([[182128, 158100], 340228]);
   });
 
   it("course labels, years added up, state rules beside documents, caveats, fee ranges, unsourced unknowns", async () => {
@@ -69,8 +116,9 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
     expect(of("KASTURBAMEDICALCOLLEGEMANIPAL", "MD/MS").bond).toMatchObject({ status: "none", years: null, caveat: expect.stringMatching(/Karnataka law/) });
     // CNMC Diploma: ₹10 L per unserved year × 2, the document's words kept.
     expect(of("CALCUTTANATIONALMEDICALCOLLEGE", "Diploma").bond).toMatchObject({ years: 2, amount: { max: 2000000, perYear: 1000000 }, quote: expect.any(String) });
-    // DY Patil Pune: the fee by subject is a range; ESIC Udyogmandal: the unknown bond with no document, its words kept.
-    expect(of("DRDYPATILMEDICALCOLLEGEPUNE", "MD/MS").years[0].fee).toMatchObject({ min: 100000, inr: 6800000 });
+    // DY Patil Pune: the fee by subject is in the profile's words only (no figure); ESIC Udyogmandal: the unknown bond with no document, its words kept.
+    const dyp = of("DRDYPATILMEDICALCOLLEGEPUNE", "MD/MS");
+    expect([dyp.years[0].fee, dyp.unread.map((u) => u.kind)]).toEqual([null, ["FEE"]]);
     const esic = of("SEPESICHOSPITALUDYOGMANDAL", "NBEMS Diploma");
     expect(esic.bond).toMatchObject({ status: "not_declared", text: expect.stringMatching(/other ESIC colleges/) });
     expect(esic.sources.find((s) => s.n === esic.bond.src)).toMatchObject({ url: null, type: "THIRD_PARTY_RESEARCH" });

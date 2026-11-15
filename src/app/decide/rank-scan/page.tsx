@@ -81,7 +81,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                           ? [<tr key={`you-${i}`} className="bg-sky/10"><td colSpan={5} className="px-4 py-1.5 text-xs font-semibold text-sky">Your rank, {formatRank(rank)}, falls here</td></tr>]
                           : []),
                         <tr key={i} className={tbl.row}>
-                          <td className={tbl.num}>{formatRank(a.rank)}</td>
+                          <td className={tbl.num}><Link href={L.rankJourney(a.rank, year.year)} className="hover:text-sky hover:underline" title={`This rank's seat in every ${year.year} round`}>{formatRank(a.rank)}</Link></td>
                           <td className={tbl.td}>{a.category}</td>
                           <td className={tbl.td}><Link href={L.institute(a.collegeSlug)} className="font-medium hover:text-sky hover:underline">{a.collegeName}</Link></td>
                           <td className={tbl.td}>
@@ -97,7 +97,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
               </div>
             </section>
           ))}
-          {groups.length > 0 && <p className="text-xs text-muted-foreground">A “Your rank falls here” row marks where ranks pass yours. In R2 and later only new or upgraded allotments are listed.</p>}
+          {groups.length > 0 && <p className="text-xs text-muted-foreground">A “Your rank falls here” row marks where ranks pass yours. In R2 and later only new or upgraded allotments are listed. Select a rank for its seat in every round that year (Rank journey).</p>}
         </>
       )}
       {year && <DataSource used={[{ year: year.year }]} />}

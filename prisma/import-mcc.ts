@@ -1,8 +1,9 @@
-// Imports the MCC export bundle (neetpg-planner `python3 -I tools/export_medpath.py` → data/medpath/).
-// Usage: npm run db:import [-- <bundle dir>]   (default ../neetpg-planner/data/medpath, or MCC_BUNDLE)
+// Imports the MCC export bundle (neetpg-planner `python3 -I tools/export_medpath.py` → data/medpath-r3/; schema 2, or 1).
+// Usage: npm run db:import [-- <bundle dir>]   (default ../neetpg-planner/data/medpath-r3, or MCC_BUNDLE)
 // Validates everything first and aborts on any error; then, in one transaction, makes the database match the bundle:
 // upserts sources, colleges (incl. the seat-list-only ones) and specialties, replaces cutoffs, allotments, terms, seat
-// lists, notices, round steps and the NBEMS score/merit aggregates, removes the colleges, courses and sources the
+// lists, notices, round steps, the NBEMS score/merit aggregates and (schema 2) clinical facts and the per-year fee table,
+// removes the colleges, courses and sources the
 // bundle no longer has, and records the college keys it retired (key_aliases.json → RetiredCollegeKey, kept across
 // imports: old links and saved option ids reach the college they became). Spot checks run before the commit.
 // Re-running the same bundle is a no-op in effect. Every file and summary file is hash- and count-checked against the manifest.
@@ -12,27 +13,39 @@ import { join, resolve } from "node:path";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import {
+  citedSources,
+  clinicalValuePaths,
   mccAllotmentSchema,
+  mccAllotmentV2Schema,
   mccCategories,
+  mccClinicalFactsSchema,
   mccCollegeSchema,
+  mccCollegeV2Schema,
   mccCourseSchema,
   mccCutoffSchema,
+  mccFeesStructuredSchema,
   mccManifestSchema,
   mccRounds,
   mccSourceSchema,
   mccTermSchema,
   movedPlaces,
   termSourceName,
+  type MccAllotment,
+  type MccAllotmentV2,
+  type MccCollege,
+  type MccCollegeV2,
 } from "../src/features/cutoffs/lib/import-schema.ts";
 import { noticeKinds, roundSteps, seatKinds, stepStatuses } from "../src/features/decide/types.ts";
 
-const dir = resolve(process.argv[2] ?? process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath");
+const dir = resolve(process.argv[2] ?? process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
 const errors: string[] = [];
 const fail = (msg: string) => errors.push(msg);
 
 // ---------- 1. verify and validate the whole bundle before touching the database ----------
 const manifestJson = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"));
 const manifest = mccManifestSchema.parse(manifestJson);
+/** Schema 2 adds college MCC ids / profile / type / website, allotment candidate category / option no / previous seat, clinical facts, the fee table. */
+const v2 = manifest.schema_version === 2;
 const fileEntry = z.object({ count: z.number().int().nonnegative(), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict();
 const summaryFiles = z.object({ "round_status.json": fileEntry, "score_rank.json": fileEntry, "merit_position.json": fileEntry }).strict().parse(manifestJson.summary_files);
 const raw: Record<string, Buffer> = {};
@@ -63,14 +76,18 @@ function parse<S extends z.ZodType>(file: string, schema: S): z.infer<S>[] {
 }
 
 const sources = parse("sources.json", mccSourceSchema);
-const colleges = parse("colleges.ndjson", mccCollegeSchema);
+// Partial: a schema 1 college has none of the schema 2 fields.
+const parseColleges = (file: string): (MccCollege & Partial<MccCollegeV2>)[] => (v2 ? parse(file, mccCollegeV2Schema) : parse(file, mccCollegeSchema));
+const colleges = parseColleges("colleges.ndjson");
 const courses = parse("courses.json", mccCourseSchema);
 const cutoffs = parse("cutoffs.ndjson", mccCutoffSchema);
 const terms = parse("terms.ndjson", mccTermSchema);
 // A BOND whose status is unknown and has no document (src_url null): imported with its words (not checked yet, other
 // colleges' terms, ask the college), its source the bond check itself (no document, no URL).
 const BOND_CHECK = { key: "seatora/bond-check", name: "Seatora bond check (no document yet)", type: "THIRD_PARTY_RESEARCH" as const };
-const allotments = parse("allotments.ndjson", mccAllotmentSchema);
+const allotments: (MccAllotment | MccAllotmentV2)[] = v2 ? parse("allotments.ndjson", mccAllotmentV2Schema) : parse("allotments.ndjson", mccAllotmentSchema);
+const clinical = v2 ? parse("clinical_facts.ndjson", mccClinicalFactsSchema) : [];
+const feeTable = v2 ? parse("fees_structured.ndjson", mccFeesStructuredSchema) : [];
 
 // Seat lists, notices, round steps, NBEMS aggregates. Strict like import-schema.ts: an extra key aborts.
 const year = z.number().int().min(2000).max(2100);
@@ -166,7 +183,7 @@ function parseOne<S extends z.ZodType>(file: string, schema: S): z.infer<S> | nu
 
 const seatSources = parse("seat_sources.json", seatSourceSchema);
 const seats = parse("seats.ndjson", seatSchema);
-const seatColleges = parse("seat_colleges.ndjson", mccCollegeSchema);
+const seatColleges = parseColleges("seat_colleges.ndjson");
 const notices = parse("notices.json", noticeSchema);
 const roundStatus = parseOne("round_status.json", roundStatusSchema);
 const scoreRank = parseOne("score_rank.json", scoreRankSchema);
@@ -209,6 +226,20 @@ allotments.forEach((a, i) => {
 });
 for (const [k, { n, min, max, want }] of cells)
   if (n !== want.n || min !== want.opening || max !== want.closing) fail(`cutoff ${k}: n/opening/closing ${want.n}/${want.opening}/${want.closing}, allotments give ${n}/${min}/${max}`);
+// Schema 2: one candidate per rank, year and round; a previous seat (R2: R1's, R3: R2's) is that round's allotment of the same rank.
+const PREV_ROUND: Record<string, string> = { R2: "R1", R3: "R2" };
+const seatOf = (a: { ikey: string; degree: string; specialty: string; quota: string }) => [a.ikey, a.degree, a.specialty, a.quota].join("|");
+const byRank = new Map(allotments.map((a) => [`${a.year}|${a.round}|${a.rank}`, a]));
+if (v2 && byRank.size !== allotments.length) fail(`allotments.ndjson: ${allotments.length - byRank.size} rank(s) allotted twice in one year and round`);
+allotments.forEach((a, i) => {
+  if (!("prev_ikey" in a) || a.prev_ikey == null) return;
+  const at = `allotments.ndjson:${i + 1}`;
+  const prev = { ikey: a.prev_ikey, degree: a.prev_degree!, specialty: a.prev_specialty!, quota: a.prev_quota! };
+  if (!collegeKeys.has(prev.ikey)) fail(`${at}: unknown previous college ${prev.ikey}`);
+  if (!courseSlug.has(`${prev.degree}|${prev.specialty}`)) fail(`${at}: unknown previous course ${prev.degree} ${prev.specialty}`);
+  const held = byRank.get(`${a.year}|${PREV_ROUND[a.round]}|${a.rank}`);
+  if (!held || seatOf(held) !== seatOf(prev)) fail(`${at}: previous seat ${seatOf(prev)} is not rank ${a.rank}'s ${a.year} ${PREV_ROUND[a.round]} allotment (${held ? seatOf(held) : "none"})`);
+});
 const termKeys = new Set<string>();
 terms.forEach((t, i) => {
   if (!collegeKeys.has(t.ikey)) fail(`terms.ndjson:${i + 1}: unknown college ${t.ikey}`);
@@ -238,6 +269,51 @@ seats.forEach((s, i) => {
 for (const s of seatSources) if (!seats.some((x) => x.src === s.key)) fail(`seat_sources.json: ${s.key} has no rows`);
 for (const k of seatCollegeKeys) if (!usedSeatColleges.has(k)) fail(`seat_colleges.ndjson: ${k} is in no seat list`);
 const unknownCourses = new Set(seats.filter((s) => !courseSlug.has(`${s.degree}|${s.specialty}`)).map((s) => `${s.degree} ${s.specialty}`));
+
+// clinical facts: one per college of the bundle; every value has its source (values_meta), and every source a value
+const clinicalKeys = new Set<string>();
+clinical.forEach((r, i) => {
+  const at = `clinical_facts.ndjson:${i + 1}`;
+  if (!allCollegeKeys.has(r.key)) fail(`${at}: unknown college ${r.key}`);
+  if (clinicalKeys.has(r.key)) fail(`${at}: ${r.key} twice`);
+  clinicalKeys.add(r.key);
+  const values = clinicalValuePaths(r);
+  const meta = Object.keys(r.values_meta ?? {});
+  for (const p of values) if (!meta.includes(p) && !meta.includes(p.split(".")[0])) fail(`${at}: ${p} has no values_meta`);
+  for (const p of meta) if (!values.some((v) => v === p || v.startsWith(`${p}.`) || p.startsWith(`${v}.`))) fail(`${at}: values_meta ${p} has no value`);
+});
+// fee table: one per college × programme × seat-type group, each seat group once per programme, every cited source listed
+const feeKeys = new Set<string>();
+const feeGroups = new Set<string>();
+feeTable.forEach((r, i) => {
+  const at = `fees_structured.ndjson:${i + 1}`;
+  if (!allCollegeKeys.has(r.key)) fail(`${at}: unknown college ${r.key}`);
+  if (feeKeys.has(r.id)) fail(`${at}: ${r.id} twice`);
+  feeKeys.add(r.id);
+  for (const g of r.seat_groups) {
+    if (feeGroups.has(`${r.key}|${r.programme}|${g}`)) fail(`${at}: seat group ${g} in two records of ${r.key} ${r.programme}`);
+    feeGroups.add(`${r.key}|${r.programme}|${g}`);
+  }
+  const ns = new Set(r.sources.map((s) => s.n));
+  if (ns.size !== r.sources.length) fail(`${at}: two sources with one n`);
+  const missing = citedSources(r).filter((n) => !ns.has(n));
+  if (missing.length) fail(`${at}: cites source(s) ${[...new Set(missing)].join(", ")} not in sources`);
+});
+// Schema 2 FEE / STIPEND terms are made from fees_structured.ndjson (the planner's fee_terms): a term must have fee-table
+// records for its college + program, which are stored once, in FeesStructured, and attached back by the catalog. If a term
+// still carries details.records (older exports), they must be exactly those records.
+const BUCKET: Record<string, string> = { "MD/MS": "MD", Diploma: "MD", DNB: "DNB", "NBEMS Diploma": "DNB" };
+const feeById = new Map(feeTable.map((r) => [r.id, JSON.stringify(r)]));
+const feeIdsOf = Map.groupBy(feeTable, (r) => `${r.key}|${BUCKET[r.programme]}`);
+terms.forEach((t, i) => {
+  const at = `terms.ndjson:${i + 1}`;
+  if (v2 && (t.kind === "FEE" || t.kind === "STIPEND") && !feeIdsOf.get(`${t.ikey}|${t.program}`)?.length) fail(`${at}: a schema 2 ${t.kind} has no fee-table records for ${t.ikey} ${t.program}`);
+  if (!t.details || !("records" in t.details)) return;
+  const ids = t.details.records.map((r) => r.id);
+  const want = (feeIdsOf.get(`${t.ikey}|${t.program}`) ?? []).map((r) => r.id);
+  if (ids.length !== want.length || !want.every((id) => ids.includes(id))) fail(`${at}: details.records are not ${t.ikey} ${t.program}'s fee-table records (${ids.length} of ${want.length})`);
+  for (const r of t.details.records) if (feeById.get(r.id) !== JSON.stringify(r)) fail(`${at}: details.records ${r.id} differs from fees_structured.ndjson`);
+});
 
 // retired keys: each once, none a key of this bundle (in clear or hashed), each pointing at a college this bundle has
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -360,6 +436,8 @@ async function main() {
       await tx.roundStep.deleteMany({});
       await tx.scoreRank.deleteMany({});
       await tx.meritPosition.deleteMany({});
+      await tx.$executeRaw`DELETE FROM "ClinicalFacts"`;
+      await tx.$executeRaw`DELETE FROM "FeesStructured"`;
       const slugs = new Set(courses.map((c) => c.slug));
       const pairKeys = new Set(cutoffs.map((c) => `${c.ikey}|${courseSlug.get(`${c.degree}|${c.specialty}`)}`));
       const oldPairs = await tx.collegeSpecialty.findMany({ select: { id: true, college: { select: { key: true } }, specialty: { select: { slug: true } } } });
@@ -434,6 +512,19 @@ async function main() {
         const row = await tx.college.upsert({ where: { key: c.key }, create: { key: c.key, slug, ...data }, update: data, select: { id: true } });
         collegeId.set(c.key, row.id);
       }
+      // Schema 2 college fields (a schema 1 bundle has none: cleared). Raw SQL: the shared generated client needn't know them.
+      const extras = [...colleges, ...seatColleges].map((c) => ({
+        id: collegeId.get(c.key)!,
+        mccIds: c.mcc_ids ?? [],
+        mccProfileUrl: c.mcc_profile_url ?? null,
+        type: c.type?.value ?? null,
+        typeBasis: c.type?.basis ?? null,
+        website: c.website ?? null,
+      }));
+      await tx.$executeRaw`
+        UPDATE "College" c SET "mccIds" = d."mccIds", "mccProfileUrl" = d."mccProfileUrl", type = d.type, "typeBasis" = d."typeBasis", website = d.website
+        FROM jsonb_to_recordset(${JSON.stringify(extras)}::jsonb) AS d(id text, "mccIds" text[], "mccProfileUrl" text, type text, "typeBasis" text, website text)
+        WHERE c.id = d.id`;
 
       // Retired keys, kept across imports (raw SQL: the shared generated client needn't know the table). A slug is
       // recorded once, when its college goes; a slug recorded before for another key moves to this one.
@@ -510,19 +601,32 @@ async function main() {
             })),
           });
         }
+        // Raw SQL with the schema 2 columns (null from a schema 1 bundle), which the shared generated client needn't know.
         for (let i = 0; i < seats.length; i += 3000) {
-          await tx.allotment.createMany({
-            data: seats.slice(i, i + 3000).map((a) => ({
-              collegeSpecialtyId: csOf(a),
-              counsellingYear: a.year,
-              round: a.round,
-              rank: a.rank,
-              quota: a.quota,
-              category: a.category,
-              status: a.status,
-              sourceId: id,
-            })),
+          const data = seats.slice(i, i + 3000).map((a) => {
+            const v = "candidate_category" in a ? a : null;
+            return {
+              cs: csOf(a),
+              y: a.year,
+              r: a.round,
+              k: a.rank,
+              q: a.quota,
+              c: a.category,
+              st: a.status,
+              cc: v?.candidate_category ?? null,
+              o: v?.option_no ?? null,
+              pc: v?.prev_ikey ? collegeId.get(v.prev_ikey)! : null,
+              ps: v?.prev_ikey ? specialtyId.get(`${v.prev_degree}|${v.prev_specialty}`)! : null,
+              pq: v?.prev_quota ?? null,
+              pr: v?.prev_remark ?? null,
+            };
           });
+          await tx.$executeRaw`
+            INSERT INTO "Allotment" (id, "collegeSpecialtyId", "counsellingYear", round, rank, quota, category, status, "sourceId",
+              "candidateCategory", "optionNo", "prevCollegeId", "prevSpecialtyId", "prevQuota", "prevRemark")
+            SELECT gen_random_uuid()::text, d.cs, d.y, d.r, d.k, d.q, d.c, d.st, ${id}, d.cc, d.o, d.pc, d.ps, d.pq, d.pr
+            FROM jsonb_to_recordset(${JSON.stringify(data)}::jsonb)
+              AS d(cs text, y int, r text, k int, q text, c text, st text, cc text, o int, pc text, ps text, pq text, pr text)`;
         }
         console.log(`${s.key}: ${rows.length} cutoffs, ${seats.length} allotments`);
       }
@@ -539,11 +643,32 @@ async function main() {
         })),
       });
       // BOND / PENALTY details (validated above): raw SQL, so the shared generated client needn't know the column yet.
-      const details = terms.flatMap((t) => (t.details ? [{ collegeId: collegeId.get(t.ikey)!, program: t.program, kind: t.kind, details: t.details }] : []));
+      // FEE / STIPEND records are the fee table's (checked above), stored there only.
+      const details = terms.flatMap((t) => (t.details && !("records" in t.details) ? [{ collegeId: collegeId.get(t.ikey)!, program: t.program, kind: t.kind, details: t.details }] : []));
       await tx.$executeRaw`
         UPDATE "CollegeTerm" t SET details = d.details
         FROM jsonb_to_recordset(${JSON.stringify(details)}::jsonb) AS d("collegeId" text, program text, kind text, details jsonb)
         WHERE t."collegeId" = d."collegeId" AND t.program = d.program AND t.kind::text = d.kind`;
+
+      // schema 2: clinical facts (one row per college) and the fee table (per programme and seat-type group), as JSONB
+      const facts = clinical.map(({ key, nbems_disclosure: d, ...data }) => ({ collegeId: collegeId.get(key)!, data, status: d.status, url: d.url ?? null, checked: d.checked ?? null }));
+      await tx.$executeRaw`
+        INSERT INTO "ClinicalFacts" ("collegeId", data, "disclosureStatus", "disclosureUrl", "checkedAt")
+        SELECT d."collegeId", d.data, d.status, d.url, d.checked::date
+        FROM jsonb_to_recordset(${JSON.stringify(facts)}::jsonb) AS d("collegeId" text, data jsonb, status text, url text, checked text)`;
+      for (let i = 0; i < feeTable.length; i += 500) {
+        // data: the record without what the row's own columns and College hold
+        const rows = feeTable.slice(i, i + 500).map((r) => ({
+          collegeId: collegeId.get(r.key)!,
+          programme: r.programme,
+          quotaGroup: r.seat_groups.join("+"),
+          data: Object.fromEntries(Object.entries(r).filter(([k]) => !["id", "key", "college", "state", "programme", "seat_groups"].includes(k))),
+        }));
+        await tx.$executeRaw`
+          INSERT INTO "FeesStructured" ("collegeId", programme, "quotaGroup", data)
+          SELECT d."collegeId", d.programme, d."quotaGroup", d.data
+          FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS d("collegeId" text, programme text, "quotaGroup" text, data jsonb)`;
+      }
 
       // seat lists, row by row as the file has them; linked to the course at the college where Decide has it (an option)
       for (const s of seatSources) {
@@ -600,6 +725,7 @@ async function main() {
           select: { closingRank: true, category: true, n: true },
         });
       const kokila = "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8";
+      const SETH_GS = "SETHGORDHANDASSUNDERDASMEDICALCOLLEGEMUM";
       const expected: [number, string, number][] = [[2025, "R1", 21699], [2025, "R2", 25059], [2025, "R3", 29892], [2025, "stray", 33685], [2026, "R1", 20132]];
       const dnbAnaes = courseSlug.get("DNB|ANAESTHESIOLOGY")!;
       const mdAnaes = courseSlug.get("MD|ANAESTHESIOLOGY")!;
@@ -631,6 +757,21 @@ async function main() {
         const want = { total: listTotal.get(s.key), rows: seats.filter((x) => x.src === s.key).length };
         if (!got || got.total !== want.total || got.sum !== want.total || got.n !== want.rows) bad.push(`seat list ${s.key}: file Σ ${want.total} in ${want.rows} rows, DB ${JSON.stringify(got)}`);
       }
+      // A virtual vacancy of the newest round is a seat someone holds from an earlier round of that year, so it has an
+      // allotment there on its own college, course, quota and seat category; one institute under two keys breaks this.
+      const order = (s: (typeof seatSources)[number]) => s.year * 10 + mccRounds.indexOf(s.round);
+      const newest = seatSources.filter((s) => s.kind === "virtual").sort((a, b) => order(b) - order(a))[0];
+      if (newest) {
+        const earlier = mccRounds.slice(0, mccRounds.indexOf(newest.round));
+        const [{ n, seats: held }] = await tx.$queryRaw<{ n: number; seats: number | null }[]>`
+          SELECT COUNT(*)::int AS n, SUM(x.seats)::int AS seats
+          FROM "SeatCount" x JOIN "DataSource" d ON d.id = x."seatSourceId"
+          WHERE d.key = ${newest.key} AND NOT EXISTS (
+            SELECT 1 FROM "Cutoff" u JOIN "CollegeSpecialty" p ON p.id = u."collegeSpecialtyId"
+            WHERE p."collegeId" = x."collegeId" AND p."specialtyId" = x."specialtyId" AND u.quota = x.quota AND u.category = x.category
+              AND u."counsellingYear" = ${newest.year} AND u.round = ANY(${earlier}))`;
+        if (n) bad.push(`${newest.key}: ${n} virtual vacancy rows (${held} seats) have no ${newest.year} ${earlier.join("/")} allotment on their college, course, quota and seat category (one institute under two keys?)`);
+      }
       const wantLinked = seats.filter((x) => pairKeys.has(`${x.ikey}|${courseSlug.get(`${x.degree}|${x.specialty}`)}`)).length;
       const linked = await tx.seatCount.count({ where: { collegeSpecialtyId: { not: null } } });
       if (linked !== wantLinked) bad.push(`seat rows linked to a course at a college: ${linked}, expected ${wantLinked}`);
@@ -638,6 +779,26 @@ async function main() {
         const [score, best] = v.rows[0];
         const got = await tx.scoreRank.findUnique({ where: { year_score: { year: +y, score } } });
         if (got?.bestRank !== best) bad.push(`score_rank ${y}: top score ${score} → rank ${got?.bestRank}, file ${best}`);
+      }
+
+      // schema 2: every previous seat in the DB is that rank's allotment one round back (as checked in the file), and one
+      // known journey: 2023 rank 23, R1 LTMMC Mumbai MD General Medicine, upgraded in R2 to Seth GS (choice 1)
+      if (v2) {
+        const [{ n: prevBad }] = await tx.$queryRaw<{ n: number }[]>`
+          SELECT COUNT(*)::int AS n FROM "Allotment" a WHERE a."prevCollegeId" IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM "Allotment" b JOIN "CollegeSpecialty" p ON p.id = b."collegeSpecialtyId"
+            WHERE b."counsellingYear" = a."counsellingYear" AND b.rank = a.rank AND b.round = (CASE a.round WHEN 'R2' THEN 'R1' WHEN 'R3' THEN 'R2' END)
+              AND p."collegeId" = a."prevCollegeId" AND p."specialtyId" = a."prevSpecialtyId" AND b.quota = a."prevQuota")`;
+        if (prevBad) bad.push(`${prevBad} allotment(s) whose previous seat is not that rank's allotment one round back`);
+        const r23 = await tx.$queryRaw<{ c: string; s: string; st: string; o: number | null; cc: string | null; pc: string | null; ps: string | null; pr: string | null }[]>`
+          SELECT c.key AS c, sp.slug AS s, a.status AS st, a."optionNo" AS o, a."candidateCategory" AS cc, pc.key AS pc, ps.slug AS ps, a."prevRemark" AS pr
+          FROM "Allotment" a JOIN "CollegeSpecialty" p ON p.id = a."collegeSpecialtyId" JOIN "College" c ON c.id = p."collegeId" JOIN "Specialty" sp ON sp.id = p."specialtyId"
+            LEFT JOIN "College" pc ON pc.id = a."prevCollegeId" LEFT JOIN "Specialty" ps ON ps.id = a."prevSpecialtyId"
+          WHERE a."counsellingYear" = 2023 AND a.round = 'R2' AND a.rank = 23`;
+        const gm = courseSlug.get("MD|GENERALMEDICINE");
+        const j = r23[0];
+        if (r23.length !== 1 || !j.c.startsWith(SETH_GS) || j.s !== gm || j.st !== "upgraded" || j.o !== 1 || j.cc !== "General" || !j.pc?.startsWith("LOKMANYATILAKMEDICALCOLLEGEMUMBAI") || j.ps !== gm || j.pr !== "reported")
+          bad.push(`2023 R2 rank 23: ${JSON.stringify(r23)}`);
       }
 
       // every retired key of the bundle points where it says; no retired key points at a college the DB doesn't have
@@ -666,6 +827,13 @@ async function main() {
         meritLists: await tx.meritList.count(),
         scoreRanks: await tx.scoreRank.count(),
         meritPositions: await tx.meritPosition.count(),
+        ...(await tx.$queryRaw<Record<string, number>[]>`
+          SELECT (SELECT COUNT(*)::int FROM "ClinicalFacts") AS "clinicalFacts", (SELECT COUNT(*)::int FROM "FeesStructured") AS "feesStructured",
+            (SELECT COUNT(*)::int FROM "College" WHERE type IS NOT NULL) AS "collegeTypes", (SELECT COUNT(*)::int FROM "College" WHERE cardinality("mccIds") > 0) AS "collegeMccIds",
+            (SELECT COUNT(*)::int FROM "College" WHERE website IS NOT NULL) AS "collegeWebsites",
+            COUNT(*) FILTER (WHERE "candidateCategory" IS NOT NULL)::int AS "allotmentCandidateCategories", COUNT("optionNo")::int AS "allotmentOptionNos",
+            COUNT("prevCollegeId")::int AS "allotmentPrevSeats"
+          FROM "Allotment"`)[0],
       };
       const want = {
         resultSources: sources.length,
@@ -674,7 +842,7 @@ async function main() {
         collegeSpecialties: pairs.size,
         cutoffs: cutoffs.length,
         terms: terms.length,
-        termDetails: terms.filter((t) => t.details).length,
+        termDetails: terms.filter((t) => t.details && !("records" in t.details)).length,
         allotments: allotments.length,
         seatSources: seatSources.length,
         seatCounts: seats.length,
@@ -683,8 +851,16 @@ async function main() {
         meritLists: nbems.size,
         scoreRanks: scoreRows.length,
         meritPositions: meritRows.length,
+        clinicalFacts: clinical.length,
+        feesStructured: feeTable.length,
+        collegeTypes: v2 ? colleges.length + seatColleges.length : 0,
+        collegeMccIds: [...colleges, ...seatColleges].filter((c) => c.mcc_ids?.length).length,
+        collegeWebsites: [...colleges, ...seatColleges].filter((c) => c.website).length,
+        allotmentCandidateCategories: v2 ? allotments.length : 0,
+        allotmentOptionNos: allotments.filter((a) => "option_no" in a && a.option_no != null).length,
+        allotmentPrevSeats: allotments.filter((a) => "prev_ikey" in a && a.prev_ikey != null).length,
       };
-      for (const [k, n] of Object.entries(want)) if (counts[k as keyof typeof counts] !== n) bad.push(`${k} in DB ${counts[k as keyof typeof counts]} != bundle ${n}`);
+      for (const [k, n] of Object.entries(want)) if ((counts as Record<string, number>)[k] !== n) bad.push(`${k} in DB ${counts[k as keyof typeof counts]} != bundle ${n}`);
       const accountsAfter = await accounts();
       if (accountsAfter !== accountsBefore) bad.push(`User/Session/WaitlistEntry counts changed: ${accountsBefore} -> ${accountsAfter}`);
       if (bad.length) throw new Error(`Spot checks FAILED, import rolled back (nothing written):\n${bad.join("\n")}`);
@@ -708,7 +884,7 @@ async function main() {
   if (unsourced) console.log(`${unsourced} unknown bond term(s) with no document: source "${BOND_CHECK.name}".`);
   if (unknownCourses.size) console.log(`Seat rows with a course not in courses.json (kept, no Specialty link): ${[...unknownCourses].join(", ")}`);
   if (result.removed.residents) console.warn(`${result.removed.residents} resident row(s) went with their college or course: run npm run db:import-residents.`);
-  console.log("Committed. Spot checks passed (Kokilaben DNB Anaesthesiology 2025 R1–stray + 2026 R1 and its stray allotment; GMC Nagpur 2026 R1 closing and 12 allotments; no provisional 2026 R1; every seat list adds up to its file; NBEMS top scores; every retired key of the bundle points at its college).");
+  console.log(`Committed. Spot checks passed (Kokilaben DNB Anaesthesiology 2025 R1–stray + 2026 R1 and its stray allotment; GMC Nagpur 2026 R1 closing and 12 allotments; no provisional 2026 R1; every seat list adds up to its file; every newest virtual vacancy has an earlier allotment; NBEMS top scores; every retired key of the bundle points at its college${v2 ? "; every previous seat is that rank's allotment one round back, and 2023 R2 rank 23's" : ""}).`);
 }
 
 main()

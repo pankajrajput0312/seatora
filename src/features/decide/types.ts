@@ -1,6 +1,6 @@
 // Shapes mirror the MCC export the importer reads (prisma/import-mcc.ts, src/features/cutoffs/lib/import-schema.ts).
 // No person-level data: no names.
-import type { BondDetails, PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
+import type { BondDetails, MccFeesStructured, PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
 import type { SourceType } from "@/types/provenance";
 
 export const rounds = ["R1", "R2", "R3", "stray", "special_stray"] as const;
@@ -49,8 +49,18 @@ export type Term = {
   amountInr: number | null;
   /** The document the text was taken from (an MCC institute profile, an NBEMS notice…). */
   source: { name: string; url: string | null; type: SourceType };
-  /** BOND / PENALTY: the verified record (status, years, amounts, penalty items); read by server/terms.ts, never parsed from `text`. */
-  details?: BondDetails | PenaltyDetails;
+  /**
+   * BOND / PENALTY: the verified record (status, years, amounts, penalty items); FEE / STIPEND (bundle schema 2): the
+   * college + program's fee-table records (FeesStructured). Read by server/terms.ts, never parsed from `text`.
+   */
+  details?: BondDetails | PenaltyDetails | { records: FeeTableRecord[] };
+};
+/** A fee-table record (FeesStructured) as a summary line reads it: fee and stipend by course year, their sources, MCC's Round 2 forfeit. */
+export type FeeTableRecord = Pick<MccFeesStructured, "programme" | "seat_groups" | "fee_per_year" | "stipend_per_month" | "sources"> & {
+  /** null (an export older than it): verbatim, never a figure. */
+  fee_display: MccFeesStructured["fee_display"] | null;
+  fee_whole_course: MccFeesStructured["fee_whole_course"] | null;
+  counselling_forfeit: MccFeesStructured["counselling_forfeit"] | null;
 };
 /**
  * PENALTY holds the college's or state's penalty for leaving the seat or course and MCC's forfeit if you resign or
@@ -66,8 +76,18 @@ export type Allotment = {
   year: number;
   round: Round;
   quota: string;
-  remark: "Fresh" | "Upgraded" | "Not reported";
+  /** As the PDF prints it, from `status` (server/queries.ts remarkOf). */
+  remark: "Allotted" | "Fresh" | "Upgraded";
+  /** MCC's remark normalised: allotted (R1, stray rounds), fresh or upgraded (R2, R3). */
+  status: "allotted" | "fresh" | "upgraded";
+  /** The candidate's own category as the PDF prints it ("General", "OBC" … "<X> PwD"), not the seat's; null: not in the import. */
+  candidateCategory: string | null;
+  /** The candidate's choice number of this seat (R2 / R3 only). */
+  optionNo: number | null;
+  /** R2 / R3: the seat the PDF prints in the previous round's columns (R1 for R2, R2 for R3) and its remark; null where it prints "-". */
+  prev: PrevSeat | null;
 };
+export type PrevSeat = { college: string; degree: string; specialty: string; quota: string; remark: "reported" | "not_reported" | "seat_surrendered" | "seat_cancelled" };
 export type Notice = { date: string; title: string; authority: string; url: string; kind: "schedule" | "announcement" | "merit"; status?: "done" | "open" | "upcoming" };
 
 /** A whole dataset in memory: the shape of the unit-test fixture (test/decide.demo.ts). Runtime reads Postgres. */

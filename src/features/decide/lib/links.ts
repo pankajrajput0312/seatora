@@ -43,11 +43,13 @@ export function decideLinks(params: URLSearchParams | string = "") {
     allotments: (o: { course?: string; inst?: string; year?: number; round?: string; quota?: string; category?: string; state?: string; from?: number; to?: number } = {}) =>
       to("/decide/allotments", { course: o.course, inst: o.inst, year: o.year, round: o.round, aq: o.quota, acat: o.category, state: o.state, from: o.from, to: o.to }),
     rankScan: (rank: number, year?: number) => to("/decide/rank-scan", { scan: rank, year }),
+    /** One rank's seat in every round of a year (`air`: never the profile's `rank`). */
+    rankJourney: (rank: number, year?: number) => to("/decide/rank-journey", { air: rank, year }),
     /** `all`: the view of every option with past allotments (view=all), whose counts the Overview shows. */
     options: (o: { q?: string; reach?: string; closed?: boolean; all?: boolean } = {}) =>
       to("/decide/options", { q: o.q, reach: o.reach, closed: o.closed ? "1" : undefined, view: o.all ? "all" : undefined }),
-    /** One seat list; with inst + course (+ quota: `squota`) only that option's seats. */
-    seats: (o: { list?: string; inst?: string; course?: string; quota?: string } = {}) => to("/decide/seats", { list: o.list, inst: o.inst, course: o.course, squota: o.quota }),
+    /** One seat list (the one-list view: its count is that list's); with inst + course (+ quota: `squota`) only that option's seats. */
+    seats: (o: { list?: string; inst?: string; course?: string; quota?: string } = {}) => to("/decide/seats", { view: "list", list: o.list, inst: o.inst, course: o.course, squota: o.quota }),
     fees: (o: { program?: string; state?: string } = {}) => to("/decide/fees", o),
     compare: (ids: string[]) => to("/decide/compare", { ids: ids.join(",") }),
     institutes: (o: { course?: string; state?: string } = {}) => to("/decide/institutes", o),

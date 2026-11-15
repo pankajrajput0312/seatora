@@ -2,7 +2,8 @@ import "server-only";
 import { cache as perRequest } from "react";
 import { requireDecideAccess } from "@/features/auth/lib/session";
 import { db } from "@/lib/db";
-import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Source, type Term } from "../types";
+import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type FeeTableRecord, type Round, type Source, type Term } from "../types";
+import { bucketOfDegree } from "./terms";
 
 /** A course at a college (CollegeSpecialty). `cs` is its id: the DB id, or "college~degree~specialty" in memory (tests). */
 export type Pair = { cs: string; college: string; degree: string; specialty: string };
@@ -135,7 +136,7 @@ export function memoryCatalog(d: DecideData): Catalog {
 }
 
 async function loadCatalog(): Promise<Catalog> {
-  const [sources, colleges, specialties, pairs, terms, options, details, retired] = await Promise.all([
+  const [sources, colleges, specialties, pairs, terms, options, details, retired, feeTable] = await Promise.all([
     db.dataSource.findMany({ select: { id: true, key: true, name: true, url: true, counsellingYear: true, round: true, provisional: true } }),
     db.college.findMany({ select: { id: true, key: true, slug: true, name: true, state: true, pincode: true, address: true }, orderBy: { name: "asc" } }),
     db.specialty.findMany({ select: { id: true, slug: true, name: true, degree: true, code: true } }),
@@ -146,12 +147,21 @@ async function loadCatalog(): Promise<Catalog> {
     // Raw SQL: the generated client may predate the details column (prisma/schema.prisma).
     db.$queryRaw<{ id: string; details: NonNullable<Term["details"]> }[]>`SELECT id, details FROM "CollegeTerm" WHERE details IS NOT NULL`,
     db.$queryRaw<{ oldKey: string; oldSlug: string | null; newKey: string | null }[]>`SELECT "oldKey", "oldSlug", "newKey" FROM "RetiredCollegeKey"`,
+    // Bundle schema 2: the fee table's figures (what a summary line reads; the Fees tab reads whole records: ./facts.ts).
+    db.$queryRaw<(FeeTableRecord & { collegeId: string })[]>`
+      SELECT "collegeId", programme, string_to_array("quotaGroup", '+') AS seat_groups, data->'fee_display' AS fee_display, data->'fee_per_year' AS fee_per_year,
+        data->'fee_whole_course' AS fee_whole_course, data->'stipend_per_month' AS stipend_per_month, data->'counselling_forfeit' AS counselling_forfeit, data->'sources' AS sources
+      FROM "FeesStructured"`,
   ]);
   const detailsOf = new Map(details.map((d) => [d.id, d.details]));
+  // FEE and STIPEND terms carry their college + program's fee-table records, as the bundle's terms do (details.records).
+  const feeRecords = Map.groupBy(feeTable, (r) => `${r.collegeId}|${bucketOfDegree(r.programme)}`);
+  const recordsOf = (t: { collegeId: string; program: string; kind: string }) => (t.kind === "FEE" || t.kind === "STIPEND" ? feeRecords.get(`${t.collegeId}|${t.program}`) : undefined);
   const collegeKey = new Map(colleges.map((c) => [c.id, c.key]));
   const spec = new Map(specialties.map((s) => [s.id, s]));
   return indexCatalog({
-    // Type, beds, year established and website are not in the MCC data; never guessed.
+    // Beds and year established are not in the MCC data; type (inferred, College.typeBasis) and website are imported
+    // (bundle schema 2) but not shown yet. Never guessed.
     colleges: colleges.map((c) => ({ key: c.key, slug: c.slug, name: c.name, state: c.state, pincode: c.pincode, address: c.address, type: null, beds: null, established: null, website: null })),
     courses: specialties.map((s) => ({ degree: s.degree, specialty: s.code ?? "", name: s.name, slug: s.slug })),
     // Allotment-result PDFs only; term documents have no year or round and travel with their term.
@@ -168,6 +178,7 @@ async function loadCatalog(): Promise<Catalog> {
       amountInr: t.amountInr,
       source: { name: t.source.name, url: t.source.url, type: t.source.type },
       ...(detailsOf.has(t.id) && { details: detailsOf.get(t.id) }),
+      ...(recordsOf(t) && { details: { records: recordsOf(t)! } }),
     })),
     retired,
   });

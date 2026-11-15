@@ -4,7 +4,7 @@ import { countAllotments, findAllotments } from "../../server/queries";
 import type { SeatRow } from "../../server/seats";
 import { decideDemoData as fx } from "../../test/decide.demo";
 import type { Source } from "../../types";
-import { allotmentMix, optionSeats } from "./institute-data";
+import { allotmentMix, optionSeats, websiteUrl } from "./institute-data";
 
 const src = (year: number, round: Source["round"], provisional = false): Source => ({ key: `${year}${round}`, url: null, year, round, provisional, name: "" });
 
@@ -58,6 +58,14 @@ it("optionSeats: one list's seats for a course and quota in the given seat categ
   expect(optionSeats(rows, md)).toBe(3);
   expect(optionSeats(rows, md, ["SC"])).toBeNull();
   expect(optionSeats(rows, { ...md, degree: "DNB" }, ["OBC"])).toBe(7);
+});
+
+it("websiteUrl: the MCC profile's website as an http(s) link, never another scheme", () => {
+  expect(websiteUrl("www.avmc.edu.in")).toBe("http://www.avmc.edu.in/");
+  expect(websiteUrl("https://www.aakashhospital.in/")).toBe("https://www.aakashhospital.in/");
+  expect(websiteUrl("javascript:alert(1)")).toBeNull();
+  expect(websiteUrl("localhost:3000")).toBeNull();
+  expect(websiteUrl(null)).toBeNull();
 });
 
 // Real MCC data (DATABASE_URL set): the SQL path agrees with the allotment rows.

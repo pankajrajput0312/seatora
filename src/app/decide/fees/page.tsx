@@ -44,6 +44,12 @@ function AmountCell({ a, years, declared, none, href }: { a: Amount; years: numb
   return <>{formatINR(a.max)}{note && <span className="block text-xs font-normal text-muted-foreground">{note}</span>}</>;
 }
 
+/** Year 1's fee; "In words" where the profile gives the fee only in its own words (no figure is shown for it). */
+function FeeCell({ t, href }: { t: ProgrammeTerms; href: string }) {
+  if (t.years[0]?.fee || !t.unread.some((u) => u.kind === "FEE")) return <Money f={t.years[0]?.fee} sources={t.sources} />;
+  return <Link href={href} className="text-xs font-normal text-sky underline">In words<span className="sr-only">: the fee is in the MCC profile&apos;s own words, no figure; see them</span></Link>;
+}
+
 /** Bond years; "No bond" only where a record says so (the college's document or the NBEMS rule), "Unknown" where it says that. */
 function BondYears({ t }: { t: ProgrammeTerms }) {
   const b = t.bond;
@@ -176,8 +182,10 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                         {programmeTitle(t)}
                         <Link href={years(r)} className="flex min-h-11 items-center text-sky">Year by year<span className="sr-only">: {r.college.name}, {t.programme}</span></Link>
                       </td>
-                      <td className={`${tbl.num} numeric`}><Money f={t.years[0]?.fee} sources={t.sources} /></td>
-                      <td className={`${tbl.num} numeric`}>{t.wholeCourseFee != null ? formatINR(t.wholeCourseFee) : <NotDeclared />}</td>
+                      <td className={`${tbl.num} numeric`}><FeeCell t={t} href={years(r)} /></td>
+                      <td className={`${tbl.num} numeric`}>
+                        {t.wholeCourseFee != null ? <>{formatINR(t.wholeCourseFee)}{t.years[0]?.fee?.kind === "maximum" && <span className="block text-xs font-normal text-muted-foreground">NBEMS maximum</span>}</> : <NotDeclared what="not stated for every year" />}
+                      </td>
                       <td className={`${tbl.num} numeric`}><Money f={t.years[0]?.stipend} sources={t.sources} /></td>
                       <td className={`${tbl.num} numeric`}><BondYears t={t} /></td>
                       <td className={`${tbl.num} numeric`}><AmountCell a={b.amount} years={b.years} declared={declared} none={b.status === "none"} href={years(r)} /></td>
@@ -199,7 +207,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                   <h3 className="text-sm font-semibold"><Link href={L.institute(r.college.slug, "fees")} className="hover:text-sky hover:underline">{r.college.name}</Link></h3>
                   <p className="text-xs text-muted-foreground">{r.college.state ?? "State not available"} · {programmeTitle(t)}</p>
                   <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                    <div><dt className="text-xs text-muted-foreground">Fee, year 1</dt><dd className="numeric font-semibold"><Money f={t.years[0]?.fee} sources={t.sources} /></dd></div>
+                    <div><dt className="text-xs text-muted-foreground">Fee, year 1</dt><dd className="numeric font-semibold"><FeeCell t={t} href={years(r)} /></dd></div>
                     <div><dt className="text-xs text-muted-foreground">Stipend, year 1</dt><dd className="numeric font-semibold"><Money f={t.years[0]?.stipend} sources={t.sources} /></dd></div>
                     <div><dt className="text-xs text-muted-foreground">Service bond</dt><dd className="numeric font-semibold"><BondYears t={t} />{declared && b.amount.state !== "none" && <span className="block"><AmountCell a={b.amount} years={b.years} declared href={years(r)} /></span>}</dd></div>
                     <div><dt className="text-xs text-muted-foreground">Leaving penalty</dt><dd className="numeric font-semibold"><AmountCell a={b.leavingAmount} years={null} declared={b.leaving.length > 0} href={years(r)} /></dd></div>
@@ -214,7 +222,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       <Pager page={res.page} pageSize={res.pageSize} total={res.total} href={(n) => L.page("/decide/fees", n)} focusId="results" label="Fees" />
 
       <div className="grid max-w-3xl gap-2 text-xs text-muted-foreground">
-        <p><b className="font-semibold text-foreground">Fee</b>: what the college says you pay that year, as declared to MCC (DNB: the NBEMS course fee, plus GST). Whole course: one yearly figure × the years, computed; year-wise fees may differ.</p>
+        <p><b className="font-semibold text-foreground">Fee</b>: what the college&apos;s MCC profile says you pay in year 1 (an amount paid at admission says so). A DNB hospital that declared no fee shows the NBEMS maximum: the most NBEMS lets it charge (no GST, paid to the hospital), not its own figure. &quot;In words&quot;: the profile gives the fee only in words (by subject, a range), so no figure is shown. Whole course: only where every year&apos;s fee is stated.</p>
         <p><b className="font-semibold text-foreground">Stipend</b>: monthly pay before tax. A &quot;minimum&quot; is the NBEMS floor: the actual pay may be higher. An NMC list figure is one PG figure, not split by year.</p>
         <p><b className="font-semibold text-foreground">Service bond</b>: years you must work after the course, and what you pay if you don&apos;t. The highest amount for that programme; an amount per defaulting year is multiplied by the years (computed). Figures for other courses, in-service candidates, or the state quota where an All India one is given are left out (they are in the exact words under Year by year).</p>
         <p><b className="font-semibold text-foreground">Leaving penalty</b>: what you pay if you leave the seat or course after joining, from the college&apos;s bond document or the state&apos;s rule. &quot;In words&quot;: declared without a ₹ figure.</p>

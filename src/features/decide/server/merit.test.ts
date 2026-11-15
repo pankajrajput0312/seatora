@@ -19,7 +19,7 @@ describe("without a database", () => {
 });
 
 // Real import against the bundle it came from (local DATABASE_URL exported, see seats.test.ts).
-const dir = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath");
+const dir = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
 type Years<T> = { years: Record<string, T> };
 describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "score_rank.json")))("NBEMS aggregates on the real import", { timeout: 60_000 }, () => {
   const sr: Years<{ max_marks: number; candidates: number; rows: [number, number, number, number][] }> = JSON.parse(readFileSync(join(dir, "score_rank.json"), "utf8"));

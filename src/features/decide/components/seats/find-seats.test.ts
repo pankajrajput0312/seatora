@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { reachOrder, type Reach } from "../../lib/reach";
 import { profileFromParams } from "../../profile";
 import type { SeatRow } from "../../server/seats";
+import { getCatalog } from "../../server/catalog";
+import { courseTerms, type ProgrammeTerms } from "../../server/terms";
 import { optionId, type College } from "../../types";
-import { listOptions, unlistedSeats } from "../../service";
-import { csvLine, findSeats, parseSeatsParams, refineSeats, seatsCsv, seatsView, type PastClosing } from "./find-seats";
+import { feeValue, listOptions, unlistedSeats } from "../../service";
+import { csvLine, findSeats, NO_LABEL, parseSeatsParams, refineSeats, seatsCsv, seatsView, type PastClosing } from "./find-seats";
 
 const row = (name: string, state: string | null, quota: string | null, seats: number): SeatRow => ({
   list: "l", college: { key: name, slug: name, name, state } as College, course: null, degree: "MD", specialty: "X", quota, category: "Open", seats, cs: null,
@@ -32,6 +34,15 @@ describe("refineSeats", () => {
     expect(names(refineSeats(xs, { sort: "reach" }))).toBe("DCAB");
     expect(names(refineSeats(xs, { sort: "closing" }))).toBe("ADCB");
   });
+});
+
+it("sorts by year-1 fee (lowest first) and bond years (no bond on record first), as the Fees page reads them; not declared last, ties keeping institute order", () => {
+  // Only what feeValue reads (server/terms.ts ProgrammeTerms): year 1's fee, the bond's years (0 = no bond on record).
+  const fees = (fee: number | null, years: number | null) => ({ years: [{ year: 1, fee: fee == null ? null : { inr: fee } }], bond: { years } }) as unknown as ProgrammeTerms;
+  const xs = [{ ...rows[0], fees: fees(500000, 2) }, rows[1], { ...rows[2], fees: fees(100000, 1) }, { ...rows[3], fees: fees(500000, 0) }];
+  expect(names(refineSeats(xs, { sort: "fee" }))).toBe("CADB");
+  expect(names(refineSeats(xs, { sort: "bond" }))).toBe("DCAB");
+  expect(names(refineSeats([{ ...rows[0], fees: fees(null, null) }, { ...rows[1], fees: fees(1, 3) }], { sort: "bond" }))).toBe("BA");
 });
 
 it("csvLine: quotes when needed, never runs a formula, — for missing", () => {
@@ -150,6 +161,79 @@ describe.skipIf(!process.env.DATABASE_URL)("findSeats on the real import", { tim
     const sameDay = lines.filter((l) => l.startsWith("NOTICE FOR ADDITION AND REMOVAL OF SEATS FROM ROUND 2 PG 2026,") && l.includes("the same day as the"));
     expect(sameDay.map((l) => l.match(/the same day as the (.*) list/)?.[1])).toEqual(["2026 R2 clear vacancy", "2026 R2 virtual vacancy"]);
     expect(v.sort).toBe("reach");
+  });
+
+  it("matrix: the round's lists merged, Σ per list = each list alone, every closing with its count; All rounds adds earlier lists and allotted-only rows", async () => {
+    const p = new URLSearchParams("rank=42284&cat=OBC&c=MD~ANAESTHESIOLOGY,DNB~ANAESTHESIOLOGY,NBEMS Diploma~ANAESTHESIOLOGY,Diploma~ANAESTHESIOLOGY,DNB~FAMILYMEDICINE");
+    const her = profileFromParams(p)!;
+    const m = (await seatsView(parseSeatsParams(p), her)).r!;
+    expect(parseSeatsParams(p).view).toBe("matrix");
+    expect(m.lists.map((l) => l.key)).toEqual(["mcc/2026/R2_clear_vacancy.pdf", "mcc/2026/R2_virtual_vacancy.pdf", "mcc/2026/R2_new_seats.pdf"]);
+    for (const l of m.lists) {
+      const one = (await seatsView(parseSeatsParams(new URLSearchParams(`${p}&view=list&list=${l.key}`)), her)).r!;
+      expect(m.seats[l.key]).toBe(one.seats[l.key]);
+    }
+    expect(m.rows.every((r) => Object.values(r.byList).some((n) => n > 0))).toBe(true);
+    // A virtual vacancy is a seat held from an earlier round: never "new"; with no allotment linked, the data gap is named.
+    const virtual = "mcc/2026/R2_virtual_vacancy.pdf";
+    expect(m.rows.filter((r) => (r.byList[virtual] ?? 0) > 0 && r.reach === "new")).toEqual([]);
+    for (const r of m.rows.filter((x) => x.noLabel === NO_LABEL.unlinked)) expect(r.byList[virtual]).toBeGreaterThan(0);
+    // Kokilaben Navi Mumbai DNB Anaesthesiology, DNB Quota, Open: every round of every year, with allotments made.
+    const k = (await findSeats({ ...mine, specialties: ["ANAESTHESIOLOGY"], degrees: ["DNB"], categories: ["Open"], quotas: ["DNB Quota"], compare: true, q: "Kokilaben" })).rows.find((r) => r.college.key.startsWith("KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8"))!;
+    expect(k.closings.map((c) => `${c.year} ${c.round} ${c.closing} (${c.n})`)).toEqual(["2025 R1 21699 (2)", "2025 R2 25059 (2)", "2025 R3 29892 (2)", "2025 stray 33685 (1)", "2026 R1 20132 (1)"]);
+    expect(m.rows.some((r) => r.closings.some((c) => c.year === 2023))).toBe(true);
+    // has: only rows with newly added seats; Σ of the new list unchanged (every newly added seat is on such a row).
+    const added = (await seatsView(parseSeatsParams(new URLSearchParams(`${p}&has=new`)), her)).r!;
+    expect(added.rows.every((r) => (r.byList["mcc/2026/R2_new_seats.pdf"] ?? 0) > 0)).toBe(true);
+    expect(added.seats["mcc/2026/R2_new_seats.pdf"]).toBe(m.seats["mcc/2026/R2_new_seats.pdf"]);
+    expect(added.total).toBeLessThan(m.total);
+    // A row whose course and quota MCC never allotted is "new", as on Options.
+    expect(m.rows.some((r) => r.reach === "new")).toBe(true);
+    // All rounds: every list, the latest rows kept, plus allotted rows no list prints (no seats, with closings).
+    const a = (await seatsView(parseSeatsParams(new URLSearchParams(`${p}&rounds=all`)), her, 100000)).r!;
+    expect(a.lists).toHaveLength(10);
+    expect(a.total).toBeGreaterThan(m.total);
+    for (const l of m.lists) expect(a.seats[l.key]).toBe(m.seats[l.key]);
+    const onlyAllotted = a.rows.filter((r) => !Object.keys(r.byList).length);
+    expect(onlyAllotted.length).toBeGreaterThan(0);
+    expect(onlyAllotted.every((r) => r.closings.length > 0 && r.seats === 0)).toBe(true);
+    const keys = a.rows.map((r) => [r.college.key, r.degree, r.specialty, r.quota, r.category].join("|"));
+    expect(new Set(keys).size).toBe(keys.length);
+    // Terms: each row's own course (its programme's bucket, its own bond figure where the record prices bonds by subject).
+    const cat = await getCatalog();
+    for (const r of m.rows) expect(r.fees).toEqual(courseTerms(cat, r.college.key, r.degree, r.specialty));
+    const byFee = (await seatsView(parseSeatsParams(new URLSearchParams(`${p}&sort=fee`)), her, 100000)).r!.rows.map((r) => feeValue.fee1(r.fees));
+    const known = byFee.filter((x) => x != null);
+    expect(known).toEqual([...known].sort((x, y) => x - y));
+    expect(byFee.slice(0, known.length)).toEqual(known); // not declared last
+    // The CSV follows: every closing column with its count, and the figures the Fees page reads.
+    const csv = await seatsCsv({ ...(await seatsView(parseSeatsParams(p), her)), r: m });
+    expect(csv.split("\r\n")[0]).toContain("Fee year 1 ₹,Stipend year 1 ₹/month,Bond years,Bond ₹ (highest),Leaving penalty ₹ (highest),Beds");
+    expect(csv.split("\r\n")[0]).toContain("2026 R1 closing rank,2026 R1 allotted,2025 R1 closing rank,2025 R1 allotted");
+    expect(csv.split("\r\n")[0]).toContain("2023 Special stray closing rank");
+    expect(csv.split("\r\n")[0]).toContain("Your chances at AIR 42284");
+  });
+
+  it("a PDF with no quota column gets no label (not \"No allotment\"), on the page and in the CSV", async () => {
+    // 2025 R2 newly added (11 Dec PDF) prints no quota; North Bengal MD Anaesthesiology has All India Open allotments.
+    const p = new URLSearchParams("rank=42284&cat=OBC&c=MD~ANAESTHESIOLOGY,DNB~ANAESTHESIOLOGY,NBEMS Diploma~ANAESTHESIOLOGY,DNB~FAMILYMEDICINE");
+    const her = profileFromParams(p)!;
+    for (const q of ["rounds=all", "view=list&list=mcc/2025/R2_new_seats_2025-12-11.pdf"]) {
+      const v = await seatsView(parseSeatsParams(new URLSearchParams(`${p}&${q}`)), her);
+      const none = v.r!.rows.filter((r) => r.quota == null);
+      expect(none.length).toBeGreaterThan(0);
+      expect(none.every((r) => r.reach === null && r.noLabel === NO_LABEL.quota)).toBe(true);
+      expect(none.some((r) => /North Bengal/i.test(r.college.name) && r.degree === "MD" && r.specialty === "ANAESTHESIOLOGY" && r.category === "Open")).toBe(true);
+      const csv = (await seatsCsv({ ...v, r: v.r! })).split("\r\n").filter((l) => l.startsWith("North Bengal Medical College,") && l.includes(",MD,") && l.includes("Anaesthesiology"));
+      expect(csv.some((l) => l.includes(NO_LABEL.quota))).toBe(true);
+      expect(csv.some((l) => /,—,Open,/.test(l) && l.includes("No allotment"))).toBe(false);
+    }
+  });
+
+  it("a list line printing 0 seats: shown in its one-list view, left out where lists are merged", async () => {
+    const f = { list: "mcc/2026/R2_new_seats.pdf", quotas: ["Armed Forces Medical"], q: "Naval" };
+    expect((await findSeats(f)).rows.filter((r) => r.seats === 0)).toHaveLength(2);
+    expect((await findSeats({ ...f, compare: true })).rows.every((r) => Object.values(r.byList).some((n) => n > 0))).toBe(true);
   });
 
   it("a state filter counts the matching seats it drops for having no state", async () => {

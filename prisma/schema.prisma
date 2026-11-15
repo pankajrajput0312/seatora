@@ -25,13 +25,6 @@ enum VerificationStatus {
   OUTDATED
 }
 
-enum CollegeType {
-  GOVERNMENT
-  PRIVATE
-  DEEMED
-  CENTRAL
-}
-
 enum TermKind {
   FEE
   STIPEND
@@ -73,7 +66,16 @@ model College {
   pincode            String?
   /// Address as printed in the MCC allotment PDFs. Null when MCC printed only a short name.
   address            String?
-  type               CollegeType?
+  /// Every MCC institute id the seat PDFs print for the college (its MD/MS and DNB records can differ). Bundle schema 2; raw SQL like CollegeTerm.details.
+  mccIds             String[]           @default([])
+  /// The MCC institute profile of the college's main id; null without an id.
+  mccProfileUrl      String?
+  /// Institution type as the bundle infers it from name and quota (govt | private | trust | deemed | central | esic |
+  /// municipal | armed_forces | psu | railway): not an official field, `typeBasis` says how. Null: not in the bundle.
+  type               String?
+  typeBasis          String?
+  /// The website field of the college's own MCC profile, as declared ("www.…"); null when not one link.
+  website            String?
   sourceId           String
   source             DataSource         @relation(fields: [sourceId], references: [id])
   lastVerifiedAt     DateTime?
@@ -82,6 +84,9 @@ model College {
   terms              CollegeTerm[]
   residents          Resident[]
   seatCounts         SeatCount[]
+  prevAllotments     Allotment[]
+  clinicalFacts      ClinicalFacts?
+  feesStructured     FeesStructured[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -89,15 +94,16 @@ model College {
 }
 
 model Specialty {
-  id         String             @id @default(cuid())
-  slug       String             @unique
-  name       String
-  degree     String // MD, MS, DNB, Diploma
+  id             String             @id @default(cuid())
+  slug           String             @unique
+  name           String
+  degree         String // MD, MS, DNB, Diploma
   /// Canonical specialty code shared across degrees, e.g. "ANAESTHESIOLOGY" (MD and DNB Anaesthesiology). Set by the importer.
-  code       String?
-  colleges   CollegeSpecialty[]
-  residents  Resident[]
-  seatCounts SeatCount[]
+  code           String?
+  colleges       CollegeSpecialty[]
+  residents      Resident[]
+  seatCounts     SeatCount[]
+  prevAllotments Allotment[]
 }
 
 model CollegeSpecialty {
@@ -151,6 +157,19 @@ model Allotment {
   status             String // "allotted" (R1, stray) | "fresh" | "upgraded" (R2, R3)
   sourceId           String
   source             DataSource       @relation(fields: [sourceId], references: [id])
+  // Bundle schema 2 (null from a schema 1 bundle). Written and read with raw SQL (import-mcc.ts, server/queries.ts).
+  /// The allotted candidate's own category as printed ("General", "OBC", … "<X> PwD"), not the seat category.
+  candidateCategory  String?
+  /// The candidate's choice number of the allotted seat (R2 / R3 PDFs only).
+  optionNo           Int?
+  /// R2 / R3: the seat the PDF prints in the previous round's columns (R1 for R2, R2 for R3); null where it prints "-".
+  prevCollegeId      String?
+  prevCollege        College?         @relation(fields: [prevCollegeId], references: [id])
+  prevSpecialtyId    String?
+  prevSpecialty      Specialty?       @relation(fields: [prevSpecialtyId], references: [id])
+  prevQuota          String?
+  /// The remark printed there: "reported" | "not_reported" | "seat_surrendered" | "seat_cancelled".
+  prevRemark         String?
 
   @@index([counsellingYear, rank])
   @@index([collegeSpecialtyId, counsellingYear, round])
@@ -205,6 +224,35 @@ model RetiredCollegeKey {
   /// The College.key it is now; null when the college is no longer in the data.
   newKey    String?
   createdAt DateTime @default(now())
+}
+
+/// A college's self-reported clinical facts (bundle clinical_facts.ndjson): beds, OPD / IPD, equipment, per-course
+/// accreditation and trainee record, disclosed stipend. `data` = the record without `key` and `nbems_disclosure`
+/// (import-schema.ts mccClinicalFactsSchema): `values_meta` gives every value's source, period, check date and flags.
+/// Replaced whole on import; raw SQL like CollegeTerm.details.
+model ClinicalFacts {
+  collegeId        String    @id
+  college          College   @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  data             Json
+  /// NBEMS mandatory disclosure on the hospital's site: "found" | "not_found" | "blocked" | "na".
+  disclosureStatus String
+  disclosureUrl    String?
+  checkedAt        DateTime? @db.Date
+}
+
+/// Fee and stipend per course year, bond, leaving penalty and MCC forfeit per college × programme ("MD/MS", "Diploma",
+/// "DNB", "NBEMS Diploma") × seat-type group (bundle fees_structured.ndjson; `quotaGroup` = its groups joined by "+",
+/// e.g. "All India+DNB Quota"). `data` = the record without id, key, college, state, programme and seat groups
+/// (import-schema.ts mccFeesStructuredSchema); `fee_display` "verbatim" (or absent) means its fee figures are never
+/// shown, only `fee_text` (server/facts.ts). Replaced whole on import; raw SQL like CollegeTerm.details.
+model FeesStructured {
+  collegeId  String
+  college    College @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  programme  String
+  quotaGroup String
+  data       Json
+
+  @@id([collegeId, programme, quotaGroup])
 }
 
 /// Fee, stipend, bond or penalty text exactly as published, per college and program (MD or DNB).

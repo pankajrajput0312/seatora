@@ -1,13 +1,14 @@
 import "server-only";
 import { formatINR } from "@/features/cutoffs/lib/format";
-import { termSourceName, type BondDetails, type PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
+import { seatGroups, termSourceName, type BondDetails, type PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
 import type { Catalog } from "./catalog";
 import type { SourceType } from "@/types/provenance";
-import type { Term } from "../types";
+import type { FeeTableRecord, Term } from "../types";
 
 // The ONE place that reads fee, stipend, bond and penalty terms (CollegeTerm) into numbers. The UI only renders
 // ProgrammeTerms. BOND and PENALTY come from their verified record (`details`: status, amounts, by course and subject,
-// penalty items; the importer requires it); only fee and stipend texts are read with regexes over the export's text shapes.
+// penalty items; the importer requires it); FEE and STIPEND from their fee-table records (bundle schema 2, FeesStructured:
+// the catalog attaches them), else (an older import) their texts, read with regexes over the export's text shapes.
 
 /**
  * Programmes, by degree. "MD" terms cover MD/MS, Diploma, MCh and MPH; "DNB" terms cover DNB and NBEMS Diploma.
@@ -33,10 +34,17 @@ export function programmeOfDegree(degree: string): Programme {
 /** The term bucket a course reads: MD/MS, Diploma, MCh, MPH → "MD"; DNB, DrNB, NBEMS Diploma → "DNB". Never the other one. */
 export const bucketOfDegree = (degree: string): Term["program"] => programmes[programmeOfDegree(degree)].bucket;
 
-/** declared: the college's own figure; nbems: NBEMS's fixed DNB fee; minimum: NBEMS floor (actual may be higher); nmc: NMC stipend list (one PG figure, not split by year). */
-export type FigureKind = "declared" | "nbems" | "minimum" | "nmc" | "published";
-/** `src`: number of the source in ProgrammeTerms.sources. `min`: a range (by subject): `inr` is its highest figure. */
-export type Figure = { inr: number; kind: FigureKind; src: number; min?: number };
+/**
+ * declared: the college's own figure; maximum: the NBEMS DNB course fee ceiling (the most a DNB hospital may charge, no
+ * GST, paid to the hospital), shown where the hospital declared none, never the college's figure; minimum: NBEMS floor
+ * (actual may be higher); nmc: NMC stipend list (one PG figure, not split by year).
+ */
+export type FigureKind = "declared" | "maximum" | "minimum" | "nmc" | "published";
+/**
+ * `src`: number of the source in ProgrammeTerms.sources. `min`: a range (by subject): `inr` is its highest figure.
+ * `atAdmission`: the profile's amount paid at admission (year 1), not an annual fee.
+ */
+export type Figure = { inr: number; kind: FigureKind; src: number; min?: number; atAdmission?: true };
 /**
  * `mccId`: the MCC institute profile the figure was read from. `sharedBy`: how many institutes in our data cite that
  * profile (more than 1: it may be another institute's).
@@ -112,14 +120,17 @@ export type Bond = {
 export type ProgrammeTerms = {
   programme: Programme;
   durationYears: number;
-  /** One row per year of the course: a 2-year course has no year 3. */
+  /** One row per year of the course: a 2-year course has no year 3. null: not stated for that year. */
   years: { year: number; fee: Figure | null; stipend: Figure | null }[];
-  /** Words beside the fee figure, e.g. "+ GST". */
+  /** Words beside the fee figure, e.g. "tuition by subject" (older imports' fee texts). */
   feeNote: string | null;
-  /** Σ fee of every year, when every year's fee is known (computed from one yearly figure: the terms have no year split). */
+  /**
+   * The whole course's fee, only when every year's is stated: the fee table's (an NBEMS maximum when the years are), or
+   * (an older import) one yearly figure × the years, computed.
+   */
   wholeCourseFee: number | null;
   bond: Bond;
-  /** MCC profile: what is forfeited if you resign or don't join from Round 2 (PENALTY). Not the leaving penalty. */
+  /** MCC profile: what is forfeited if you resign or don't join from Round 2 (PENALTY, else the fee table). Not the leaving penalty. */
   resignForfeit: Figure | null;
   /** A term whose shape isn't read: shown as published. Also a bond or penalty without its record (an import older than the records). */
   unread: { kind: Term["kind"]; text: string; src: number }[];
@@ -191,18 +202,23 @@ function amountOf(parts: TermPart[], years: number | null): Amount {
 
 // ---------- per kind ----------
 
-/** "₹150,000/yr — college declaration to MCC 2025" or "₹1.25 L/yr + GST to NBEMS (official DNB course fee)". */
+/**
+ * An older import's fee text: "₹150,000/yr — college declaration to MCC 2025", or the NBEMS ceiling ("Up to ₹1,25,000/yr,
+ * no GST …"; older: "₹1.25 L/yr + GST to NBEMS (official DNB course fee)": NBEMS withdrew the GST in November 2023).
+ */
 export function parseFee(text: string): { inr: number; min?: number; kind: FigureKind; note: string | null; year: number | null; quality: Quality } | null {
   // "₹1,00,000 to ₹68,00,000/yr tuition by subject (management / paid seats) + ₹3,05,000 hostel — college declaration to MCC 2025"
   const r = text.match(/^₹([\d,]+) to ₹([\d,]+)\/yr (.+?) — college declaration to MCC (\d{4})$/);
   if (r) return { inr: toInr(r[2], undefined), min: toInr(r[1], undefined), kind: "declared", note: r[3], year: Number(r[4]), quality: "partial" };
+  const up = text.match(/^Up to ₹([\d,]+)\/yr, no GST\b/);
+  if (up) return { inr: toInr(up[1], undefined), kind: "maximum", note: null, year: null, quality: "full" };
   const m = text.match(/^₹\s?(\d[\d,]*(?:\.\d+)?)\s*(L|lakh)?\s*\/\s*yr\b(.*)$/i);
   if (!m) return null;
   const inr = toInr(m[1], m[2]);
   const rest = m[3].trim();
   const y = rest.match(/^— college declaration to MCC (\d{4})$/);
   if (y) return { inr, kind: "declared", note: null, year: Number(y[1]), quality: "full" };
-  if (rest === "+ GST to NBEMS (official DNB course fee)") return { inr, kind: "nbems", note: "+ GST", year: null, quality: "full" };
+  if (rest === "+ GST to NBEMS (official DNB course fee)") return { inr, kind: "maximum", note: null, year: null, quality: "full" };
   return { inr, kind: "published", note: rest || null, year: null, quality: "partial" };
 }
 
@@ -357,6 +373,45 @@ function penaltiesFromRecord(d: PenaltyDetails, kind: Kind) {
 }
 
 /**
+ * The programme's fee-table records, All India, Deemed/Paid, NRI, DNB Quota first (a summary line shows the first); null
+ * when its terms have none (an import before the fee table: the texts are read), [] when none is for this programme.
+ */
+function recordsOf(programme: Programme, ...ts: (Term | undefined)[]): FeeTableRecord[] | null {
+  const d = ts.map((t) => t?.details).find((x) => x && "records" in x);
+  if (!d || !("records" in d)) return null;
+  const pos = (r: FeeTableRecord) => seatGroups.indexOf(r.seat_groups[0]);
+  return d.records.filter((r) => r.programme === programme).sort((a, b) => pos(a) - pos(b));
+}
+
+/**
+ * Figures of one fee-table record, each with its source (`src`: its number in ProgrammeTerms.sources). Fee only when the
+ * record says it may be shown (fee_display "numbers"; verbatim or absent: none, `verbatim`), in ₹; each year as stated
+ * (null: not stated, never copied from another year); the whole course only when the record gives it (every year stated).
+ * Stipends always (an NBEMS floor is `minimum`). MCC's Round 2 forfeit from its form fields.
+ */
+function fromRecords(r: FeeTableRecord | undefined, src: (s: FeeTableRecord["sources"][number]) => number) {
+  if (!r) return null;
+  const at = (n: number) => src(r.sources.find((s) => s.n === n)!); // the importer checks every cited n is listed
+  const numbers = r.fee_display === "numbers";
+  const fee = r.fee_per_year.map((f): Figure | null =>
+    numbers && f?.amount != null && f.currency === "INR"
+      ? { inr: f.amount_max ?? f.amount, kind: f.maximum ? "maximum" : "declared", src: at(f.src), ...(f.amount_max != null && f.amount_max !== f.amount && { min: f.amount }), ...(f.kind === "amount_at_admission" && { atAdmission: true as const }) }
+      : null,
+  );
+  const stipend = r.stipend_per_month.map((s): Figure | null => s && { inr: s.inr, kind: s.minimum ? "minimum" : s.kind === "nmc_list" ? "nmc" : "declared", src: at(s.src) });
+  const w = numbers ? r.fee_whole_course : null;
+  const cf = r.counselling_forfeit;
+  const forfeit = cf?.forfeited_if_resign_or_not_join_from_round2?.inr;
+  return {
+    verbatim: !numbers,
+    fee,
+    stipend,
+    whole: w && w.currency === "INR" && w.amount_max == null ? w.amount : null,
+    forfeit: cf && forfeit != null ? ({ inr: forfeit, kind: "declared", src: at(cf.src) } satisfies Figure) : null,
+  };
+}
+
+/**
  * One programme's terms at one college, from the terms of its own bucket only (MD: MD/MS, Diploma, MCh, MPH; DNB: DNB,
  * NBEMS Diploma): never the other bucket's. `sharedBy`: institutes citing an MCC profile id.
  */
@@ -365,14 +420,16 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
   const own = terms.filter((t) => t.program === def.bucket);
   const get = (k: Term["kind"]) => own.find((t) => t.kind === k);
   const sources: TermSource[] = [];
-  const srcOf = (t: Pick<Term, "kind" | "source">, year: number | null, label?: string | null) => {
-    const mccId = mccIdOf(t.source.url);
-    const shared = mccId ? sharedBy(mccId) : 1;
-    const s = { label: label ?? sourceLabel(t, shared), url: t.source.url, year, mccId, sharedBy: shared, type: t.source.type };
+  const add = (s: Omit<TermSource, "n">) => {
     const found = sources.find((x) => x.label === s.label && x.url === s.url && x.year === s.year);
     if (found) return found.n;
     sources.push({ n: sources.length + 1, ...s });
     return sources.length;
+  };
+  const srcOf = (t: Pick<Term, "kind" | "source">, year: number | null, label?: string | null) => {
+    const mccId = mccIdOf(t.source.url);
+    const shared = mccId ? sharedBy(mccId) : 1;
+    return add({ label: label ?? sourceLabel(t, shared), url: t.source.url, year, mccId, sharedBy: shared, type: t.source.type });
   };
   /**
    * A document a record links (its own, by_course, penalty items): the term's own source when it is the same URL, named
@@ -392,21 +449,27 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     notes.push(`The college's MCC profile gives one fee and stipend (shown under MD/MS); none is declared for ${programme}.`);
     feeT = stT = undefined;
   }
-  const fee = feeT && parseFee(feeT.text);
+  const recs = recordsOf(programme, feeT, stT);
+  const read = recs ? fromRecords(recs[0], (s) => add({ label: s.label, url: s.url, year: typeof s.year === "number" ? s.year : null, mccId: s.mcc_id ?? null, sharedBy: 1, type: "OFFICIAL" })) : null;
+  // A fee in the profile's own words only (verbatim): no figure, its text as published ("see terms").
+  if (read?.verbatim && feeT) unread.push({ kind: "FEE", text: feeT.text, src: srcOf(feeT, null) });
+
+  const fee = !recs && feeT ? parseFee(feeT.text) : null;
   let feeFig: Figure | null = null;
   if (feeT && fee) feeFig = { inr: fee.inr, kind: fee.kind, src: srcOf(feeT, fee.year), ...(fee.min != null && { min: fee.min }) };
-  else if (feeT) unread.push({ kind: "FEE", text: feeT.text, src: srcOf(feeT, null) });
+  else if (feeT && !recs) unread.push({ kind: "FEE", text: feeT.text, src: srcOf(feeT, null) });
 
-  const st = stT && parseStipend(stT.text);
+  const st = !recs && stT ? parseStipend(stT.text) : null;
   const stSrc = stT && st ? srcOf(stT, st.year) : 0;
-  if (stT && !st) unread.push({ kind: "STIPEND", text: stT.text, src: srcOf(stT, null) });
+  if (stT && !st && !recs) unread.push({ kind: "STIPEND", text: stT.text, src: srcOf(stT, null) });
   const stipendAt = (y: number): Figure | null => {
+    if (recs) return read?.stipend[y - 1] ?? null;
     if (!st) return null;
     const inr = st.allYears ? st.perYear[0] : st.perYear[y - 1];
     return inr == null ? null : { inr, kind: st.kind, src: stSrc };
   };
 
-  const years = Array.from({ length: def.years }, (_, i) => ({ year: i + 1, fee: feeFig, stipend: stipendAt(i + 1) }));
+  const years = Array.from({ length: def.years }, (_, i) => ({ year: i + 1, fee: recs ? (read?.fee[i] ?? null) : feeFig, stipend: stipendAt(i + 1) }));
 
   const bondT = get("BOND");
   const penT = get("PENALTY");
@@ -425,6 +488,7 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     if (f) resignForfeit = { inr: f.inr!, kind: "declared", src: src(f.url) };
     else if (p.forfeit[0]) unread.push({ kind: "PENALTY", text: p.forfeit[0].text, src: src(p.forfeit[0].url) });
   } else if (penT) unread.push({ kind: "PENALTY", text: penT.text, src: srcOf(penT, null) });
+  resignForfeit ??= read?.forfeit ?? null;
 
   return {
     programme,
@@ -432,7 +496,7 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     years,
     feeNote: fee && feeFig ? fee.note : null,
     // A range (by subject) has no one whole-course figure.
-    wholeCourseFee: feeFig && feeFig.min == null ? feeFig.inr * def.years : null,
+    wholeCourseFee: recs ? (read?.whole ?? null) : feeFig && feeFig.min == null ? feeFig.inr * def.years : null,
     bond,
     resignForfeit,
     unread,

@@ -4,7 +4,8 @@ import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/features/auth/lib/password";
 import { freshIp, hasInvite, invited, signIn, signUpOrIn } from "./auth";
 
-// Writes to the database: the waitlist row and the extra accounts here are @seatora.test and deleted afterwards. The
+// No waitlist test: the landing page has no waitlist form (the gateway-ready site). Writes to the database: the extra
+// accounts here are @seatora.test and deleted afterwards (and any waitlist row of theirs). The
 // change-password test signs out every other session of the invited account, so run the suite with --workers=1.
 const db = new PrismaClient();
 const made: string[] = [];
@@ -32,12 +33,6 @@ test("landing page renders key sections", async ({ page }) => {
   for (const id of new Set(hashes)) await expect(page.locator(`#${id}`), `#${id}`).toBeAttached();
 });
 
-test("waitlist form validates email", async ({ page }) => {
-  await page.goto("/#waitlist");
-  await page.getByRole("button", { name: "Get early access" }).last().click();
-  await expect(page.getByText("Enter a valid email address")).toBeVisible();
-});
-
 test("resident finder takes a rank and shows hospitals or an honest empty state", async ({ page }) => {
   await page.goto("/");
   const finder = page.locator("#preview");
@@ -46,16 +41,6 @@ test("resident finder takes a rank and shows hospitals or an honest empty state"
   await input.blur();
   await expect(input).toHaveValue("5,000");
   await expect(finder.getByText("Residents are being added.").or(finder.getByRole("heading", { level: 3 }).first())).toBeVisible();
-});
-
-test("waitlist sign-up succeeds", async ({ page }) => {
-  needsDb();
-  const email = testEmail("waitlist");
-  made.push(email);
-  await page.goto("/#waitlist");
-  await page.getByPlaceholder("you@example.com").fill(email);
-  await page.getByRole("button", { name: "Get early access" }).last().click();
-  await expect(page.getByText("You're on the list")).toBeVisible();
 });
 
 test("sign-up needs the invited email and the invite code; nothing is created otherwise", async ({ page }) => {

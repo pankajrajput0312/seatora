@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { Term } from "../types";
+import type { FeeTableRecord, Term } from "../types";
 import type { BondDetails, PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
 import { bucketOfDegree, groupOf, normalizeProgramme, parseFee, parseStipend, programmeOfDegree, programmesOf, termQuality } from "./terms";
 
@@ -33,10 +33,62 @@ const TRIPURA_PENALTY = penalty("MD", "Seat-leaving penalty: ₹35,00,000 (PG de
   ],
 });
 
-it("reads the two fee shapes", () => {
+it("reads the fee shapes; the NBEMS fee is a ceiling with no GST (withdrawn in 2023), never '+ GST'", () => {
   expect(parseFee("₹150,000/yr — college declaration to MCC 2025")).toEqual({ inr: 150000, kind: "declared", note: null, year: 2025, quality: "full" });
-  expect(parseFee("₹1.25 L/yr + GST to NBEMS (official DNB course fee)")).toEqual({ inr: 125000, kind: "nbems", note: "+ GST", year: null, quality: "full" });
+  expect(parseFee("₹1.25 L/yr + GST to NBEMS (official DNB course fee)")).toEqual({ inr: 125000, kind: "maximum", note: null, year: null, quality: "full" });
+  expect(parseFee("Up to ₹1,25,000/yr, no GST (NBEMS course fee ceiling; the hospital declared none)")).toEqual({ inr: 125000, kind: "maximum", note: null, year: null, quality: "full" });
   expect(parseFee("Not listed")).toBeNull();
+});
+
+// ---------- bundle schema 2: FEE / STIPEND with their fee-table records ----------
+
+const PROFILE_SRC = { n: 1, kind: "mcc_profile" as const, label: "MCC institute profile 700479 (college's own declaration, Annexure-C)", url: MCC(700479).url, year: 2026, mcc_id: "700479" };
+const NBEMS_SRC = { n: 2, kind: "nbems_rule" as const, label: "NBEMS annual course fee (ceiling, no GST)", url: "https://natboard.edu.in/x.pdf", year: 2025 };
+const rec = (programme: FeeTableRecord["programme"], group: FeeTableRecord["seat_groups"][number], r: Partial<FeeTableRecord>): FeeTableRecord => ({
+  programme, seat_groups: [group], fee_display: "numbers", fee_per_year: [null, null, null], fee_whole_course: null, stipend_per_month: [null, null, null], counselling_forfeit: null, sources: [PROFILE_SRC, NBEMS_SRC], ...r,
+});
+const withRecords = (program: Term["program"], records: FeeTableRecord[], feeText = "₹70,324/yr (yr 1; yr 2/3 not stated) — college's MCC profile"): Term[] => [
+  { ...term(program, "FEE", feeText), details: { records } },
+  { ...term(program, "STIPEND", "₹60,000/month (every year) — college's MCC profile"), details: { records } },
+];
+const inr = (amount: number, kind: "annual_fee" | "amount_at_admission" | "declared_for_year" = "annual_fee") => ({ amount, currency: "INR" as const, kind, src: 1 });
+
+it("schema 2: figures come from the programme's first fee-table record, each year as stated, never from the texts", () => {
+  // Goa MC: ₹70,324 at admission, years 2 and 3 not stated: no year-1 figure copied, no whole course; MCC's Round 2 forfeit.
+  const goa = rec("MD/MS", "All India", {
+    fee_per_year: [inr(70324, "amount_at_admission"), null, null],
+    stipend_per_month: [1, 2, 3].map(() => ({ inr: 60000, kind: "declared" as const, src: 1 })),
+    counselling_forfeit: { forfeited_if_resign_or_not_join_from_round2: { inr: 8432 }, deducted_on_reallocation: { inr: 2000 }, src: 1 },
+  });
+  const t = normalizeProgramme("MD/MS", withRecords("MD", [rec("MD/MS", "NRI", { fee_display: "verbatim" }), goa]));
+  expect(t.years.map((y) => [y.fee?.inr ?? null, y.fee?.atAdmission ?? null, y.stipend?.inr])).toEqual([[70324, true, 60000], [null, null, 60000], [null, null, 60000]]);
+  expect([t.wholeCourseFee, t.resignForfeit?.inr, t.unread]).toEqual([null, 8432, []]);
+  expect(t.sources).toEqual([{ n: 1, label: PROFILE_SRC.label, url: PROFILE_SRC.url, year: 2026, mccId: "700479", sharedBy: 1, type: "OFFICIAL" }]);
+  // RG Kar: at admission, then annual; the whole course as the record gives it.
+  const rg = normalizeProgramme("MD/MS", withRecords("MD", [rec("MD/MS", "All India", { fee_per_year: [inr(18000, "amount_at_admission"), inr(12000), inr(12000)], fee_whole_course: { amount: 42000, currency: "INR" } })]));
+  expect([rg.years.map((y) => y.fee?.inr), rg.wholeCourseFee]).toEqual([[18000, 12000, 12000], 42000]);
+});
+
+it("schema 2: a fee in the profile's own words (verbatim, or no fee_display) has no figure, whatever the text says", () => {
+  // Chettinad: "₹48 L/yr" in an older text, but the record is verbatim (₹3 L–₹48 L by specialty).
+  for (const fee_display of ["verbatim", null] as const) {
+    const t = normalizeProgramme("MD/MS", withRecords("MD", [rec("MD/MS", "Deemed/Paid", { fee_display, stipend_per_month: [{ inr: 48000, kind: "declared", src: 1 }, null, null] })], "₹48 L/yr — college declaration to MCC 2025"));
+    expect([t.years.map((y) => y.fee), t.wholeCourseFee, t.years[0].stipend?.inr]).toEqual([[null, null, null], null, 48000]);
+    expect(t.unread.map((u) => u.kind)).toEqual(["FEE"]); // shown as "see terms", never a figure
+  }
+});
+
+it("schema 2: an NBEMS ceiling is a maximum and an NBEMS floor a minimum; a programme without its own record shows nothing", () => {
+  const dnb = rec("DNB", "DNB Quota", {
+    fee_per_year: [1, 2, 3].map(() => ({ amount: 125000, currency: "INR" as const, kind: "nbems_ceiling" as const, maximum: true as const, src: 2 })),
+    fee_whole_course: { amount: 375000, currency: "INR", maximum: true },
+    stipend_per_month: [43000, 45000, 47000].map((v) => ({ inr: v, kind: "nbems_minimum" as const, minimum: true as const, src: 2 })),
+  });
+  const t = normalizeProgramme("DNB", withRecords("DNB", [dnb]));
+  expect(t.years.map((y) => [y.fee?.kind, y.stipend?.inr, y.stipend?.kind])).toEqual([["maximum", 43000, "minimum"], ["maximum", 45000, "minimum"], ["maximum", 47000, "minimum"]]);
+  expect([t.wholeCourseFee, t.feeNote]).toEqual([375000, null]);
+  const nd = normalizeProgramme("NBEMS Diploma", withRecords("DNB", [dnb]));
+  expect([nd.years.map((y) => [y.fee, y.stipend]), nd.unread]).toEqual([[[null, null], [null, null]], []]);
 });
 
 it("reads stipends by year, the NBEMS floor as a year-1 minimum and the NMC figure as every year", () => {
@@ -118,14 +170,14 @@ it("DNB hospital with only the NBEMS fee and a declared stipend: no bond term me
     term("DNB", "FEE", "₹1.25 L/yr + GST to NBEMS (official DNB course fee)", NBEMS),
     term("DNB", "STIPEND", "₹63,000 / 64,000 / 65,000/month (yr 1/2/3) — college declaration to MCC 2025", MCC(700970)),
   ]);
-  expect(t.years.map((y) => y.fee?.kind)).toEqual(["nbems", "nbems", "nbems"]);
-  expect(t.feeNote).toBe("+ GST");
+  expect(t.years.map((y) => y.fee?.kind)).toEqual(["maximum", "maximum", "maximum"]);
+  expect(t.feeNote).toBeNull();
   expect(t.bond.status).toBe("not_declared");
   expect(t.resignForfeit).toBeNull();
   expect(t.sources.map((s) => s.label)).toEqual(["NBEMS fee notice", "Declared by the college to MCC"]);
   // Never the MD bucket's fee, even when the DNB bucket has none.
   const both = [term("DNB", "FEE", "₹1.25 L/yr + GST to NBEMS (official DNB course fee)", NBEMS), term("MD", "FEE", "₹150,000/yr — college declaration to MCC 2025")];
-  expect(normalizeProgramme("NBEMS Diploma", both).years.map((y) => y.fee?.kind)).toEqual(["nbems", "nbems"]);
+  expect(normalizeProgramme("NBEMS Diploma", both).years.map((y) => y.fee?.kind)).toEqual(["maximum", "maximum"]);
   expect(normalizeProgramme("NBEMS Diploma", both.slice(1)).years[0].fee).toBeNull();
 });
 

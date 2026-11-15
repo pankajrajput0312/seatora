@@ -123,20 +123,21 @@ const terms: Omit<Term, "source">[] = [
     { college: keyOf(s), program: "MD", kind: "STIPEND", text: `₹${(45000 + i * 8000).toLocaleString("en-IN")}/month (Y1)`, amountInr: 45000 + i * 8000 },
   ]),
   ...dnb.flatMap((s, i): Omit<Term, "source">[] => [
-    { college: keyOf(s), program: "DNB", kind: "FEE", text: "₹1.25 L/yr + GST to NBEMS", amountInr: 125000 },
+    { college: keyOf(s), program: "DNB", kind: "FEE", text: "Up to ₹1,25,000/yr, no GST (NBEMS course fee ceiling; the hospital declared no fee on MCC)", amountInr: 125000 },
     ...(i === 6 ? [] : [{ college: keyOf(s), program: "DNB" as const, kind: "STIPEND" as const, text: `₹${(72000 + i * 2500).toLocaleString("en-IN")}/month (Y1)`, amountInr: 72000 + i * 2500 }]),
     ...(i === 1 ? [{ college: keyOf(s), program: "DNB" as const, kind: "BOND" as const, text: "1 year service", amountInr: null }] : []),
   ]),
 ];
 
 // Rank-level rows behind each cutoff (no names), for Rank scan.
-const remarks: Allotment["remark"][] = ["Fresh", "Upgraded", "Fresh", "Not reported"];
+const remarks: Allotment["remark"][] = ["Fresh", "Upgraded", "Fresh", "Fresh"];
 const allotments: Allotment[] = cutoffs.flatMap((c) =>
   Array.from({ length: c.n }, (_, i) => ({
     rank: c.n === 1 ? c.closing : Math.round(c.opening + ((c.closing - c.opening) * i) / (c.n - 1)),
     category: c.category, college: c.college, degree: c.degree, specialty: c.specialty, year: c.year, round: c.round, quota: c.quota,
-    remark: c.round === "R1" ? "Fresh" : remarks[hash(`${c.college}${c.round}${i}`) % remarks.length],
-  })),
+    remark: c.round === "R2" || c.round === "R3" ? remarks[hash(`${c.college}${c.round}${i}`) % remarks.length] : "Allotted",
+    candidateCategory: null, optionNo: null, prev: null,
+  })).map((a) => ({ ...a, status: a.remark === "Upgraded" ? "upgraded" : a.round === "R2" || a.round === "R3" ? "fresh" : "allotted" })),
 );
 
 const demoSource = { name: "Test fixture, illustrative only", url: null, type: "UNVERIFIED_COMMUNITY" as const };

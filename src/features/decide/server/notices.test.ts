@@ -14,7 +14,7 @@ describe("without a database", () => {
 });
 
 // Real import against the bundle it came from (local DATABASE_URL exported, see seats.test.ts).
-const dir = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath");
+const dir = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
 describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "notices.json")))("MCC notices on the real import", { timeout: 60_000 }, () => {
   type FileNotice = { title: string; date: string; url: string; kind: string; year: number; round: string | null };
   const notices: FileNotice[] = JSON.parse(readFileSync(join(dir, "notices.json"), "utf8"));

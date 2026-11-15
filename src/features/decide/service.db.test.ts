@@ -8,6 +8,7 @@ import { GET as optionsApi } from "@/app/api/v1/options/route";
 import { db } from "@/lib/db";
 import { eligibleCategories, reachOrder, resultsSpan, roundReachOrder } from "./lib/reach";
 import { profileHasCourse, profileQuotas, profileToParams, type Profile } from "./profile";
+import { clinicalFactsFor, feesFor } from "./server/facts";
 import { listSeats, seatLists } from "./server/seats";
 import * as svc from "./service";
 import { optionId, type SeatKind } from "./types";
@@ -47,7 +48,7 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     const c = await collegeKey(GMC_NAGPUR);
     const a = await svc.listAllotments({ year: 2026, round: "R1", course: "md-anaesthesiology" }, { page: 1, pageSize: 50 }, c.key);
     expect(a.total).toBe(12);
-    expect(a.rows.every((r) => !r.provisional && r.remark === "Fresh")).toBe(true);
+    expect(a.rows.every((r) => !r.provisional && r.remark === "Allotted" && r.status === "allotted")).toBe(true);
     // her grid (Open + OBC seats): closing from her categories, bracketed count = allotments in every category
     const inst = (await svc.getInstitute(c.slug, her))!;
     const md = inst.options.find((o) => o.course.slug === "md-anaesthesiology" && o.quota === "All India")!;
@@ -113,7 +114,8 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     expect(trends.total).toBeGreaterThan(10000);
     expect(trends.rows).toHaveLength(50);
     const inst = await timed("listInstitutes her", () => svc.listInstitutes(her, {}));
-    expect(inst.total).toBe(2032); // colleges.ndjson (1,985) + seat_colleges.ndjson (47) in the bundle manifest
+    const files = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")).files;
+    expect(inst.total).toBe(files["colleges.ndjson"].count + files["seat_colleges.ndjson"].count); // every college of the bundle
     const firstPage = await timed("listInstitutes her, page 1", () => svc.listInstitutes(her, {}, { page: 1, pageSize: 48 }));
     expect(firstPage.rows).toHaveLength(48);
     // best reach (per-year maxima in SQL) agrees with the institute page, over the options in her profile only
@@ -130,7 +132,7 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
 });
 
 // Options' round view on the real import, reconciled with the bundle's seats.ndjson (the MCC lists of 12–13 Nov 2026).
-const dir = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath");
+const dir = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
 type FileSeat = { kind: SeatKind; ikey: string; degree: string; specialty: string; quota: string | null; category: string; seats: number; src: string };
 describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "seats.ndjson")))("Options' round view on real MCC data", { timeout: 120_000 }, () => {
   const file: FileSeat[] = readFileSync(join(dir, "seats.ndjson"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
@@ -256,5 +258,43 @@ describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "key_aliases.
       expect([res.status, res.headers.get("Location")]).toEqual([308, `/api/v1/colleges/${to.slug}?rank=42284`]);
     }
     expect(await svc.renamedCollege("no-such-college-000000")).toBeNull();
+  });
+});
+
+// Bundle schema 2: allotment status / option no / previous seat, clinical facts, the per-year fee table.
+describe.skipIf(!process.env.DATABASE_URL)("bundle schema 2 on real MCC data", { timeout: 60_000 }, () => {
+  it("rank 23 in 2023: R1 at LTMMC Mumbai, upgraded in R2 to Seth GS on choice 1, the R1 seat reported", async () => {
+    const j = await svc.rankJourney(2023, 23);
+    expect(j.map((a) => [a.round, a.college.slice(0, 20), a.courseName, a.status, a.optionNo, a.candidateCategory])).toEqual([
+      ["R1", "LOKMANYATILAKMEDICAL", "MD General Medicine", "allotted", null, "General"],
+      ["R2", "SETHGORDHANDASSUNDER", "MD General Medicine", "upgraded", 1, "General"],
+    ]);
+    expect(j[0].prev).toBeNull();
+    expect(j[1].prev).toMatchObject({ college: j[0].college, collegeName: j[0].collegeName, degree: "MD", specialty: "GENERALMEDICINE", quota: "All India", remark: "reported" });
+    expect(await svc.rankJourney(2023, 999_999)).toEqual([]);
+  });
+
+  it("allotment rows carry status, candidate category, option no and previous seat (R1: none)", async () => {
+    const c = await collegeKey(GMC_NAGPUR);
+    const a = await svc.listAllotments({ year: 2026, round: "R1", course: "md-anaesthesiology" }, { page: 1, pageSize: 50 }, c.key);
+    expect(a.rows.every((r) => r.status === "allotted" && r.optionNo === null && r.prev === null && !!r.candidateCategory)).toBe(true);
+  });
+
+  it("clinical facts: self-reported values with their sources, and the NBEMS disclosure check", async () => {
+    const key = (await collegeKey("AADHARHEALTHINSTITUTEAUNITOFVLCOMHEALTHC")).key;
+    const f = (await clinicalFactsFor(key))!;
+    expect(f.facts?.beds_total).toBe(400);
+    expect(f.values_meta?.["facts.beds_total"]).toMatchObject({ source_type: "hospital_site", flags: ["self_reported"] });
+    expect(f.disclosure).toEqual({ status: "not_found", url: null, checked: "2026-11-15" });
+    expect(await clinicalFactsFor("NOSUCHCOLLEGE")).toBeNull();
+  });
+
+  it("fee table: an NBEMS ceiling and floor are flagged, verbatim groups never carry figures, groups in seat-group order", async () => {
+    const [dnb] = await feesFor(`${KOKILA_NM}#400710`, "DNB");
+    expect(dnb.fee).toMatchObject({ display: "numbers", perYear: [{ amount: 125000, kind: "nbems_ceiling", maximum: true }, {}, {}] });
+    expect(dnb.stipendPerMonth[0]).toMatchObject({ inr: 43000, kind: "nbems_minimum", minimum: true });
+    const md = await feesFor((await collegeKey("AARUPADAIVEEDUMEDICALCOLLEGEANDHOSPITALP")).key, "MD/MS");
+    expect(md.map((g) => [g.quotaGroup, g.fee.display, "perYear" in g.fee])).toEqual([["Deemed/Paid", "verbatim", false], ["NRI", "verbatim", false]]);
+    expect(await feesFor(`${KOKILA_NM}#400710`, "MCh")).toEqual([]);
   });
 });

@@ -9,5 +9,7 @@ export default defineConfig({
       "server-only": fileURLToPath(new URL("./node_modules/server-only/empty.js", import.meta.url)),
     },
   },
+  // tsconfig keeps JSX for Next.js ("preserve"); tests that render a component (renderToStaticMarkup) need it compiled.
+  oxc: { jsx: { runtime: "automatic" } },
   test: { include: ["src/**/*.test.ts"] },
 });
