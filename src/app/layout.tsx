@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: { default: `${siteConfig.name} · NEET PG counselling planner`, template: `%s · ${siteConfig.name}` },
   description: siteConfig.description,
-  openGraph: { type: "website", siteName: siteConfig.name, title: `${siteConfig.name} · NEET PG counselling planner`, description: siteConfig.description },
+  openGraph: { type: "website", siteName: siteConfig.name, title: `${siteConfig.name} · See the residents at every NEET PG hospital`, description: "77,000+ residents by hospital, course and year from MCC's official lists, plus options for your rank, seats, fees, stipend and bond. Free." },
   twitter: { card: "summary_large_image" },
   appleWebApp: { capable: true, title: siteConfig.name, statusBarStyle: "black" },
 };
