@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Building2, CalendarDays, GitCompareArrows, IndianRupee, LayoutDashboard, LayoutGrid, ListOrdered, Route, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
+import { Building2, CalendarDays, GitCompareArrows, IndianRupee, LayoutDashboard, LayoutGrid, ListOrdered, Route, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { LogoMark } from "@/components/layout/logo";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -37,6 +38,7 @@ const sections = [
       { href: "/decide/institutes", label: "Institutes", icon: Building2 },
       { href: "/decide/last-ranks", label: "Last ranks", icon: TrendingUp },
       { href: "/decide/allotments", label: "Allotments", icon: Table2 },
+      { href: "/decide/residents", label: "Residents", icon: Users, badge: "Premium" },
       { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch },
       { href: "/decide/rank-journey", label: "Rank journey", icon: Route },
       { href: "/decide/rank-tools", label: "Score & rank", icon: Calculator },
@@ -162,8 +164,8 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
           >
             {sections.map((sec) => (
               <SideNavSection key={sec.title} title={sec.title}>
-                {sec.items.map(({ href, label, icon }) => (
-                  <SideNavItem key={href} label={label} icon={icon} href={L.to(href)} isSelected={isCurrent(href)} />
+                {sec.items.map(({ href, label, icon, badge }) => (
+                  <SideNavItem key={href} label={label} icon={icon} href={L.to(href)} isSelected={isCurrent(href)} endContent={badge && <Badge tone="info">{badge}</Badge>} />
                 ))}
               </SideNavSection>
             ))}

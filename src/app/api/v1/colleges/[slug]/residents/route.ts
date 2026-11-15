@@ -6,8 +6,9 @@ import { getCollege } from "@/features/decide/service";
 const querySchema = pageSchema.extend({ course: z.string().max(100).optional(), year: z.coerce.number().int().min(2000).max(2100).optional() });
 
 /**
- * Names from MCC's admitted-candidates lists at one institute (name, course, year, list, 2025 rank where known), one
- * page at a time (pageSize max 200). Never hidden rows; deliberately no endpoint across institutes; never cached.
+ * Names from MCC's admitted-candidates lists at one institute (name, course, year, list and, where known, the All India
+ * Rank from that year's NBEMS NEET PG result, 2023-2025: `rankSource` = that result, in `sources`), one page at a time
+ * (pageSize max 200). Never hidden rows; deliberately no endpoint across institutes; never cached.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   return handle(async () => {
@@ -22,7 +23,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     const { page, pageSize, ...f } = q.data;
     const r = await listResidents(college.key, f, { page, pageSize });
     const res = ok(
-      r.rows.map(({ name, year, list, rank, course, sourceKey }) => ({ name, year, list, rank, course, source: sourceKey })),
+      r.rows.map(({ name, year, list, rank, rankBasis, course, sourceKey }) => ({ name, year, list, rank, rankSource: rankBasis, course, source: sourceKey })),
       { page: { page, pageSize, total: r.total }, sources: r.sources.map((s) => ({ key: s.key, name: s.name, url: s.url, ...(s.year != null && { year: s.year }) })) },
     );
     res.headers.set("Cache-Control", "private, no-store");

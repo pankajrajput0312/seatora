@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound, permanentRedirect, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
-import { SourceLabel } from "@/components/ui/source-label";
 import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -11,6 +10,7 @@ import { Closing, Dash, HISTORY_CAPTION, PageHead, Provisional, ReachBadge } fro
 import { FeesSection, programmeTitle, termDocs, TermsSummary } from "@/features/decide/components/fees";
 import { ChoiceStar, CompareToggle } from "@/features/decide/components/option-actions";
 import { HideableRow } from "@/features/decide/components/residents/hideable-row";
+import { Rank, ResidentsSources } from "@/features/decide/components/residents-results";
 import { reportedCount, TypeBadge } from "@/features/decide/components/institute/hospital-bits";
 import { allotmentMixAt, clinicalAt, headerLists, hospitalInfo, optionSeats, roundSeatsAt, roundSeatTotals, websiteUrl } from "@/features/decide/components/institute/institute-data";
 import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, HospitalFacts, RoundSeatsHead, SeatNumber } from "@/features/decide/components/institute/institute-parts";
@@ -463,7 +463,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.institute(slug, "courses")} action="See the courses here" />
       )}
       {residentsAccess === "limited" && (
-        <EmptyState title="Too many requests" description="Residents were opened too many times from this network. Try again in an hour." href={L.institute(slug, "courses")} action="See the courses here" />
+        <EmptyState title="Too many requests" description="Residents were opened too many times from this network or account. Try again in an hour, or tomorrow." href={L.institute(slug, "courses")} action="See the courses here" />
       )}
       {tab === "residents" && residents && (
         <section aria-labelledby="res-h" className="grid grid-cols-1 gap-4">
@@ -508,7 +508,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       <caption className="sr-only">Residents in {g.course.degree} {g.course.name} at {college.name}, newest year first</caption>
                       <thead><tr className={tbl.headRow}>
                         <th scope="col" className={tbl.th}>Name</th><th scope="col" className={tbl.th}>Year</th><th scope="col" className={tbl.th}>MCC list</th>
-                        <th scope="col" className={`${tbl.th} text-right`}>2025 AIR</th><th scope="col" className={tbl.th}><span className="sr-only">Hide</span></th>
+                        <th scope="col" className={`${tbl.th} text-right`}>Rank</th><th scope="col" className={tbl.th}><span className="sr-only">Hide</span></th>
                       </tr></thead>
                       {g.years.map((y) => (
                         <tbody key={y.year}>
@@ -518,7 +518,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                               <th scope="row" className={`${tbl.td} text-left font-medium`}>{r.name}</th>
                               <td className={`${tbl.td} numeric`}>{r.year}</td>
                               <td className={tbl.td}>{r.list}</td>
-                              <td className={tbl.num}>{r.rank != null ? formatRank(r.rank) : <Dash />}</td>
+                              <td className={tbl.num}><Rank rank={r.rank} year={r.year} /></td>
                             </HideableRow>
                           ))}
                         </tbody>
@@ -527,14 +527,10 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   </div>
                 </section>
               ))}
-              <p className="text-xs text-muted-foreground">2025 AIR: the All India Rank in NBEMS&apos;s NEET PG 2025 merit list, where known. It is where one person got in, not a closing rank or a prediction. No contact details are held.</p>
+              <p className="text-xs text-muted-foreground">Rank: All India Rank from that year&apos;s NBEMS NEET PG result, where known. It is where one person got in, not a closing rank or a prediction. No contact details are held.</p>
             </>
           )}
-          <div className="grid gap-1">
-            {residents.sources.map((s) => (
-              <SourceLabel key={s.key} provenance={{ sourceName: s.name, sourceUrl: s.url, sourceType: "OFFICIAL", academicYear: `PG counselling ${s.year ?? "—"}` }} />
-            ))}
-          </div>
+          <ResidentsSources rows={residents.rows} sources={residents.sources} />
         </section>
       )}
     </AppPage>

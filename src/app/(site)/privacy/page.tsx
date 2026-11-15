@@ -63,8 +63,8 @@ export default function PrivacyPage() {
             <h2>Residents&apos; names</h2>
             <p className="mt-2">
               Seatora shows the names of residents at each college, with their course, their year and, where NBEMS has published it, their
-              NEET PG All India Rank. The names come from MCC&apos;s official admitted-candidates lists and the ranks from the NBEMS merit
-              list, both public documents. We hold no contact details for anyone on them. Names are shown only to signed-in accounts that
+              NEET PG All India Rank. The names come from MCC&apos;s official admitted-candidates lists and the ranks from that year&apos;s NBEMS
+              NEET PG result, both public documents. We hold no contact details for anyone on them. Names are shown only to signed-in accounts that
               have been given access.
             </p>
             <p className="mt-2">

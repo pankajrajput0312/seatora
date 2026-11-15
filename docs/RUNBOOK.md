@@ -107,7 +107,7 @@ python3 -I tools/check_db.py --bundle data/medpath-r3      # and with the import
 tools/backup_all.sh
 ```
 
-- Always run `export_residents.py`. It is quick. You must run it when a new admitted list arrives or when a build changed a college key. Before running it for a new list, add the list to `LIST_ORDER` and `LIST_LABEL` at the top of `tools/export_residents.py` (later lists win within a year). Ranks only join for 2025 (the Seatora importer refuses other years' ranks), so a new year's residents show no rank.
+- Always run `export_residents.py`. It is quick. You must run it when a new admitted list arrives or when a build changed a college key. Before running it for a new list, add the list to `LISTS` at the top of `tools/export_residents.py` (order, label, last round covered; later lists win within a year). Ranks join from the same year's NBEMS result (2023-2025 today): a new year's result needs its name in `RANK_SOURCES` there and its URL in `data/official_sources.json`, or the export stops (the Seatora importer likewise refuses a rank whose result is not in the manifest's `rank_sources`).
 - If a build retires a published college key (a `same_college` merge or a `separate_as` label in `data/institute_aliases.json`), add `old -> new` to `data/retired_keys.json`. `export_medpath.py` refuses to export otherwise. Judge every merge on evidence: precision over recall.
 - `export_notices.py` keeps a few facts read by hand from notice PDFs (`SCHEDULED`, `SUSPENDED_UNTIL` near the top). When MCC publishes a new or modified schedule, add its dates there. Otherwise Schedule shows the step without dates.
 - To re-parse a PDF MCC replaced under the same name: delete its cache `data/build/rows/<key with / as __>.jsonl` and its rows in `data/build/neetpg.db` (`DELETE FROM allotment WHERE src = '<key>'`, or `admitted`/`merit`), then rerun.
@@ -173,7 +173,7 @@ Add `mcc/<year>/<round>_final.pdf` next to the provisional key and run 1.2 and t
 These are hard-coded today. Each one is a code change, so test it in a `/tmp` copy (`npm run typecheck && npm run lint && npm run test`) before 1.3 b–d:
 - **Reach labels count 2024, 2025 and the latest year's R1 only** (`src/features/decide/lib/reach.ts`: `LATEST_YEAR`, `PAST_YEARS`, `classifyReach`, `reachWindow`). A 2026 R2 result appears automatically in every grid (Rounds by year, Last ranks, Allotments, Rank scan, Rank journey, college pages), but the labels ignore it until this changes. Options' "leave out provisional" toggle also assumes only the latest R1 can be provisional.
 - **The virtual-vacancy guard compares against that year's R1 only** (`check_db.py` section 4, and `export_medpath.py` near "virtual-vacancy rows"). A Round 3 virtual list can hold seats first allotted in Round 2, so widen both guards to every earlier round of the year (the Seatora importer already does this) before importing R3 lists.
-- **A new counselling year (2027):** `LATEST_YEAR`/`PAST_YEARS`/`YEARS` in `reach.ts`, `YEAR` in `export_notices.py`, `MAX_MARKS` in `export_merit_stats.py`, `AIR` in `export_her.py` if her rank changes, and the importer's rank-year rule for residents.
+- **A new counselling year (2027):** `LATEST_YEAR`/`PAST_YEARS`/`YEARS` in `reach.ts`, `YEAR` in `export_notices.py`, `MAX_MARKS` in `export_merit_stats.py`, `AIR` in `export_her.py` if her rank changes, and that year's NBEMS result in `RANK_SOURCES` (`export_residents.py`) for residents' ranks.
 
 ## 2. Restore from a backup
 
