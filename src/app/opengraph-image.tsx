@@ -7,8 +7,8 @@ export const contentType = "image/png";
 // The link preview (Instagram, WhatsApp, X): residents first. The table is a sketch: bars, never real names.
 const row = (w1: number, w2: number, course: string, year: string) => (
   <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "12px 20px", borderTop: "1px solid #232a33" }}>
-    <div style={{ width: w1, height: 16, borderRadius: 8, background: "#3a4552" }} />
-    <div style={{ width: w2, height: 16, borderRadius: 8, background: "#2b343f" }} />
+    <div style={{ width: 220, display: "flex" }}><div style={{ width: w1, height: 16, borderRadius: 8, background: "#3a4552" }} /></div>
+    <div style={{ width: 260, display: "flex" }}><div style={{ width: w2, height: 16, borderRadius: 8, background: "#2b343f" }} /></div>
     <div style={{ flex: 1, display: "flex", fontSize: 22, color: "#a3abb3" }}>{course}</div>
     <div style={{ display: "flex", fontSize: 22, color: "#a3abb3" }}>{year}</div>
   </div>
