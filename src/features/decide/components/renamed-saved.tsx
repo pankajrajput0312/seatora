@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { collegeKeyOf, renameOptionId, renameSaved, type RenamedCollege } from "../lib/choices";
 import { useChoices, useCompare } from "../lib/use-decide-store";
+import { navigating } from "./nav-pending";
 
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 const sha256 = async (s: string) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
@@ -54,6 +55,7 @@ export function RenamedSaved() {
       if (next.some((id, i) => id !== urlIds[i])) {
         const p = new URLSearchParams(sp.toString());
         p.set("ids", [...new Set(next)].join(","));
+        navigating();
         router.replace(`${pathname}?${p}`, { scroll: false });
       }
     })().catch(() => {

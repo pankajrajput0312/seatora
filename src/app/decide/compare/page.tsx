@@ -95,13 +95,16 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           action="Pick options to compare"
         />
       ) : (
-        <div role="region" aria-label="Comparison" tabIndex={0} className={`relative mt-8 rounded-xl border border-border bg-card [scroll-padding-inline-start:11rem] ${tbl.scroll}`}>
+        <>
+        {/* Phones: a narrower label column and 10rem columns, so the next option peeks in at the edge, and this line. */}
+        {options.length > 1 && <p className="mt-6 text-sm text-muted-foreground md:hidden">Swipe the table sideways for all {options.length} options; the labels stay put.</p>}
+        <div role="region" aria-label="Comparison" tabIndex={0} className={`relative mt-3 md:mt-8 rounded-xl border border-border bg-card [scroll-padding-inline-start:11rem] ${tbl.scroll}`}>
           {/* Fixed columns, 12rem at least: four options fit beside the labels from 1280px (a wide grid scrolls in its cell). */}
-          <table className="w-full table-fixed text-sm" style={{ minWidth: `${11 + options.length * 12}rem` }}>
+          <table className="w-full min-w-[calc(7rem+var(--n)*10rem)] table-fixed text-sm md:min-w-[calc(11rem+var(--n)*12rem)]" style={{ "--n": options.length } as React.CSSProperties}>
             <caption className="sr-only">Comparison of {options.length} {options.length === 1 ? "option" : "options"}</caption>
             <thead className={tbl.head}>
               <tr className="align-top">
-                <td className="sticky left-0 z-10 w-44 bg-card p-3" />
+                <td className="sticky left-0 z-10 w-28 bg-card p-3 md:w-44" />
                 {options.map((r, i) => (
                   <th key={r.id} id={`col-${r.id}`} tabIndex={-1} scope="col" className="p-3 text-left font-medium">
                     <div className="flex items-start justify-between gap-2">
@@ -126,6 +129,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             </tbody>
           </table>
         </div>
+        </>
       )}
       <div className="mt-6 grid gap-2 text-xs text-muted-foreground">
         <HistoryNote

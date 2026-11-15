@@ -1,4 +1,4 @@
-import { Slot } from "radix-ui";
+import * as Slot from "radix-ui/slot"; // subpath: the "radix-ui" barrel in a server component ships every primitive to the client
 import { cn } from "@/lib/cn";
 
 const variants = {

@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCompare } from "../lib/use-decide-store";
+import { navigating } from "./nav-pending";
 
 /** Without ?ids=, load the compare tray from this device into the URL; drop ids that no longer exist. */
 export function CompareFromDevice({ validIds, requested }: { validIds: string[]; requested: string[] }) {
@@ -20,6 +21,7 @@ export function CompareFromDevice({ validIds, requested }: { validIds: string[];
     if (!sp.get("ids") && ids.length) {
       const p = new URLSearchParams(sp.toString());
       p.set("ids", ids.join(","));
+      navigating();
       router.replace(`${pathname}?${p}`);
     }
   }, [ids, sp, router, pathname]);
@@ -56,6 +58,7 @@ export function RemoveFromCompare({ id, label, nextFocus }: { id: string; label:
         p.delete("ids");
         if (rest.length) p.set("ids", rest.join(","));
         inFlight = { from: current, to: p.toString() };
+        navigating();
         router.replace(`${pathname}?${p}`, { scroll: false });
         const next = [nextFocus, ...rest].filter((i) => i && rest.includes(i)).map((i) => document.getElementById(`col-${i}`)).find(Boolean);
         (next ?? document.getElementById("main-h1"))?.focus();

@@ -20,7 +20,7 @@ export default function ContactPage() {
     phone && { label: "Phone", value: <a href={`tel:${phone.replace(/\s/g, "")}`} className={link}>{phone}</a> },
   ].filter((r) => !!r);
   return (
-    <Container className="py-20 md:py-28">
+    <Container className="py-10 md:py-28">
       <article className="max-w-prose">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Contact</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Contact Us</h1>

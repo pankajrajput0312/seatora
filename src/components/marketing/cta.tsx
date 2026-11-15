@@ -17,10 +17,10 @@ export function Cta() {
             Seatora NEET PG 2026 Season Pass: <FreePrice className="font-semibold text-foreground" /> for the whole 2026 counselling season. Create a free account and access is switched on immediately.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="w-full sm:w-auto">
               <Link href="/signup">Create free account</Link>
             </Button>
-            <Button asChild size="lg" variant="ghost">
+            <Button asChild size="lg" variant="ghost" className="w-full sm:w-auto">
               <Link href="/login">Sign in</Link>
             </Button>
           </div>

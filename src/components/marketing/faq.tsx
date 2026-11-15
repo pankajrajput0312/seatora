@@ -37,12 +37,12 @@ export function Faq() {
         <SectionHeading eyebrow="FAQ" title="Questions aspirants ask us." />
         <div className="divide-y divide-border border-y border-border">
           {faqs.map((f) => (
-            <details key={f.q} className="group py-5">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-medium [&::-webkit-details-marker]:hidden">
+            <details key={f.q} className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-base font-medium [&::-webkit-details-marker]:hidden">
                 {f.q}
                 <Plus className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-45" strokeWidth={1.75} aria-hidden />
               </summary>
-              <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted-foreground">{f.a}</p>
+              <p className="-mt-2 max-w-prose pb-5 text-sm leading-relaxed text-muted-foreground">{f.a}</p>
             </details>
           ))}
         </div>

@@ -13,7 +13,7 @@ export default function ShippingPolicyPage() {
   const { email } = business;
   const mail = email && <a href={`mailto:${email}`} className="text-sky underline">{email}</a>;
   return (
-    <Container className="py-20 md:py-28">
+    <Container className="py-10 md:py-28">
       <article className="max-w-prose">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Legal</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Shipping &amp; Delivery Policy</h1>

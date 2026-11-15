@@ -17,6 +17,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { MAX_COMPARE } from "../lib/choices";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
+import { NAV_EVENT, navigating } from "./nav-pending";
 import { ProfileDialog, type ProfileMeta } from "./profile-dialog";
 import { RenamedSaved } from "./renamed-saved";
 
@@ -82,8 +83,13 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
     next.delete("editProfile");
     if (wantsEdit) setEditing(true);
     const saved = profile && profileToParams(profile, next);
-    if (saved && !profileSchema.safeParse(profileInput(next)).success && `${saved}` !== `${next}`) router.replace(`${pathname}?${saved}`, { scroll: false });
-    else if (wantsEdit) router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
+    if (saved && !profileSchema.safeParse(profileInput(next)).success && `${saved}` !== `${next}`) {
+      navigating();
+      router.replace(`${pathname}?${saved}`, { scroll: false });
+    } else if (wantsEdit) {
+      navigating();
+      router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
+    }
   }, [hydrated, profile, sp, pathname, router]);
 
   const save = (p: Profile) => {
@@ -91,10 +97,12 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
     // First run: on to Options, which opens on the current round's seats in her courses (service.ts optionsView).
     if (!shown) {
       landing.current = "/decide/options";
+      navigating();
       return router.push(`/decide/options?${profileToParams(p)}`);
     }
     const next = profileToParams(p, new URLSearchParams(sp.toString()));
     next.delete("editProfile");
+    if (`${next}` !== `${sp}`) navigating();
     router.replace(`${pathname}?${next}`, { scroll: false });
   };
 
@@ -112,6 +120,33 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
     };
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
+  }, []);
+
+  // React (19.2 canary in Next 15.5) sometimes loses the ping of a same-route navigation's data (new search params under
+  // a loading.tsx): the transition never commits until something else updates. Any update retries it, so while a
+  // navigation is pending the shell re-renders now and then (backing off); cleared when the address changes.
+  // ponytail: drop once upstream is fixed (check: Options, a reach chip or Next page, with this effect removed).
+  const [kick, setKick] = useState(0); // a router.refresh() to keep moving (no address change, so no dimming)
+  const [, nudge] = useState(0);
+  useEffect(() => {
+    if (!loading && !kick) return;
+    let ms = 300;
+    let t: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      nudge((n) => n + 1);
+      if (ms < 10_000) t = setTimeout(tick, (ms *= 2)); // 6 nudges over ~19 s
+    };
+    t = setTimeout(tick, ms);
+    const give = setTimeout(() => setLoading(false), 15_000); // never dimmed for good (a navigation that went nowhere)
+    return () => {
+      clearTimeout(t);
+      clearTimeout(give);
+    };
+  }, [loading, kick]);
+  useEffect(() => {
+    const on = (e: Event) => ((e as CustomEvent<{ refresh?: boolean }>).detail?.refresh ? setKick((k) => k + 1) : setLoading(true));
+    window.addEventListener(NAV_EVENT, on);
+    return () => window.removeEventListener(NAV_EVENT, on);
   }, []);
 
   const isCurrent = (href: string) => (href === "/decide" ? pathname === href : pathname.startsWith(href));
@@ -179,7 +214,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
           <Button data-profile-edit variant="secondary" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
         </div>
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
-        <div aria-busy={loading || undefined} className={cn("isolate pb-24 transition-opacity md:pb-0", loading && "opacity-60")}>
+        <div aria-busy={loading || undefined} className={cn("isolate pb-[calc(6rem+env(safe-area-inset-bottom))] transition-opacity md:pb-0", loading && "opacity-60")}>
           <RenamedSaved />
           {children}
         </div>
@@ -188,7 +223,7 @@ export function DecideShell({ meta, children }: { meta: ProfileMeta; children: R
       <div aria-hidden className={cn("fixed inset-x-0 top-0 z-50 h-0.5 bg-mark", loading ? "animate-pulse" : "hidden")} />
       <p role="status" className="sr-only">{loading ? "Loading the page…" : ""}</p>
 
-      <nav aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-background md:hidden">
+      <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {[...bottom, compare.length ? { href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows } : { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch }].map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 border-t-2 text-xs", isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <Icon className="size-5" strokeWidth={1.75} aria-hidden />

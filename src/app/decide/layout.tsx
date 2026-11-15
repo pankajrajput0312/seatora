@@ -23,7 +23,7 @@ const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-a
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: { default: "Decide", template: "%s · Decide · Seatora" } };
-export const viewport: Viewport = { themeColor: "#f3f6f9" }; // chart paper (--color-background inside .app)
+export const viewport: Viewport = { themeColor: "#f3f6f9", viewportFit: "cover" }; // chart paper (--color-background inside .app)
 
 export default async function DecideLayout({ children }: { children: React.ReactNode }) {
   // No database (or it is down): an honest "Data unavailable" inside the app shell, never stand-in data.

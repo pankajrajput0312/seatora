@@ -184,7 +184,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         {f.view && <input type="hidden" name="view" value={f.view} />}
         <ViewField />
         <Fragment key={params.toString()}>
-          <label className="min-w-56 flex-1">
+          <label className="min-w-0 flex-1 basis-32 md:min-w-56">
             <span className="sr-only">Search institute, state or course</span>
             <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Search" className={control} />
           </label>
@@ -227,7 +227,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       </FilterForm>
       <ActiveFilters items={active} clear={clearAll} />
 
-      <nav aria-label="Filter by reach" className="flex flex-wrap gap-2">
+      <nav aria-label="Filter by reach" className="chip-row flex flex-wrap gap-2">
         <Link href={here({ reach: null })} aria-current={!f.reach ? "true" : undefined} className={chip(!f.reach)}>
           All <span className="numeric font-semibold">{formatRank(all)}</span><span className="sr-only"> options</span>
         </Link>

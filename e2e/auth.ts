@@ -62,5 +62,16 @@ export const test = base.extend<object, { signedIn: State | undefined }>({
     { scope: "worker" },
   ],
   storageState: ({ signedIn }, provide) => provide(signedIn),
+  // A Decide page streams in after its loading.tsx skeleton; React reveals the streamed copy (a hidden div after the
+  // shell) a frame or more after "load", and strict locators see both copies until then. goto returns once it is in.
+  page: async ({ page }, provide) => {
+    const goto = page.goto.bind(page);
+    page.goto = async (...a: Parameters<typeof goto>) => {
+      const res = await goto(...a);
+      await page.waitForFunction(() => !document.querySelector('div[hidden][id^="S:"]'));
+      return res;
+    };
+    await provide(page);
+  },
 });
 export { expect };
