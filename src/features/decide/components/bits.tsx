@@ -1,17 +1,39 @@
 import { History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatRank } from "@/features/cutoffs/lib/format";
+import { cn } from "@/lib/cn";
 import { LATEST_YEAR, PAST_YEARS, reachLabel, reachTone, type Deepest, type Reach } from "../lib/reach";
 import { roundLabel, type Term } from "../types";
+import { InfoTip } from "./info-tip";
+import { SourceRef } from "./page-sources";
 
 export const HISTORY_CAPTION =
   "Based on previous years' closing ranks. History, not a prediction — seat matrix, category and competition change every round.";
 
-/** Page title. The h1 takes focus (id main-h1) when the content it heads is removed, e.g. the last Compare column. */
-export function PageHead({ title, children }: { title: string; children?: React.ReactNode }) {
+/**
+ * HISTORY_CAPTION as one short line, the rest behind an (i). `more`: the block's own caveat, added in the tip (phrasing
+ * content). Every block of past closing ranks keeps the short line visible (docs/DATA_INTEGRITY.md, rule 3).
+ */
+export function HistoryNote({ more, className }: { more?: React.ReactNode; className?: string }) {
+  return (
+    <p className={cn("flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground", className)}>
+      Previous years&apos; closing ranks: history, not a prediction.
+      <InfoTip label="previous years' closing ranks">{HISTORY_CAPTION}{more && <> {more}</>}</InfoTip>
+    </p>
+  );
+}
+
+/**
+ * Page title. The h1 takes focus (id main-h1) when the content it heads is removed, e.g. the last Compare column.
+ * `children`: one short intro line. `about`: the longer explanation, behind an (i) beside the title (phrasing content).
+ */
+export function PageHead({ title, children, about }: { title: string; children?: React.ReactNode; about?: React.ReactNode }) {
   return (
     <div className="max-w-3xl">
-      <h1 id="main-h1" tabIndex={-1} className="text-3xl font-bold tracking-tight md:text-[2.25rem]">{title}</h1>
+      <div className="flex items-center gap-2">
+        <h1 id="main-h1" tabIndex={-1} className="text-3xl font-bold tracking-tight md:text-[2.25rem]">{title}</h1>
+        {about && <InfoTip label={title}>{about}</InfoTip>}
+      </div>
       {children && <p className="mt-2 text-base leading-relaxed text-muted-foreground">{children}</p>}
     </div>
   );
@@ -58,21 +80,14 @@ export function Dash() {
 
 /**
  * A fee, stipend, bond or seat-leaving penalty exactly as published (amounts with a qualifier such as "at least" or
- * "yr 1/2/3" stay in their words), with a link to the document it came from; "—" when not listed.
+ * "yr 1/2/3" stay in their words), with its numbered source (the page's Sources footer); "—" when not listed.
  */
 export function TermText({ term }: { term: Pick<Term, "text" | "source"> | null | undefined }) {
   if (!term) return <Dash />;
-  const { name, url } = term.source;
   return (
     <span>
-      {term.text}{" "}
-      <span className="text-xs font-normal text-muted-foreground">
-        {url ? (
-          <a href={url} target="_blank" rel="noopener noreferrer" title={name} aria-label={`Source: ${name} (opens in a new tab)`} className="underline hover:text-sky">source</a>
-        ) : (
-          `(${name})`
-        )}
-      </span>
+      {term.text}
+      <SourceRef doc={term.source} />
     </span>
   );
 }

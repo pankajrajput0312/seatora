@@ -5,6 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { roundLabel, type Round } from "../types";
+import { InfoTip } from "./info-tip";
 
 // Charts follow the dataviz skill: emphasis form (one accent + gray context), thin marks, hairline solid grid,
 // hover tooltips, legend for 2+ series, and a table view for every chart. Text never wears the data colour.
@@ -29,15 +30,19 @@ function Tooltip({ tip, setTip }: { tip: Tip; setTip: (t: Tip) => void }) {
   );
 }
 
-export function ChartCard({ title, subtitle, legend, table, children, className, source }: { title: string; subtitle?: string; legend?: React.ReactNode; table: React.ReactNode; children: React.ReactNode; className?: string; source?: React.ReactNode }) {
+/**
+ * A chart with its "Show as table" view. `subtitle`: how to read it, behind an (i) beside the title (the chart's words
+ * stay one click away, not a paragraph over it). `source`: one short line under it, e.g. DataSource ("Sources 1, 2").
+ */
+export function ChartCard({ title, subtitle, legend, table, children, className, source }: { title: string; subtitle?: React.ReactNode; legend?: React.ReactNode; table: React.ReactNode; children: React.ReactNode; className?: string; source?: React.ReactNode }) {
   const [asTable, setAsTable] = useState(false);
   const id = useId();
   return (
     <figure aria-labelledby={id} className={cn("m-0 rounded-xl border border-border bg-card p-5", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="flex items-center gap-1.5">
           <h2 id={id} className="text-base font-medium">{title}</h2>
-          {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+          {subtitle && <InfoTip label={title}>{subtitle}</InfoTip>}
         </div>
         {/* The label says what it does, so no aria-pressed (a pressed "Show chart" contradicts itself). */}
         <button type="button" onClick={() => setAsTable((v) => !v)} className="min-h-11 rounded-md px-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">

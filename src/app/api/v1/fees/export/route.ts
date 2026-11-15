@@ -2,6 +2,7 @@ import { siteConfig } from "@/config/site";
 import { handle } from "@/features/decide/api";
 import { feeDefaults, feesCsv, feesFilters, feesParamsSchema } from "@/features/decide/components/fees-view";
 import { parseSearchParams } from "@/features/decide/lib/params";
+import { termFilterLists } from "@/features/decide/lib/term-filters";
 import { profileFromParams } from "@/features/decide/profile";
 import { getDecideData, listFees } from "@/features/decide/service";
 
@@ -12,7 +13,7 @@ import { getDecideData, listFees } from "@/features/decide/service";
 export async function GET(req: Request) {
   return handle(async () => {
     const p = new URL(req.url).searchParams;
-    const f = parseSearchParams(feesParamsSchema, p);
+    const f = parseSearchParams(feesParamsSchema, p, termFilterLists);
     const { courses } = await getDecideData();
     const { rows } = await listFees(feesFilters(f, feeDefaults(profileFromParams(p), courses)));
     const notes = [

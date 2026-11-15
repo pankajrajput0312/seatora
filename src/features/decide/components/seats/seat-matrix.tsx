@@ -13,30 +13,35 @@ import { fmtDay, listDay } from "../../lib/format";
 import { useLocal } from "../../lib/local-store";
 import { LATEST_YEAR, PAST_YEARS, reachWindow } from "../../lib/reach";
 import { useDecideLinks } from "../../lib/use-decide-store";
+import { statKeys, statLabel } from "../../lib/stat-format";
 import { openQuotas, roundLabel, seatKindLabel, type Round, type SeatList, type Source } from "../../types";
 import { Dash, HISTORY_CAPTION, Provisional, ReachBadge } from "../bits";
-import { TermSources, TermsSummary } from "../fees";
-import { reportedCount, SELF_REPORTED, TypeBadge, ValueSource } from "../institute/hospital-bits";
+import { programmeTitle, TermSources } from "../fees";
+import { Beds } from "../pages/beds";
+import { reportedCount, SELF_REPORTED, ValueSource } from "../institute/hospital-bits";
+import { TermStatCells } from "../stat-cells";
+import { TypeBadge as TypeChip } from "../type-badge";
 import { smallLink, tbl } from "../ui";
+import { paneClass, useView, ViewPanes } from "../view-toggle";
 import type { PastClosing, SeatLine, SeatSort } from "./find-seats";
+import { SeatCards, seatCourse as courseOf, seatRowKey as rowKey } from "./seat-cards";
 
 // The Seats page's matrix view (src/app/decide/seats): one row per institute, course, quota and seat category, its
-// seats in each round's lists (never added together), its course's terms (TermsSummary: the course's own programme, and
-// its own bond figure where the record prices bonds by subject), her label and every closing rank on the row's own quota
-// and seat category. Display (columns shown) is saved on the device; a row opens its details with every source.
+// seats in each round's lists (never added together), its course's terms (TermStatCells: the course's own programme
+// and quota, and its own bond figure where the record prices bonds by subject), her label and every closing rank on the
+// row's own quota and seat category; as cards (SeatCards) or the table. Display (the table's columns) is saved on the
+// device; a row or card opens its details with every source.
 
 /** One round's seat columns: its clear and virtual vacancy lists, and its newly added list(s), shown as a badge. */
 export type SeatGroup = { key: string; label: string; clear: SeatList | null; virtual: SeatList | null; added: SeatList[] };
 /** Closing-rank columns: one group per year, newest first. */
 export type ClosingYear = { year: number; rounds: Round[] };
 /** What the matrix reads of a seat row (the page leaves out the rest: the published terms are most of a row's bytes). */
-export type MatrixRow = Omit<SeatLine, "terms" | "rounds" | "deepest" | "list" | "seats" | "cs">;
+export type MatrixRow = Omit<SeatLine, "terms" | "rounds" | "list" | "seats" | "cs">;
 
 const DISPLAY_KEY = "medpath.seatMatrix.hidden";
-/** Hidden until she picks them in Display: both are in every row's details too. */
-const DEFAULT_HIDDEN = ["type", "beds"];
-const rowKey = (r: MatrixRow) => [r.college.key, r.degree, r.specialty, r.quota, r.category].join("|");
-const courseOf = (r: MatrixRow) => `${r.degree} ${r.course?.name ?? r.specialty}`;
+/** Hidden until she picks it in Display: it is in every row's details and card too. */
+const DEFAULT_HIDDEN = ["beds"];
 const listName = (l: SeatList) => `${l.year} ${roundLabel[l.round]} ${seatKindLabel[l.kind].toLowerCase()}`;
 const at = (r: MatrixRow, year: number, round: Round) => r.closings.find((c) => c.year === year && c.round === round);
 
@@ -68,16 +73,6 @@ function AddedBadges({ r, added }: { r: MatrixRow; added: SeatList[] }) {
   });
 }
 
-/** A Beds cell: the count as the source prints it ("270+"), marked where the source prints conflicting figures. */
-function Beds({ b }: { b: NonNullable<NonNullable<SeatLine["hospital"]>["beds"]> }) {
-  const c = reportedCount(b);
-  return (
-    <span title={`As reported${b.kind ? `: ${b.kind}` : ""}. ${SELF_REPORTED}.`}>
-      {c.text}
-      {c.conflicting && <span className="block text-xs font-normal text-sun">conflicting</span>}
-    </span>
-  );
-}
 
 /**
  * The hidden columns of a table, saved on the device under `key`: `defaults` (a stable array) until she picks, and
@@ -132,9 +127,10 @@ export function DisplayMenu({ cols, hidden, setHidden, always = "The institute c
 
 /**
  * The matrix. `groups`: seat columns per round (newest first); `years`: closing-rank columns; `results`: the MCC result
- * PDFs behind them; `ranked`: she has a rank (the "Your chances" column). Rows are one page, in the server's order.
+ * PDFs behind them; `ranked`: she has a rank (the "Your chances" column). `list` / `lists`: the picked list and every list
+ * shown (its round's, or all with All rounds: the cards' numbers). Rows are one page, in the server's order.
  */
-export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption }: {
+export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption, list, lists }: {
   rows: MatrixRow[];
   groups: SeatGroup[];
   years: ClosingYear[];
@@ -142,22 +138,23 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   ranked: boolean;
   sort: SeatSort;
   caption: string;
+  list: SeatList;
+  lists: SeatList[];
 }) {
   const L = useDecideLinks();
-  const typed = rows.some((r) => r.hospital?.type);
+  const view = useView("seats");
   const cols = useMemo(
     () => [
-      ...(typed ? [{ key: "type", label: "Type (inferred)" }] : []),
       { key: "course", label: "Course" },
       { key: "quota", label: "Quota" },
       { key: "category", label: "Category" },
+      ...statKeys.map((k) => ({ key: k, label: statLabel[k] })),
       ...groups.map((g) => ({ key: g.key, label: `${g.label} seats` })),
-      { key: "terms", label: "Fee, stipend, bond and leaving penalty" },
       { key: "beds", label: "Beds (as reported)" },
       ...(ranked ? [{ key: "chances", label: "Your chances" }] : []),
       ...years.map((y) => ({ key: `closing-${y.year}`, label: `Closing ranks ${y.year}` })),
     ],
-    [typed, groups, ranked, years],
+    [groups, ranked, years],
   );
   const [hidden, save] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   const [open, setOpen] = useState<string | null>(null);
@@ -168,7 +165,8 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
     opened.current = k;
     setOpen(k);
   };
-  const refocus = () => [...document.querySelectorAll<HTMLElement>("#seat-matrix [data-row]")].find((b) => b.dataset.row === opened.current)?.focus();
+  // Its button in the pane shown (the hidden pane's can't take focus).
+  const refocus = () => [...document.querySelectorAll<HTMLElement>("[data-seat-rows] [data-row]")].find((b) => b.dataset.row === opened.current && b.checkVisibility())?.focus();
 
   const th = cn(tbl.th, "px-3 align-bottom");
   const td = "px-3 py-2 align-top";
@@ -178,116 +176,120 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   const firstClear = groups[0]?.clear?.key;
 
   return (
-    <div className="grid gap-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">Scroll sideways for every round. Select a row, or its Details button, for every number and its source.</p>
+    // grid-cols-1, not a bare grid: an auto track would grow to the table's width and the table box would not scroll.
+    <div data-seat-rows className="grid grid-cols-1 gap-2">
+      <div className={cn("justify-self-end", paneClass(view, "table"))}>
         <DisplayMenu cols={cols} hidden={hidden} setHidden={save} />
       </div>
       {/* Hiding is CSS on data-col, so a header group and its cells go together (keys are the known columns only). */}
       <style>{[...hidden].map((k) => `#seat-matrix [data-col="${k}"]{display:none}`).join("")}</style>
-      <div id="seat-matrix" role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, tbl.scroll, "scroll-pl-44 md:scroll-pl-68")}>
-        <table className={tbl.table}>
-          <caption className="sr-only">{caption}</caption>
-          <thead className={tbl.head}>
-            <tr className="text-left">
-              <th rowSpan={2} scope="col" className={cn(th, sticky)} aria-sort={sorted("college", "ascending")}>Institute</th>
-              {typed && (
-                <th rowSpan={2} scope="col" data-col="type" className={th} title="Inferred from name and quota (a few from Seatora's research on the hospital), not an official field">
-                  Type<span className="block font-normal">inferred</span>
-                </th>
-              )}
-              <th rowSpan={2} scope="col" data-col="course" className={cn(th, "min-w-40")}>Course</th>
-              <th rowSpan={2} scope="col" data-col="quota" className={th}>Quota</th>
-              <th rowSpan={2} scope="col" data-col="category" className={th}>Category</th>
-              {groups.map((g) => (
-                <th key={g.key} colSpan={2} scope="colgroup" data-col={g.key} className={cn(th, "border-l border-border text-center")}>{g.label} seats</th>
-              ))}
-              <th rowSpan={2} scope="col" data-col="terms" className={cn(th, "min-w-72")} aria-sort={sort === "fee" || sort === "bond" ? "ascending" : undefined}>Fee, stipend, bond and leaving penalty</th>
-              <th rowSpan={2} scope="col" data-col="beds" className={cn(th, "text-right")} title={SELF_REPORTED}>
-                Beds<span className="block font-normal">as reported</span>
-              </th>
-              {ranked && <th rowSpan={2} scope="col" data-col="chances" className={cn(th, "min-w-40")} aria-sort={sorted("reach", "ascending")}>Your chances</th>}
-              {years.map((y) => (
-                <th key={y.year} colSpan={y.rounds.length} scope="colgroup" data-col={`closing-${y.year}`} className={cn(th, "border-l border-border text-center")}>Closing rank {y.year}</th>
-              ))}
-            </tr>
-            <tr className="text-left">
-              {groups.map((g) => (
-                <Fragment key={g.key}>
-                  <th scope="col" data-col={g.key} className={cn(th, "border-l border-border text-right")} aria-sort={g.clear?.key === firstClear ? sorted("seats", "descending") : undefined}><span className="sr-only">{g.label} </span>Clear</th>
-                  <th scope="col" data-col={g.key} className={cn(th, "text-right")}><span className="sr-only">{g.label} </span>Virtual</th>
-                </Fragment>
-              ))}
-              {years.map((y) =>
-                y.rounds.map((rd, i) => (
-                  <th key={`${y.year}-${rd}`} scope="col" data-col={`closing-${y.year}`} className={cn(th, "text-right whitespace-nowrap", i === 0 && "border-l border-border")}>
-                    <span className="sr-only">{y.year} </span>{roundLabel[rd]}
+      <ViewPanes
+        page="seats"
+        cards={<SeatCards rows={rows} list={list} lists={lists} ranked={ranked} L={L} title={caption} onDetails={show} />}
+        table={
+          <div id="seat-matrix" role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, tbl.scroll, "scroll-pl-44 md:scroll-pl-68")}>
+            <table className={tbl.table}>
+              <caption className="sr-only">{caption}</caption>
+              <thead className={tbl.head}>
+                <tr className="text-left">
+                  <th rowSpan={2} scope="col" className={cn(th, sticky)} aria-sort={sorted("college", "ascending")}>Institute</th>
+                  <th rowSpan={2} scope="col" data-col="course" className={cn(th, "min-w-40")}>Course</th>
+                  <th rowSpan={2} scope="col" data-col="quota" className={th}>Quota</th>
+                  <th rowSpan={2} scope="col" data-col="category" className={th}>Category</th>
+                  {/* The course's terms right after the course (as on Options): in view without scrolling sideways. */}
+                  {statKeys.map((k) => (
+                    <th key={k} rowSpan={2} scope="col" data-col={k} className={cn(th, "text-right")} aria-sort={(sort === "fee" && k === "fee") || (sort === "bond" && k === "bond") ? "ascending" : undefined}>{statLabel[k]}</th>
+                  ))}
+                  {groups.map((g) => (
+                    <th key={g.key} colSpan={2} scope="colgroup" data-col={g.key} className={cn(th, "border-l border-border text-center")}>{g.label} seats</th>
+                  ))}
+                  <th rowSpan={2} scope="col" data-col="beds" className={cn(th, "text-right")} title={SELF_REPORTED}>
+                    Beds<span className="block font-normal">as reported</span>
                   </th>
-                )),
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const k = rowKey(r);
-              // The row header names the institute already; the button adds what tells its rows apart.
-              const name = `${courseOf(r)}, ${r.quota ?? "quota not printed"}, ${r.category} seats`;
-              return (
-                <tr
-                  key={k}
-                  className={cn(tbl.row, "cursor-pointer")}
-                  onClick={(e) => {
-                    if (!(e.target as Element).closest("a, button, summary, input")) show(k);
-                  }}
-                >
-                  <th scope="row" className={cn(td, sticky, "text-left font-normal")}>
-                    <Link href={L.institute(r.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{r.college.name}</Link>
-                    {/* State and Details share a line (the whole row opens the details too, so the button can be the small one). */}
-                    <span className="flex flex-wrap items-center gap-x-1">
-                      <span className="text-xs text-muted-foreground">{r.college.state ?? "State not listed"}</span>
-                      <Button type="button" variant="ghost" size="sm" className="-ml-1 px-2 text-sky" data-row={k} onClick={() => show(k)} aria-haspopup="dialog">
-                        Details<span className="sr-only">: {name}</span>
-                      </Button>
-                    </span>
-                  </th>
-                  {typed && <td data-col="type" className={td}>{r.hospital?.type ? <TypeBadge type={r.hospital.type} /> : <Dash />}</td>}
-                  <td data-col="course" className={td}>{courseOf(r)}</td>
-                  <td data-col="quota" className={td}>
-                    {r.quota ?? "Not printed"}
-                    {r.quota != null && !openQuotas.includes(r.quota) && <Badge tone="warning" className="mt-1">Restricted</Badge>}
-                  </td>
-                  <td data-col="category" className={cn(td, "whitespace-nowrap")}>{r.category}</td>
+                  {ranked && <th rowSpan={2} scope="col" data-col="chances" className={cn(th, "min-w-40")} aria-sort={sorted("reach", "ascending")}>Your chances</th>}
+                  {years.map((y) => (
+                    <th key={y.year} colSpan={y.rounds.length} scope="colgroup" data-col={`closing-${y.year}`} className={cn(th, "border-l border-border text-center")}>Closing rank {y.year}</th>
+                  ))}
+                </tr>
+                <tr className="text-left">
                   {groups.map((g) => (
                     <Fragment key={g.key}>
-                      <td data-col={g.key} className={cn(num, "border-l border-border")}>
-                        {g.clear && r.byList[g.clear.key] != null ? <span className="font-semibold">{formatRank(r.byList[g.clear.key])}</span> : <Dash />}
-                        <AddedBadges r={r} added={g.added} />
-                      </td>
-                      <td data-col={g.key} className={num}>{g.virtual && r.byList[g.virtual.key] != null ? <span className="font-semibold">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>
+                      <th scope="col" data-col={g.key} className={cn(th, "border-l border-border text-right")} aria-sort={g.clear?.key === firstClear ? sorted("seats", "descending") : undefined}><span className="sr-only">{g.label} </span>Clear</th>
+                      <th scope="col" data-col={g.key} className={cn(th, "text-right")}><span className="sr-only">{g.label} </span>Virtual</th>
                     </Fragment>
                   ))}
-                  <td data-col="terms" className={td}><TermsSummary t={r.fees} className="text-xs" /></td>
-                  <td data-col="beds" className={num}>
-                    {r.hospital?.beds ? <Beds b={r.hospital.beds} /> : <Dash />}
-                  </td>
-                  {ranked && (
-                    <td data-col="chances" className={td}>
-                      {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : <span className="text-xs text-muted-foreground">{r.noLabel}</span>}
-                    </td>
-                  )}
                   {years.map((y) =>
                     y.rounds.map((rd, i) => (
-                      <td key={`${y.year}-${rd}`} data-col={`closing-${y.year}`} className={cn(num, i === 0 && "border-l border-border")}>
-                        <ClosingValue c={at(r, y.year, rd)} />
-                      </td>
+                      <th key={`${y.year}-${rd}`} scope="col" data-col={`closing-${y.year}`} className={cn(th, "text-right whitespace-nowrap", i === 0 && "border-l border-border")}>
+                        <span className="sr-only">{y.year} </span>{roundLabel[rd]}
+                      </th>
                     )),
                   )}
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const k = rowKey(r);
+                  // The row header names the institute already; the button adds what tells its rows apart.
+                  const name = `${courseOf(r)}, ${r.quota ?? "quota not printed"}, ${r.category} seats`;
+                  return (
+                    <tr
+                      key={k}
+                      className={cn(tbl.row, "cursor-pointer")}
+                      onClick={(e) => {
+                        if (!(e.target as Element).closest("a, button, summary, input")) show(k);
+                      }}
+                    >
+                      <th scope="row" className={cn(td, sticky, "text-left font-normal")}>
+                        <Link href={L.institute(r.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{r.college.name}</Link>
+                        {/* State, type and Details share a line (the whole row opens the details too, so the button can be the small one). */}
+                        <span className="flex flex-wrap items-center gap-x-1.5">
+                          <span className="text-xs text-muted-foreground">{r.college.state ?? "State not listed"}</span>
+                          {r.hospital?.type && <TypeChip type={r.hospital.type} of={r.college.name} />}
+                          <Button type="button" variant="ghost" size="sm" className="-ml-1 px-2 text-sky" data-row={k} onClick={() => show(k)} aria-haspopup="dialog">
+                            Details<span className="sr-only">: {name}</span>
+                          </Button>
+                        </span>
+                      </th>
+                      <td data-col="course" className={td}>{courseOf(r)}</td>
+                      <td data-col="quota" className={td}>
+                        {r.quota ?? "Not printed"}
+                        {r.quota != null && !openQuotas.includes(r.quota) && <Badge tone="warning" className="mt-1">Restricted</Badge>}
+                      </td>
+                      <td data-col="category" className={cn(td, "whitespace-nowrap")}>{r.category}</td>
+                      <TermStatCells t={r.fees} variant="table" short of={`${r.college.name}, ${name}`} />
+                      {groups.map((g) => (
+                        <Fragment key={g.key}>
+                          <td data-col={g.key} className={cn(num, "border-l border-border")}>
+                            {g.clear && r.byList[g.clear.key] != null ? <span className="font-semibold">{formatRank(r.byList[g.clear.key])}</span> : <Dash />}
+                            <AddedBadges r={r} added={g.added} />
+                          </td>
+                          <td data-col={g.key} className={num}>{g.virtual && r.byList[g.virtual.key] != null ? <span className="font-semibold">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>
+                        </Fragment>
+                      ))}
+                      <td data-col="beds" className={num}>
+                        {r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} /> : <Dash />}
+                      </td>
+                      {ranked && (
+                        <td data-col="chances" className={td}>
+                          {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : <span className="text-xs text-muted-foreground">{r.noLabel}</span>}
+                        </td>
+                      )}
+                      {years.map((y) =>
+                        y.rounds.map((rd, i) => (
+                          <td key={`${y.year}-${rd}`} data-col={`closing-${y.year}`} className={cn(num, i === 0 && "border-l border-border")}>
+                            <ClosingValue c={at(r, y.year, rd)} />
+                          </td>
+                        )),
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        }
+      />
       <RowDetails row={row} groups={groups} years={years} results={results} ranked={ranked} onClose={() => setOpen(null)} refocus={refocus} />
     </div>
   );
@@ -390,8 +392,9 @@ function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }
               )}
 
               <section aria-labelledby="row-terms" className="grid gap-2">
-                <h3 id="row-terms" className="font-semibold">Fee, stipend, bond and leaving penalty</h3>
-                <TermsSummary t={r.fees} programme />
+                <h3 id="row-terms" className="font-semibold">Fee, stipend, bond and leaving penalty: {programmeTitle(r.fees)}</h3>
+                {/* The row's own cells, so the drawer never reads differently from it. */}
+                <TermStatCells t={r.fees} of={`${r.college.name}, ${courseOf(r)}, ${r.quota}`} className="rounded-lg border border-border" />
                 <p className="text-xs text-muted-foreground">Year by year, with each figure&apos;s source and the bond&apos;s exact words: the institute&apos;s Fees &amp; bond tab.</p>
                 <TermSources t={r.fees} />
               </section>
@@ -417,7 +420,7 @@ function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }
                   {r.hospital?.type && (
                     <div>
                       <dt className="text-xs font-semibold text-muted-foreground">Type</dt>
-                      <dd><TypeBadge type={r.hospital.type} note /></dd>
+                      <dd><TypeChip type={r.hospital.type} of={r.college.name} /></dd>
                     </div>
                   )}
                 </dl>

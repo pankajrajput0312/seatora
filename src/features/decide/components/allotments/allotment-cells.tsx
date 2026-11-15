@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { DecideLinks } from "../../lib/links";
 import type { PrevSeat } from "../../types";
 import { Dash } from "../bits";
+import type { ReportedBeds } from "../institute/institute-data";
+import { Beds as OneBeds } from "../pages/beds";
 import { prevRemarkLabel } from "./allotments-view";
 
 type NamedPrev = PrevSeat & { collegeName: string; collegeSlug: string; courseName: string };
@@ -20,3 +22,6 @@ export function PrevSeatCell({ prev, L }: { prev: NamedPrev | null; L: DecideLin
     </span>
   );
 }
+
+/** "1,538 beds" as the hospital reports it: the one Beds (pages/beds.tsx). `of`: the institute. */
+export const Beds = ({ beds, of }: { beds: ReportedBeds; of: string }) => <OneBeds b={beds} inst={of} unit />;

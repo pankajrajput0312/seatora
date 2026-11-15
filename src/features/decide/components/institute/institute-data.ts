@@ -1,10 +1,12 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { anyTermFilter, termVerdict, type TermFilters, type TermVerdict } from "../../lib/term-filters";
 import { profileHasCourse, type Profile } from "../../profile";
 import { getCatalog, type Catalog, type YearInfo } from "../../server/catalog";
 import { clinicalFactsFor } from "../../server/facts";
 import { countAllotments, type AllotmentCount } from "../../server/queries";
 import { listSeats, seatLists, sumSeats, type SeatRow } from "../../server/seats";
+import { courseTerms } from "../../server/terms";
 import { baseCategories, openQuotas, roundLabel, type Round, type SeatList, type Source } from "../../types";
 import type { CollegeType } from "./college-type";
 import type { ValueMeta } from "./hospital-bits";
@@ -163,3 +165,33 @@ export async function clinicalAt(collegeKey: string, profile: Profile | null) {
   return { ...facts, courses: courses.sort((a, b) => Number(b.mine) - Number(a.mine)) };
 }
 export type ClinicalAt = NonNullable<Awaited<ReturnType<typeof clinicalAt>>>;
+
+const rank: Record<TermVerdict, number> = { pass: 2, unknown: 1, fail: 0 };
+/**
+ * Institutes by the term filters (lib/term-filters.ts): an institute passes when one of its options (course × quota;
+ * with `course`, that course's only) passes. `unknown`: institutes left out only because a filtered value is not
+ * declared (what "Include not declared", nd=keep, would add; none when it is ticked). Null when no filter is set.
+ */
+export async function institutesByTerms(tf: TermFilters, course?: string): Promise<{ pass: Set<string>; unknown: Set<string> } | null> {
+  if (!anyTermFilter(tf)) return null;
+  const [cat, info] = await Promise.all([getCatalog(), hospitalInfo()]);
+  const best = new Map<string, TermVerdict>();
+  for (const o of cat.options) {
+    if (best.get(o.college) === "pass" || (course && cat.courseOf.get(`${o.degree}|${o.specialty}`)?.slug !== course)) continue;
+    const v = termVerdict(courseTerms(cat, o.college, o.degree, o.specialty, o.quota), info.get(o.college)?.type?.value, tf);
+    const was = best.get(o.college);
+    if (!was || rank[v] > rank[was]) best.set(o.college, v);
+  }
+  // No option (no past allotments): only its type can be checked; a cap has nothing to read (unknown), "No bond" fails.
+  const capped = [tf.minStipend, tf.maxFee, tf.maxBondYears, tf.maxBondInr, tf.maxLeavingInr].some((v) => v != null);
+  for (const c of cat.colleges) {
+    if (best.has(c.key)) continue;
+    const t = info.get(c.key)?.type?.value;
+    best.set(c.key, (tf.types?.length && (!t || !tf.types.includes(t))) || tf.maxBondYears === 0 ? "fail" : capped ? "unknown" : "pass");
+  }
+  const keys = (v: TermVerdict) => new Set([...best].filter(([, x]) => x === v).map(([k]) => k));
+  const pass = keys("pass");
+  const unknown = keys("unknown");
+  if (tf.keepUnknown) for (const k of unknown) pass.add(k);
+  return { pass, unknown: tf.keepUnknown ? new Set() : unknown };
+}

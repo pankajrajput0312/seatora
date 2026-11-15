@@ -3,38 +3,17 @@ import { Badge } from "@/components/ui/badge";
 import { formatINR, formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import type { SeatRow } from "../../server/seats";
-import type { SeatList } from "../../types";
 import { Dash, Provisional } from "../bits";
-import { SeatsHead } from "../options-view";
+import { InfoTip } from "../info-tip";
+import { RegisterSources } from "../page-sources";
 import { fmtDay } from "../seats/seat-lists";
 import { smallLink, tbl } from "../ui";
-import { reportedCount, SELF_REPORTED, ValueSource } from "./hospital-bits";
+import { reportedCount, SELF_REPORTED, sourceName, ValueSource } from "./hospital-bits";
 import type { AllotmentMix, ClinicalAt, ValueMeta } from "./institute-data";
 
 // Institute page parts (src/app/decide/institutes/[slug]), server-rendered.
 
-/** A seats column heading, e.g. "R2 seats / clear vacancy"; with the PDF's date (else its name) when the round has two lists of that kind. */
-export function RoundSeatsHead({ list, lists }: { list: SeatList; lists: SeatList[] }) {
-  const twin = lists.some((l) => l.key !== list.key && l.kind === list.kind);
-  return (
-    <>
-      <SeatsHead list={list} />
-      {twin && <span className="block font-normal">{list.publishedAt ? fmtDay(list.publishedAt) : list.name}</span>}
-    </>
-  );
-}
-
-/** One option's seats in one list, linking to them on Seats; "—" when the list prints none. `label`: sr-only context. */
-export function SeatNumber({ n, href, label }: { n: number | null; href: string; label: string }) {
-  if (n == null) return <Dash />;
-  return (
-    <Link href={href} className={`${smallLink} numeric min-w-11 justify-end font-semibold text-sky`}>
-      {formatRank(n)}<span className="sr-only"> {label}</span>
-    </Link>
-  );
-}
-
-/** Her seat categories or every one, for the seat columns (`scat=all`). */
+/** Her seat categories or every one, for the seat counts (`scat=all`). */
 export function CategoryToggle({ mine, all, href }: { mine: string[]; all: boolean; href: (all: boolean) => string }) {
   const chip = (on: boolean, to: boolean, text: string) => (
     <Link
@@ -48,25 +27,25 @@ export function CategoryToggle({ mine, all, href }: { mine: string[]; all: boole
   );
   return (
     <nav aria-label="Seat categories counted in the seat columns" className="flex flex-wrap items-center gap-2">
-      {chip(!all, false, `Your seat categories: ${mine.join(", ")}`)}
-      {chip(all, true, "All seat categories")}
+      {chip(!all, false, `Yours: ${mine.join(", ")}`)}
+      {chip(all, true, "All categories")}
     </nav>
   );
 }
 
 /** One seat list's rows at one institute: course, quota, seat category, seats (as the PDF printed them). */
 export function CollegeSeatTable({ rows, caption }: { rows: SeatRow[]; caption: string }) {
-  const td = "px-3 py-3 align-top md:px-4";
+  const td = "px-3 py-3 align-top max-sm:px-2 md:px-4";
   return (
     <div role="region" aria-label={caption} tabIndex={0} className={tbl.wrap}>
       <table className={tbl.table}>
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr className={tbl.headRow}>
-            <th scope="col" className={cn(tbl.th, "px-3 md:px-4")}>Course</th>
-            <th scope="col" className={cn(tbl.th, "px-3 md:px-4")}>Quota</th>
-            <th scope="col" className={cn(tbl.th, "px-3 md:px-4")}>Seat category</th>
-            <th scope="col" className={cn(tbl.th, "px-3 text-right md:px-4")}>Seats</th>
+            <th scope="col" className={cn(tbl.th, "px-3 max-sm:px-2 md:px-4")}>Course</th>
+            <th scope="col" className={cn(tbl.th, "px-3 max-sm:px-2 md:px-4")}>Quota</th>
+            <th scope="col" className={cn(tbl.th, "px-3 max-sm:px-2 md:px-4")}>Seat category</th>
+            <th scope="col" className={cn(tbl.th, "px-3 text-right max-sm:px-2 md:px-4")}>Seats</th>
           </tr>
         </thead>
         <tbody>
@@ -75,7 +54,7 @@ export function CollegeSeatTable({ rows, caption }: { rows: SeatRow[]; caption: 
               <th scope="row" className={cn(td, "text-left font-medium")}>{r.degree} {r.course?.name ?? r.specialty}</th>
               <td className={td}>{r.quota ?? <Dash />}</td>
               <td className={td}>{r.category}</td>
-              <td className={cn(tbl.num, "px-3 md:px-4")}>{formatRank(r.seats)}</td>
+              <td className={cn(tbl.num, "px-3 max-sm:px-2 md:px-4")}>{formatRank(r.seats)}</td>
             </tr>
           ))}
         </tbody>
@@ -86,16 +65,16 @@ export function CollegeSeatTable({ rows, caption }: { rows: SeatRow[]; caption: 
 
 /** Allotments per quota (row groups) × seat category: the newest result round, then each year. */
 export function AllotmentMixTable({ mix, name }: { mix: AllotmentMix; name: string }) {
-  const cell = "px-3 py-2 md:px-4";
+  const cell = "px-3 py-2 max-sm:px-2 md:px-4";
   return (
     <div role="region" aria-label="Allotments by quota and seat category" tabIndex={0} className={cn(tbl.wrap, "max-w-3xl")}>
       <table className={tbl.table}>
         <caption className="sr-only">Allotments at {name} by quota and seat category: {mix.columns[0].label}, then each year</caption>
         <thead>
           <tr className={tbl.headRow}>
-            <th scope="col" className={cn(tbl.th, "px-3 md:px-4")}>Quota and seat category</th>
+            <th scope="col" className={cn(tbl.th, cell)}>Quota and seat category</th>
             {mix.columns.map((c) => (
-              <th key={c.label} scope="col" className={cn(tbl.th, "px-3 text-right md:px-4")}>
+              <th key={c.label} scope="col" className={cn(tbl.th, cell, "text-right")}>
                 <span className="numeric">{c.label}</span>
                 <span className="block font-normal">{c.round ? "latest round" : "all rounds"}</span>
                 <Provisional when={c.provisional} />
@@ -147,21 +126,22 @@ function FactsTable({ caption, groups, whole }: { caption: string; groups: Group
     <>
       {blockFlags.length > 0 && groups.some((g) => g.lines.some((l) => !l.meta && has(l))) && (
         <div className="grid gap-1 text-xs text-muted-foreground">
-          <span>Rows without a source of their own share this one, flagged for its figures as a whole:</span>
+          <span>Shared source (its flags are for its figures as a whole):</span>
           <ValueSource m={{ ...whole!, flags: blockFlags }} />
         </div>
       )}
       <div role="region" aria-label={caption} tabIndex={0} className={tbl.wrap}>
-        {/* Fixed columns from md: the hospital's table and each course's line up. Phones: columns fit their text. */}
+        {/* Fixed columns from md: the hospital's table and each course's line up. Phones: no Period column (the period
+            heads the source cell), so the table fits 390px. */}
         <table className={cn(tbl.table, "md:min-w-[44rem] md:table-fixed")}>
           <caption className="sr-only">{caption}. {SELF_REPORTED}.</caption>
-          <colgroup><col className="w-[26%]" /><col className="w-[22%]" /><col className="w-[22%]" /><col className="w-[30%]" /></colgroup>
+          <colgroup><col className="md:w-[26%]" /><col className="md:w-[22%]" /><col className="md:w-[22%]" /><col className="md:w-[30%]" /></colgroup>
           <thead>
             <tr className={tbl.headRow}>
-              <th scope="col" className={tbl.th}>Fact</th>
-              <th scope="col" className={cn(tbl.th, "text-right")}>As reported</th>
-              <th scope="col" className={tbl.th}>Period</th>
-              <th scope="col" className={tbl.th}>Source</th>
+              <th scope="col" className={cn(tbl.th, "max-md:px-3")}>Fact</th>
+              <th scope="col" className={cn(tbl.th, "text-right max-md:px-3")}>As reported</th>
+              <th scope="col" className={cn(tbl.th, "max-md:hidden")}>Period</th>
+              <th scope="col" className={cn(tbl.th, "max-md:px-3")}>Source</th>
             </tr>
           </thead>
           {groups.map((g) => (
@@ -175,13 +155,16 @@ function FactsTable({ caption, groups, whole }: { caption: string; groups: Group
                 const m = l.meta ?? inherited;
                 return (
                   <tr key={l.label} className={tbl.row}>
-                    <th scope="row" className={cn(tbl.td, "text-left font-normal text-muted-foreground")}>{l.label}</th>
-                    <td className={cn(tbl.td, "text-right font-semibold break-words", typeof l.value === "string" && /^[\d,.]+[%+]?$/.test(l.value) && "numeric")}>
+                    <th scope="row" className={cn(tbl.td, "text-left font-normal text-muted-foreground max-md:px-3")}>{l.label}</th>
+                    <td className={cn(tbl.td, "text-right font-semibold [overflow-wrap:anywhere] max-md:px-3", typeof l.value === "string" && /^[\d,.]+[%+]?$/.test(l.value) && "numeric")}>
                       {has(l) ? l.value : <Dash />}
                       {has(l) && l.note && <span className="block text-xs font-normal text-muted-foreground">{l.note}</span>}
                     </td>
-                    <td className={cn(tbl.td, "text-xs text-muted-foreground")}>{has(l) && m?.period}</td>
-                    <td className={tbl.td}>{has(l) && <ValueSource m={m} />}</td>
+                    <td className={cn(tbl.td, "text-xs text-muted-foreground max-md:hidden")}>{has(l) && m?.period}</td>
+                    <td className={cn(tbl.td, "max-md:px-3")}>
+                      {has(l) && m?.period && <span className="mb-1 block text-xs text-muted-foreground md:hidden">{m.period}</span>}
+                      {has(l) && <ValueSource m={m} />}
+                    </td>
                   </tr>
                 );
               })}
@@ -259,12 +242,17 @@ export function HospitalFacts({ f, name }: { f: ClinicalAt; name: string }) {
     },
   ];
   return (
-    <section aria-labelledby="facts-h" className="grid gap-4 rounded-xl border border-border bg-card p-5">
+    <section aria-labelledby="facts-h" className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:p-5">
+      {/* Each document once in the page's Sources (the Source column links them where they are used). */}
+      <RegisterSources docs={[...new Map(Object.values(f.values_meta ?? {}).flatMap((m) => (m?.url ? [[m.url, { name: `${name}: ${sourceName(m)}`, url: m.url, note: SELF_REPORTED }] as const] : []))).values()]} />
       <div className="grid gap-1">
         <h2 id="facts-h" className="text-lg font-semibold">Hospital facts (as reported)</h2>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          {SELF_REPORTED}: each figure is what the institution published (its website, NIRF data, NMC or NBEMS pages), with the period it covers, where Seatora read it and when.
-          &quot;—&quot; means Seatora did not find it, not zero.
+        <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+          {SELF_REPORTED}.
+          <InfoTip label="hospital facts">
+            Each figure is what the institution published (its website, NIRF data, NMC or NBEMS pages), with the period it covers, where Seatora read it and when.
+            &quot;—&quot; means Seatora did not find it, not zero.
+          </InfoTip>
         </p>
       </div>
       <p className="text-sm">

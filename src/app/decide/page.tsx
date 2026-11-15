@@ -2,14 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
-import { HISTORY_CAPTION, PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
+import { HistoryNote, PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
 import { ChartCard, LabelBars, RankStrip, RoundTrend } from "@/features/decide/components/charts";
 import { ChoicesStat, TopChoices } from "@/features/decide/components/dashboard-parts";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
+import { InfoTip } from "@/features/decide/components/info-tip";
 import { RoundStatusBanner } from "@/features/decide/components/round-status";
 import { EmptyState, smallLink, StatStrip } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
+import { termValueLabel } from "@/features/decide/lib/term-filters";
 import { eligibleCategories, reachLabel, reachOrder, reachWindow } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { dashboard, getMeta, LATEST_YEAR, listOptions, PAST_YEARS, type StripPoint } from "@/features/decide/service";
@@ -58,22 +60,26 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
   const counted = reachWindow(LATEST_YEAR, PAST_YEARS);
   const labelSources = <DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR, round: "R1" }]} />;
+  // Her fee / bond caps leave out options whose figure is not declared (in words only, or missing): say so, with the way back.
+  const caps = [profile.maxFeeLakh != null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && termValueLabel.bondyrs(profile.maxBondYears)].flatMap((c) => (c ? [c[0].toLowerCase() + c.slice(1)] : [])).join(", ");
+  const leftOut = r.unknownTerms > 0 ? ` Your caps (${caps}) leave out ${formatRank(r.unknownTerms)} more whose figure is not declared (in words only, or not in Seatora's data).` : "";
+  const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} not declared</Link></>;
 
   return (
     <AppPage className="grid grid-cols-1 gap-6">
-      <PageHead title="Overview">
-        AIR <span className="numeric">{formatRank(profile.rank)}</span>, {profile.category}{profile.pwd ? " PwD" : ""}. Closing ranks below are on {seats} seats, the seat categories you can take.
+      <PageHead title="Overview" about={`Closing ranks here are on ${seats} seats, the seat categories you can take.`}>
+        AIR <span className="numeric">{formatRank(profile.rank)}</span> · {profile.category}{profile.pwd ? " PwD" : ""}
       </PageHead>
       <RoundStatusBanner params={params} />
 
       <section aria-labelledby="numbers-h" className="grid gap-2">
-        <div>
+        <div className="flex items-center gap-1">
           <h2 id="numbers-h" className="text-lg font-semibold">{list ? `${roundWords} seats in your courses` : "Your options"}</h2>
-          <p className="text-sm text-muted-foreground">
+          <InfoTip label={list ? `${roundWords} seats in your courses` : "your options"}>
             {list
               ? `Options with seats in MCC's ${list.year} ${roundWords} lists, in your courses, quotas and ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`
               : `Every option in your profile with past allotments, labelled from closing ranks in ${counted}. Each number opens them on Options.`}
-          </p>
+          </InfoTip>
         </div>
         <StatStrip
           items={[
@@ -81,29 +87,32 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
               ? {
                   label: `Options with ${roundWords} seats`,
                   value: formatRank(total),
-                  note: (
-                    <>
-                      {formatRank(sum.clear)} in the clear vacancy list, {formatRank(sum.virtualOnly)} virtual only{sum.newOnly > 0 && `, ${formatRank(sum.newOnly)} only newly added`}.{" "}
-                      <Link href={L.options()} className={smallLink}>Open the {roundWords} view</Link>
-                    </>
-                  ),
+                  info: `${formatRank(sum.clear)} in the clear vacancy list, ${formatRank(sum.virtualOnly)} virtual only${sum.newOnly > 0 ? `, ${formatRank(sum.newOnly)} only newly added` : ""}.${leftOut}`,
+                  note: <><Link href={L.options()} className={smallLink}>{formatRank(sum.clear)} clear, {formatRank(sum.virtualOnly)} virtual only</Link>{undeclared}</>,
                 }
               : {
                   label: "Options in your profile",
                   value: formatRank(total),
-                  note: <Link href={L.options({ closed: true })} className={smallLink}>{`${formatRank(d.summary.length)} ${d.summary.length === 1 ? "course" : "courses"}, ${formatRank(r.counts["closed-before"])} closed before your rank`}</Link>,
+                  info: `Every option in your profile's ${formatRank(d.summary.length)} ${d.summary.length === 1 ? "course" : "courses"} with past allotments; ${formatRank(r.counts["closed-before"])} of them closed before your rank.${leftOut}`,
+                  note: <><Link href={L.options({ closed: true })} className={smallLink}>{formatRank(r.counts["closed-before"])} closed before your rank</Link>{undeclared}</>,
                 },
             {
               label: "Reached your rank in a past round",
+              info: `Options whose closing rank reached yours in at least one past round of ${counted}.`,
               value: formatRank(reached),
               note: (
                 <span className="inline-flex flex-wrap items-center gap-x-1.5">
-                  <Link href={L.options({ reach: "reached-latest" })} className={smallLink}>{formatRank(r.counts["reached-latest"])} of them in {LATEST_YEAR} R1</Link>
+                  <Link href={L.options({ reach: "reached-latest" })} className={smallLink}>{formatRank(r.counts["reached-latest"])} in {LATEST_YEAR} R1</Link>
                   <Provisional when={latestR1?.provisional} />
                 </span>
               ),
             },
-            { label: "Within 10% in a past round", value: formatRank(r.counts["within-10"]), note: <Link href={L.options({ reach: "within-10" })} className={smallLink}>Closed just before your rank: see them</Link> },
+            {
+              label: "Within 10% in a past round",
+              info: "Options that closed just before your rank (within 10% of it) in a past round.",
+              value: formatRank(r.counts["within-10"]),
+              note: <Link href={L.options({ reach: "within-10" })} className={smallLink}>See them</Link>,
+            },
           ]}
         >
           <ChoicesStat />
@@ -141,7 +150,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         source={<DataSource used={[{ year: 2025 }]} />}
         className="chart-paper"
         title="Where your rank sits"
-        subtitle={`Each dot is one option's deepest closing rank in 2025, on ${seats} seats. Dots at or right of your line closed at or after your rank.${d.strip.length < d.summary.length ? ` The ${d.strip.length} courses with the most options are drawn; the table lists all ${d.summary.length}.` : ""}`}
+        subtitle={`Each dot is one option's deepest closing rank in 2025, on ${seats} seats. Dots at or right of your line closed at or after your rank.${d.strip.length < d.summary.length ? ` The ${d.strip.length} courses with the most options are drawn; the table lists all ${d.summary.length}. Tick courses in your profile to choose which are drawn.` : ""} Every option, with its round and seat category, is on Options.`}
         legend={
           <>
             <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-mark" />Closed at or after your rank in 2025</span>
@@ -181,8 +190,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       >
         <RankStrip rank={profile.rank} rows={d.strip.map((x) => ({ course: `${x.course.degree} ${x.course.name}`, points: x.points }))} />
         <p className="mt-2 text-xs text-muted-foreground">
-          {d.strip.length < d.summary.length && "Tick courses in your profile to choose which are drawn. "}
-          Every option, with its round and seat category, is on <Link href={L.options({ closed: true, all: true })} className={`${smallLink} text-sky`}>Options</Link>.
+          <Link href={L.options({ closed: true, all: true })} className={`${smallLink} text-sky`}>Every option on Options</Link>
         </p>
       </ChartCard>
 
@@ -204,7 +212,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       </ChartCard>
 
       <div className="grid gap-2 text-xs text-muted-foreground">
-        <p>{HISTORY_CAPTION}</p>
+        <HistoryNote />
         <DataSource />
         {list && r.seatLists.map((l) => <SeatSource key={l.key} list={l} L={L} />)}
       </div>

@@ -1,18 +1,19 @@
 import Link from "next/link";
 import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
-import { sourceTypeLabels } from "@/components/ui/source-label";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { fmtDay, listDay } from "../../lib/format";
 import type { DecideLinks } from "../../lib/links";
-import { roundName } from "../../lib/round-status";
-import type { SeatRow } from "../../server/seats";
-import { openQuotas, roundLabel, rounds, seatKindLabel, type MccNotice, type Round, type SeatKind, type SeatList } from "../../types";
+import { statKeys, statLabel } from "../../lib/stat-format";
+import { openQuotas, roundLabel, rounds, seatKindLabel, type Round, type SeatKind, type SeatList } from "../../types";
 import { Dash, Provisional, ReachBadge } from "../bits";
-import { TermsSummary } from "../fees";
+import { InfoTip } from "../info-tip";
+import { TermStatCells } from "../stat-cells";
+import { TypeBadge } from "../type-badge";
 import { smallLink, tbl } from "../ui";
 import { PAST_ROUNDS, type SeatLine, type SeatSort } from "./find-seats";
+import { seatCourse as courseOf } from "./seat-cards";
 
 // Seats page parts (src/app/decide/seats): one MCC seat list at a time, never added to another list.
 
@@ -62,55 +63,6 @@ export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; cu
   );
 }
 
-function NoticeList({ notices }: { notices: MccNotice[] }) {
-  return (
-    <ul className="grid">
-      {notices.map((n) => (
-        <li key={n.url}>
-          <a href={n.url!} target="_blank" rel="noopener noreferrer" className={`${smallLink} hover:text-sky`}>
-            {n.title}, <span className="numeric ml-1">{fmtDay(n.date)}</span><span className="sr-only"> (opens in a new tab)</span>
-          </a>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/**
- * The list's official PDF and notice date, and the MCC seat notices of its round that may change it: `later` (after
- * the list's date: not applied) and `sameDay` (may already be in it), from seatChanges (server/seats.ts).
- */
-export function SeatListSource({ list, later, sameDay, noticesHref }: { list: SeatList; later: MccNotice[]; sameDay: MccNotice[]; noticesHref: string }) {
-  const tier = sourceTypeLabels.OFFICIAL;
-  return (
-    <div className="grid gap-1 text-xs text-muted-foreground">
-      <p className="flex flex-wrap items-center gap-x-2">
-        <Badge tone={tier.tone}>{tier.text}</Badge>
-        {list.url ? (
-          <a href={list.url} target="_blank" rel="noopener noreferrer" className={`${smallLink} hover:text-sky`}>
-            {list.name}, PDF<span className="sr-only"> (opens in a new tab)</span>
-          </a>
-        ) : (
-          <span>{list.name}</span>
-        )}
-        <span>· MCC notice dated {list.publishedAt ? <span className="numeric">{fmtDay(list.publishedAt)}</span> : <Dash />}</span>
-      </p>
-      <p>
-        The list as that PDF printed it: seats MCC added or removed afterwards are not applied here.
-        {later.length > 0 && ` Check ${later.length === 1 ? "this later MCC notice" : "these later MCC notices"} before you lock your choices:`}
-      </p>
-      {later.length > 0 && <NoticeList notices={later} />}
-      {sameDay.length > 0 && (
-        <>
-          <p>Published the same day as this list, so the list may already include {sameDay.length === 1 ? "it" : "them"}:</p>
-          <NoticeList notices={sameDay} />
-        </>
-      )}
-      <p><Link href={noticesHref} className={`${smallLink} hover:text-sky`}>All MCC seat notices, PG {list.year} {roundName[list.round]}</Link></p>
-    </div>
-  );
-}
-
 /**
  * The seats of a list in her profile whose course and quota has no past allotments (service.ts unlistedOf), named on
  * Options and institute pages with a link to them on Seats. `here`: at one institute. `options`: while Options' round
@@ -130,15 +82,13 @@ export function UnlistedSeats({ u, profile, here, href, options }: { u: { list: 
   );
 }
 
-const courseOf = (r: SeatRow) => `${r.degree} ${r.course?.name ?? r.specialty}`;
-
 /** The deepest closing of the shown past rounds (PAST_ROUNDS), and behind a disclosure every round the reach label counts. */
 function PastClosings({ r, name }: { r: SeatLine; name: string }) {
   if (!r.rounds.length) return <Dash />;
   const d = r.deepest;
   const at = (p: { year: number; round: Round }) => r.rounds.find((c) => c.year === p.year && c.round === p.round);
   const all: { year: number; round: Round; closing: number | null; provisional: boolean }[] = [...PAST_ROUNDS.map((p) => at(p) ?? { ...p, closing: null, provisional: false }), ...r.rounds.filter((c) => !PAST_ROUNDS.some((p) => p.year === c.year && p.round === c.round))]
-    .sort((a, b) => a.year - b.year || rounds.indexOf(a.round) - rounds.indexOf(b.round));
+    .sort((a, b) => b.year - a.year || rounds.indexOf(a.round) - rounds.indexOf(b.round));
   return (
     <div className="grid justify-items-end gap-1 whitespace-nowrap">
       {d ? (
@@ -167,8 +117,9 @@ function PastClosings({ r, name }: { r: SeatLine; name: string }) {
 
 /**
  * Seat rows: institute (with course, quota and state; sticky, so a phone scrolls the rest beside it), seat category,
- * seats in each of `lists` (one list, or every list of a round side by side: never added; `current` orders the seats sort), the deepest past closing on
- * the row's quota and seat category, her reach label on it (`ranked`), and the published terms.
+ * the course's terms as number cells, seats in each of `lists` (one list, or every list of a round side by side: never
+ * added; `current` orders the seats sort), the deepest past closing on the row's quota and seat category, and her reach
+ * label on it (`ranked`).
  */
 export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { rows: SeatLine[]; lists: SeatList[]; current: string; sort: SeatSort; caption: string; ranked: boolean; L: DecideLinks }) {
   const td = "px-3 py-3 align-top md:px-4";
@@ -183,16 +134,20 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
           <tr className="text-left">
             <th scope="col" className={cn(th, sticky)} aria-sort={sort === "college" ? "ascending" : undefined}>Institute, course, quota and state</th>
             <th scope="col" className={th}>Seat category</th>
+            {/* The course's terms beside it (as on Options), in view without scrolling sideways. */}
+            {statKeys.map((k) => (
+              <th key={k} scope="col" className={cn(th, "text-right")} aria-sort={(sort === "fee" && k === "fee") || (sort === "bond" && k === "bond") ? "ascending" : undefined}>{statLabel[k]}</th>
+            ))}
             {lists.map((l) => (
               <th key={l.key} scope="col" className={cn(th, "text-right")} aria-sort={sort === "seats" && l.key === current ? "descending" : undefined}>
                 {several ? <>{seatKindLabel[l.kind]}{lists.some((x) => x !== l && x.kind === l.kind) && listDay(l) && <span className="numeric block font-normal">{fmtDay(listDay(l)!)} PDF</span>}</> : "Seats"}
               </th>
             ))}
-            <th scope="col" className={cn(th, "text-right")} aria-sort={sort === "closing" ? "descending" : undefined}>
-              Deepest past closing<span className="block font-normal">{PAST_ROUNDS.map((p) => `${p.year} ${roundLabel[p.round]}`).join(", ")}</span>
+            <th scope="col" className={cn(th, "text-right whitespace-nowrap")} aria-sort={sort === "closing" ? "descending" : undefined}>
+              Deepest past closing
+              <InfoTip label="deepest past closing">The deepest closing rank on the row&apos;s quota and seat category of {PAST_ROUNDS.map((p) => `${p.year} ${roundLabel[p.round]}`).join(", ")}; every round the reach label counts behind &quot;Every round&quot;.</InfoTip>
             </th>
             {ranked && <th scope="col" className={cn(th, "min-w-36")}>Reach</th>}
-            <th scope="col" className={cn(th, "min-w-72")}>Fee, stipend, bond and leaving penalty</th>
           </tr>
         </thead>
         <tbody>
@@ -205,9 +160,13 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
                   <span className="block text-xs text-muted-foreground">
                     {courseOf(r)}, {r.quota ?? "quota not printed"}, {r.college.state ?? "state not listed"}
                   </span>
-                  {r.quota != null && !openQuotas.includes(r.quota) && <Badge tone="warning" className="mt-1">Restricted quota</Badge>}
+                  <span className="mt-1 flex flex-wrap gap-1">
+                    {r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />}
+                    {r.quota != null && !openQuotas.includes(r.quota) && <Badge tone="warning">Restricted quota</Badge>}
+                  </span>
                 </th>
                 <td className={td}>{r.category}</td>
+                <TermStatCells t={r.fees} variant="table" short of={name} />
                 {lists.map((l) => (
                   <td key={l.key} className={cn(tbl.num, "px-3 md:px-4")}>{r.byList[l.key] != null ? formatRank(r.byList[l.key]) : <Dash />}</td>
                 ))}
@@ -217,10 +176,6 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
                     {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : <span className="text-xs text-muted-foreground">{r.noLabel}</span>}
                   </td>
                 )}
-                <td className={td}>
-                  <TermsSummary t={r.fees} className="text-xs" />
-                  <Link href={L.institute(r.college.slug, "fees")} className={cn(smallLink, "text-xs text-sky")}>Fees &amp; bond<span className="sr-only">: {r.college.name}</span></Link>
-                </td>
               </tr>
             );
           })}

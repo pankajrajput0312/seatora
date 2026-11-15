@@ -23,6 +23,9 @@ Every important record must support (`src/types/provenance.ts`, `DataSource` in 
 | Verification status | VERIFIED · PENDING · DISPUTED · OUTDATED |
 | Category / quota / round | Required for cutoffs and seat matrices |
 
+### Provenance one click away (Decide)
+Every Decide page ends with one collapsed **"Sources (N)"** footer (`AppPage` renders `PageSourcesFooter`, `components/page-sources.tsx`): each document the page's blocks cite, once, numbered 1…N in the order the page first cites it, with its trust-tier badge, its link (the MCC result PDFs as one entry a year, a link a round, Provisional marked) and its note. A block shows only its numbers ("Sources 1, 2" from `DataSource` / `SourceRefs`; a figure's superscript `SourceRef`, named "Source N: …"); each number opens the footer at its entry and moves focus there. Explanations of a figure (how it is counted, its exact published words, caveats) sit behind an (i) `InfoTip`, never only on hover; what a figure must say in view stays in view: "Provisional", "history, not a prediction" (`HistoryNote`), "NBEMS max" / "min", "state rule", later MCC seat notices to check, and "—" for missing. On paper the footer prints open.
+
 ## Trust tiers
 | Tier | Example | UI treatment |
 |---|---|---|

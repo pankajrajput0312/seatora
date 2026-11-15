@@ -48,6 +48,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
   const [find, setFind] = useState("");
   const [step, setStep] = useState(0);
   const stepHead = useRef<HTMLHeadingElement>(null);
+  const rankInput = useRef<HTMLInputElement>(null);
   /** Setup: to another step; its (visually hidden) heading takes focus, so a screen reader hears where she is. */
   const go = (n: number) => {
     setStep(n);
@@ -121,7 +122,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
       <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <label className="grid gap-1.5 text-sm font-medium">
           All India Rank
-          <Input inputMode="numeric" value={rankText} onChange={(e) => setRankText(e.target.value)} placeholder="e.g. 42,284" aria-invalid={!!error} aria-describedby={error ? "profile-error" : undefined} className={`numeric ${control}`} />
+          <Input ref={rankInput} inputMode="numeric" value={rankText} onChange={(e) => setRankText(e.target.value)} placeholder="e.g. 42,284" aria-invalid={!!error} aria-describedby={error ? "profile-error" : undefined} className={`numeric ${control}`} />
         </label>
         <label className="grid gap-1.5 text-sm font-medium">
           Category
@@ -216,7 +217,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
           Max bond
           <select value={draft.maxBondYears ?? ""} onChange={(e) => set("maxBondYears", e.target.value ? Number(e.target.value) : null)} className={control}>
             <option value="">Any</option>
-            {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? "No bond (or unknown)" : `Up to ${y} ${y === 1 ? "year" : "years"}`}</option>)}
+            {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? "No bond" : `Up to ${y} ${y === 1 ? "year" : "years"}`}</option>)}
           </select>
         </label>
       </div>
@@ -227,13 +228,21 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
     // No Portal: rendered inside .app (DecideShell), so the dialog uses the case-sheet tokens, not the dark site's.
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
-      <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-xl border border-border bg-popover p-6 shadow-overlay md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
+      <Dialog.Content
+        // Focus lands on the first field, not the Close button; on close the shell puts it on the visible Edit / Set
+        // your rank button.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          rankInput.current?.focus();
+        }}
+        // First run: a stray tap outside would throw the steps away; Escape and Close still leave.
+        onInteractOutside={(e) => setup && e.preventDefault()}
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-xl border border-border bg-popover p-6 shadow-overlay md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <Dialog.Title className="text-xl font-semibold">{setup ? "Set up Decide" : "Your rank and preferences"}</Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-              {setup && "Three steps, then Options opens on this round's seats in your courses. "}
-              Saved on this device, and added to Decide page addresses so every screen can use it. Your rank, category, PwD status and filters appear in the address, so they travel with links you share and stay in browser history.
+              Saved on this device. Your rank, category, PwD status and filters show in page addresses, so links you share carry them and they stay in browser history.
             </Dialog.Description>
           </div>
           <Dialog.Close asChild>

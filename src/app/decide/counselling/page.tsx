@@ -7,6 +7,7 @@ import { sourceTypeLabels } from "@/components/ui/source-label";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { Dash, PageHead } from "@/features/decide/components/bits";
+import { InfoTip } from "@/features/decide/components/info-tip";
 import { MCC_PG, MccLink } from "@/features/decide/components/pages/mcc-link";
 import { NoticeLink } from "@/features/decide/components/round-status";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
@@ -39,6 +40,9 @@ const schema = z.object({
 });
 type Filters = z.infer<typeof schema>;
 const official = sourceTypeLabels.OFFICIAL;
+const mccSite = (text: string) => (
+  <a href={MCC_PG} target="_blank" rel="noopener noreferrer" className={smallLink}>{text}<span className="sr-only">: MCC PG counselling (opens in a new tab)</span></a>
+);
 
 export default async function CounsellingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
@@ -47,7 +51,9 @@ export default async function CounsellingPage({ searchParams }: { searchParams: 
 
   return (
     <AppPage className="grid grid-cols-1 gap-6">
-      <PageHead title="Counselling">MCC All India PG counselling: where each round stands, every MCC notice in the data, and the NEET PG results. Each item links its official document; confirm on the MCC site before acting.</PageHead>
+      <PageHead title="Counselling" about="Where each MCC All India PG round stands, every MCC notice in the data, and the NEET PG results. Each item links its official document; confirm on the MCC site before acting.">
+        MCC rounds, notices and results, from official documents.
+      </PageHead>
       <SubTabs label="Counselling" current={f.tab} items={tabs.map((t) => ({ key: t.key, label: t.label, href: L.to("/decide/counselling", { tab: t.key }) }))} />
       {f.tab === "schedule" ? <Schedule L={L} /> : f.tab === "announcements" ? <Announcements f={f} params={params} L={L} /> : <MeritLists />}
     </AppPage>
@@ -67,14 +73,16 @@ async function Schedule({ L }: { L: DecideLinks }) {
   return (
     <section aria-labelledby="schedule-h" className="grid gap-4">
       <div className="grid gap-1">
-        <h2 id="schedule-h" className="text-lg font-semibold">PG counselling {rs.year}, round by round</h2>
-        <p className="text-sm text-muted-foreground">
-          Each status comes from MCC&apos;s notices as of <span className="numeric">{fmtIST(rs.asOf)}</span> and moves on only when today (<span className="numeric">{fmtIST(now.toISOString())}</span>) passes a date printed in MCC&apos;s schedule. Dates are as printed; tentative ones may change.
-        </p>
+        <div className="flex items-center gap-1">
+          <h2 id="schedule-h" className="text-lg font-semibold">PG counselling {rs.year}, round by round</h2>
+          <InfoTip label="the round statuses">
+            Each status comes from MCC&apos;s notices as of <span className="numeric">{fmtIST(rs.asOf)}</span> and moves on only when today (<span className="numeric">{fmtIST(now.toISOString())}</span>) passes a date printed in MCC&apos;s schedule. Dates are as printed; tentative ones may change. Each step links the MCC notice behind its status.
+          </InfoTip>
+        </div>
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           <Badge tone={official.tone}>{official.text}</Badge>
-          <span>Each step links the MCC notice behind its status.</span>
-          <a href={MCC_PG} target="_blank" rel="noopener noreferrer" className={smallLink}>MCC PG counselling site<span className="sr-only"> (opens in a new tab)</span></a>
+          <span>As of <span className="numeric">{fmtIST(rs.asOf)}</span></span>
+          {mccSite("MCC site")}
         </p>
       </div>
       {rs.rounds.map((r) => (
@@ -134,15 +142,17 @@ async function Announcements({ f, params, L }: { f: Filters; params: URLSearchPa
         <Field label="Counselling year"><Select name="year" value={f.year ? String(f.year) : undefined} all="All years" options={years.map((y) => ({ value: String(y), label: `PG ${y}` }))} /></Field>
       </FilterBar>
 
-      <div className="grid gap-1">
-        <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+        <p id="results" tabIndex={-1} aria-live="polite">
           <span className="numeric font-semibold text-foreground">{rangeLabel(res)}</span> MCC notices, newest first
         </p>
         {all[0] && (
-          <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-x-1 text-xs">
             <Badge tone={official.tone}>{official.text}</Badge>
-            <span>Each notice links its MCC document. The latest in the data is from <time dateTime={all[0].date} className="numeric">{fmtIST(all[0].date, true)}</time>; anything newer is only on</span>
-            <a href={MCC_PG} target="_blank" rel="noopener noreferrer" className={smallLink}>the MCC site<span className="sr-only"> (opens in a new tab)</span></a>
+            <InfoTip label="the notices">
+              Each notice links its MCC document. The latest in the data is from <time dateTime={all[0].date} className="numeric">{fmtIST(all[0].date, true)}</time>; anything newer is only on the MCC site.
+            </InfoTip>
+            {mccSite("MCC site")}
           </p>
         )}
       </div>
@@ -192,8 +202,11 @@ async function MeritLists() {
   return (
     <section aria-labelledby="merit-h" className="grid gap-3">
       <div className="grid gap-1">
-        <h2 id="merit-h" className="text-lg font-semibold">NEET PG results</h2>
-        <p className="text-sm text-muted-foreground">The NBEMS result PDFs behind Decide&apos;s score and rank history. History only: each year has its own maximum marks, so compare ranks across years, not scores.</p>
+        <div className="flex items-center gap-1">
+          <h2 id="merit-h" className="text-lg font-semibold">NEET PG results</h2>
+          <InfoTip label="the NEET PG results">The NBEMS result PDFs behind Decide&apos;s score and rank history. Each year has its own maximum marks, so compare ranks across years, not scores.</InfoTip>
+        </div>
+        <p className="text-sm text-muted-foreground">History only: compare ranks, not scores.</p>
       </div>
       <div role="region" aria-label="NEET PG result PDFs" tabIndex={0} className={tbl.wrap}>
         <table className={tbl.table}>

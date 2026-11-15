@@ -1,32 +1,36 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Fragment } from "react";
+import { Download } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { CSV_MAX_ROWS } from "@/features/decide/api";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
-import { HISTORY_CAPTION, PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
+import { PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { termDocs } from "@/features/decide/components/fees";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm } from "@/features/decide/components/filter-form";
+import { InfoTip } from "@/features/decide/components/info-tip";
 import { OptionsResults } from "@/features/decide/components/option-actions";
 import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
+import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, MoreFilters, smallLink } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
-import { BOND_YEAR_CHOICES, feeChoices, keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
+import { readTermFilters, termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
+import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, LATEST_YEAR, listOptions, optionsView, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
 import { openQuotas, openQuotasNote, optionsViews, roundLabel, seatKindLabel, seatKinds, type SeatKind } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
 
-/** Page filters (her profile filters are the profile params: sp, deg, quota, st, fee, bond). */
+/** Page filters (her profile filters are the profile params: sp, deg, quota, st, fee, bond; the term filters: lib/term-filters.ts). */
 const filtersSchema = z.object({
   q: z.string().max(100).optional(),
   reach: z.enum(reachOrder).optional(),
@@ -49,8 +53,10 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   if (!profile) return <AppPage><PageHead title="Options" /><SetRankPrompt path="/decide/options" /></AppPage>;
 
   const f = parseSearchParams(filtersSchema, params);
+  // Term filters (college type, fee, stipend, bond, leaving): an absent maxfee / bondyrs is her profile's cap.
+  const { params: tp, filters: terms } = readTermFilters(params, profile);
   const hasSeats = f.seats === "1" ? "clear" : f.seats === "all" ? false : f.seats;
-  const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view };
+  const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms };
   const [meta, r] = await Promise.all([getMeta(), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE })]);
   const lists = r.seatLists;
   const roundView = r.view === "round";
@@ -72,14 +78,15 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // The latest year's R1 is the only round that can be provisional (MCC's provisional result); the toggle exists only then.
   const latestProvisional = !!meta.sources.find((s) => s.year === LATEST_YEAR && s.round === "R1")?.provisional;
   const keep = keepProfileParams(params);
-  // Same profile and filters for /api/v1/options, where "Show more" reads the next pages.
+  // Same profile and filters for /api/v1/options, where "Show more" reads the next pages (and the CSV).
   const api = profileToParams(profile);
   for (const [k, v] of [["q", f.q], ["reach", f.reach], ["prov", f.prov], ["view", r.view], ["showClosed", r.showClosed ? "1" : "0"], ["hasSeats", r.seats ?? "all"]] as const) if (v) api.set(k, v);
+  for (const [k, v] of Object.entries(tp)) if (v != null) api.set(k, Array.isArray(v) ? v.join(",") : String(v));
   const caption = `Options for AIR ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added` : ""}`;
   // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
-  const bondWords = (y: number) => (y === 0 ? "No bond (or unknown)" : `Bond up to ${y} ${y === 1 ? "yr" : "yrs"}`);
   const seatsWords = (s: SeatKind | "any") => (s === "any" ? `Has seats in a ${round} list` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
   const closedDefault = roundView ? "1" : "0";
+  const termKeys = ["ctype", "maxfee", "minstip", "bondyrs", "maxbond", "maxleave", "nd"] as const;
   const active = [
     f.q && { label: `Search: “${f.q}”`, href: here({ q: null }) },
     f.reach && { label: reachLabel(f.reach, LATEST_YEAR, PAST_YEARS, !f.prov), href: here({ reach: null, closed: null }) },
@@ -88,76 +95,97 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     f.prov && { label: `Without ${LATEST_YEAR} R1 (provisional)`, href: here({ prov: null }) },
     profile.quotas.length > 0 && { label: `Quota: ${profile.quotas.length > 2 ? `${profile.quotas.length} selected` : profile.quotas.join(", ")}`, href: here({ quota: null }) },
     profile.states.length > 0 && { label: `State: ${profile.states.length > 2 ? `${profile.states.length} selected` : profile.states.join(", ")}`, href: here({ st: null }) },
-    profile.maxFeeLakh != null && { label: `Fee up to ₹${profile.maxFeeLakh} L`, href: here({ fee: null }) },
-    profile.maxBondYears != null && { label: bondWords(profile.maxBondYears), href: here({ bond: null }) },
+    // Her profile's caps, while the page's own fee / bond filter does not replace them.
+    profile.maxFeeLakh != null && tp.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: here({ fee: null }) },
+    profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: here({ bond: null }) },
+    ...termChips(tp).map((c) => ({ label: c.label, href: here({ [c.key]: null }) })),
   ].filter((x) => !!x);
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
+  const n = (x: number) => <span className="numeric font-semibold">{formatRank(x)}</span>;
+  // What the round's seat lists are, behind the (i) of the summary (round view) or of the link to that view.
+  const listsTip = lists.length > 0 && (
+    <>
+      From MCC&apos;s {round} lists:{" "}
+      {lists.map((l, i) => (
+        <Fragment key={l.key}>
+          {i > 0 && ", "}
+          {seatKindLabel[l.kind].toLowerCase()}
+          {l.publishedAt && <> (<span className="numeric">{fmtDay(l.publishedAt)}</span>)</>}
+        </Fragment>
+      ))}
+      , each its own list (PDFs in Sources below), counted in your quotas and seat categories ({seats}). A seat can be in two lists, so they are never added:{" "}
+      {lists.map((l) => `${seatKindLabel[l.kind]}: ${seatKindNote[l.kind]}`).join(" ")} &quot;—&quot; when a list has none; select a number to see those seats.
+    </>
+  );
+  const moreOpen = termMoreOpen(tp) || !!f.seats || !!f.prov;
 
   return (
-    <AppPage className="grid grid-cols-1 gap-5">
-      <PageHead title="Options">
-        Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats, the seat
-        categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${openQuotas.join(", ")})`}.
+    <AppPage className="grid grid-cols-1 gap-4">
+      <PageHead
+        title="Options"
+        about={
+          <>
+            Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats,
+            the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${openQuotas.join(", ")})`}. Within 10%: in a past round the closing rank was at
+            least 90% of yours (AIR <span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or later) but before your rank.
+            {roundView && <> New: no past allotment = MCC allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years)}), in any round or seat category, so there is no closing rank to compare.</>}
+          </>
+        }
+      >
+        Labelled by your rank against past closing ranks.
       </PageHead>
 
       {sum && (
-        <section aria-label={`${round} seats in your courses`} className="grid gap-1 rounded-xl border border-border bg-card p-3 text-sm">
-          <p>
-            <span className="numeric font-semibold">{formatRank(sum.options)}</span> {sum.options === 1 ? "option has" : "options have"} {roundWords} seats in your courses:{" "}
-            <span className="numeric font-semibold">{formatRank(sum.clear)}</span> in the clear vacancy list, <span className="numeric font-semibold">{formatRank(sum.virtualOnly)}</span> virtual only
-            {sum.newOnly > 0 && <>, <span className="numeric font-semibold">{formatRank(sum.newOnly)}</span> only newly added</>};{" "}
-            <span className="numeric font-semibold">{formatRank(sum.withNew)}</span> with newly added seats,{" "}
-            {sum.fresh > 0 ? (
-              <Link href={here({ reach: "new", seats: null, q: null })} className="text-sky underline"><span className="numeric font-semibold">{formatRank(sum.fresh)}</span> new: no past allotment</Link>
-            ) : (
-              "none new (every one has a past allotment)"
-            )}
-            .
-          </p>
-          <p className="text-muted-foreground">
-            From MCC&apos;s {round} lists:{" "}
-            {lists.map((l, i) => (
-              <Fragment key={l.key}>
-                {i > 0 && ", "}
-                {l.url ? (
-                  <a href={l.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-sky">
-                    {seatKindLabel[l.kind].toLowerCase()}<span className="sr-only"> PDF (opens in a new tab)</span>
-                  </a>
-                ) : (
-                  seatKindLabel[l.kind].toLowerCase()
-                )}
-                {l.publishedAt && <> (<span className="numeric">{fmtDay(l.publishedAt)}</span>)</>}
-              </Fragment>
-            ))}
-            . Counted in your quotas and seat categories ({seats}); a seat can be in two lists, so they are never added. Virtual only = seats there fall vacant only if their holder upgrades or leaves.
+        <section aria-label={`${round} seats in your courses`} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <p className="inline-flex flex-wrap items-center gap-x-1">
+            <span>{n(sum.options)} with {round} seats:</span>
+            <span>{n(sum.clear)} clear,</span>
+            <span>{n(sum.virtualOnly)} virtual only{sum.newOnly > 0 && <>, {n(sum.newOnly)} only newly added</>},</span>
+            {sum.fresh > 0 ? <Link href={here({ reach: "new", seats: null, q: null })} className="text-sky underline">{n(sum.fresh)} new<span className="sr-only">: no past allotment</span></Link> : <span>none new</span>}
+            <InfoTip label={`${round} seats`}>
+              {formatRank(sum.options)} {sum.options === 1 ? "option has" : "options have"} {roundWords} seats in your courses: {formatRank(sum.clear)} in the clear vacancy list,{" "}
+              {formatRank(sum.virtualOnly)} virtual only (seats there fall vacant only if their holder upgrades or leaves){sum.newOnly > 0 && `, ${formatRank(sum.newOnly)} only newly added`};{" "}
+              {formatRank(sum.withNew)} with newly added seats; {sum.fresh > 0 ? `${formatRank(sum.fresh)} new: no past allotment` : "none new (every one has a past allotment)"}. {listsTip}{" "}
+              Sorted by label (reached, then within 10%, then new and no allotment in your categories, closed before your rank last), then {round} clear vacancy seats, then the deepest{" "}
+              {PAST_YEARS[1]} closing.
+            </InfoTip>
           </p>
           <p className="flex flex-wrap gap-x-4">
             {r.seats ? (
-              <Link href={here({ seats: "all" })} className={`${smallLink} text-sky`}>Also show options without {roundWords} seats</Link>
+              <Link href={here({ seats: "all" })} className={`${smallLink} text-sky`}>Also without {roundLabel[lists[0].round]} seats</Link>
             ) : (
-              <Link href={here({ seats: null })} className={`${smallLink} text-sky`}>Only options with {roundWords} seats</Link>
+              <Link href={here({ seats: null })} className={`${smallLink} text-sky`}>Only with {roundLabel[lists[0].round]} seats</Link>
             )}
-            <Link href={otherView} className={`${smallLink} text-sky`}>Every option with past allotments instead (closed hidden)</Link>
+            <Link href={otherView} className={`${smallLink} text-sky`}>Every option with past allotments (closed hidden)</Link>
           </p>
         </section>
       )}
       {!roundView && lists.length > 0 && (
-        <p className="text-sm text-muted-foreground">
-          <Link href={otherView} className={`${smallLink} text-sky`}>Show the {round} view</Link>: every option with {roundWords} seats in your courses, new ones included, closed ones shown, most clear vacancy seats first within a label.
+        <p className="flex flex-wrap items-center gap-x-1 text-sm">
+          <Link href={otherView} className={`${smallLink} text-sky`}>Show the {round} view</Link>
+          <InfoTip label={`the ${round} view`}>
+            Every option with {roundWords} seats in your courses, new ones included, closed ones shown, most clear vacancy seats first within a label. {listsTip}
+          </InfoTip>
         </p>
       )}
 
-      {/* The profile filters are URL params, so this visit can differ from the saved profile. The form and Apply stay mounted (focus stays on Apply); only the fields remount to show what was applied. */}
-      <FilterForm action="/decide/options" scroll={false} role="search" aria-label="Filter options" className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3">
-        {(["rank", "cat", "pwd"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
+      {/* The profile filters are URL params, so this visit can differ from the saved profile. The form, Apply and the "Show all filters" box stay mounted (focus stays on Apply, her tick survives); only the fields remount to show what was applied. On phones the box folds the less-used fields (.more-filter), as on every filter bar. */}
+      <FilterForm
+        action="/decide/options"
+        scroll={false}
+        role="search"
+        aria-label="Filter options"
+        className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3"
+      >
+        {(["rank", "cat", "pwd", "fee", "bond"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         {f.reach && <input type="hidden" name="reach" value={f.reach} />}
         {f.closed && <input type="hidden" name="closed" value={f.closed} />}
         {f.view && <input type="hidden" name="view" value={f.view} />}
         <Fragment key={params.toString()}>
           <label className="min-w-56 flex-1">
             <span className="sr-only">Search institute, state or course</span>
-            <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Search institute, state or course" className={control} />
+            <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Search" className={control} />
           </label>
           {/* Exact courses in her profile (pairs) replace course x degree, so they get one exact-course filter. */}
           {profile.pairs?.length ? (
@@ -170,20 +198,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           )}
           <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" noneNote={openQuotasNote} />
           <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} />
-          <label className="more-filter w-44">
-            <span className="sr-only">Maximum fee per year</span>
-            <select name="fee" defaultValue={profile.maxFeeLakh ?? ""} className={control}>
-              <option value="">Any fee</option>
-              {feeChoices(profile.maxFeeLakh).map((l) => <option key={l} value={l}>Fee up to ₹{l} L</option>)}
-            </select>
-          </label>
-          <label className="more-filter w-44">
-            <span className="sr-only">Maximum service bond</span>
-            <select name="bond" defaultValue={profile.maxBondYears ?? ""} className={control}>
-              <option value="">Any bond</option>
-              {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{bondWords(y)}</option>)}
-            </select>
-          </label>
+          <TermFilterControls f={tp} caps={profile} />
           {lists.length > 0 && (
             <label className="more-filter w-64 max-w-full">
               <span className="sr-only">Seats in the {round} seat lists</span>
@@ -196,15 +211,19 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           )}
           {latestProvisional && (
             <label className="more-filter inline-flex min-h-11 items-center gap-2 px-1 text-sm">
-              <input type="checkbox" name="prov" value="0" defaultChecked={!!f.prov} className="size-4 accent-sky" />
+              <input type="checkbox" name="prov" value="0" defaultChecked={!!f.prov} className="size-5 accent-sky" />
               Leave out {LATEST_YEAR} R1 (provisional) from the labels
             </label>
           )}
         </Fragment>
-        <MoreFilters open={profile.maxFeeLakh != null || profile.maxBondYears != null || !!f.seats || !!f.prov} />
+        {/* Remounts only when a folded filter is newly set or cleared (e.g. "Include them"), so it opens to show it; otherwise her tick survives. */}
+        <MoreFilters key={`more-${moreOpen}`} open={moreOpen} />
         <Button type="submit">Apply</Button>
       </FilterForm>
-      <ActiveFilters items={active} clear={here({ q: null, reach: null, seats: null, closed: null, prov: null, quota: null, st: null, fee: null, bond: null })} />
+      <ActiveFilters
+        items={active}
+        clear={here({ q: null, reach: null, seats: null, closed: null, prov: null, quota: null, st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) })}
+      />
 
       <nav aria-label="Filter by reach" className="flex flex-wrap gap-2">
         <Link href={here({ reach: null })} aria-current={!f.reach ? "true" : undefined} className={chip(!f.reach)}>
@@ -218,49 +237,38 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         ))}
       </nav>
       {(r.hiddenClosed > 0 || (r.showClosed && !f.reach && r.counts["closed-before"] > 0)) && (
-        <p className="text-sm text-muted-foreground">
-          {r.hiddenClosed > 0 ? (
-            <>
-              <span className="numeric">{formatRank(r.hiddenClosed)}</span> that closed before your rank in every round of {counted} are hidden
-              {r.hiddenProvisional > 0 && <> (<span className="numeric">{formatRank(r.hiddenProvisional)}</span> of them only in the provisional {LATEST_YEAR} R1)</>}.
-            </>
-          ) : (
-            <><span className="numeric">{formatRank(r.counts["closed-before"])}</span> that closed before your rank in every round of {counted} are included.</>
-          )}{" "}
+        <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+          <span className="mr-1">{r.hiddenClosed > 0 ? <>{n(r.hiddenClosed)} closed before your rank hidden.</> : "Closed ones shown."}</span>
           {/* One link in both states, so React keeps the element and focus stays on it after the toggle. */}
           <Link href={here({ closed: r.hiddenClosed > 0 ? "1" : "0" })} className={`${smallLink} text-sky`}>{r.hiddenClosed > 0 ? "Show them" : "Hide them"}</Link>
+          <InfoTip label="closed before your rank">
+            Options whose closing rank came before yours in every round of {counted}
+            {r.hiddenProvisional > 0 && ` (${formatRank(r.hiddenProvisional)} of the hidden ones only in the provisional ${LATEST_YEAR} R1)`}.
+          </InfoTip>
         </p>
       )}
 
       {r.virtualOnly && r.virtualOnly.options > 0 && (
         <p className="text-sm text-muted-foreground">
-          <span className="numeric">{formatRank(r.virtualOnly.options)}</span> more {r.virtualOnly.options === 1 ? "option has" : "options have"} seats only in the{" "}
-          {r.virtualOnly.list.year} {roundLabel[r.virtualOnly.list.round]} virtual vacancy list (seats that open if their holder upgrades or leaves), so this filter hides{" "}
-          {r.virtualOnly.options === 1 ? "it" : "them"}.{" "}
+          {n(r.virtualOnly.options)} more only in the {r.virtualOnly.list.year} {roundLabel[r.virtualOnly.list.round]} virtual vacancy list.{" "}
           <Link href={here({ seats: "virtual" })} className={`${smallLink} text-sky`}>Show options with virtual vacancy seats</Link>
         </p>
       )}
       {unlisted && <UnlistedSeats u={unlisted} profile href={L.to("/decide/seats", { view: "list", list: unlisted.list.key, nohist: "1" })} />}
       {r.noState > 0 && (
         <p className="text-sm text-muted-foreground">
-          <span className="numeric">{formatRank(r.noState)}</span> more {r.noState === 1 ? "option" : "options"} with {round} seats in your courses, quotas and seat categories{" "}
-          {r.noState === 1 ? "is at an institute" : "are at institutes"} with no state in Decide&apos;s data, so the state filter leaves {r.noState === 1 ? "it" : "them"} out.
+          {n(r.noState)} more with {round} seats left out by the state filter: no state in Decide&apos;s data.
+        </p>
+      )}
+      {r.unknownTerms > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {n(r.unknownTerms)} more left out: a filtered fee, stipend, bond or leaving figure is not declared.{" "}
+          <Link href={here({ nd: "keep" })} className={`${smallLink} text-sky`}>Include them</Link>
         </p>
       )}
       {/* Stays mounted across filter changes (OptionsResults remounts), so the new count is announced. */}
       <p role="status" className="sr-only">{formatRank(r.total)} {r.total === 1 ? "option matches" : "options match"}</p>
 
-      {r.total > CSV_MAX_ROWS ? (
-        <p className="text-sm text-muted-foreground">
-          <span className="numeric">{formatRank(r.total)}</span> options are more than one CSV download holds (<span className="numeric">{formatRank(CSV_MAX_ROWS)}</span>): narrow the filters to download them.
-        </p>
-      ) : (
-        r.total > 0 && (
-          <Button asChild variant="secondary" className="justify-self-start">
-            <a href={`/api/v1/options/export?${api}`} download>Download these {formatRank(r.total)} options (CSV)</a>
-          </Button>
-        )
-      )}
       {r.total ? (
         <OptionsResults
           key={`${api}|${r.page}`}
@@ -271,46 +279,37 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           query={api.toString()}
           caption={caption}
           firstPageHref={r.page > 1 ? here({}) : undefined}
+          tools={
+            r.total > CSV_MAX_ROWS ? (
+              <span className="text-xs text-muted-foreground">CSV: narrow to <span className="numeric">{formatRank(CSV_MAX_ROWS)}</span> or fewer</span>
+            ) : (
+              <Button asChild variant="secondary">
+                <a href={`/api/v1/options/export?${api}`} download><Download className="size-4" aria-hidden />CSV<span className="sr-only">: download these {formatRank(r.total)} options</span></a>
+              </Button>
+            )
+          }
           latestYear={LATEST_YEAR}
           pastYears={PAST_YEARS}
           includeLatest={!f.prov}
           seatLists={lists}
+          historyMore={
+            <>
+              Closing = the highest All India Rank allotted in that round on a seat of that category; here {seats} seats, the ones you can take. {LATEST_YEAR} R1 is that round alone. Labels
+              count every round of {PAST_YEARS[0]} and {PAST_YEARS[1]}{!f.prov && `, and ${LATEST_YEAR} R1`}; Rounds by year shows every round of every year (R2 and R3 included), older years
+              too, which the labels do not count; its bracketed numbers are allotments made that round in every category, not the seat matrix.
+            </>
+          }
         />
       ) : (
         <EmptyState
           title="No options match"
-          description="Nothing in your profile matches this search and label. Clear them, or widen the course, quota, state, fee or bond filters above."
-          href={here({ q: null, reach: null, closed: "1", seats: roundView ? "all" : null })}
-          action="Clear search, seats and labels"
+          description="Clear the search and page filters, or widen your courses, quotas or states above."
+          href={here({ q: null, reach: null, closed: "1", seats: roundView ? "all" : null, ...Object.fromEntries(termKeys.map((k) => [k, null])) })}
+          action="Clear search and page filters"
         />
       )}
 
-      <div className="grid gap-2 text-xs text-muted-foreground">
-        <p>{HISTORY_CAPTION}</p>
-        <p>
-          Closing = the highest All India Rank allotted in that round on a seat of that category; here {seats} seats, the ones you can take. {LATEST_YEAR} R1 is
-          that round alone. Bracketed numbers are allotments made that round in every category, not the seat matrix.
-        </p>
-        <p>
-          Labels count every round of {PAST_YEARS[0]} and {PAST_YEARS[1]}{!f.prov && `, and ${LATEST_YEAR} R1`}; Rounds by year shows every round of every year (R2 and R3 included), older years too, which the labels do not count.
-        </p>
-        {lists.length > 0 && (
-          <p>
-            {round} seats: {lists.map((l) => seatKindLabel[l.kind].toLowerCase()).join(", ")}, each its own MCC list, counted in this option&apos;s quota and your seat categories ({seats}); &quot;—&quot; when that
-            list has none. The lists overlap, so they are never added: {lists.map((l) => `${l.kind[0].toUpperCase()}${l.kind.slice(1)}: ${seatKindNote[l.kind]}`).join(" ")} Select a number to see those seats.
-          </p>
-        )}
-        {roundView && (
-          <p>
-            {round} view: options with seats in a {round} list in your courses (or every option, when you ask for those without), sorted by label (reached, then within 10%, then new and
-            no allotment in your categories, closed before your rank last), then {round} clear vacancy seats, then the deepest {PAST_YEARS[1]} closing. New: no past allotment = MCC allotted
-            nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years)}), in any round or seat category, so there is no closing rank to compare.
-          </p>
-        )}
-        <p>
-          Within 10%: in a past round the closing rank was at least 90% of yours (AIR <span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or
-          later) but before your rank. Options with no fee or bond listed stay in when you set a fee or bond limit.
-        </p>
+      <div className="grid gap-1 text-xs text-muted-foreground">
         <DataSource terms={termDocs(r.rows.map((x) => x.fees))} />
         {lists.map((l) => <SeatSource key={l.key} list={l} L={L} />)}
       </div>

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { setTestCatalog } from "../../server/catalog";
 import { decideDemoData as fx } from "../../test/decide.demo";
+import { feeValue } from "../../lib/term-filters";
 import { allotmentsCsv, allotmentsView } from "./allotments-view";
 
 vi.stubEnv("DATABASE_URL", "");
@@ -24,7 +25,20 @@ it("CSV: candidate category, choice no., status, the previous seat with its rema
   expect(lines[0]).toContain(",Seat category,Candidate category,Choice no.,Status,Institute,");
   expect(lines[1]).toContain(`,${a.category},OBC,7,Upgraded,`);
   expect(lines[1]).toContain(",Prev College,MD X,All India,seat surrendered,");
+  // The stat cells' plain numbers after the previous seat ("—" when not declared), then type and beds.
+  expect(lines[0]).toContain(",Previous seat remark,Fee year 1 ₹,Stipend year 1 ₹/month,Bond years,Bond ₹ (highest),Leaving penalty ₹ (highest),Type (not official),Beds (self-reported),");
+  const n = (x: number | null) => (x == null ? "—" : String(x));
+  expect(lines[1]).toContain(`,seat surrendered,${[feeValue.fee1(a.fees), feeValue.stip1(a.fees), feeValue.bondyrs(a.fees), feeValue.bond(a.fees), feeValue.leave(a.fees)].map(n).join(",")},—,—,`);
   expect(lines[2]).toMatch(/,—,—,(Fresh|Upgraded),.*,—,—,—,—,/); // no candidate category, choice no. or previous seat
   expect(lines).toContain("A note");
   expect(lines.filter((l) => l.includes("2025 R2 allotments")).length).toBe(1);
+});
+
+it("unknownTerms: the rows Include not declared (nd=keep) would add; 0 with it ticked or with no term filter", async () => {
+  const strict = (await allotmentsView(new URLSearchParams("year=all&minstip=50000"), 10))!;
+  const keep = (await allotmentsView(new URLSearchParams("year=all&minstip=50000&nd=keep"), 10))!;
+  expect(strict.r.unknownTerms).toBeGreaterThan(0);
+  expect(strict.r.unknownTerms).toBe(keep.r.total - strict.r.total);
+  expect(keep.r.unknownTerms).toBe(0);
+  expect((await allotmentsView(new URLSearchParams("year=all"), 10))!.r.unknownTerms).toBe(0);
 });

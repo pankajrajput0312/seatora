@@ -7,7 +7,8 @@ import type { Catalog } from "./catalog";
 
 /** Filters pushed into SQL. `cs` = CollegeSpecialty ids; undefined means no restriction, [] means nothing. */
 export type CutoffQuery = { cs?: string[]; quotas?: string[]; categories?: string[]; years?: number[] };
-export type AllotmentQuery = { cs?: string[]; year?: number; round?: Round; quota?: string; category?: string; from?: number; to?: number };
+/** `csQuota`: only these (CollegeSpecialty id, quota) pairs (the term filters' options); [] matches nothing. */
+export type AllotmentQuery = { cs?: string[]; csQuota?: [string, string][]; year?: number; round?: Round; quota?: string; category?: string; from?: number; to?: number };
 
 /** MCC's remark, from the status: "Allotted" (R1, stray rounds), "Fresh" (a fresh allotment in R2 / R3), "Upgraded" (moved up a seat). */
 export const remarkOf = (status: string): Allotment["remark"] => (status === "upgraded" ? "Upgraded" : status === "fresh" ? "Fresh" : "Allotted");
@@ -103,14 +104,16 @@ export async function findReachInputs(
 
 /** Allotments, newest year first, then round, then rank. `total` counts every match (only when `count` is set). */
 export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { limit?: number; offset?: number; count?: boolean } = {}): Promise<{ total: number; rows: Allotment[] }> {
-  if (q.cs?.length === 0) return { total: 0, rows: [] };
+  if (q.cs?.length === 0 || q.csQuota?.length === 0) return { total: 0, rows: [] };
   const offset = opts.offset ?? 0;
   if (cat.mem) {
     const cs = q.cs && new Set(q.cs);
+    const csq = q.csQuota && new Set(q.csQuota.map(([c, qu]) => `${c}|${qu}`));
     const all = cat.mem.allotments
       .filter(
         (a) =>
           (!cs || cs.has(memCs(a))) &&
+          (!csq || csq.has(`${memCs(a)}|${a.quota}`)) &&
           (!q.year || a.year === q.year) &&
           (!q.round || a.round === q.round) &&
           (!q.quota || a.quota === q.quota) &&
@@ -123,6 +126,7 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
   }
   const where = [
     q.cs && csIn(q.cs),
+    q.csQuota && Prisma.sql`("collegeSpecialtyId", quota) IN (SELECT * FROM unnest(${q.csQuota.map((x) => x[0])}::text[], ${q.csQuota.map((x) => x[1])}::text[]))`,
     q.year && Prisma.sql`"counsellingYear" = ${q.year}`,
     q.round && Prisma.sql`round = ${q.round}`,
     q.quota && Prisma.sql`quota = ${q.quota}`,

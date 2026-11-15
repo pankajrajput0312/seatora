@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { getCatalog, memoryCatalog, yearsOf } from "../../server/catalog";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getCatalog, memoryCatalog, setTestCatalog, yearsOf } from "../../server/catalog";
 import { countAllotments, findAllotments } from "../../server/queries";
 import type { SeatRow } from "../../server/seats";
 import { decideDemoData as fx } from "../../test/decide.demo";
 import type { Source } from "../../types";
-import { allotmentMix, optionSeats, websiteUrl } from "./institute-data";
+import { reportedCount } from "./hospital-bits";
+import { allotmentMix, institutesByTerms, optionSeats, websiteUrl } from "./institute-data";
 
 const src = (year: number, round: Source["round"], provisional = false): Source => ({ key: `${year}${round}`, url: null, year, round, provisional, name: "" });
 
@@ -66,6 +67,39 @@ it("websiteUrl: the MCC profile's website as an http(s) link, never another sche
   expect(websiteUrl("javascript:alert(1)")).toBeNull();
   expect(websiteUrl("localhost:3000")).toBeNull();
   expect(websiteUrl(null)).toBeNull();
+});
+
+describe("institutesByTerms on the test fixture", () => {
+  beforeAll(() => setTestCatalog(fx));
+  afterAll(() => setTestCatalog(null));
+  it("an institute passes when one of its options does; not declared is left out (and counted) unless nd=keep", async () => {
+    const sorted = (xs: Iterable<string>) => [...xs].sort();
+    expect(await institutesByTerms({})).toBeNull();
+    const cap = (await institutesByTerms({ maxFee: 1 }))!;
+    const keep = (await institutesByTerms({ maxFee: 1, keepUnknown: true }))!;
+    expect(keep.unknown.size).toBe(0);
+    expect(sorted(keep.pass)).toEqual(sorted([...cap.pass, ...cap.unknown]));
+    // A cap above every fee: no institute fails it; the ones with no year-1 fee anywhere are the unknown ones.
+    const loose = (await institutesByTerms({ maxFee: 1e12 }))!;
+    expect(loose.pass.size).toBeGreaterThan(0);
+    expect(sorted([...loose.pass, ...loose.unknown])).toEqual(sorted(fx.colleges.map((c) => c.key)));
+    // No type in the memory catalog: a type filter lists none, and never as unknown; "No bond" is never unknown either.
+    const typed = (await institutesByTerms({ types: ["govt"], keepUnknown: true }))!;
+    expect(typed.pass.size + typed.unknown.size).toBe(0);
+    expect((await institutesByTerms({ maxBondYears: 0 }))!.unknown.size).toBe(0);
+  });
+});
+
+it("reportedCount: a count without its own entry keeps only the block's period flag, in view and in its source line", () => {
+  const meta = { source_type: "nirf", url: "https://example.org", period: "2022", checked: "2026-11-15", flags: ["self_reported", "old", "conflicting", "derived"] } as never;
+  const inherited = reportedCount({ n: 3522, meta, own: false });
+  expect(inherited.flags).toEqual(["old"]);
+  expect(inherited.meta!.flags).toEqual(["self_reported", "old"]);
+  expect(inherited.conflicting).toBe(false);
+  const own = reportedCount({ n: 500, meta, own: true });
+  expect(own.meta!.flags).toEqual(["self_reported", "old", "conflicting", "derived"]);
+  expect(own.conflicting).toBe(true);
+  expect(reportedCount({ n: 1, meta: null, own: true }).meta).toBeNull();
 });
 
 // Real MCC data (DATABASE_URL set): the SQL path agrees with the allotment rows.

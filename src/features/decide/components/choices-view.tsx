@@ -1,27 +1,50 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowDown, ArrowUp, Check, GripVertical, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { formatRank } from "@/features/cutoffs/lib/format";
 import { duplicateList, markTypedUpTo, move, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
 import { LATEST_YEAR, PAST_YEARS, reachWindow, seatsBelowText, type Reach, type SeatsBelow } from "../lib/reach";
+import { statKeys, statLabel } from "../lib/stat-format";
 import { useChoices, useDecideLinks } from "../lib/use-decide-store";
 import { keepProfileParams } from "../profile";
-import type { SeatsBy } from "../service";
+import type { ProgrammeTerms } from "../server/terms";
+import type { RowHospital, SeatsBy } from "../service";
 import { roundLabel, type SeatList } from "../types";
-import { ReachBadge } from "./bits";
+import { Dash, ReachBadge } from "./bits";
+import { InfoTip } from "./info-tip";
 import { CompareToggle } from "./option-actions";
 import { SeatsLink } from "./options-view";
-import { control, EmptyState, smallLink } from "./ui";
+import { Beds } from "./pages/beds";
+import { ResultCard } from "./result-card";
+import { TermStatCells } from "./stat-cells";
+import { TypeBadge } from "./type-badge";
+import { control, EmptyState, smallLink, tbl } from "./ui";
+import { useView, ViewToggle } from "./view-toggle";
 
-type Live = Record<string, { reach: Reach; provisional: boolean; seats: SeatsBy; below: SeatsBelow[] }>;
+/** `reach` null: no rank in the address (terms and hospital only; the stored label stays). */
+type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; fees: ProgrammeTerms; hospital: RowHospital }>;
+
+// Memoised: a reorder re-renders every row, but each one's terms, type and beds (their (i) tips and source refs, the
+// bulk of a long list) only change when the live data does.
+const StatCellsM = memo(TermStatCells);
+const TypeBadgeM = memo(TypeBadge);
+const BedsM = memo(Beds);
+
+const WIDE = "(min-width: 48rem)"; // Tailwind md: ViewToggle's default (cards below it, the table from it up)
+const onWide = (cb: () => void) => {
+  const m = window.matchMedia(WIDE);
+  m.addEventListener("change", cb);
+  return () => m.removeEventListener("change", cb);
+};
 /**
  * Reach labels and seats per list (`lists`: the newest round's clear, virtual, new) from the current data for these ids
- * and profile params (a server action); null when unavailable.
+ * and profile params (a server action); with no rank only the terms and hospital. null when unavailable.
  */
 type ReachFor = (ids: string[], profile: string) => Promise<{ lists: SeatList[]; options: Live } | null>;
 
@@ -36,7 +59,10 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
   const [removed, setRemoved] = useState<{ listId: string; listName: string; item: ChoiceItem; index: number } | null>(null);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const dragFrom = useRef<number | null>(null);
-  const listRef = useRef<HTMLOListElement>(null);
+  // Cards or table (ViewToggle "choices"). Only the one shown is rendered: its controls carry the ids focus moves to.
+  const chosen = useView("choices");
+  const wide = useSyncExternalStore(onWide, () => window.matchMedia(WIDE).matches, () => false);
+  const view = chosen ?? (wide ? "table" : "cards");
 
   const items = list.items;
   const n = items.length;
@@ -45,21 +71,27 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
   const name = (i: ChoiceItem) => `${i.institute}, ${i.course}`;
   const setItems = (next: ChoiceItem[]) => setState((s) => updateActive(s, (l) => ({ ...l, items: next })));
 
-  // Relabel from the current data and her rank and category in the URL; the stored labels are the fallback.
+  // Relabel from the current data and her rank and category in the URL; the stored labels are the fallback. With no
+  // rank the terms and hospital still come (they don't depend on it).
   const url = new URLSearchParams(sp.toString());
   const who = new URLSearchParams([...keepProfileParams(url)].filter(([k]) => k === "rank" || k === "cat" || k === "pwd")).toString();
-  const liveKey = who.includes("rank=") && n ? JSON.stringify([who, items.map((i) => i.id).sort()]) : "";
+  const ranked = new URLSearchParams(who).has("rank");
+  const liveKey = n ? JSON.stringify([who, items.map((i) => i.id).sort()]) : "";
   // Labels gathered for this rank and category (kept across edits, so nothing flickers); `fresh` = the last answer
   // covered exactly these ids, so a missing id really is missing from the data.
   const [live, setLive] = useState<{ who: string; key: string; data: Live; lists: SeatList[] } | null>(null);
+  // The last key the server had no answer for (no data, no access): its rows say "—", not "Loading".
+  const [failed, setFailed] = useState("");
   useEffect(() => {
     if (!hydrated || !reachFor || !liveKey) return;
     let stale = false;
     const [qs, ids] = JSON.parse(liveKey) as [string, string[]];
-    reachFor(ids, qs).then(
-      (r) => !stale && r && setLive((prev) => ({ who: qs, key: liveKey, lists: r.lists, data: { ...(prev?.who === qs ? prev.data : {}), ...r.options } })),
-      () => {}, // no data: keep the stored labels
-    );
+    const fail = () => !stale && setFailed(liveKey); // no data: keep the stored labels
+    reachFor(ids, qs).then((r) => {
+      if (stale) return;
+      if (!r) return fail();
+      setLive((prev) => ({ who: qs, key: liveKey, lists: r.lists, data: { ...(prev?.who === qs ? prev.data : {}), ...r.options } }));
+    }, fail);
     return () => {
       stale = true;
     };
@@ -74,7 +106,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
     requestAnimationFrame(() => {
       const el = id ? document.getElementById(`${which}-${id}`) : null;
       const handle = id ? document.getElementById(`handle-${id}`) : null;
-      const target = el && !(el as HTMLButtonElement).disabled ? el : handle ?? listRef.current ?? document.getElementById("choices-undo") ?? document.getElementById("choices-h");
+      const target = el && !(el as HTMLButtonElement).disabled ? el : handle ?? document.getElementById("choices-list") ?? document.getElementById("choices-undo") ?? document.getElementById("choices-h");
       target?.focus();
       target?.scrollIntoView({ block: "nearest" });
     });
@@ -159,8 +191,198 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
 
   if (!hydrated) return <div className="mt-8 h-40 animate-pulse rounded-xl bg-muted" />;
 
+  /** One choice's state: typed, its live label, seats and terms (`lr`), and the warnings shown in view. */
+  const rowOf = (item: ChoiceItem, i: number) => {
+    const typed = list.typedIds.includes(item.id);
+    const lr = current?.[item.id];
+    const closed = lr?.reach ? lr.reach === "closed-before" : item.closedEveryRound;
+    const flags = [
+      (counts.get(dupKey(item)) ?? 0) > 1 && "Same institute and course listed more than once",
+      closed && `Closed before your rank in every round of ${reachWindow(LATEST_YEAR, PAST_YEARS)}${lr?.reach ? "" : " (when added)"}`,
+      // Seats are matched to the option by institute and course; say what was found, not what MCC printed.
+      lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
+      ...(lr?.below ?? []).map((b) => seatsBelowText(b, LATEST_YEAR, PAST_YEARS)),
+      fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
+      typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
+    ].filter(Boolean) as string[];
+    return { typed, lr, flags, picking: picked?.index === i };
+  };
+  const drop = (i: number) => ({
+    onDragOver: (e: React.DragEvent) => e.preventDefault(),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (dragFrom.current != null) {
+        const to = reorder(dragFrom.current, i);
+        setAnnounce(`${name(items[dragFrom.current])} moved to position ${to + 1}.`);
+      }
+      dragFrom.current = null;
+    },
+  });
+  const handle = (item: ChoiceItem, i: number, picking: boolean) => (
+    <Button
+      id={`handle-${item.id}`}
+      size="icon"
+      variant="ghost"
+      draggable
+      onDragStart={(e) => { dragFrom.current = i; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", item.id); }}
+      onKeyDown={(e) => onHandleKey(e, i)}
+      onBlur={() => picked && setPicked(null)}
+      aria-label={`Reorder ${name(item)}, position ${i + 1} of ${n}. ${picking ? "Picked up: arrows move it, Space drops it, Escape cancels." : "Press Space to pick up."}`}
+      aria-pressed={picking}
+      className="shrink-0 cursor-grab active:cursor-grabbing"
+      data-print-hide
+    >
+      <GripVertical className="size-5" aria-hidden />
+    </Button>
+  );
+  const upDown = (item: ChoiceItem, i: number) => (
+    <>
+      <Button id={`up-${item.id}`} size="icon" variant="ghost" disabled={i === 0} aria-label={`Move ${name(item)} up`} onClick={() => moveBy(i, -1)} data-print-hide><ArrowUp className="size-4" aria-hidden /></Button>
+      <Button id={`down-${item.id}`} size="icon" variant="ghost" disabled={i === n - 1} aria-label={`Move ${name(item)} down`} onClick={() => moveBy(i, 1)} data-print-hide><ArrowDown className="size-4" aria-hidden /></Button>
+    </>
+  );
+  const removeButton = (item: ChoiceItem, i: number) => (
+    <Button size="icon" variant="danger" aria-label={`Remove ${name(item)}`} onClick={() => remove(i)}><Trash2 className="size-4" aria-hidden /></Button>
+  );
+  /** Cards: move to a position, compare, remove (the table has drag, the handle and up / down). */
+  const tools = (item: ChoiceItem, i: number) => (
+    <span className="flex flex-wrap items-center gap-1" data-print-hide>
+      <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("to")); if (v) { const t = reorder(i, v - 1); focusItem(item.id); setAnnounce(`${name(item)} moved to position ${t + 1} of ${n}.`); } }}>
+        <label className="sr-only" htmlFor={`to-${item.id}`}>Move {name(item)} to position</label>
+        <span className="w-16"><input id={`to-${item.id}`} name="to" type="number" min={1} max={n} placeholder="#" className={cn(control, "numeric")} /></span>
+        <Button type="submit" variant="ghost">Move</Button>
+      </form>
+      <CompareToggle id={item.id} label={name(item)} />
+      {removeButton(item, i)}
+    </span>
+  );
+  const reachOf = (item: ChoiceItem, lr: Live[string] | undefined) =>
+    lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>;
+  const typedBadge = <Badge tone="success"><Check className="mr-1 size-3" aria-hidden />Typed into MCC</Badge>;
+  const seatsOf = (item: ChoiceItem, lr: Live[string], l: SeatList) => (
+    <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${item.quota}`} />
+  );
+  const related = (item: ChoiceItem, lr: Live[string] | undefined) =>
+    item.courseSlug && lr?.reach !== "new" && (
+      <span className="flex flex-wrap gap-x-4 text-xs" data-print-hide>
+        <Link href={L.lastRanks(item.courseSlug, { inst: item.slug })} className={cn(smallLink, "text-sky")}>Last ranks</Link>
+        <Link href={L.allotments({ course: item.courseSlug, inst: item.slug })} className={cn(smallLink, "text-sky")}>Allotments</Link>
+      </span>
+    );
+  const flagLines = (flags: string[]) => flags.map((f) => <span key={f} className="block text-xs text-sun">{f}</span>);
+  const listName = `${list.name} choice list, ${n} items`;
+
+  const cards = (
+    <ol id="choices-list" tabIndex={-1} aria-label={listName} className="grid max-w-4xl gap-3">
+      {items.map((item, i) => {
+        const { typed, lr, flags, picking } = rowOf(item, i);
+        return (
+          <li key={item.id} {...drop(i)} className={cn("grid min-w-0 rounded-xl", picking && "ring-2 ring-sky")}>
+            <ResultCard
+              chips={[item.quota, reachOf(item, lr), typed && typedBadge]}
+              actions={<>{handle(item, i, picking)}{upDown(item, i)}</>}
+              stat={{ label: "Choice", value: formatRank(i + 1) }}
+              title={item.institute}
+              href={L.institute(item.slug)}
+              subtitle={item.course}
+              meta={[item.state ?? "State not listed", lr?.hospital?.type && <TypeBadgeM type={lr.hospital.type} of={item.institute} />, lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />]}
+              footer={
+                <>
+                  {lr && <StatCellsM t={lr.fees} of={name(item)} />}
+                  <div className={cn("grid gap-1 px-4 py-2", lr && "border-t border-border")}>
+                    {lr && lists.length > 0 && (
+                      <p className="flex flex-wrap items-center gap-x-3 text-xs">
+                        <span className="text-muted-foreground">{round} seats:</span>
+                        {lists.map((l) => <span key={l.key} className="inline-flex items-center gap-1">{l.kind}{seatsOf(item, lr, l)}</span>)}
+                      </p>
+                    )}
+                    {flags.length > 0 && <p>{flagLines(flags)}</p>}
+                    <div className="flex flex-wrap items-center justify-between gap-x-3">
+                      {related(item, lr)}
+                      {tools(item, i)}
+                    </div>
+                  </div>
+                </>
+              }
+            />
+          </li>
+        );
+      })}
+    </ol>
+  );
+
+  const th = cn(tbl.th, "whitespace-nowrap");
+  const kindShort = { clear: "Clear", virtual: "Virtual", new: "New" } as const;
+  // A long figure ("1 + 1 = 2 years", a ₹ range) may wrap, so the five cells fit beside the names at laptop widths.
+  const statTd = "px-3! [&>span]:whitespace-normal";
+  // Every row control sits in the sticky Choice cell, so a move never scrolls the table sideways; the round's seat
+  // lists share one column.
+  const table = (
+    <div id="choices-list" role="region" aria-label={listName} tabIndex={0} className={cn(tbl.wrap, tbl.scroll)}>
+      <table className={tbl.table}>
+        <caption className="sr-only">{listName}</caption>
+        <thead className={tbl.head}>
+          <tr className={tbl.headRow}>
+            <th scope="col" className={cn(th, "bg-card md:sticky md:left-0 md:z-[3]")}>Choice</th>
+            <th scope="col" className={cn(th, "px-3!")}>Your reach</th>
+            {lists.length > 0 && <th scope="col" className={cn(th, "px-3! text-right")}>{round} seats</th>}
+            {statKeys.map((k) => <th key={k} scope="col" className={cn(th, "px-3! text-right")}>{statLabel[k]}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, i) => {
+            const { typed, lr, flags, picking } = rowOf(item, i);
+            return (
+              <tr key={item.id} {...drop(i)} className={cn(tbl.row, picking && "outline-2 -outline-offset-2 outline-sky")}>
+                {/* Sticky from md up; on a phone a sticky 18rem column would leave no room for the others. */}
+                <th scope="row" className={cn(tbl.td, "min-w-64 bg-card py-2 text-left font-normal md:sticky md:left-0 md:z-[1] md:w-64")}>
+                  <span className="flex items-start gap-1">
+                    {handle(item, i, picking)}
+                    <span className="numeric grid h-11 min-w-8 place-items-center text-base font-bold">{i + 1}</span>
+                    <span className="min-w-0 py-1">
+                      <Link href={L.institute(item.slug)} className="font-medium hover:text-sky hover:underline">{item.institute}</Link>
+                      <span className="block text-xs text-muted-foreground">{item.course}, {item.quota}</span>
+                      <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                        {item.state ?? "State not listed"}
+                        {lr?.hospital?.type && <TypeBadgeM type={lr.hospital.type} of={item.institute} />}
+                        {lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />}
+                        {typed && typedBadge}
+                      </span>
+                      {flagLines(flags)}
+                      <span className="-ml-2.5 flex items-center" data-print-hide>
+                        {upDown(item, i)}
+                        <CompareToggle id={item.id} label={name(item)} />
+                        {removeButton(item, i)}
+                      </span>
+                    </span>
+                  </span>
+                </th>
+                <td className={cn(tbl.td, "px-3! text-xs")}>{reachOf(item, lr)}</td>
+                {lists.length > 0 && (
+                  <td className={cn(tbl.td, "px-3! py-1! text-right text-xs")}>
+                    {lists.map((l) => (
+                      <span key={l.key} className="flex min-h-11 items-center justify-end gap-1 whitespace-nowrap">
+                        <span className="text-muted-foreground">{kindShort[l.kind]}</span>
+                        {lr ? seatsOf(item, lr, l) : <Dash />}
+                      </span>
+                    ))}
+                  </td>
+                )}
+                {lr ? (
+                  <StatCellsM t={lr.fees} variant="table" of={name(item)} tdClassName={statTd} />
+                ) : (
+                  <td colSpan={statKeys.length} className={cn(tbl.td, "text-xs text-muted-foreground")}>{fresh || failed === liveKey || !reachFor ? <Dash /> : "Loading terms…"}</td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
-    <div className="mt-8 grid gap-6">
+    <div className="mt-6 grid gap-4">
       <div className="flex flex-wrap items-center gap-2" data-print-hide>
         {state.lists.map((l) => (
           <Button key={l.id} variant={l.id === list.id ? "primary" : "secondary"} aria-pressed={l.id === list.id} onClick={() => setState((s) => ({ ...s, activeId: l.id }))}>
@@ -182,7 +404,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
         <Button variant="secondary" disabled={!n} onClick={copy}>Copy in MCC order</Button>
         <Button variant="secondary" disabled={!n} onClick={download}>Download CSV</Button>
         <Button variant="secondary" disabled={!n} onClick={() => window.print()}>Print</Button>
-        <label className="ml-auto inline-flex min-h-11 items-center gap-2 text-sm">
+        <label className="inline-flex min-h-11 items-center gap-2 text-sm">
           Typed into the MCC portal up to #
           <span className="w-20">
             <input
@@ -192,6 +414,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
             />
           </span>
         </label>
+        <ViewToggle page="choices" className="ml-auto" />
       </div>
       {copyMsg && <p className="text-sm" data-print-hide>{copyMsg}</p>}
       {missingTyped > 0 && (
@@ -217,91 +440,14 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
         </EmptyState>
       ) : (
         <>
-          <ol ref={listRef} tabIndex={-1} aria-label={`${list.name} choice list, ${n} items`} className="grid gap-2">
-            {items.map((item, i) => {
-              const typed = list.typedIds.includes(item.id);
-              const lr = current?.[item.id];
-              const closed = lr ? lr.reach === "closed-before" : item.closedEveryRound;
-              const flags = [
-                (counts.get(dupKey(item)) ?? 0) > 1 && "Same institute and course listed more than once",
-                closed && `Closed before your rank in every round of ${reachWindow(LATEST_YEAR, PAST_YEARS)}${lr ? "" : " (when added)"}`,
-                // Seats are matched to the option by institute and course; say what was found, not what MCC printed.
-                lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
-                ...(lr?.below ?? []).map((b) => seatsBelowText(b, LATEST_YEAR, PAST_YEARS)),
-                fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
-                typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
-              ].filter(Boolean) as string[];
-              const picking = picked?.index === i;
-              return (
-                <li
-                  key={item.id}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => { e.preventDefault(); if (dragFrom.current != null) { const to = reorder(dragFrom.current, i); setAnnounce(`${name(items[dragFrom.current])} moved to position ${to + 1}.`); } dragFrom.current = null; }}
-                  className={cn("grid grid-cols-[auto_auto_1fr] items-start gap-3 rounded-xl border bg-card p-3 sm:grid-cols-[auto_auto_1fr_auto]", picking ? "border-sky" : "border-border")}
-                >
-                  <Button
-                    id={`handle-${item.id}`}
-                    size="icon"
-                    variant="ghost"
-                    draggable
-                    onDragStart={(e) => { dragFrom.current = i; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", item.id); }}
-                    onKeyDown={(e) => onHandleKey(e, i)}
-                    onBlur={() => picked && setPicked(null)}
-                    aria-label={`Reorder ${name(item)}, position ${i + 1} of ${n}. ${picking ? "Picked up: arrows move it, Space drops it, Escape cancels." : "Press Space to pick up."}`}
-                    aria-pressed={picking}
-                    className="cursor-grab active:cursor-grabbing"
-                    data-print-hide
-                  >
-                    <GripVertical className="size-5" aria-hidden />
-                  </Button>
-                  <span className="grid h-11 min-w-11 place-items-center text-xl font-bold tabular-nums">{i + 1}</span>
-                  <div className="min-w-0 py-1">
-                    <p className="font-medium">
-                      <Link href={L.institute(item.slug)} className="hover:text-sky hover:underline">{item.institute}</Link>
-                      {typed && <Badge tone="success" className="ml-2 align-middle"><Check className="mr-1 size-3" aria-hidden />Typed into MCC</Badge>}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{item.course}, {item.quota}, {item.state ?? "state not listed"}</p>
-                    <p className="mt-1 text-xs">
-                      {lr ? <ReachBadge reach={lr.reach} provisional={lr.provisional} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>}
-                    </p>
-                    {lr && lists.length > 0 && (
-                      <p className="flex flex-wrap items-center gap-x-3 text-xs">
-                        <span className="text-muted-foreground">{round} seats:</span>
-                        {lists.map((l) => (
-                          <span key={l.key} className="inline-flex items-center gap-1">
-                            {l.kind}
-                            <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${item.quota}`} />
-                          </span>
-                        ))}
-                      </p>
-                    )}
-                    {item.courseSlug && lr?.reach !== "new" && (
-                      <p className="flex flex-wrap gap-x-4 text-xs" data-print-hide>
-                        <Link href={L.lastRanks(item.courseSlug, { inst: item.slug })} className={cn(smallLink, "text-sky")}>Last ranks</Link>
-                        <Link href={L.allotments({ course: item.courseSlug, inst: item.slug })} className={cn(smallLink, "text-sky")}>Allotments</Link>
-                      </p>
-                    )}
-                    {flags.map((f) => <p key={f} className="mt-1 text-xs text-sun">{f}</p>)}
-                  </div>
-                  <div className="col-span-3 flex flex-wrap items-center gap-1 sm:col-span-1" data-print-hide>
-                    <Button id={`up-${item.id}`} size="icon" variant="ghost" disabled={i === 0} aria-label={`Move ${name(item)} up`} onClick={() => moveBy(i, -1)}><ArrowUp className="size-4" aria-hidden /></Button>
-                    <Button id={`down-${item.id}`} size="icon" variant="ghost" disabled={i === n - 1} aria-label={`Move ${name(item)} down`} onClick={() => moveBy(i, 1)}><ArrowDown className="size-4" aria-hidden /></Button>
-                    <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("to")); if (v) { const t = reorder(i, v - 1); focusItem(item.id); setAnnounce(`${name(item)} moved to position ${t + 1} of ${n}.`); } }}>
-                      <label className="sr-only" htmlFor={`to-${item.id}`}>Move {name(item)} to position</label>
-                      <span className="w-16"><input id={`to-${item.id}`} name="to" type="number" min={1} max={n} placeholder="#" className={cn(control, "numeric")} /></span>
-                      <Button type="submit" variant="ghost">Move</Button>
-                    </form>
-                    <CompareToggle id={item.id} label={name(item)} />
-                    <Button size="icon" variant="danger" aria-label={`Remove ${name(item)}`} onClick={() => remove(i)}><Trash2 className="size-4" aria-hidden /></Button>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-          <p className="text-xs text-muted-foreground">
-            {current
-              ? `Reach labels use your current rank and category and previous years' closing ranks.${round ? ` ${round} seats: each choice's seats in the ${lists.map((l) => l.kind).join(", ")} lists, in its quota and your seat categories, "—" when a list has none; the lists overlap, so they are never added.` : ""}`
-              : "Labels marked (when added) are from when you added each option. Set your rank to see them for your current profile."}
+          {view === "cards" ? cards : table}
+          <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+            {current && ranked ? "Labels, seats and terms: from the current data and your rank." : current ? "Terms: from the current data. Labels marked (when added) are from when you added each option." : "Labels marked (when added) are from when you added each option."}
+            <InfoTip label="labels, seats and terms">
+              {current && ranked
+                ? `Reach labels use your current rank and category and previous years' closing ranks.${round ? ` ${round} seats: each choice's seats in the ${lists.map((l) => l.kind).join(", ")} lists, in its quota and your seat categories, "—" when a list has none; the lists overlap, so they are never added.` : ""} Fee, stipend, bond and leaving: each choice's course and quota, as published.`
+                : `Set your rank to see labels and seats for your current profile.${current ? " Fee, stipend, bond and leaving: each choice's course and quota, as published." : ""}`}
+            </InfoTip>
           </p>
         </>
       )}

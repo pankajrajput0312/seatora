@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { listDay } from "../../lib/format";
 import { pageValue, parseSearchParams } from "../../lib/params";
+import { splitByTerms, termFilterLists, termFilters, termFilterShape, type TermFilters } from "../../lib/term-filters";
 import { classifyReach, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachLabel, reachOrder, type Reach } from "../../lib/reach";
 import { pairSchema, profileCourseFilter, profileQuotas, type Profile } from "../../profile";
 import { getCatalog, type Catalog } from "../../server/catalog";
@@ -19,10 +20,10 @@ export const seatSorts = ["reach", "closing", "seats", "college", "state", "fee"
 export type SeatSort = (typeof seatSorts)[number];
 export const seatCategories: Category[] = [...baseCategories, ...baseCategories.map((c) => `${c} PwD` as const)];
 
-/** The past rounds every seat row shows, on its own quota and seat category: R2 and R3 of the two past years, and the latest R1. */
+/** The past rounds every seat row shows, on its own quota and seat category: the latest R1, and R2 and R3 of the two past years (newest year first, as every list of rounds shows them). */
 export const PAST_ROUNDS: { year: number; round: Round }[] = [
-  ...PAST_YEARS.flatMap((year) => (["R2", "R3"] as const).map((round) => ({ year, round }))),
   { year: LATEST_YEAR, round: "R1" },
+  ...[...PAST_YEARS].sort((a, b) => b - a).flatMap((year) => (["R2", "R3"] as const).map((round) => ({ year, round }))),
 ];
 
 /** `n`: allotments MCC made in that round on the row's quota and seat category (not seats). */
@@ -45,7 +46,7 @@ export type SeatHistory = {
   reachProvisional: boolean;
   /** Fee, stipend, bond and penalty terms as published for the row's institute and program, each with its source (CSV). */
   terms: OptionTerms;
-  /** The same for the row's programme, read into figures (server/terms.ts): the row shows it with TermsSummary. */
+  /** The same for the row's programme, read into figures (server/terms.ts): the row shows it as stat cells (TermStatCells). */
   fees: ProgrammeTerms;
 };
 /**
@@ -55,8 +56,8 @@ export type SeatHistory = {
 export type SeatLine = SeatRow &
   SeatHistory & {
     byList: Record<string, number>;
-    /** The institute's type (inferred, not official) and the beds its hospital reports; null when the import has neither. */
-    hospital: Pick<HospitalInfo, "type" | "beds"> | null;
+    /** The institute's type (inferred, not official), the beds its hospital reports and its MCC profile; null when the import has none. */
+    hospital: Pick<HospitalInfo, "type" | "beds" | "mccProfileUrl"> | null;
   };
 
 /**
@@ -65,7 +66,8 @@ export type SeatLine = SeatRow &
  * past allotments). `compare`: every list of the picked list's round side by side, one row per institute, course,
  * quota and seat category; "all": every list of every round, plus the rows MCC allotted in some result that no list
  * prints (the Seats matrix's "All rounds"). `has`: only rows with seats in a list of these kinds in the picked list's
- * round (any of them). `reachFor`: her rank and the seat categories she can take, for the reach labels.
+ * round (any of them). `reachFor`: her rank and the seat categories she can take, for the reach labels. `terms`: fee,
+ * stipend, bond, leaving and college-type filters on each row's course and quota terms (lib/term-filters.ts).
  */
 export type SeatQuery = Omit<SeatFilters, "quota" | "state"> & {
   quotas?: (string | null)[];
@@ -75,6 +77,7 @@ export type SeatQuery = Omit<SeatFilters, "quota" | "state"> & {
   compare?: boolean | "all";
   has?: SeatKind[];
   reachFor?: { rank: number; categories: string[] } | null;
+  terms?: TermFilters;
 };
 
 const lastIfNull = (s: string | null) => s ?? "￿";
@@ -197,16 +200,18 @@ const rowKey = (x: SeatRow) => [x.college.key, x.degree, x.specialty, x.quota, x
  * Seat rows for the Seats page, its CSV and /api/v1/seats, each with its past closings, reach label and terms.
  * `seats[list key]` = Σ seats of every matching row of that one list (lists are never added together). Empty filter
  * arrays mean "all". `noState[list key]`: with a state filter, Σ seats of rows that match everything else but are at an
- * institute with no state in the data (the filter drops them). `pg` returns one page, without it every row.
+ * institute with no state in the data (the filter drops them). `unknownTerms`: rows that match everything else but are
+ * left out because a filtered fee, stipend, bond or leaving value is not declared (`terms.keepUnknown` adds them).
+ * `pg` returns one page, without it every row.
  * ponytail: reads every matching row of the picked list(s) (≤ ~18k each, ~150 ms; "all": every list and every allotted
  * row) and sorts/pages here; history is read for the page only unless the sort needs it (reach, closing). Move sort and
  * paging into SQL if lists grow.
  */
 export async function findSeats(f: SeatQuery, pg?: PageQuery) {
-  const { quotas, states, sort, nohist, compare, has, reachFor, courses, specialties, degrees, pairs, categories, ...rest } = f;
+  const { quotas, states, sort, nohist, compare, has, reachFor, terms, courses, specialties, degrees, pairs, categories, ...rest } = f;
   const filters = { ...rest, courses: some(courses), specialties: some(specialties), degrees: some(degrees), pairs: some(pairs), categories: some(categories), quota: quotas?.length === 1 ? (quotas[0] ?? undefined) : undefined };
   // State is filtered here, not in SQL, so the rows a state filter drops for having no state can be counted.
-  const [r, cat] = await Promise.all([listSeats(filters), getCatalog()]);
+  const [r, cat, info] = await Promise.all([listSeats(filters), getCatalog(), hospitalInfo()]);
   const cur = r.lists[0];
   let lists = r.lists;
   let lines = r.rows.map((x) => ({ ...x, byList: { [x.list]: x.seats } }));
@@ -222,12 +227,19 @@ export async function findSeats(f: SeatQuery, pg?: PageQuery) {
   }
   const round = cur ? lists.filter((l) => l.year === cur.year && l.round === cur.round) : [];
   const hasKind = (x: (typeof lines)[number]) => !has?.length || round.some((l) => has.includes(l.kind) && (x.byList[l.key] ?? 0) > 0);
-  const kept = lines.filter((x) => (!nohist || !hasOption(cat, x)) && hasKind(x)).map((x) => ({
-    ...x,
-    terms: termsOf(cat, x.college.key, x.degree),
-    // The course's own programme bucket, and its own bond figure where the record prices bonds by subject.
-    fees: courseTerms(cat, x.college.key, x.degree, x.specialty),
-  }));
+  const { kept, unknown } = splitByTerms(
+    lines
+      .filter((x) => (!nohist || !hasOption(cat, x)) && hasKind(x))
+      .map((x) => ({
+        ...x,
+        terms: termsOf(cat, x.college.key, x.degree),
+        // The course's own programme bucket and quota, and its own bond figure where the record prices bonds by subject.
+        fees: courseTerms(cat, x.college.key, x.degree, x.specialty, x.quota ?? undefined),
+      })),
+    terms,
+    (x) => x.fees,
+    (x) => info.get(x.college.key)?.type?.value,
+  );
   const matching = refineSeats(kept, { quotas, states });
   const noState = states?.length ? refineSeats(kept, { quotas }).filter((x) => x.college.state == null) : [];
   const perList = (xs: typeof kept) => Object.fromEntries(lists.map((l) => [l.key, xs.reduce((a, x) => a + (x.byList[l.key] ?? 0), 0)]));
@@ -236,22 +248,19 @@ export async function findSeats(f: SeatQuery, pg?: PageQuery) {
   const pageSize = pg?.pageSize ?? Math.max(1, total);
   const page = pg ? Math.min(Math.max(1, pg.page), Math.max(1, Math.ceil(total / pg.pageSize))) : 1;
   const cut = <T>(xs: T[]) => xs.slice((page - 1) * pageSize, page * pageSize);
-  const [paged, info] = await Promise.all([
-    sort === "reach" || sort === "closing"
-      ? withHistory(cat, matching, reachFor, virtual).then((xs) => cut(refineSeats(xs, { sort })))
-      : withHistory(cat, cut(refineSeats(matching, { sort })), reachFor, virtual),
-    hospitalInfo(),
-  ]);
+  const paged = await (sort === "reach" || sort === "closing"
+    ? withHistory(cat, matching, reachFor, virtual).then((xs) => cut(refineSeats(xs, { sort })))
+    : withHistory(cat, cut(refineSeats(matching, { sort })), reachFor, virtual));
   const rows: SeatLine[] = paged.map((x) => {
     const h = info.get(x.college.key);
-    return { ...x, hospital: h && (h.type || h.beds) ? { type: h.type, beds: h.beds } : null };
+    return { ...x, hospital: h && (h.type || h.beds || h.mccProfileUrl) ? { type: h.type, beds: h.beds, mccProfileUrl: h.mccProfileUrl } : null };
   });
-  return { rows, total, page, pageSize, lists, seats: perList(matching), noState: perList(noState) };
+  return { rows, total, page, pageSize, lists, seats: perList(matching), noState: perList(noState), unknownTerms: refineSeats(unknown, { quotas, states }).length };
 }
 
 // ---------- The Seats page's params, shared with its CSV (/api/v1/seats/export) ----------
 
-const listParams = ["sp", "deg", "c", "quota", "st", "has"];
+const listParams = ["sp", "deg", "c", "quota", "st", "has", ...termFilterLists];
 /**
  * Seats page filters. Course, degree, exact course, quota and state are her profile params (sp, deg, c, quota, st), as
  * on Options, so her profile applies by default (no quota ticked: the open quotas); `scat` (seat category: absent = the
@@ -259,7 +268,8 @@ const listParams = ["sp", "deg", "c", "quota", "st", "has"];
  * (no past allotments). `view`: `matrix` (default: one row per institute, course, quota and seat category with seats in the
  * round's lists, every closing rank; `rounds=all` adds every earlier list and the rows MCC allotted that no list prints),
  * `list` (one list) or `compare` (every list of the round side by side). `has`: rows with seats in the round's clear,
- * virtual or newly added list (any ticked). `sort` absent: reach with a rank, else institute.
+ * virtual or newly added list (any ticked). `sort` absent: reach with a rank, else institute. Fee, stipend, bond, leaving,
+ * college type and `nd`: lib/term-filters.ts (on Seats an absent cap is no cap, not her profile's).
  */
 export const seatsParamsSchema = z.object({
   tab: z.enum(["matrix", "trends"]).default("matrix"),
@@ -282,6 +292,7 @@ export const seatsParamsSchema = z.object({
   q: z.string().max(100).optional(),
   sort: z.enum(seatSorts).optional(),
   page: pageValue.default(1),
+  ...termFilterShape,
 });
 export type SeatsParams = z.infer<typeof seatsParamsSchema>;
 /** Leniently, as pages do: a bad field falls back to its default. */
@@ -318,6 +329,7 @@ export async function seatsView(f: SeatsParams, profile: Profile | null, pageSiz
       compare: f.view === "list" ? false : f.view === "matrix" && f.rounds ? "all" : true,
       has: f.view === "matrix" ? f.has : undefined,
       reachFor: profile && mine && { rank: profile.rank, categories: mine },
+      terms: termFilters(f),
     },
     pageSize ? { page: f.page, pageSize } : undefined,
   );
@@ -346,11 +358,11 @@ const docOf = (s: { name: string; url: string | null } | null | undefined) => s 
 /**
  * The view as CSV (UTF-8, no BOM: the route adds it), in the page's order and filters, every matching row: seats per
  * list (never added), past closings (matrix: every round of every year, each with its allotments), the reach label (with
- * a rank), and terms each with its own document (matrix: also the course's figures as the Fees page reads them). After a blank
+ * a rank), and terms each with its own document, the course's figures as the Fees page reads them, its beds and type. After a blank
  * row: `notes` and the sources every column comes from (seat list PDFs with their date, the later MCC seat notices they
  * don't apply and the same-day ones they may already include; the MCC result PDF of each round). "—" = not available.
  */
-/** The matrix CSV's Beds note: how the source prints a rounded count ("270+"), and a conflict in the source. */
+/** The CSV's Beds note: how the source prints a rounded count ("270+"), and a conflict in the source. */
 function bedsNote(b: ReportedBeds) {
   const c = reportedCount(b);
   return [c.text.endsWith("+") && `the source prints ${c.text}`, c.conflicting && "the source prints conflicting figures"].filter(Boolean).join("; ") || null;
@@ -374,8 +386,9 @@ export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }
     "Institute", "State", "Degree", "Course", "Quota", "Restricted quota", "Seat category",
     ...r.lists.map((l) => seatsCol(l, r.lists)),
     ...(matrix
-      ? [...closingCols.flatMap((p) => [`${label(p)} closing rank`, `${label(p)} allotted`]), "Fee year 1 ₹", "Stipend year 1 ₹/month", "Bond years", "Bond ₹ (highest)", "Leaving penalty ₹ (highest)", "Beds", "Beds note", "Type"]
+      ? closingCols.flatMap((p) => [`${label(p)} closing rank`, `${label(p)} allotted`])
       : [...PAST_ROUNDS.map((p) => `${label(p)} closing rank`), "Deepest of these", "Deepest round", "Other closing ranks the reach label counts"]),
+    "Fee year 1 ₹", "Stipend year 1 ₹/month", "Bond years", "Bond ₹ (highest)", "Leaving penalty ₹ (highest)", "Beds", "Beds note", "Type",
     ...(profile ? [`${matrix ? "Your chances" : "Reach"} at AIR ${profile.rank} (history, not a prediction)`] : []),
     ...kinds.flatMap((k) => [termLabel[kindOf[k]], `${termLabel[kindOf[k]]} source`]),
   ];
@@ -384,15 +397,13 @@ export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }
     x.college.name, x.college.state, x.degree, x.course?.name ?? x.specialty, x.quota, x.quota == null ? null : openQuotas.includes(x.quota) ? "No" : "Yes", x.category,
     ...r.lists.map((l) => x.byList[l.key]),
     ...(matrix
-      ? [
-          ...closingCols.flatMap((p) => [all(x, p)?.closing, all(x, p)?.n]),
-          feeValue.fee1(x.fees), feeValue.stip1(x.fees), feeValue.bondyrs(x.fees), feeValue.bond(x.fees), feeValue.leave(x.fees), x.hospital?.beds?.n, x.hospital?.beds && bedsNote(x.hospital.beds), x.hospital?.type && collegeTypeLabel[x.hospital.type.value],
-        ]
+      ? closingCols.flatMap((p) => [all(x, p)?.closing, all(x, p)?.n])
       : [
           ...PAST_ROUNDS.map((p) => at(x, p)?.closing),
           x.deepest?.closing, x.deepest && prov(x.deepest),
           x.rounds.filter((c) => !PAST_ROUNDS.some((p) => p.year === c.year && p.round === c.round)).map((c) => `${prov(c)}: ${c.closing}`).join("; "),
         ]),
+    feeValue.fee1(x.fees), feeValue.stip1(x.fees), feeValue.bondyrs(x.fees), feeValue.bond(x.fees), feeValue.leave(x.fees), x.hospital?.beds?.n, x.hospital?.beds && bedsNote(x.hospital.beds), x.hospital?.type && collegeTypeLabel[x.hospital.type.value],
     ...(profile ? [x.reach ? `${reachLabel(x.reach, LATEST_YEAR, PAST_YEARS, true, x.category)}${x.reachProvisional ? " (provisional)" : ""}` : x.noLabel] : []),
     ...kinds.flatMap((k) => [x.terms[k]?.text, docOf(x.terms[k]?.source)]),
   ]);
@@ -411,7 +422,8 @@ export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }
   const foot = [
     ...notes.map((n) => [n]),
     ["Closing rank = the highest All India Rank MCC allotted in that round on a seat of the row's quota and seat category. Seat columns are separate MCC lists of one round: they overlap, so never add them."],
-    ...(matrix ? [["Allotted = allotments MCC made in that round on the row's quota and seat category (not seats). Provisional results are marked in the sources below. Fee, stipend, bond and leaving figures are the course's programme terms as the Fees page reads them (a fee range: its highest; bond and leaving: the highest amount for the course; Bond years and Bond ₹ 0 = no bond on record, a record says so); — = not declared, or declared in words only (see the term columns). Beds = as the hospital reports them (self-reported, not verified by Seatora; its period and source are on the institute's Hospital facts tab; Beds note: a count the source prints rounded, e.g. 270+, or conflicting figures in the source). Type = inferred from the institute's name and quota (a few from Seatora's research on the hospital), not an official field."]] : []),
+    ...(matrix ? [["Allotted = allotments MCC made in that round on the row's quota and seat category (not seats). Provisional results are marked in the sources below."]] : []),
+    ["Fee, stipend, bond and leaving figures are the course's programme terms as the Fees page reads them (a fee range: its highest; an NBEMS fee ceiling or stipend minimum is that limit, not the hospital's own figure: the term column says so; bond and leaving: the highest amount for the course; Bond years and Bond ₹ 0 = no bond on record, a record says so); — = not declared, or declared in words only (see the term columns). Beds = as the hospital reports them (self-reported, not verified by Seatora; its period and source are on the institute's Hospital facts tab; Beds note: a count the source prints rounded, e.g. 270+, or conflicting figures in the source). Type = inferred from the institute's name and quota (a few from Seatora's research on the hospital), not an official field."],
     [],
     ["Source", "Link", "Note"],
     ...sources,

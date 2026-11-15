@@ -59,8 +59,13 @@ export type Term = {
 export type FeeTableRecord = Pick<MccFeesStructured, "programme" | "seat_groups" | "fee_per_year" | "stipend_per_month" | "sources"> & {
   /** null (an export older than it): verbatim, never a figure. */
   fee_display: MccFeesStructured["fee_display"] | null;
+  /** The MCC profile's fee words for these seats (a verbatim record's only fee) and where they were read; absent in an older import. */
+  fee_text?: string | null;
+  fee_text_src?: MccFeesStructured["fee_text_src"] | null;
   fee_whole_course: MccFeesStructured["fee_whole_course"] | null;
   counselling_forfeit: MccFeesStructured["counselling_forfeit"] | null;
+  /** The MCC quotas the record covers; absent in an older import (then every record stands for the programme). */
+  quotas?: string[];
 };
 /**
  * PENALTY holds the college's or state's penalty for leaving the seat or course and MCC's forfeit if you resign or

@@ -72,9 +72,14 @@ it("schema 2: figures come from the programme's first fee-table record, each yea
 it("schema 2: a fee in the profile's own words (verbatim, or no fee_display) has no figure, whatever the text says", () => {
   // Chettinad: "₹48 L/yr" in an older text, but the record is verbatim (₹3 L–₹48 L by specialty).
   for (const fee_display of ["verbatim", null] as const) {
-    const t = normalizeProgramme("MD/MS", withRecords("MD", [rec("MD/MS", "Deemed/Paid", { fee_display, stipend_per_month: [{ inr: 48000, kind: "declared", src: 1 }, null, null] })], "₹48 L/yr — college declaration to MCC 2025"));
+    const r = rec("MD/MS", "Deemed/Paid", { fee_display, fee_text: "Fee Min: 300000 to Max: 4800000", stipend_per_month: [{ inr: 48000, kind: "declared", src: 1 }, null, null] });
+    const t = normalizeProgramme("MD/MS", withRecords("MD", [r], "₹48 L/yr — college declaration to MCC 2025"));
     expect([t.years.map((y) => y.fee), t.wholeCourseFee, t.years[0].stipend?.inr]).toEqual([[null, null, null], null, 48000]);
-    expect(t.unread.map((u) => u.kind)).toEqual(["FEE"]); // shown as "see terms", never a figure
+    // Shown as "see terms" in the record's own words (never the summary's figure).
+    expect(t.unread.map((u) => [u.kind, u.text])).toEqual([["FEE", "Fee Min: 300000 to Max: 4800000"]]);
+    // No words for these seats: nothing to quote, said in a note.
+    const none = normalizeProgramme("MD/MS", withRecords("MD", [{ ...r, fee_text: null }], "₹48 L/yr — college declaration to MCC 2025"));
+    expect([none.unread, none.notes]).toEqual([[], ["The MCC profile gives no fee in words for these seats, so Seatora shows no fee."]]);
   }
 });
 

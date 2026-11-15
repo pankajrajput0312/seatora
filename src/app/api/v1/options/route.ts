@@ -11,6 +11,8 @@ import { parseOptionsQuery } from "./query";
  * kind, any, 0/all), `showClosed`; the response says which applied (`view`, `seats`: null = with or without,
  * `showClosed`) and, in the round view, `summary` (her profile's options with seats in the round, search aside) and
  * `noState` (with a state filter, options with seats in the round it drops because their institute has no state).
+ * Term filters (ctype, maxfee, minstip, bondyrs, maxbond, maxleave, nd: lib/term-filters.ts; an absent maxfee / bondyrs
+ * is her profile's cap): `unknownTerms` counts her options left out only because a filtered value is not declared.
  */
 export async function GET(req: Request) {
   return handle(async () => {
@@ -20,7 +22,7 @@ export async function GET(req: Request) {
     return ok(
       {
         rows: r.rows, counts: r.counts, hiddenClosed: r.hiddenClosed, hiddenProvisional: r.hiddenProvisional, seatList: r.seatList, seatLists: r.seatLists,
-        view: r.view, seats: r.seats, showClosed: r.showClosed, summary: r.summary, noState: r.noState,
+        view: r.view, seats: r.seats, showClosed: r.showClosed, summary: r.summary, noState: r.noState, unknownTerms: r.unknownTerms,
       },
       { page: pageOf(r), sources: [...sourcesFor(meta.sources, gridRounds(r.rows)), ...r.seatLists.flatMap(seatListSource)] },
     );

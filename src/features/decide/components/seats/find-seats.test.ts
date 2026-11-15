@@ -153,7 +153,8 @@ describe.skipIf(!process.env.DATABASE_URL)("findSeats on the real import", { tim
     const csv = await seatsCsv({ ...v, r: v.r! });
     const lines = csv.split("\r\n");
     expect(lines.indexOf("")).toBe(v.r!.total + 1); // header, rows, then a blank row before the notes and sources
-    expect(lines[0]).toContain("2026 R2 clear vacancy seats,2026 R2 virtual vacancy seats,2026 R2 newly added seats,2024 R2 closing rank");
+    expect(lines[0]).toContain("2026 R2 clear vacancy seats,2026 R2 virtual vacancy seats,2026 R2 newly added seats,2026 R1 closing rank,2025 R2 closing rank,2025 R3 closing rank,2024 R2 closing rank,2024 R3 closing rank,Deepest of these");
+    expect(lines[0]).toContain("Leaving penalty ₹ (highest),Beds,Beds note,Type");
     expect(lines[0]).toContain("Reach at AIR 42284 (history, not a prediction)");
     expect(lines.some((l) => l.startsWith("MCC PG 2026 Round 2 clear vacancy (list as published),https://"))).toBe(true);
     expect(lines.some((l) => l.startsWith("MCC PG 2025 Round 3 allotment result (final),https://"))).toBe(true);

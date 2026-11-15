@@ -28,11 +28,15 @@ export type ValueMeta = NonNullable<MccClinicalFacts["values_meta"]>[string];
 export const SELF_REPORTED = "Self-reported by the hospital, not verified by Seatora";
 
 /**
- * A reported count as the source prints it: "270+" where its own entry says rounded; `conflicting`: the source prints
- * two figures (its own entry, or the block's it inherits).
+ * A reported count as the source prints it: "270+" where its own entry says rounded. `flags`: the ones about this
+ * count (Hospital facts' rule): its own entry's, else only the period's ("old") of the block it inherits, whose other
+ * flags may be about another figure. `conflicting`: its own entry says the source prints two figures. `meta`: its source
+ * for ValueSource, with only those flags (and self-reported), so a (i) never pins the block's other flags on it.
  */
 export function reportedCount(b: { n: number; meta: ValueMeta | null | undefined; own: boolean }) {
-  return { text: `${formatRank(b.n)}${b.own && b.meta?.flags.includes("rounded") ? "+" : ""}`, conflicting: !!b.meta?.flags.includes("conflicting") };
+  const flags = (b.meta?.flags ?? []).filter((f) => f !== "self_reported" && (b.own || f === "old"));
+  const meta = b.meta && { ...b.meta, flags: b.meta.flags.filter((f) => f === "self_reported" || flags.includes(f)) };
+  return { text: `${formatRank(b.n)}${flags.includes("rounded") ? "+" : ""}`, conflicting: flags.includes("conflicting"), flags, meta };
 }
 
 const sourceKind: Record<string, string> = {
@@ -48,7 +52,7 @@ const sourceKind: Record<string, string> = {
   mcc_profile: "MCC institute profile",
   other: "Document",
 };
-const flagLabel: Record<ValueMeta["flags"][number], string | null> = {
+export const flagLabel: Record<ValueMeta["flags"][number], string | null> = {
   self_reported: null, // every value is: said once per value in its source line
   old: "old: period ends before 2024",
   rounded: "rounded figure",
@@ -56,10 +60,16 @@ const flagLabel: Record<ValueMeta["flags"][number], string | null> = {
   conflicting: "the source prints conflicting figures",
 };
 
+/** A flag in a few words, where the value shows (the full words in its (i)); rounded has none: the count's "+" says it. */
+export const flagShort: Partial<Record<ValueMeta["flags"][number], string>> = { old: "old figure", derived: "derived", conflicting: "conflicting figures" };
+
+/** The kind of document a value comes from ("NIRF data (the institution's submission)"). */
+export const sourceName = (m: Pick<ValueMeta, "source_type">) => sourceKind[m.source_type] ?? m.source_type.replace(/_/g, " ");
+
 /** A value's source line: the kind of document (linked), self-reported, checked date; its flags as badges. */
 export function ValueSource({ m }: { m: ValueMeta | null | undefined }) {
   if (!m) return null;
-  const name = sourceKind[m.source_type] ?? m.source_type.replace(/_/g, " ");
+  const name = sourceName(m);
   return (
     <span className="grid gap-1 text-xs text-muted-foreground">
       <span>

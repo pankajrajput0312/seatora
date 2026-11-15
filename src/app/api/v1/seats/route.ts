@@ -2,13 +2,14 @@ import { z } from "zod";
 import { handle, invalid, notFound, ok, pageOf, pageSchema, parseOptionalProfile, parseQuery, sourcesFor } from "@/features/decide/api";
 import { findSeats, seatSorts } from "@/features/decide/components/seats/find-seats";
 import { eligibleCategories } from "@/features/decide/lib/reach";
+import { termFilterLists, termFilters, termFilterShape } from "@/features/decide/lib/term-filters";
 import { pairSchema, profileCourseFilter } from "@/features/decide/profile";
 import { seatLists } from "@/features/decide/server/seats";
 import { getCollege, getMeta } from "@/features/decide/service";
 import { baseCategories, rounds, seatKinds } from "@/features/decide/types";
 
 const categories = [...baseCategories, ...baseCategories.map((c) => `${c} PwD` as const)] as const;
-const multi = ["specialty", "course", "degree", "quota", "category", "state", "sp", "deg", "c", "st", "has"];
+const multi = ["specialty", "course", "degree", "quota", "category", "state", "sp", "deg", "c", "st", "has", ...termFilterLists];
 const code = z.string().regex(/^[A-Z0-9]+$/, "Specialty code, e.g. ANAESTHESIOLOGY");
 const seatsQuerySchema = pageSchema.extend({
   /** SeatList key, e.g. mcc/2026/R2_clear_vacancy.pdf; overrides kind/year/round. */
@@ -38,6 +39,8 @@ const seatsQuerySchema = pageSchema.extend({
   college: z.string().max(200).optional(),
   q: z.string().trim().max(100).optional(),
   sort: z.enum(seatSorts).default("college"),
+  /** ctype, maxfee, minstip, bondyrs, maxbond, maxleave, nd (lib/term-filters.ts): an absent cap is no cap. */
+  ...termFilterShape,
 });
 
 /**
@@ -48,6 +51,7 @@ const seatsQuerySchema = pageSchema.extend({
  * with the optional profile params (rank, cat, pwd) the reach label Options uses, on that seat category (`reach`; null on
  * a seat category she can't take). Courses: `specialty`, `degree`, `course`; without any of them, her profile's `sp`,
  * `deg` and exact courses `c` apply, as on the Seats page (states: `state`, else her `st`). Quotas are only `quota`.
+ * Term filters (lib/term-filters.ts): `unknownTerms` counts the rows left out only because a filtered value is not declared.
  */
 export async function GET(req: Request) {
   return handle(async () => {
@@ -56,7 +60,7 @@ export async function GET(req: Request) {
     const profile = parseOptionalProfile(p);
     if (!q.success || !profile.success) return invalid(q.error, profile.error);
     const me = profile.data;
-    const { page, pageSize, college, specialty, course, degree, quota, category, state, sp, deg, c, st, view, rounds: all, has, ...f } = q.data;
+    const { page, pageSize, college, specialty, course, degree, quota, category, state, sp, deg, c, st, view, rounds: all, has, ctype, maxfee, minstip, bondyrs, maxbond, maxleave, nd, ...f } = q.data;
     const courses = specialty.length || course.length || degree.length ? { specialties: specialty, courses: course, degrees: degree } : profileCourseFilter({ specialties: sp, degrees: deg, pairs: c });
     if (f.list && !(await seatLists()).some((l) => l.key === f.list)) return notFound("No seat list with this key");
     const inst = college ? await getCollege(college) : null;
@@ -66,13 +70,14 @@ export async function GET(req: Request) {
         ...f, ...courses, college: inst?.key, quotas: quota, categories: category, states: state.length ? state : st,
         compare: view === "list" ? false : view === "matrix" && all ? "all" : true, has: view === "matrix" ? has : undefined,
         reachFor: me && { rank: me.rank, categories: eligibleCategories(me.category, me.pwd) },
+        terms: termFilters({ ctype, maxfee, minstip, bondyrs, maxbond, maxleave, nd }),
       },
       { page, pageSize },
     );
     if (!r.lists.length) return notFound("No MCC seat list for this kind, year and round");
     const meta = await getMeta();
     return ok(
-      { lists: r.lists, seats: r.seats, rows: r.rows },
+      { lists: r.lists, seats: r.seats, rows: r.rows, unknownTerms: r.unknownTerms },
       {
         page: pageOf(r),
         sources: [...r.lists.map((l) => ({ key: l.key, name: l.name, url: l.url, year: l.year, round: l.round })), ...sourcesFor(meta.sources, r.rows.flatMap((x) => x.closings))],

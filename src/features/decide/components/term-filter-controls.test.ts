@@ -1,0 +1,41 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { readTermFilters } from "../lib/term-filters";
+import { TermFilterControls } from "./term-filter-controls";
+
+const render = (q: string, caps?: { maxFeeLakh: number | null; maxBondYears: number | null }) =>
+  renderToStaticMarkup(createElement("form", null, createElement(TermFilterControls, { f: readTermFilters(new URLSearchParams(q)).params, caps })));
+const checked = (html: string, name: string, value: string) =>
+  (html.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`, "g")) ?? []).some((i) => i.includes(`value="${value}"`) && i.includes("checked"));
+const selected = (html: string, name: string) => html.match(new RegExp(`<select name="${name}"[\\s\\S]*?</select>`))![0].match(/<option value="([^"]*)" selected/)?.[1];
+
+describe("TermFilterControls", () => {
+  it("native GET fields named as the params, the applied values selected", () => {
+    const html = render("ctype=govt&maxfee=5&bondyrs=0&minstip=80000&maxbond=10&maxleave=5&nd=keep");
+    for (const n of ["maxfee", "bondyrs", "minstip", "maxbond", "maxleave"]) expect(html).toContain(`<select name="${n}"`);
+    expect(selected(html, "maxfee")).toBe("5");
+    expect(selected(html, "bondyrs")).toBe("0");
+    expect(checked(html, "ctype", "govt")).toBe(true);
+    expect(checked(html, "ctype", "esic")).toBe(false);
+    expect(checked(html, "nd", "keep")).toBe(true);
+    expect(html).toContain(">No bond<");
+    expect(html).toContain('aria-label="About not declared"');
+  });
+
+  it("nothing applied: any, include-not-declared unticked; the less-used fields fold on phones", () => {
+    const html = render("");
+    expect(selected(html, "maxfee")).toBe("");
+    expect(checked(html, "nd", "keep")).toBe(false);
+    expect(html).toMatch(/<label class="[^"]*more-filter[^"]*"><span class="sr-only">Stipend/);
+    expect(html).not.toMatch(/<label class="[^"]*more-filter[^"]*"><span class="sr-only">Fee/);
+  });
+
+  it("her profile's caps are the default, and Any clears them; a value off the list is kept", () => {
+    const html = render("maxfee=7", { maxFeeLakh: 10, maxBondYears: 1 });
+    expect(html).toContain("Your cap: Fee up to ₹10 L/yr");
+    expect(html).toContain("Your cap: Bond up to 1 year");
+    expect(html).toContain('<option value="any">Any fee</option>');
+    expect(selected(html, "maxfee")).toBe("7");
+  });
+});

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { termFilters, termFilterShape } from "../lib/term-filters";
 import { profileHasCourse, type Profile } from "../profile";
 import { feeSorts, type FeeFilters, type FeeRow } from "../service";
 import { programmeNames, programmes, programmesOf, type Amount, type Programme } from "../server/terms";
@@ -19,16 +20,12 @@ export const feesParamsSchema = z.object({
   program: z.enum([...slugs, "all", "MD", "DNB"]).optional(),
   state: z.string().max(100).optional(),
   q: z.string().trim().max(100).optional(),
-  /** ₹ lakh per year (year 1). */
-  maxfee: z.union([z.literal("any"), z.coerce.number().positive().max(1000)]).optional(),
-  /** ₹ per month, year 1. */
-  minstip: z.coerce.number().int().positive().max(1000000).optional(),
-  bondyrs: z.union([z.literal("any"), z.coerce.number().int().min(0).max(20)]).optional(),
-  /** ₹ lakh. */
-  maxbond: z.coerce.number().positive().max(100000).optional(),
+  /**
+   * Fee, stipend, bond, leaving, college type and `nd` (lib/term-filters.ts); an absent fee or bond-years cap is her
+   * profile's. A capped value not declared is left out unless nd=keep ("Include not declared" ticked).
+   */
+  ...termFilterShape,
   bdecl: z.enum(["declared", "none"]).optional(),
-  /** The "Include colleges that haven't declared it" checkbox: hide = unticked (its hidden input); absent or keep = ticked. */
-  nd: z.enum(["hide", "keep"]).optional(),
   sort: z.preprocess((v) => (typeof v === "string" ? (OLD_SORTS[v] ?? v) : v), z.enum(feeSorts).default("fee1")),
   dir: z.enum(["asc", "desc"]).optional(),
 });
@@ -46,8 +43,8 @@ export function feeDefaults(profile: Profile | null, courses: Course[]) {
 }
 
 export function feesFilters(f: FeesParams, d: ReturnType<typeof feeDefaults>): FeeFilters {
-  const maxFee = f.maxfee === "any" ? null : (f.maxfee ?? d.maxFeeLakh);
   return {
+    ...termFilters(f, d),
     programmes:
       f.program === "all" ? undefined
       : f.program === "MD" || f.program === "DNB" ? programmeNames.filter((p) => programmes[p].bucket === f.program)
@@ -55,12 +52,7 @@ export function feesFilters(f: FeesParams, d: ReturnType<typeof feeDefaults>): F
       : (d.programmes ?? undefined),
     states: f.state === "all" ? undefined : f.state ? [f.state] : (d.states ?? undefined),
     search: f.q,
-    maxFee: maxFee == null ? null : maxFee * 100000,
-    minStipend: f.minstip ?? null,
-    maxBondYears: f.bondyrs === "any" ? null : (f.bondyrs ?? d.maxBondYears),
-    maxBondInr: f.maxbond ? f.maxbond * 100000 : null,
     bond: f.bdecl,
-    hideUnknown: f.nd === "hide",
     sort: f.sort,
     dir: f.dir,
   };

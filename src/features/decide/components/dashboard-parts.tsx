@@ -17,7 +17,7 @@ export function SetRankPrompt({ path }: { path: string }) {
   return (
     <EmptyState
       title="Set up Decide in three steps"
-      description="Your All India Rank, category and PwD status; your courses, each an exact degree and specialty like DNB Family Medicine; and the quotas you can take. Options then opens on this round's seats in your courses. Saved on this device and added to Decide page links, so your rank and category appear in the page address."
+      description="Rank and category, your courses, then quotas. Options then opens on this round's seats. Saved on this device; your rank and category show in page addresses."
       className="mt-6"
     >
       <Button asChild size="lg"><Link href={`${path}?editProfile=1`}>Set your rank</Link></Button>

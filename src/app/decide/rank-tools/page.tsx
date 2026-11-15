@@ -4,6 +4,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
 import { DataSource } from "@/features/decide/components/data-source";
+import { InfoTip } from "@/features/decide/components/info-tip";
 import { control, EmptyState, Field, FilterBar, Select } from "@/features/decide/components/ui";
 import { parseSearchParams, rankValue } from "@/features/decide/lib/params";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
@@ -24,8 +25,13 @@ const air = (r: ScoreRankRow) => `AIR ${formatRank(r.bestRank)}${r.worstRank > r
 const plural = (n: number, one: string, many: string) => `${formatRank(n)} ${n === 1 ? one : many}`;
 const covers = (s: MeritSource) => `Covers ${formatRank(s.candidates)} candidates: ${s.coverage.replace(/\.$/, "")}.`;
 
-/** The NBEMS PDF and the notice that publishes it. */
-const Sources = ({ s }: { s: MeritSource }) => <DataSource results={false} terms={[s, { name: `${s.name}: NBEMS notice`, url: s.noticeUrl, type: s.type }]} />;
+/** The NBEMS PDF and the notice that publishes it (numbered), with `more` (what the list covers) behind an (i) named by its `block`. */
+const Sources = ({ s, more, block }: { s: MeritSource; more?: string; block: string }) => (
+  <div className="flex flex-wrap items-center gap-x-1">
+    <DataSource results={false} terms={[s, { name: `${s.name}: NBEMS notice`, url: s.noticeUrl, type: s.type }]} />
+    {more && <InfoTip label={`${block}, NEET PG ${s.year} list`}>{more}</InfoTip>}
+  </div>
+);
 
 function Sheet({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -56,7 +62,9 @@ export default async function RankToolsPage({ searchParams }: { searchParams: Pr
 
   return (
     <AppPage className="grid grid-cols-1 gap-6">
-      <PageHead title="Score & rank">What a NEET PG score or rank meant in earlier NBEMS results: the rank a score was, and how many candidates of a category were ahead of a rank. History of those exams, not a prediction.</PageHead>
+      <PageHead title="Score & rank" about="What a NEET PG score or rank meant in earlier NBEMS results: the rank a score was, and how many candidates of a category were ahead of a rank.">
+        Earlier NBEMS results: history, not a prediction.
+      </PageHead>
 
       <FilterBar action="/decide/rank-tools" params={params} cols="md:grid-cols-[1fr_1fr_1fr_auto]">
         <Field label="NEET PG score">
@@ -69,10 +77,12 @@ export default async function RankToolsPage({ searchParams }: { searchParams: Pr
       </FilterBar>
 
       <section aria-labelledby="score-h" className="grid grid-cols-1 gap-3">
-        <h2 id="score-h" className="text-lg font-semibold">Score to rank</h2>
-        <p className="text-sm text-muted-foreground">
-          Each year has its own scale ({lists.map((l) => `${l.year} out of ${l.maxMarks}`).join(", ")}), so the same score means different things in different years: compare ranks, not scores.
-        </p>
+        <div className="flex items-center gap-1">
+          <h2 id="score-h" className="text-lg font-semibold">Score to rank</h2>
+          <InfoTip label="score to rank">
+            Each year has its own scale ({lists.map((l) => `${l.year} out of ${l.maxMarks}`).join(", ")}), so the same score means different things in different years: compare ranks, not scores.
+          </InfoTip>
+        </div>
         <div aria-live="polite">
           {badScore ? (
             <p id="score-error" role="alert" className="text-sm text-ember">“{typedScore}” isn&apos;t a score. Enter a whole number, for example 419.</p>
@@ -93,8 +103,7 @@ export default async function RankToolsPage({ searchParams }: { searchParams: Pr
                           ? <>In NEET PG {s.year} (out of {s.maxMarks}), a score of {score} was <span className="numeric font-semibold">{air(at)}</span>: {plural(at.count, "candidate", "candidates")} had that score.</>
                           : `In NEET PG ${s.year} (out of ${s.maxMarks}), no candidate in the list scored ${score}. Nearest: ${nearest}.`}
                     </p>
-                    <p className="text-xs text-muted-foreground">{covers(s)}</p>
-                    <Sources s={s} />
+                    <Sources s={s} more={covers(s)} block="score to rank" />
                   </Sheet>
                 );
               })}
@@ -104,8 +113,10 @@ export default async function RankToolsPage({ searchParams }: { searchParams: Pr
       </section>
 
       <section aria-labelledby="merit-h" className="grid grid-cols-1 gap-3">
-        <h2 id="merit-h" className="text-lg font-semibold">Merit position</h2>
-        <p className="text-sm text-muted-foreground">How many candidates of one category had a NEET PG rank at or ahead of the one you enter, in an earlier AIQ merit list. Counts only, from that year: the candidates, category mix and seats change every year.</p>
+        <div className="flex items-center gap-1">
+          <h2 id="merit-h" className="text-lg font-semibold">Merit position</h2>
+          <InfoTip label="merit position">How many candidates of one category had a NEET PG rank at or ahead of the one you enter, in an earlier AIQ merit list. Counts only, from that year: the candidates, category mix and seats change every year.</InfoTip>
+        </div>
         <div aria-live="polite">
           {badAir ? (
             <p id="air-error" role="alert" className="text-sm text-ember">“{typedAir}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example 42,284.</p>
@@ -113,25 +124,28 @@ export default async function RankToolsPage({ searchParams }: { searchParams: Pr
             <EmptyState headingLevel={3} title="Enter a rank" description="Type an All India Rank above, or set your rank, to see how many candidates of a category were ahead of it." />
           ) : (
             <ul className="grid gap-3 lg:grid-cols-2">
-              {positions.map((p) => {
-                if (!p) return null;
+              {/* Newest year first, the years with no category-wise list among them. */}
+              {[...positions.flatMap((p) => (p ? [{ year: p.year, p }] : [])), ...lists.filter((l) => !l.hasCategories).map((s) => ({ year: s.year, s }))].sort((a, b) => b.year - a.year).map((x) => {
+                if ("s" in x) {
+                  const { s } = x;
+                  return (
+                    <Sheet key={s.year} title={`NEET PG ${s.year}`}>
+                      <p>No {s.year} count: the {s.year} category-wise merit list is not published yet. The NEET PG {s.year} result NBEMS has published prints no category.</p>
+                      <Sources s={s} block="merit position" />
+                    </Sheet>
+                  );
+                }
+                const { p } = x;
                 const cat = p.category === category ? category : `${p.category} (${category})`;
                 const n = p.min !== p.max ? `${formatRank(p.min)}–${formatRank(p.max)}` : p.min === p.qualified ? "all" : formatRank(p.min);
                 const steps = [p.from, p.to].flatMap((r) => (r ? [`up to AIQ rank ${formatRank(r.aiqRank)} (AIR ${formatRank(r.maxAir)} or better), ${formatRank(r.count)}`] : []));
                 return (
                   <Sheet key={p.year} title={`NEET PG ${p.year} AIQ merit list`}>
                     <p>In NEET PG {p.year}, <span className="numeric font-semibold">{n}</span> of the {formatRank(p.qualified)} {cat} candidates in the AIQ merit list had AIR {formatRank(p.rank)} or better.</p>
-                    <p className="text-xs text-muted-foreground">The list is counted in steps of AIQ rank: {steps.join("; ")} {p.category} candidates. {covers(p.source)}</p>
-                    <Sources s={p.source} />
+                    <Sources s={p.source} more={`The list is counted in steps of AIQ rank: ${steps.join("; ")} ${p.category} candidates. ${covers(p.source)}`} block="merit position" />
                   </Sheet>
                 );
               })}
-              {lists.filter((l) => !l.hasCategories).map((s) => (
-                <Sheet key={s.year} title={`NEET PG ${s.year}`}>
-                  <p>No {s.year} count: the {s.year} category-wise merit list is not published yet. The NEET PG {s.year} result NBEMS has published prints no category.</p>
-                  <Sources s={s} />
-                </Sheet>
-              ))}
             </ul>
           )}
         </div>

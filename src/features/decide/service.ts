@@ -1,7 +1,9 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { cache } from "react";
+import { hospitalInfo, type HospitalInfo } from "./components/institute/institute-data";
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
+import { anyTermFilter, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
 import { buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Reach, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { pairKey, profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
@@ -87,8 +89,13 @@ export type OptionRow = {
   allotmentsByYear: Record<number, number | null>;
   /** Fee, stipend, bond and penalty terms as published, each with its source document. */
   terms: OptionTerms;
-  /** The same for this course's programme, read into figures (server/terms.ts): rows show it with TermsSummary. */
+  /**
+   * The same for this course and quota, read into figures (server/terms.ts courseTerms: that quota's fee-table record,
+   * the specialty's own bond figure): what the stat cells (lib/stat-format.ts) and the term filters read.
+   */
   fees: ProgrammeTerms;
+  /** The institute's type (inferred, not official) and the beds its hospital reports; null when the import has neither (rowsFor, lastRanks). */
+  hospital?: RowHospital;
   feeInr: number | null;
   feeText: string | null;
   stipendText: string | null;
@@ -105,6 +112,16 @@ export type OptionRow = {
   /** Beside `seatsBy`, with a profile: the lists whose seats here are all on seat categories whose own label is not `reach` (lib/reach.ts). */
   seatsBelow?: SeatsBelow[];
 };
+
+export type RowHospital = Pick<HospitalInfo, "type" | "beds" | "mccProfileUrl"> | null;
+/** Rows with their institute's type, beds and MCC profile (hospitalInfo, read once per catalog; empty in tests). */
+async function withHospital<T extends { college: { key: string } }>(rows: T[]): Promise<(T & { hospital: RowHospital })[]> {
+  const info = await hospitalInfo();
+  return rows.map((r) => {
+    const h = info.get(r.college.key);
+    return { ...r, hospital: h && (h.type || h.beds || h.mccProfileUrl) ? { type: h.type, beds: h.beds, mccProfileUrl: h.mccProfileUrl } : null };
+  });
+}
 
 /** Seats of one option per seat list kind; null = that list prints none; a kind with no list is absent. */
 export type SeatsBy = Partial<Record<SeatKind, number | null>>;
@@ -125,7 +142,8 @@ export function optionsView(asked: OptionsView | undefined, lists: SeatList[], s
  * only options with seats in one list of the newest round (true = clear vacancy) or in "any" of them; false = with or
  * without; undefined: the view's (round: "any", all: with or without).
  */
-export type OptionFilters = { search?: string; reach?: Reach[]; includeProvisional?: boolean; showClosed?: boolean; hasSeats?: boolean | SeatKind | "any"; view?: OptionsView };
+/** `terms`: fee, stipend, bond, leaving and college-type filters (lib/term-filters.ts); given, they replace her profile's fee and bond caps. */
+export type OptionFilters = { search?: string; reach?: Reach[]; includeProvisional?: boolean; showClosed?: boolean; hasSeats?: boolean | SeatKind | "any"; view?: OptionsView; terms?: TermFilters };
 
 /** Seats per kind in one option's own cells (OptionSeats.cells, `lists` order), in `categories` (all when omitted); null = that list prints none. */
 export function seatsByKind(lists: SeatList[], s: Pick<OptionSeats, "cells"> | undefined, categories?: string[]) {
@@ -167,14 +185,7 @@ function termsFor(cat: Catalog, college: string, degree: string): OptionTerms {
   return { fee: get("FEE"), stipend: get("STIPEND"), bond: get("BOND"), penalty: get("PENALTY") };
 }
 
-/** Bond years as the Fees page has them (server/terms.ts): 0 = no bond on record, null = not declared or not stated. */
-const bondYearsOf = (t: ProgrammeTerms) => t.bond.years;
-/**
- * A bond-years cap: known years within it; unknown years pass unless `hideUnknown`, except that a declared bond never
- * passes a 0 ("no bond") cap.
- */
-const bondWithin = (t: ProgrammeTerms, max: number, hideUnknown = false) =>
-  t.bond.years != null ? t.bond.years <= max : !(max === 0 && t.bond.status === "declared") && !hideUnknown;
+export { feeValue };
 
 const provisionalKeys = (cat: Catalog) => new Set(cat.sources.filter((s) => s.provisional).map((s) => s.key));
 const latestR1Provisional = (cat: Catalog) => cat.sources.some((s) => s.year === LATEST_YEAR && s.round === "R1" && s.provisional);
@@ -205,7 +216,7 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], profile: Profile | null,
   const provisional = provisionalKeys(cat);
   const deepest = deepestByYear(mine, provisional);
   const t = termsFor(cat, college.key, course.degree);
-  const fees = courseTerms(cat, college.key, course.degree, course.specialty);
+  const fees = courseTerms(cat, college.key, course.degree, course.specialty, o.quota);
   const label: { reach: Reach; provisional: boolean } = o.fresh
     ? { reach: "new", provisional: false }
     : profile ? labelOf(profile.rank, mine, includeProvisional, latestR1Provisional(cat)) : { reach: "no-data", provisional: false };
@@ -229,7 +240,7 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], profile: Profile | null,
     feeText: t.fee?.text ?? null,
     stipendText: t.stipend?.text ?? null,
     bondText: t.bond?.text ?? null,
-    bondYears: bondYearsOf(fees),
+    bondYears: feeValue.bondyrs(fees),
     penaltyText: t.penalty?.text ?? null,
   };
 }
@@ -253,25 +264,26 @@ async function rowsFor(cat: Catalog, opts: Opt[], profile: Profile | null, inclu
   const query: CutoffQuery = narrow ? { cs: [...new Set(old.map((o) => o.cs))], quotas: quotas.length < cat.meta.quotas.length ? quotas : undefined } : {};
   const cutoffs = await cutoffsOnce(cat, JSON.stringify(query));
   const groups = groupByOption(cutoffs);
-  return opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], profile, includeProvisional));
+  return withHospital(opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], profile, includeProvisional)));
 }
 
-/**
- * Her profile filters on one option: course, degree, quota (none ticked: the open quotas only), state, fee cap and
- * bond cap (unknown fee or bond passes).
- */
-function optMatches(cat: Catalog, o: Pick<Opt, "college" | "degree" | "specialty"> & { quota: string | null }, p: Profile | null) {
+/** Her profile's course, degree, quota (none ticked: the open quotas only) and state on one option (any without a profile). */
+function inProfile(cat: Catalog, o: Pick<Opt, "college" | "degree" | "specialty"> & { quota: string | null }, p: Profile | null) {
   if (!p) return true;
   const state = cat.collegeByKey.get(o.college)?.state ?? null;
-  if (!profileHasCourse(p, o)) return false;
-  if (o.quota == null || !profileQuotas(p).includes(o.quota)) return false;
-  if (p.states.length && (state == null || !p.states.includes(state))) return false;
-  if (p.maxFeeLakh == null && p.maxBondYears == null) return true;
-  // The same figures as the Fees page: year 1 fee, bond years (server/terms.ts).
-  const t = courseTerms(cat, o.college, o.degree, o.specialty);
-  const fee = t.years[0]?.fee?.inr ?? null;
-  return (p.maxFeeLakh == null || fee == null || fee <= p.maxFeeLakh * 100000) && (p.maxBondYears == null || bondWithin(t, p.maxBondYears));
+  return profileHasCourse(p, o) && o.quota != null && profileQuotas(p).includes(o.quota) && (!p.states.length || (state != null && p.states.includes(state)));
 }
+/** The course and quota's terms (the same figures as the Fees page and the stat cells), for the term filters. */
+const optTerms = (cat: Catalog, o: Pick<Opt, "college" | "degree" | "specialty"> & { quota: string | null }) => courseTerms(cat, o.college, o.degree, o.specialty, o.quota ?? undefined);
+/**
+ * Her profile filters on one option (inProfile) and the term filters `tf` (lib/term-filters.ts; default: her fee and
+ * bond caps; an unknown value fails unless `keepUnknown`). `types`: college types (hospitalInfo), for a type filter.
+ */
+function optMatches(cat: Catalog, o: Pick<Opt, "college" | "degree" | "specialty"> & { quota: string | null }, p: Profile | null, tf: TermFilters | null = p && profileTermFilters(p), types?: Map<string, HospitalInfo>) {
+  return inProfile(cat, o, p) && (!anyTermFilter(tf) || termsPass(optTerms(cat, o), types?.get(o.college)?.type?.value, tf!));
+}
+/** College types, read only when a type filter needs them. */
+const typesFor = (tf: TermFilters | null | undefined) => (tf?.types?.length ? hospitalInfo() : Promise.resolve(undefined));
 
 type Ranked = { o: Opt; reach: Reach; provisional: boolean; deepest: ReachInput | undefined };
 
@@ -349,10 +361,10 @@ const seatsOfOpts = async (lists: SeatList[], opts: Pick<Opt, "college" | "degre
  * her profile (courses, quotas, state, fee and bond caps; any without a profile). Ids follow optionId, so a saved choice
  * keeps its id once MCC results give it history. Seats outside the MCC course list are left out (no course to name).
  */
-export function newOptions(cat: Catalog, seats: Map<string, OptionSeats>, profile: Profile | null): Opt[] {
+export function newOptions(cat: Catalog, seats: Map<string, OptionSeats>, profile: Profile | null, match = (o: OptionSeats) => optMatches(cat, o, profile)): Opt[] {
   return [...seats].flatMap(([id, s]): Opt[] =>
     cat.optionById.has(id) || !cat.collegeByKey.has(s.college) || !cat.courseOf.has(`${s.degree}|${s.specialty}`) ||
-    !s.cells.some((xs) => xs.some((c) => c.seats > 0)) || !optMatches(cat, s, profile)
+    !s.cells.some((xs) => xs.some((c) => c.seats > 0)) || !match(s)
       ? []
       : [{ cs: "", id, college: s.college, degree: s.degree, specialty: s.specialty, quota: s.quota, byYear: {}, fresh: true }],
   );
@@ -404,6 +416,7 @@ export async function choiceOptions(ids: string[], profile: Profile | null) {
  * lists behind `seatsBy`. `view`, `showClosed` and `seats` (the seats filter: a kind, "any", null = with or without) are
  * the ones applied; `summary` (round view) counts her profile's options with seats in the round, search aside; `noState`
  * (round view, state filter) the options with seats in the round that only the state filter drops (institute without a state).
+ * `f.terms` (else her fee and bond caps): the term filters on each option's course and quota (lib/term-filters.ts).
  * Round view order: roundReachOrder, then clear vacancy seats, then deepest closing.
  */
 export async function listOptions(profile: Profile | null, f: OptionFilters = {}, pg?: PageQuery) {
@@ -421,24 +434,37 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     const course = cat.courseOf.get(`${o.degree}|${o.specialty}`)!;
     return `${college.name} ${college.state ?? ""} ${course.name} ${course.degree}`.toLowerCase().includes(q);
   };
-  const mine = cat.options.filter((o) => optMatches(cat, o, profile));
+  const tf = f.terms ?? (profile && profileTermFilters(profile));
+  const types = await typesFor(tf);
+  const matches = (o: Parameters<typeof optMatches>[1]) => optMatches(cat, o, profile, tf, types);
+  const split = splitByTerms(cat.options.filter((o) => inProfile(cat, o, profile)), tf, (o) => optTerms(cat, o), (o) => types?.get(o.college)?.type?.value);
+  const mine = split.kept;
   const opts = mine.filter(text);
+  // Options left out only because a filtered term is not declared: labelled and filtered as the shown ones, for the count.
+  const unknownOpts = split.unknown.filter(text);
   // Seats of every option in her profile (courses, quotas, seat categories) when the view or a seats filter needs them,
   // in one read beside the labels; else just the page's, below.
-  const [profileSeats, labelled] = await Promise.all([
+  const [profileSeats, labelled, labelledUnknown] = await Promise.all([
     round || kind ? optionSeats(lists, profile ? { ...profileCourseFilter(profile), quotas: profileQuotas(profile), categories: seatCats(profile) } : {}) : null,
     rankOptions(cat, opts, profile, includeProvisional),
+    unknownOpts.length ? rankOptions(cat, unknownOpts, profile, includeProvisional) : [],
   ]);
-  const fresh = profileSeats && round ? newOptions(cat, profileSeats, profile) : [];
-  const by = new Map(profileSeats ? [...mine, ...fresh].map((o) => [o.id, seatsByKind(lists, profileSeats.get(o.id)).by]) : []);
-  const ranked: Ranked[] = [...labelled, ...fresh.filter(text).map((o) => ({ o, reach: "new" as const, provisional: false, deepest: undefined }))];
+  const fresh = profileSeats && round ? newOptions(cat, profileSeats, profile, matches) : [];
+  const freshUnknown = profileSeats && round && tf && !tf.keepUnknown && anyTermFilter(tf)
+    ? newOptions(cat, profileSeats, profile, (o) => inProfile(cat, o, profile) && termVerdict(optTerms(cat, o), types?.get(o.college)?.type?.value, tf) === "unknown")
+    : [];
+  const by = new Map(profileSeats ? [...mine, ...fresh, ...split.unknown, ...freshUnknown].map((o) => [o.id, seatsByKind(lists, profileSeats.get(o.id)).by]) : []);
+  const asNew = (o: Opt): Ranked => ({ o, reach: "new", provisional: false, deepest: undefined });
+  const ranked: Ranked[] = [...labelled, ...fresh.filter(text).map(asNew)];
   const clear = (x: Ranked) => by.get(x.o.id)?.clear ?? 0;
   if (round) ranked.sort((a, b) => roundReachOrder.indexOf(a.reach) - roundReachOrder.indexOf(b.reach) || clear(b) - clear(a) || (b.deepest?.closing ?? 0) - (a.deepest?.closing ?? 0));
   const has = (x: Ranked, k: SeatKind | "any") => hasSeatsIn(by.get(x.o.id) ?? {}, k);
-  const every = kind ? ranked.filter((x) => has(x, kind)) : ranked;
   const inReach = (x: Ranked) => !f.reach?.length || f.reach.includes(x.reach);
+  const inView = (xs: Ranked[]) => (kind ? xs.filter((x) => has(x, kind)) : xs);
+  const open = (xs: Ranked[]) => (showClosed ? xs : xs.filter((r) => r.reach !== "closed-before"));
+  const every = inView(ranked);
   const all = every.filter(inReach);
-  const shown = showClosed ? all : all.filter((r) => r.reach !== "closed-before");
+  const shown = open(all);
   // With the clear vacancy filter, the options it hides that have seats in the round's virtual vacancy list are counted.
   const virtualList = kind === "clear" ? (lists.find((l) => l.kind === "virtual") ?? null) : null;
   const virtualOnly = virtualList ? ranked.filter((x) => !has(x, "clear") && has(x, "virtual") && inReach(x) && (showClosed || x.reach !== "closed-before")).length : 0;
@@ -455,7 +481,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   const noState = anyState
     ? [...profileSeats!.values()].filter((s) => {
         const c = cat.collegeByKey.get(s.college);
-        return c && c.state == null && cat.courseOf.has(`${s.degree}|${s.specialty}`) && optMatches(cat, s, anyState) && hasSeatsIn(seatsByKind(lists, s).by, "any");
+        return c && c.state == null && cat.courseOf.has(`${s.degree}|${s.specialty}`) && optMatches(cat, s, anyState, tf, types) && hasSeatsIn(seatsByKind(lists, s).by, "any");
       }).length
     : 0;
   return {
@@ -466,6 +492,8 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     seats: kind,
     summary: round ? roundSummary([...mine, ...fresh].map((o) => ({ by: by.get(o.id)!, fresh: o.fresh }))) : null,
     noState,
+    /** Options this view would show but for a filtered fee, stipend, bond or leaving value that is not declared (nd=keep adds them). */
+    unknownTerms: open(inView([...labelledUnknown, ...freshUnknown.filter(text).map(asNew)]).filter(inReach)).length,
     hiddenClosed: hidden.length,
     /** Of the hidden ones, those whose label rests on the provisional latest-year R1 alone. */
     hiddenProvisional: hidden.filter((r) => r.provisional).length,
@@ -537,7 +565,8 @@ function seatNames(cat: Catalog, s: { college: string; degree: string; specialty
 /** The seat an allotment held one round back, with its names. */
 const namedPrev = (cat: Catalog, p: Allotment["prev"]) => p && { ...p, ...seatNames(cat, p) };
 
-export type LastRanksFilters = { degree?: string; specialty: string; category?: string; quota?: string; years?: number[]; sort?: { year: number; round: Round; dir: "asc" | "desc" } };
+/** `terms`: fee, stipend, bond, leaving and college-type filters on each option's course and quota (lib/term-filters.ts). */
+export type LastRanksFilters = { degree?: string; specialty: string; category?: string; quota?: string; years?: number[]; sort?: { year: number; round: Round; dir: "asc" | "desc" }; terms?: TermFilters };
 
 /**
  * Every institute's closing rank by year and round for one course, on one seat category (all when omitted); bracketed
@@ -547,10 +576,11 @@ export type LastRanksFilters = { degree?: string; specialty: string; category?: 
  */
 export async function lastRanks(f: LastRanksFilters, pg?: PageQuery) {
   const cat = await getCatalog();
-  const opts = cat.options.filter((o) => o.specialty === f.specialty && (!f.degree || o.degree === f.degree) && (!f.quota || o.quota === f.quota));
+  const types = await typesFor(f.terms);
+  const opts = cat.options.filter((o) => o.specialty === f.specialty && (!f.degree || o.degree === f.degree) && (!f.quota || o.quota === f.quota) && optMatches(cat, o, null, f.terms ?? null, types));
   const groups = groupByOption(await findCutoffs(cat, { cs: [...new Set(opts.map((o) => o.cs))], quotas: f.quota ? [f.quota] : undefined, years: f.years?.length ? f.years : undefined }));
   const eligible = f.category ? new Set([f.category]) : undefined;
-  const built = opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], null, true, eligible));
+  const built = await withHospital(opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], null, true, eligible)));
   let rows = built.filter((r) => Object.keys(r.grid).length > 0);
   const columns = [...new Set(rows.flatMap((r) => Object.keys(r.grid).map(Number)))].sort().map((year) => ({
     year,
@@ -717,11 +747,13 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
   return { ...page, rows };
 }
 
-export type AllotmentFilters = { year?: number; round?: Round; course?: string; quota?: string; category?: string; state?: string; from?: number; to?: number };
+/** `terms`: fee, stipend, bond, leaving and college-type filters on each allotment's course and quota (lib/term-filters.ts). */
+export type AllotmentFilters = { year?: number; round?: Round; course?: string; quota?: string; category?: string; state?: string; from?: number; to?: number; terms?: TermFilters };
 
 /**
  * Allotments (ranks only, never names), newest year, then round, then rank, one page. A page past the end returns the
- * last page (as every list here does: `page` says which).
+ * last page (as every list here does: `page` says which). Each row: `fees` (its course and quota's terms, courseTerms)
+ * and `hospital` (type and beds, or null).
  */
 export async function listAllotments(f: AllotmentFilters, pg: PageQuery, collegeKey?: string) {
   const cat = await getCatalog();
@@ -733,7 +765,14 @@ export async function listAllotments(f: AllotmentFilters, pg: PageQuery, college
         .filter((p) => (!collegeKey || p.college === collegeKey) && (!f.course || (course && p.degree === course.degree && p.specialty === course.specialty)) && (!f.state || cat.collegeByKey.get(p.college)?.state === f.state))
         .map((p) => p.cs)
     : undefined;
-  const q = { cs, year: f.year, round: f.round, quota: f.quota, category: f.category, from: f.from, to: f.to };
+  // Term filters: the courses and quotas (options) whose terms pass, into the SQL WHERE as (course, quota) pairs.
+  const tf = anyTermFilter(f.terms) ? f.terms! : null;
+  const types = await typesFor(tf);
+  const inCs = cs && new Set(cs);
+  const csQuota = tf
+    ? cat.options.filter((o) => (!inCs || inCs.has(o.cs)) && (!f.quota || o.quota === f.quota) && optMatches(cat, o, null, tf, types)).map((o) => [o.cs, o.quota] as [string, string])
+    : undefined;
+  const q = { cs, csQuota, year: f.year, round: f.round, quota: f.quota, category: f.category, from: f.from, to: f.to };
   const at = (page: number) => findAllotments(cat, q, { limit: pg.pageSize, offset: (page - 1) * pg.pageSize, count: true });
   let page = Math.max(1, pg.page);
   let res = await at(page);
@@ -748,7 +787,7 @@ export async function listAllotments(f: AllotmentFilters, pg: PageQuery, college
     total,
     page,
     pageSize: pg.pageSize,
-    rows: rows.map((a) => {
+    rows: await withHospital(rows.map((a) => {
       const t = termsFor(cat, a.college, a.degree);
       const c = cat.courseOf.get(`${a.degree}|${a.specialty}`);
       return {
@@ -759,71 +798,54 @@ export async function listAllotments(f: AllotmentFilters, pg: PageQuery, college
         courseSlug: c?.slug ?? "",
         provisional: provisional.has(`${a.year}|${a.round}`),
         terms: t,
-        fees: courseTerms(cat, a.college, a.degree, a.specialty),
+        fees: courseTerms(cat, a.college, a.degree, a.specialty, a.quota),
         feeInr: t.fee?.amountInr ?? null,
         feeText: t.fee?.text ?? null,
         stipendText: t.stipend?.text ?? null,
         bondText: t.bond?.text ?? null,
         penaltyText: t.penalty?.text ?? null,
       };
-    }),
+    })),
   };
 }
 
 export const feeSorts = ["fee1", "feetotal", "stip1", "bondyrs", "bond", "leave", "name"] as const;
 export type FeeSort = (typeof feeSorts)[number];
 /**
- * Caps in ₹ (maxFee: year 1, a range's highest; maxBondInr: the highest bond amount for the programme). A capped value
- * that is not declared passes unless `hideUnknown`. `maxBondYears` 0 = no bond (never a declared one). `bond`: declared,
- * or "none" = no bond on record (a record says so; never an unknown one).
+ * The term filters (lib/term-filters.ts: caps in ₹ on the programme's figures; a capped value that is not declared fails
+ * unless `keepUnknown`). `bond`: declared, or "none" = no bond on record (a record says so; never an unknown one).
  */
-export type FeeFilters = {
+export type FeeFilters = TermFilters & {
   programmes?: Programme[];
   states?: string[];
   search?: string;
-  maxFee?: number | null;
-  minStipend?: number | null;
-  maxBondYears?: number | null;
-  maxBondInr?: number | null;
   bond?: "declared" | "none";
-  hideUnknown?: boolean;
   sort?: FeeSort;
   dir?: "asc" | "desc";
 };
 export type FeeRow = { college: Pick<College, "key" | "slug" | "name" | "state">; terms: ProgrammeTerms };
 
-const declaredBond = (t: ProgrammeTerms) => t.bond.status === "declared";
-/** The number each sort and cap uses; null = not declared, or declared in words only. Ranges use the highest (cautious) figure. */
-export const feeValue: Record<Exclude<FeeSort, "name">, (t: ProgrammeTerms) => number | null> = {
-  fee1: (t) => t.years[0]?.fee?.inr ?? null,
-  feetotal: (t) => t.wholeCourseFee,
-  stip1: (t) => t.years[0]?.stipend?.inr ?? null,
-  bondyrs: bondYearsOf,
-  bond: (t) => (t.bond.status === "none" ? 0 : declaredBond(t) ? t.bond.amount.max : null),
-  leave: (t) => t.bond.leavingAmount.max,
-};
 /** Nothing declared for the programme: no fee, stipend, bond or Round 2 forfeit. */
-export const nothingDeclared = (t: ProgrammeTerms) => !t.years.some((y) => y.fee || y.stipend) && t.bond.status === "not_declared" && !t.resignForfeit && !t.unread.length;
+export const nothingDeclared = (t: ProgrammeTerms) => !t.years.some((y) => y.fee || y.stipend) && t.bond.status === "not_declared" && !t.resignForfeit && !t.resignForfeitText && !t.unread.length;
 
 /**
  * One row per institute × programme it offers (from its courses), declared or not. Sorted by one column (unknown values
- * last in both directions, then by name); `undeclared` counts the matching rows with nothing declared.
+ * last in both directions, then by name); `undeclared` counts the matching rows with nothing declared; `unknownTerms` the
+ * rows left out only because a filtered value is not declared (`keepUnknown` adds them).
  */
 export async function listFees(f: FeeFilters, pg?: PageQuery) {
   const cat = await getCatalog();
   const q = f.search?.trim().toLowerCase();
-  const pass = (v: number | null, ok: (v: number) => boolean) => (v == null ? !f.hideUnknown : ok(v));
-  const rows: FeeRow[] = cat.colleges
-    .filter((c) => (!f.states?.length || (c.state != null && f.states.includes(c.state))) && (!q || `${c.name} ${c.state ?? ""}`.toLowerCase().includes(q)))
-    .flatMap((c) => collegeTerms(cat, c.key).map((terms) => ({ college: { key: c.key, slug: c.slug, name: c.name, state: c.state }, terms })))
-    .filter(({ terms: t }) =>
-      (!f.programmes?.length || f.programmes.includes(t.programme)) &&
-      (f.maxFee == null || pass(feeValue.fee1(t), (v) => v <= f.maxFee!)) &&
-      (f.minStipend == null || pass(feeValue.stip1(t), (v) => v >= f.minStipend!)) &&
-      (f.maxBondYears == null || bondWithin(t, f.maxBondYears, f.hideUnknown)) &&
-      (f.maxBondInr == null || pass(feeValue.bond(t), (v) => v <= f.maxBondInr!)) &&
-      (!f.bond || t.bond.status === (f.bond === "declared" ? "declared" : "none")),
-    );
+  const types = await typesFor(f);
+  const { kept: rows, unknown } = splitByTerms(
+    cat.colleges
+      .filter((c) => (!f.states?.length || (c.state != null && f.states.includes(c.state))) && (!q || `${c.name} ${c.state ?? ""}`.toLowerCase().includes(q)))
+      .flatMap((c) => collegeTerms(cat, c.key).map((terms): FeeRow => ({ college: { key: c.key, slug: c.slug, name: c.name, state: c.state }, terms })))
+      .filter(({ terms: t }) => (!f.programmes?.length || f.programmes.includes(t.programme)) && (!f.bond || t.bond.status === (f.bond === "declared" ? "declared" : "none"))),
+    f,
+    (r) => r.terms,
+    (r) => types?.get(r.college.key)?.type?.value,
+  );
   const by = f.sort ?? "fee1";
   const sign = (f.dir ?? (by === "stip1" ? "desc" : "asc")) === "asc" ? 1 : -1;
   const name = (a: FeeRow, b: FeeRow) => a.college.name.localeCompare(b.college.name);
@@ -832,5 +854,5 @@ export async function listFees(f: FeeFilters, pg?: PageQuery) {
     const [x, y] = [feeValue[by](a.terms), feeValue[by](b.terms)];
     return x == null || y == null ? (x == null ? 1 : 0) - (y == null ? 1 : 0) || name(a, b) : sign * (x - y) || name(a, b);
   });
-  return { ...paged(rows, pg), undeclared: rows.filter((r) => nothingDeclared(r.terms)).length };
+  return { ...paged(rows, pg), undeclared: rows.filter((r) => nothingDeclared(r.terms)).length, unknownTerms: unknown.length };
 }

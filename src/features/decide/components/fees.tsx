@@ -6,15 +6,18 @@ import { fmtDay, formatInrShort } from "../lib/format";
 import type { FeeQuotaGroup } from "../server/facts";
 import type { Amount, Figure, ProgrammeTerms, TermPart, TermSource } from "../server/terms";
 import { termLabel } from "../types";
+import { SourceRef } from "./page-sources";
 import { smallLink } from "./ui";
 
 // Fees, stipend and bond as ProgrammeTerms (server/terms.ts) renders them. Server-safe and client-safe on purpose (no
 // "use client", type-only server imports): the institute and Fees pages render them on the server, Options rows in the browser.
 
-/** The documents behind TermsSummary lines, for the DataSource under them (one entry per document). */
-export const termDocs = (ts: Pick<ProgrammeTerms, "sources">[]) => ts.flatMap((t) => t.sources.map((s) => ({ name: `${s.label}${idOf(s) ? `, MCC profile ${idOf(s)}` : ""}`, url: s.url, type: s.type })));
+/** The documents behind rows' stat cells, for the DataSource under them (one entry per document). */
+export const termDocs = (ts: Pick<ProgrammeTerms, "sources">[]) => ts.flatMap((t) => t.sources.map((s) => ({ name: srcName(s), url: s.url, type: s.type })));
 /** The MCC profile id to add to a source's name, unless its label already gives it (a fee-table source). */
 const idOf = (s: TermSource) => (s.mccId && !s.label.includes(s.mccId) ? s.mccId : null);
+/** "MCC institute profile (…), 2026, MCC profile 700417": a source's name with its year. */
+const srcName = (s: TermSource) => `${s.label}${s.year ? `, ${s.year}` : ""}${idOf(s) ? `, MCC profile ${idOf(s)}` : ""}`;
 
 /** "MD/MS", "Diploma (2 years)", "DNB", "NBEMS Diploma (2 years)", "MCh (6 years)". */
 export const programmeTitle = (t: Pick<ProgrammeTerms, "programme" | "durationYears">) => (t.durationYears === 3 ? t.programme : `${t.programme} (${t.durationYears} years)`);
@@ -37,21 +40,11 @@ export function NotDeclared({ what = "not in our MCC data" }: { what?: string })
   return <span>—<span className="sr-only">{what}</span></span>;
 }
 
-const srcName = (s: TermSource) => `${s.label}${s.year ? `, ${s.year}` : ""}${idOf(s) ? `, MCC profile ${idOf(s)}` : ""}`;
 
-/** A figure's source number, linking its document; its name starts with the number shown (label in name). */
+/** A figure's source number in the page's "Sources (N)" footer (page-sources.tsx), named "Source N: …". */
 export function Sup({ n, sources }: { n: number | null | undefined; sources: TermSource[] }) {
   const s = n != null ? sources.find((x) => x.n === n) : undefined;
-  if (!s) return null;
-  return (
-    <sup className="ml-0.5 text-[0.7em] font-normal text-muted-foreground">
-      {s.url ? (
-        <a href={s.url} target="_blank" rel="noopener noreferrer" aria-label={`Source ${s.n}: ${srcName(s)} (opens in a new tab)`} className="underline hover:text-sky">{s.n}</a>
-      ) : (
-        <span title={srcName(s)}>{s.n}</span>
-      )}
-    </sup>
-  );
+  return s ? <SourceRef doc={termDocs([{ sources: [s] }])[0]} /> : null;
 }
 
 const kindNote: Partial<Record<Figure["kind"], string>> = {
@@ -112,14 +105,9 @@ const BASIS: Record<NonNullable<ProgrammeTerms["bond"]["basis"]>, string> = { do
 
 const otherCourse = (t: ProgrammeTerms) => `Not declared for ${t.programme}: the bond on the college's MCC profile is for other courses (its exact words are below).`;
 
+/** The NBEMS bond rules as source numbers (the page's footer). */
 function NbemsRules() {
-  return (
-    <span className="flex flex-wrap gap-x-3 text-xs">
-      {NBEMS_BOND_RULES.map((r) => (
-        <a key={r.url} href={r.url} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>{r.label}<span className="sr-only"> (PDF, opens in a new tab)</span></a>
-      ))}
-    </span>
-  );
+  return NBEMS_BOND_RULES.map((r) => <SourceRef key={r.url} doc={{ name: r.label, url: r.url, type: "OFFICIAL" }} />);
 }
 
 // ---------- The per-year fee table by seat-type group (FeesStructured, server/facts.ts feesFor) ----------
@@ -384,16 +372,15 @@ function TermsYears({ t }: { t: ProgrammeTerms }) {
 
 /**
  * One programme's fees, stipend and bond (college Fees tab): fees on the left (wide screens), the bond box on the right,
- * one numbered source list under both. `groups` (the fee table, FeesStructured): one block per seat-type group; without
+ * each figure's source a number in the page's "Sources (N)" footer (Sup). `groups` (the fee table, FeesStructured): one block per seat-type group; without
  * them (MCh, MPH, an import before the table) a year table from the programme's terms (a 2-year course has no year 3)
  * with the whole-course fee.
  */
 export function FeesSection({ t: all, id, className, groups = [] }: { t: ProgrammeTerms; id: string; className?: string; groups?: FeeQuotaGroup[] }) {
-  // One numbering per programme: each group's sources, then the bond block's.
+  // Each group's sources, then the bond block's, kept apart (Sup finds a figure's document in its block's list).
   const offs = groups.reduce<number[]>((o, g, i) => [...o, o[i] + lastSource(g)], [0]);
   const t = groups.length ? bondBlock(all, offs[groups.length]) : all;
   const title = programmeTitle(t);
-  const sources = [...groups.flatMap((g, i) => groupSources(g, offs[i])), ...t.sources];
   return (
     <section aria-labelledby={id} className={cn("grid content-start gap-5", className)}>
       <h3 id={id} className="text-lg font-semibold">{title}</h3>
@@ -403,12 +390,6 @@ export function FeesSection({ t: all, id, className, groups = [] }: { t: Program
         </div>
         <BondBox t={t} id={`${id}-bond`} of={id} />
       </div>
-      {sources.length > 0 && (
-        <div className="grid gap-1 border-t border-border pt-3">
-          <h4 className="text-xs font-semibold text-muted-foreground">Sources</h4>
-          <SourceList sources={sources} label={`Sources, ${title}`} />
-        </div>
-      )}
     </section>
   );
 }
@@ -484,7 +465,9 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
         <div>
           <dt className={term}>Resign or don&apos;t join from Round 2</dt>
           <dd>
-            {t.resignForfeit ? <span className="numeric font-semibold">{formatINR(t.resignForfeit.inr)}<Sup n={t.resignForfeit.src} sources={sources} /></span> : NOT_IN_DATA}
+            {t.resignForfeit ? <span className="numeric font-semibold">{formatINR(t.resignForfeit.inr)}<Sup n={t.resignForfeit.src} sources={sources} /></span>
+              : t.resignForfeitText ? <>{t.resignForfeitText.text}<Sup n={t.resignForfeitText.src} sources={sources} /></>
+              : NOT_IN_DATA}
             <span className={note}>What MCC lets the college keep if you resign or don&apos;t join from Round 2. Separate from the leaving penalty.</span>
           </dd>
         </div>
@@ -509,7 +492,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
 function bondBlock(t: ProgrammeTerms, off: number): ProgrammeTerms {
   const b = t.bond;
   const unread = t.unread.filter((u) => u.kind === "BOND" || u.kind === "PENALTY");
-  const cited = new Set([b.src, b.doc, t.resignForfeit?.src, ...[...b.amounts, ...b.leaving, ...b.otherPenalties].map((p) => p.src), ...unread.map((u) => u.src)]);
+  const cited = new Set([b.src, b.doc, t.resignForfeit?.src, t.resignForfeitText?.src, ...[...b.amounts, ...b.leaving, ...b.otherPenalties].map((p) => p.src), ...unread.map((u) => u.src)]);
   const kept = t.sources.filter((s) => cited.has(s.n));
   const to = new Map(kept.map((s, i) => [s.n, off + i + 1]));
   const re = (n: number) => to.get(n)!;
@@ -518,6 +501,7 @@ function bondBlock(t: ProgrammeTerms, off: number): ProgrammeTerms {
     ...t,
     bond: { ...b, src: b.src && re(b.src), doc: b.doc && re(b.doc), amounts: b.amounts.map(part), leaving: b.leaving.map(part), otherPenalties: b.otherPenalties.map(part) },
     resignForfeit: t.resignForfeit && { ...t.resignForfeit, src: re(t.resignForfeit.src) },
+    resignForfeitText: t.resignForfeitText && { ...t.resignForfeitText, src: re(t.resignForfeitText.src) },
     unread: unread.map((u) => ({ ...u, src: re(u.src) })),
     sources: kept.map((s) => ({ ...s, n: re(s.n) })),
   };
@@ -544,55 +528,3 @@ function SourceList({ sources, label }: { sources: TermSource[]; label: string }
   );
 }
 
-/**
- * One line for a row or a card: "Fee ₹1.5 L/yr · Stipend ₹55,200/mo yr 1 · Bond 1 yr, ₹50 L · Leaving ₹35 L", each
- * "not declared" when missing (never "no bond": that is only a record saying so, "No bond (NBEMS rule)", with what the
- * record is unsure of), "unknown" when the record says it is, "see terms" when declared in words only (a fee as
- * published); "(state rule)" when that is the basis, "(+ state rule)" beside the college's document. For Options, Seats
- * and Allotments rows (the course's programme: service courseTerms) and the college Overview. Bond and leaving figures
- * are the same ones the Fees page sorts on (server/terms.ts Amount). `programme`: lead with the programme title.
- */
-export function TermsSummary({ t, programme, className }: { t: ProgrammeTerms; programme?: boolean; className?: string }) {
-  const y1 = t.years[0];
-  const later = t.years.at(-1)?.fee;
-  // A year left out by the source: never shown as year 1's figure.
-  const laterMissing = t.years.slice(1).some((y) => !y.fee);
-  const b = t.bond;
-  const nd = <span className="text-muted-foreground">not declared</span>;
-  const money = (a: Amount, years: number | null) => {
-    const v = amountText(a);
-    if (!v) return a.state === "words" ? "see terms" : null;
-    const note = amountNote(a, years);
-    return note ? `${v} (${note})` : v;
-  };
-  const rule = b.basis === "state_rule" ? "state rule" : b.basis === "nbems_rule" ? "NBEMS rule" : b.stateRule ? (b.status === "declared" ? "+ state rule" : "a state rule may apply") : null;
-  const basis = [rule, b.status === "none" ? b.caveat : null].filter(Boolean).join("; ");
-  const why = basis ? ` (${basis})` : "";
-  const bondText =
-    b.status === "declared" ? `${[b.years != null ? `${b.yearsSum ?? b.years} yr` : b.yearsText ? "years in terms" : null, money(b.amount, b.years)].filter(Boolean).join(", ") || "see terms"}${why}`
-    : b.status === "not_declared" && b.text ? "unknown" // the record says so: not checked, not declared on MCC, or no clear terms
-    : null;
-  const leaving = b.leaving.length ? money(b.leavingAmount, null) : null;
-  const fee = y1?.fee;
-  return (
-    <span className={cn("numeric text-sm", className)}>
-      {programme && <span className="font-semibold">{programmeTitle(t)} · </span>}
-      <span>
-        Fee{" "}
-        {fee ? (
-          <>
-            {fee.kind === "maximum" && "up to "}{fee.min != null && `${formatInrShort(fee.min)}–`}{formatInrShort(fee.inr)}{fee.atAdmission ? " at admission" : "/yr"}{fee.kind === "maximum" && " (NBEMS max)"}
-            {laterMissing ? ", later yrs not stated" : later && later.inr !== fee.inr && `, then ${formatInrShort(later.inr)}${fee.atAdmission ? "/yr" : ""}`}
-          </>
-        )
-        : t.unread.some((u) => u.kind === "FEE") ? "see terms" : nd}
-      </span>
-      {" · "}
-      <span>Stipend {y1?.stipend ? <>{formatInrShort(y1.stipend.inr)}/mo yr 1{y1.stipend.kind === "minimum" && " min"}</> : nd}</span>
-      {" · "}
-      <span>{b.status === "none" ? `No bond${why}` : <>Bond {bondText ?? nd}</>}</span>
-      {" · "}
-      <span>Leaving {leaving ?? nd}</span>
-    </span>
-  );
-}

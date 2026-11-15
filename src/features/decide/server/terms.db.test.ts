@@ -1,10 +1,7 @@
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { seatGroups, type MccFeesStructured } from "@/features/cutoffs/lib/import-schema";
 import { db } from "@/lib/db";
-import { TermsSummary } from "../components/fees";
-import { formatInrShort } from "../lib/format";
+import { inrFull, statCells } from "../lib/stat-format";
 import { getCatalog } from "./catalog";
 import { collegeTerms, courseTerms, programmes, termQuality, type Quality } from "./terms";
 
@@ -47,10 +44,12 @@ describe.skipIf(!process.env.DATABASE_URL)("terms normalizer on the real MCC dat
         );
         expect(p.years.map((y) => y.stipend && [y.stipend.inr, y.stipend.kind === "minimum"]), at).toEqual(Array.from({ length: len }, (_, i) => (r?.stipend_per_month[i] ? [r.stipend_per_month[i]!.inr, !!r.stipend_per_month[i]!.minimum] : null)));
         expect(p.wholeCourseFee, at).toBe(numbers ? (r!.fee_whole_course?.amount ?? null) : null);
-        // The line itself: a verbatim fee shows no ₹ figure; a numbers one its year-1 figure, "at admission" where it is that.
-        const fee = renderToStaticMarkup(createElement(TermsSummary, { t: p })).replace(/<[^>]+>/g, "").split(" · ")[0];
-        if (numbers && p.years[0].fee) expect(fee, at).toContain(`${formatInrShort(p.years[0].fee.inr)}${p.years[0].fee.atAdmission ? " at admission" : "/yr"}`);
-        else expect(fee, at).not.toContain("₹");
+        // The fee cell itself: a verbatim fee shows no ₹ figure; a numbers one its year-1 figure, "at admission" where it is that.
+        const fee = statCells(p)[0];
+        if (numbers && p.years[0].fee) {
+          expect(fee.full, at).toContain(inrFull(p.years[0].fee.inr));
+          if (p.years[0].fee.atAdmission) expect(fee.marker, at).toBe("at admission");
+        } else expect(fee.full, at).not.toContain("₹");
         n[!r ? "none" : numbers ? "numbers" : "verbatim"]++;
       }
     console.log("programmes by fee-table record", JSON.stringify(n));

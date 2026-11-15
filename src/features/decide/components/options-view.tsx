@@ -19,6 +19,13 @@ const notListed = ["terms", "feeText", "stipendText", "bondText", "penaltyText",
 export type ListRow = Omit<OptionRow, (typeof notListed)[number]>;
 export const listRow = (r: OptionRow) => Object.fromEntries(Object.entries(r).filter(([k]) => !(notListed as readonly string[]).includes(k))) as ListRow;
 
+/** The closing a card shows big: the newest with data (the latest R1 while the labels count it, else the later past year's deepest, then the older's, then a latest R1 the labels leave out); null when none. */
+export function cardClosing(r: Pick<OptionRow, "latest" | "byYear">, latestYear: number, [older, last]: [number, number], includeLatest: boolean): { d: Deepest; year: number } | null {
+  if (includeLatest && r.latest) return { d: r.latest, year: latestYear };
+  for (const year of [last, older]) if (r.byYear[year]) return { d: r.byYear[year]!, year };
+  return r.latest ? { d: r.latest, year: latestYear } : null;
+}
+
 /** A snapshot for the choice list; Choices relabels it from the current data when her rank is known. */
 export function toChoiceItem(r: ListRow): ChoiceItem {
   return {
@@ -27,12 +34,16 @@ export function toChoiceItem(r: ListRow): ChoiceItem {
   };
 }
 
+/** A seat list's kind in a few letters: "clear", "virtual", "+ new" (newly added seats). */
+export const seatKindShort = (k: SeatList["kind"]) => (k === "new" ? "+ new" : k);
+
 /**
- * Column heading for an option's seats in one list, e.g. "R2 seats" over "clear vacancy" (`short`: over "clear"; the
- * year is in each cell's name and the source line).
+ * Column heading for an option's seats in one list, e.g. "R2 seats" over "clear vacancy" (`short`: "R2" over "clear";
+ * the year is in each cell's name and the source line).
  */
 export function SeatsHead({ list, short }: { list: SeatList; short?: boolean }) {
-  return <span className="whitespace-nowrap">{roundLabel[list.round]} seats<span className="block font-normal">{short ? list.kind : seatKindLabel[list.kind].toLowerCase()}</span></span>;
+  if (short) return <span className="whitespace-nowrap">{roundLabel[list.round]}<span className="block font-normal">{seatKindShort(list.kind)}<span className="sr-only"> seats</span></span></span>;
+  return <span className="whitespace-nowrap">{roundLabel[list.round]} seats<span className="block font-normal">{seatKindLabel[list.kind].toLowerCase()}</span></span>;
 }
 
 /** `n` seats of one option (`at`, named `name`) in one list, linking to them on Seats; "—" when the list prints none. `end`: right-aligned (columns). */
@@ -70,9 +81,9 @@ export function FeeText({ t }: { t: Term | undefined }) {
   return <TermText term={t && t.amountInr != null ? { ...t, text: `${formatInrShort(t.amountInr)}/yr` } : t} />;
 }
 
-/** Year × round grid: closing rank with its seat category, and allotments made (all categories) in brackets. */
+/** Year × round grid, newest year first: closing rank with its seat category, and allotments made (all categories) in brackets. */
 export function RoundGrid({ row, caption }: { row: Pick<OptionRow, "grid" | "reach">; caption: string }) {
-  const years = Object.keys(row.grid).map(Number).sort();
+  const years = Object.keys(row.grid).map(Number).sort((a, b) => b - a);
   const used = rounds.filter((r) => years.some((y) => row.grid[y]?.[r]));
   if (!years.length)
     return (

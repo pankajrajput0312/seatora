@@ -132,6 +132,8 @@ export type ProgrammeTerms = {
   bond: Bond;
   /** MCC profile: what is forfeited if you resign or don't join from Round 2 (PENALTY, else the fee table). Not the leaving penalty. */
   resignForfeit: Figure | null;
+  /** That forfeit when the PENALTY record gives it in words only (no ₹ figure): never the leaving penalty. */
+  resignForfeitText?: { text: string; src: number } | null;
   /** A term whose shape isn't read: shown as published. Also a bond or penalty without its record (an import older than the records). */
   unread: { kind: Term["kind"]; text: string; src: number }[];
   /** Plain sentences about figures left out for this programme. */
@@ -251,12 +253,16 @@ export function termQuality(t: Pick<Term, "kind" | "text">): Quality {
 // ---------- per programme ----------
 
 const MCC_PROFILE = termSourceName("https://mcc.admissions.nic.in/");
+const BOND_PAGE = /[?&]Type=BM\b/i;
+const BOND_DOC = "The college's bond document on MCC";
 const mccIdOf = (url: string | null) => url?.match(/[?&]InstituteId=(\d+)/i)?.[1] ?? null;
 
 /** `shared`: institutes in our data citing the same MCC profile; more than one and it may be another institute's. */
 function sourceLabel(t: Pick<Term, "kind" | "source">, shared: number) {
   if (t.source.name === MCC_PROFILE) {
     const whose = shared > 1 ? `an MCC profile that ${shared} institutes in Seatora's data cite (it may be another institute's)` : null;
+    // The profile's bond page (Type=BM), whichever term cites it: named the same everywhere, so the page lists it once.
+    if (BOND_PAGE.test(t.source.url ?? "")) return whose ? `Bond document on ${whose}` : BOND_DOC;
     if (t.kind === "BOND") return `Bond document summary on ${whose ?? "the college's MCC profile"}`;
     return whose ? `From ${whose}` : t.kind === "PENALTY" ? "The college's MCC profile" : "Declared by the college to MCC";
   }
@@ -316,7 +322,7 @@ function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url
   const url = course ? course.src_url : t.source.url;
   // An unknown record links the college's MCC profile, not a bond document: named so; its document (doc_url) beside it.
   const own = src(url, unknown && url && termSourceName(url) === MCC_PROFILE ? "The college's MCC profile" : undefined);
-  const doc = d.doc_url && d.doc_url !== url ? src(d.doc_url, "The college's bond document on MCC") : null;
+  const doc = d.doc_url && d.doc_url !== url ? src(d.doc_url, BOND_PAGE.test(d.doc_url) ? undefined : BOND_DOC) : null;
   const mayApply = st.status === "none" ? (text.match(MAY_APPLY)?.[1] ?? null) : null;
   const caveat = mayApply ?? (st.basis === "nbems_rule" && d.confidence ? d.confidence.replace(/^\w+: /, "") : null);
   // A state rule's applies_to is the checker's research note; its text already says whom the rule binds.
@@ -384,6 +390,16 @@ function recordsOf(programme: Programme, ...ts: (Term | undefined)[]): FeeTableR
 }
 
 /**
+ * The record for a seat's quota: the one whose MCC quotas include it, else the All India group's (a central or state
+ * quota such as Delhi University pays its fee), else none (an NRI seat at a college with only Deemed/Paid figures: never
+ * another group's). No quota, or records without their quotas (an older import): the first, as a programme summary.
+ */
+function recordFor(recs: FeeTableRecord[], quota: string | undefined) {
+  if (!quota || recs.some((r) => !r.quotas)) return recs[0];
+  return recs.find((r) => r.quotas!.includes(quota)) ?? recs.find((r) => r.seat_groups.includes("All India"));
+}
+
+/**
  * Figures of one fee-table record, each with its source (`src`: its number in ProgrammeTerms.sources). Fee only when the
  * record says it may be shown (fee_display "numbers"; verbatim or absent: none, `verbatim`), in ₹; each year as stated
  * (null: not stated, never copied from another year); the whole course only when the record gives it (every year stated).
@@ -413,9 +429,10 @@ function fromRecords(r: FeeTableRecord | undefined, src: (s: FeeTableRecord["sou
 
 /**
  * One programme's terms at one college, from the terms of its own bucket only (MD: MD/MS, Diploma, MCh, MPH; DNB: DNB,
- * NBEMS Diploma): never the other bucket's. `sharedBy`: institutes citing an MCC profile id.
+ * NBEMS Diploma): never the other bucket's. `sharedBy`: institutes citing an MCC profile id. `quota`: the fee and stipend
+ * of that quota's fee-table record (recordFor); omitted, the first record's.
  */
-export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy: (mccId: string) => number = () => 1): ProgrammeTerms {
+export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy: (mccId: string) => number = () => 1, quota?: string): ProgrammeTerms {
   const def = programmes[programme];
   const own = terms.filter((t) => t.program === def.bucket);
   const get = (k: Term["kind"]) => own.find((t) => t.kind === k);
@@ -450,9 +467,15 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     feeT = stT = undefined;
   }
   const recs = recordsOf(programme, feeT, stT);
-  const read = recs ? fromRecords(recs[0], (s) => add({ label: s.label, url: s.url, year: typeof s.year === "number" ? s.year : null, mccId: s.mcc_id ?? null, sharedBy: 1, type: "OFFICIAL" })) : null;
-  // A fee in the profile's own words only (verbatim): no figure, its text as published ("see terms").
-  if (read?.verbatim && feeT) unread.push({ kind: "FEE", text: feeT.text, src: srcOf(feeT, null) });
+  const read = recs ? fromRecords(recordFor(recs, quota), (s) => add({ label: s.label, url: s.url, year: typeof s.year === "number" ? s.year : null, mccId: s.mcc_id ?? null, sharedBy: 1, type: "OFFICIAL" })) : null;
+  // A fee in the profile's own words only (verbatim): no figure; the quota's record's words as published ("see terms"),
+  // read from its MCC profile page; none in words: said so.
+  if (read?.verbatim && feeT) {
+    const r = recordFor(recs!, quota)!;
+    const url = r.fee_text_src?.url;
+    if (r.fee_text) unread.push({ kind: "FEE", text: r.fee_text, src: url ? srcOf({ kind: "FEE", source: { name: termSourceName(url), url, type: "OFFICIAL" } }, null) : srcOf(feeT, null) });
+    else notes.push("The MCC profile gives no fee in words for these seats, so Seatora shows no fee.");
+  }
 
   const fee = !recs && feeT ? parseFee(feeT.text) : null;
   let feeFig: Figure | null = null;
@@ -479,6 +502,7 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
   else if (bondT) unread.push({ kind: "BOND", text: bondT.text, src: srcOf(bondT, null) });
 
   let resignForfeit: Figure | null = null;
+  let resignForfeitText: ProgrammeTerms["resignForfeitText"] = null;
   if (penT && penRecord) {
     const p = penaltiesFromRecord(penRecord, def.kind);
     const src = docOf(penT);
@@ -486,7 +510,7 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     bond = { ...bond, leaving: at(p.leaving), leavingAmount: amountOf(p.leaving, null), otherPenalties: at(p.other) };
     const f = p.forfeit.find((x) => x.inr != null);
     if (f) resignForfeit = { inr: f.inr!, kind: "declared", src: src(f.url) };
-    else if (p.forfeit[0]) unread.push({ kind: "PENALTY", text: p.forfeit[0].text, src: src(p.forfeit[0].url) });
+    else if (p.forfeit[0]) resignForfeitText = { text: p.forfeit[0].text, src: src(p.forfeit[0].url) };
   } else if (penT) unread.push({ kind: "PENALTY", text: penT.text, src: srcOf(penT, null) });
   resignForfeit ??= read?.forfeit ?? null;
 
@@ -499,6 +523,7 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     wholeCourseFee: recs ? (read?.whole ?? null) : feeFig && feeFig.min == null ? feeFig.inr * def.years : null,
     bond,
     resignForfeit,
+    resignForfeitText,
     unread,
     notes,
     sources,
@@ -511,7 +536,7 @@ export function programmesOf(degrees: Iterable<string>): Programme[] {
   return programmeNames.filter((p) => have.has(p));
 }
 
-type Index = { degrees: Map<string, Set<string>>; terms: Map<string, Term[]>; sharedBy: (mccId: string) => number; out: Map<string, ProgrammeTerms[]> };
+type Index = { degrees: Map<string, Set<string>>; terms: Map<string, Term[]>; sharedBy: (mccId: string) => number; out: Map<string, ProgrammeTerms[]>; byQuota: Map<string, ProgrammeTerms> };
 const memo = new WeakMap<Catalog, Index>();
 function indexOf(cat: Catalog) {
   let m = memo.get(cat);
@@ -525,7 +550,7 @@ function indexOf(cat: Catalog) {
       const id = mccIdOf(t.source.url);
       if (id) (byId.get(id) ?? byId.set(id, new Set()).get(id)!).add(t.college);
     }
-    memo.set(cat, (m = { degrees, terms, sharedBy: (id) => byId.get(id)?.size ?? 1, out: new Map() }));
+    memo.set(cat, (m = { degrees, terms, sharedBy: (id) => byId.get(id)?.size ?? 1, out: new Map(), byQuota: new Map() }));
   }
   return m;
 }
@@ -544,12 +569,17 @@ export function collegeTerms(cat: Catalog, college: string): ProgrammeTerms[] {
 
 /**
  * The terms for one course at a college (its programme). `specialty`: a bond that varies by specialty (the record's
- * by_subject) gives that course's own figure.
+ * by_subject) gives that course's own figure. `quota`: the fee and stipend of that quota's fee-table record (memoized).
  */
-export function courseTerms(cat: Catalog, college: string, degree: string, specialty?: string): ProgrammeTerms {
+export function courseTerms(cat: Catalog, college: string, degree: string, specialty?: string, quota?: string): ProgrammeTerms {
   const p = programmeOfDegree(degree);
   const m = indexOf(cat);
-  const t = collegeTerms(cat, college).find((x) => x.programme === p) ?? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy);
+  const k = quota ? `${college}|${p}|${quota}` : null;
+  let t = k ? m.byQuota.get(k) : undefined;
+  if (!t) {
+    t = k ? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy, quota) : (collegeTerms(cat, college).find((x) => x.programme === p) ?? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy));
+    if (k) m.byQuota.set(k, t);
+  }
   const d = specialty && t.bond.status === "declared" ? m.terms.get(college)?.find((x) => x.program === programmes[p].bucket && x.kind === "BOND")?.details : undefined;
   const own = d && "status" in d ? d.by_subject?.[specialty!] : undefined;
   return own == null ? t : { ...t, bond: { ...t.bond, amount: { ...t.bond.amount, state: "figure", min: own, max: own, perYear: null, varies: false } } };

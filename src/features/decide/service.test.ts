@@ -155,7 +155,7 @@ describe("service on the test fixture", () => {
     expect(r.byYear[2024]).toBe(want || null);
   });
 
-  it("fees: a row per institute × programme offered; unknown last both ways; caps keep unknown unless hidden", async () => {
+  it("fees: a row per institute × programme offered; unknown last both ways; caps leave unknown out (counted) unless kept", async () => {
     const all = await svc.listFees({}, { page: 1, pageSize: 1000 });
     expect(all.total).toBe(new Set(fx.cutoffs.map((c) => `${c.college}|${programmeOfDegree(c.degree)}`)).size);
     const fee1 = (r: FeeRow) => r.terms.years[0]?.fee?.inr ?? null;
@@ -165,9 +165,11 @@ describe("service on the test fixture", () => {
       expect(xs.slice(0, known.length)).toEqual([...known].sort((a, b) => (dir === "asc" ? a - b : b - a)));
     }
     const capped = await svc.listFees({ maxFee: 100000 });
-    expect(capped.rows.every((r) => fee1(r) == null || fee1(r)! <= 100000)).toBe(true);
-    const hidden = await svc.listFees({ maxFee: 100000, hideUnknown: true });
-    expect(hidden.rows.every((r) => fee1(r) != null)).toBe(true);
+    expect(capped.rows.every((r) => fee1(r) != null && fee1(r)! <= 100000)).toBe(true);
+    const kept = await svc.listFees({ maxFee: 100000, keepUnknown: true });
+    expect(kept.rows.every((r) => fee1(r) == null || fee1(r)! <= 100000)).toBe(true);
+    expect(kept.total).toBe(capped.total + capped.unknownTerms);
+    expect(kept.unknownTerms).toBe(0);
     expect((await svc.listFees({ bond: "none" })).rows.every((r) => r.terms.bond.status !== "declared")).toBe(true);
   });
 

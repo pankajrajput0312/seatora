@@ -30,9 +30,10 @@ test("every route: skip link is the first tab stop, no sideways scroll at 390 px
     await expect(page.getByRole("link", { name: "Skip to content" }), path).toBeFocused();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), path).toBeLessThanOrEqual(0);
   }
-  // The Seats matrix's and Allotments' Display menus open on screen, every checkbox visible.
+  // The Seats matrix's and Allotments' Display menus open on screen, every checkbox visible (the menu shows with the
+  // table; at 390 px the pages open on cards).
   for (const path of ["/decide/seats", "/decide/allotments"]) {
-    await page.goto(`${path}?${PROFILE}`);
+    await page.goto(`${path}?${PROFILE}&layout=table`);
     await page.locator("summary", { hasText: "Display" }).click();
     for (const box of await page.getByRole("group", { name: "Columns shown" }).getByRole("checkbox").all()) {
       const b = (await box.boundingBox())!;
@@ -59,7 +60,7 @@ test("set profile, label options, and reorder choices with the keyboard only", a
   const stars = page.locator('button[aria-pressed="false"][aria-label^="In Round 2"]').filter({ visible: true });
   for (let i = 0; i < 3; i++) await stars.first().click(); // a clicked star becomes pressed, so .first() moves to the next row
 
-  await page.goto(`/decide/choices?${PROFILE}`);
+  await page.goto(`/decide/choices?${PROFILE}&layout=cards`); // the list (desktop opens on the table)
   const list = page.getByRole("list", { name: /Round 2 · 2026 choice list, 3 items/ });
   const names = async () => list.locator(":scope > li").evaluateAll((lis) => lis.map((li) => li.querySelector("a")?.textContent));
   await expect(list).toBeVisible();
@@ -81,8 +82,9 @@ test("overview leads with what's open now and the round's numbers, each opening 
   await page.goto(`/decide?${PROFILE}`);
   await expect(page.getByRole("region", { name: "MCC counselling 2026 now" })).toBeVisible();
   const numbers = page.getByRole("region", { name: "Round 2 seats in your courses" });
-  await expect(numbers).toContainText("Options with Round 2 seats1,065708 in the clear vacancy list, 357 virtual only.");
-  await numbers.getByRole("link", { name: "Open the Round 2 view" }).click();
+  await expect(numbers).toContainText("Options with Round 2 seats");
+  await expect(numbers).toContainText(/1,065\s*708 clear, 357 virtual only/); // the long sentence is behind its (i)
+  await numbers.getByRole("link", { name: "708 clear, 357 virtual only" }).click(); // the stat's own link opens the Round 2 view
   await expect(page.locator("#options-count")).toContainText("of 1,065 options");
 });
 
@@ -97,39 +99,41 @@ test("options, the round view by default: her options with 2026 R2 seats, new on
   await page.goto(`/decide/options?${PROFILE}`);
   // Her courses in MCC's 2026 R2 lists (seats.ndjson): 1,065 options, 708 clear vacancy, 357 virtual only, 103 with newly added seats.
   const summary = page.getByRole("region", { name: "2026 R2 seats in your courses" });
-  await expect(summary).toContainText(/^1,065 options have Round 2 seats in your courses: 708 in the clear vacancy list, 357 virtual only; 103 with newly added seats, \d+ new: no past allotment\./);
+  // Short; the full sentence (103 with newly added seats…) is behind its (i) "About 2026 R2 seats".
+  await expect(summary).toContainText(/^1,065 with 2026 R2 seats:\s*708 clear,\s*357 virtual only,\s*\d+ new: no past allotment/);
+  await expect(summary).toContainText("103 with newly added seats");
   await expect(page.getByRole("link", { name: "All 1,065 options" })).toBeVisible();
   const count = page.locator("#options-count");
   await expect(count).toContainText("Showing 1–25 of 1,065 options");
-  await expect(page.getByText(/that closed before your rank in every round of .* are included/)).toBeVisible();
+  await expect(page.getByText(/Closed ones shown\./).first()).toBeVisible(); // "…every round of …" is behind the (i)
 
   // New options: their own chip; a real row whose star saves it under its option id.
-  const fresh = Number((await summary.getByRole("link", { name: /new: no past allotment/ }).textContent())!.match(/[\d,]+/)![0].replace(",", ""));
+  const fresh = Number((await summary.getByRole("link", { name: /new\s*: no past allotment/ }).textContent())!.match(/[\d,]+/)![0].replace(",", ""));
   await page.getByRole("link", { name: new RegExp(`^New: no past allotment ${fresh} options$`) }).click();
   await expect(count).toContainText(`of ${fresh} options`);
   const row = page.locator("[data-item]").filter({ visible: true }).first();
   await expect(row).toContainText("New: no past allotment");
   await row.getByRole("button", { name: /^In Round 2/ }).click();
-  await page.goto(`/decide/choices?${PROFILE}`);
+  await page.goto(`/decide/choices?${PROFILE}&layout=cards`); // the list (desktop opens on the table)
   await expect(page.getByRole("list", { name: /choice list, 1 item/ })).toContainText("New: no past allotment");
 
   // Also options without R2 seats; then the view of every option with past allotments, closed hidden.
   await page.goto(`/decide/options?${PROFILE}`);
-  await page.getByRole("link", { name: "Also show options without Round 2 seats" }).click();
+  await page.getByRole("link", { name: "Also without R2 seats" }).click();
   await expect(count).toContainText(`of ${formatN(1282 + fresh)} options`);
-  await page.getByRole("link", { name: "Every option with past allotments instead (closed hidden)" }).click();
+  await page.getByRole("link", { name: /^Every option with past allotments/ }).click();
   await expect(page).toHaveURL(/view=all/);
   await expect(count).toContainText("of 641 options");
 
   // From the New chip, the other view drops that label (it has no new options) instead of opening empty.
   await page.goto(`/decide/options?${PROFILE}&reach=new`);
-  await page.getByRole("link", { name: "Every option with past allotments instead (closed hidden)" }).click();
+  await page.getByRole("link", { name: /^Every option with past allotments/ }).click();
   await expect(page).toHaveURL(/view=all/);
   await expect(page).not.toHaveURL(/reach=/);
   await expect(count).toContainText("of 641 options");
   // The summary's new link opens every new option, whatever the seats filter.
   await page.goto(`/decide/options?${PROFILE}&seats=virtual`);
-  await page.getByRole("region", { name: "2026 R2 seats in your courses" }).getByRole("link", { name: /new: no past allotment/ }).click();
+  await page.getByRole("region", { name: "2026 R2 seats in your courses" }).getByRole("link", { name: /new\s*: no past allotment/ }).click();
   await expect(count).toContainText(`of ${fresh} options`);
   // Hide them by keyboard: the same link, now "Show them", keeps focus.
   await page.goto(`/decide/options?${PROFILE}`);
@@ -168,13 +172,14 @@ test("options and compare: official closings with their seat category, 2026 R1 f
   await page.goto(`/decide/options?${PROFILE}&q=Kokilaben&closed=1`);
   const row = page.locator("[data-item]").filter({ visible: true }).filter({ hasText: "DNB Anaesthesiology" })
     .filter({ has: page.getByRole("link", { name: "Kokilaben Dhirubhai Ambani Hospital", exact: true }) });
-  for (const v of ["20,132", "R1, Open seat", "33,685", "Stray, Open seat"]) await expect(row).toContainText(v);
+  // The table says "R1, Open seat"; a card's header has "2026 · R1" and "Open seat" as chips.
+  for (const v of ["20,132", "R1", "Open seat", "33,685", "Stray, Open seat"]) await expect(row).toContainText(v);
   await expect(row).not.toContainText("Provisional");
 
   // GMC Nagpur 2026 R1 MD Anaesthesiology: OBC closing 17,213 and 12 allotments (all categories).
   await page.goto(`/decide/compare?${new URLSearchParams({ ids: [OPT_KOKILA_ANAES, OPT_GMC_NAGPUR].join(",") })}&${PROFILE}`);
   const table = page.getByRole("table", { name: "Comparison of 2 options" });
-  for (const v of ["20,132", "17,213", "R1, OBC seat", "2026 R1 closing", "Leaving penalty / Round 2 forfeit"]) await expect(table).toContainText(v);
+  for (const v of ["20,132", "17,213", "R1, OBC seat", "2026 R1 closing", "Leaving"]) await expect(table).toContainText(v);
   await expect(table).not.toContainText(/provisional/i);
   await expect(table.getByRole("row", { name: /^Allotments made/ })).toContainText("12");
 
@@ -190,6 +195,7 @@ test("compare without a rank asks for one instead of claiming no past allotment"
   await page.goto(`/decide/compare?${new URLSearchParams({ ids: OPT_KOKILA_ANAES })}`);
   await expect(page.getByRole("link", { name: "Set your rank to see" })).toBeVisible();
   await expect(page.getByText("No past allotment in your categories")).toHaveCount(0);
+  await page.getByRole("button", { name: "About previous years' closing ranks" }).click(); // the note is behind its (i)
   await expect(page.getByText(/deepest on any seat category/)).toBeVisible();
 });
 
@@ -206,7 +212,7 @@ test("choices: labels follow the current data, Undo goes back to its own list, a
     lists: [{ id: "r2", name: "Round 2 · 2026", items, typedIds: [] }, { id: "r3", name: "Round 3 · 2026", items: [], typedIds: [] }],
     activeId: "r2",
   })), items);
-  await page.reload();
+  await page.goto(`/decide/choices?${PROFILE}&layout=cards`); // the list (desktop opens on the table)
   const list = page.getByRole("list", { name: /Round 2 · 2026 choice list, 3 items/ });
   // All three closed before AIR 42,284 on Open/OBC seats: the stored "Reached in 2026 R1" is replaced.
   await expect(list.getByText("Closed before your rank", { exact: true })).toHaveCount(3);
@@ -279,7 +285,7 @@ test("research and counselling routes render real data, never demo data", async 
 test("last ranks show the official closings: closing on one seat category, allotments in every category", async ({ page }) => {
   // Kokilaben Navi Mumbai, DNB Anaesthesiology, DNB Quota, Open seats: 2025 R1 → stray, then 2026 R1 (final).
   // The institute link opens the page that holds its row.
-  await page.goto(`/decide/last-ranks?${PROFILE}&course=dnb-anaesthesiology&lcat=Open&lquota=DNB+Quota&inst=${KOKILA_NM}`);
+  await page.goto(`/decide/last-ranks?${PROFILE}&course=dnb-anaesthesiology&lcat=Open&lquota=DNB+Quota&inst=${KOKILA_NM}&layout=table`); // phones open on cards
   const kokila = page.locator(`#inst-${KOKILA_NM}`);
   await expect(kokila).toBeVisible();
   for (const v of ["21,699", "25,059", "29,892", "33,685", "20,132"]) await expect(kokila).toContainText(v);
@@ -333,7 +339,7 @@ test("rank journey: 2023 rank 23 in R1 at LTMMC, upgraded in R2 to Seth GS on ch
   await expect(page.getByLabel("All India Rank")).toHaveValue("42284"); // her rank, the newest year
   await expect(page.getByLabel("Year")).toHaveValue("2026");
 
-  await page.goto(`/decide/rank-journey?${PROFILE}&air=23&year=2023`);
+  await page.goto(`/decide/rank-journey?${PROFILE}&air=23&year=2023&layout=table`); // phones open on cards
   const journey = page.getByRole("region", { name: "Rank 23, 2023" });
   await expect(journey.getByRole("row", { name: /^2023 R1/ })).toContainText("Allotted");
   const r2 = journey.getByRole("row", { name: /^2023 R2/ });
@@ -341,7 +347,7 @@ test("rank journey: 2023 rank 23 in R1 at LTMMC, upgraded in R2 to Seth GS on ch
   await expect(page.getByText("No allotment to this rank in the R3,")).toBeVisible();
 
   // Allotments: candidate category, choice no., status and previous seat; a column hidden under Display; the CSV.
-  await page.goto(`/decide/allotments?${PROFILE}&year=2023&round=R2&from=23&to=23`);
+  await page.goto(`/decide/allotments?${PROFILE}&year=2023&round=R2&from=23&to=23&layout=table`); // Allotments opens on cards
   const table = page.getByRole("region", { name: "Allotments", exact: true });
   await expect(table.getByRole("row").nth(1)).toContainText("All IndiaOpenGeneral1Upgraded");
   await page.getByText("Display").click();
@@ -354,7 +360,7 @@ test("rank journey: 2023 rank 23 in R1 at LTMMC, upgraded in R2 to Seth GS on ch
   await table.getByRole("link", { name: /^Journey/ }).click();
   await expect(page).toHaveURL(/air=23&year=2023/);
 
-  await page.goto(`/decide/rank-scan?${PROFILE}&scan=23&year=2023&w=100`);
+  await page.goto(`/decide/rank-scan?${PROFILE}&scan=23&year=2023&w=100&round=R2&layout=table`); // 50 a page: the round's own; the table (phones open on cards)
   await page.getByRole("region", { name: "2023 R2 allotments" }).getByRole("link", { name: "23", exact: true }).click();
   await expect(h1(page)).toHaveText("Rank journey");
 });
@@ -362,7 +368,7 @@ test("rank journey: 2023 rank 23 in R1 at LTMMC, upgraded in R2 to Seth GS on ch
 test("print: every table box lets all its rows onto paper", async ({ page }) => {
   test.setTimeout(90_000);
   for (const path of [
-    `/decide/options?${PROFILE}`, `/decide/seats?${PROFILE}`, `/decide/allotments?${PROFILE}&course=md-anaesthesiology&year=2025&round=R2`,
+    `/decide/options?${PROFILE}`, `/decide/seats?${PROFILE}`, `/decide/allotments?${PROFILE}&course=md-anaesthesiology&year=2025&round=R2&layout=table`,
     `/decide/last-ranks?${PROFILE}&course=dnb-anaesthesiology`, `/decide/compare?${new URLSearchParams({ ids: [OPT_KOKILA_ANAES, OPT_GMC_NAGPUR].join(",") })}&${PROFILE}`,
   ]) {
     await page.goto(path);
@@ -381,7 +387,8 @@ test("print: every table box lets all its rows onto paper", async ({ page }) => 
 
 test("institute page: MCC address, terms with their sources, paginated allotments", async ({ page }) => {
   await page.goto(`/decide/institutes/${KOKILA_NM}?${PROFILE}&tab=fees`);
-  await expect(page.getByText(/Navi Mumbai/).first()).toBeVisible();
+  await page.getByRole("button", { name: "About address" }).click(); // the address is behind its (i)
+  await expect(page.getByRole("dialog", { name: "address" })).toContainText("Navi Mumbai");
   // DNB, the fee table's DNB Quota seats: the NBEMS maximum fee and minimum stipend each year (labelled, never the
   // college's figures), the whole course, and "No bond" from the NBEMS rule's record; one source numbering for the block.
   const dnb = page.getByRole("region", { name: "DNB", exact: true });
@@ -389,12 +396,16 @@ test("institute page: MCC address, terms with their sources, paginated allotment
   const y1 = quota.getByRole("row", { name: /^Year 1/ });
   for (const v of ["₹1,25,000", "NBEMS maximum", "₹43,000", "NBEMS minimum"]) await expect(y1).toContainText(v);
   await expect(quota.getByRole("row", { name: /^Whole course/ })).toContainText("₹3,75,000");
-  await expect(quota.getByRole("link", { name: /^Source 3: NBEMS annual course fee \(ceiling, no GST\)/ }).first()).toHaveAttribute("href", /natboard\.edu\.in/);
+  // Each figure's number opens the page's one Sources footer at its document (one URL, one entry).
+  const ceiling = quota.getByRole("link", { name: /^Source \d+: NBEMS annual course fee \(ceiling, no GST\)/ }).first();
+  const n = (await ceiling.getAttribute("href"))!.replace("#source-", "");
+  await ceiling.click();
+  await expect(page.locator(`#source-${n}`)).toBeFocused();
+  await expect(page.locator(`#source-${n}`).getByRole("link").first()).toHaveAttribute("href", /natboard\.edu\.in/);
   await expect(dnb).toContainText("No bond (NBEMS rule)");
   await expect(dnb).not.toContainText("GST to NBEMS");
-  // One numbered list under the card: the bond box's figures go on from the fee groups' numbers.
-  await expect(dnb.getByRole("region", { name: "Service bond" }).getByRole("link", { name: /^Source 4:/ }).first()).toBeVisible();
-  await expect(dnb.getByRole("list", { name: "Sources, DNB" }).getByRole("listitem").nth(3)).toHaveText(/^4/);
+  // The bond box's NBEMS bulletin is the same document as the fee ceiling's (the same PDF): the same number.
+  await expect(dnb.getByRole("region", { name: "Service bond" }).getByRole("link", { name: new RegExp(`^Source ${n}: NBEMS Accreditation Information Bulletin`) })).toBeVisible();
 
   await page.goto(`/decide/institutes/${SETH_GS}?${PROFILE}&tab=allotments`);
   const results = page.locator("#results");
@@ -410,7 +421,8 @@ test("fees: a fee in the profile's own words shows no figure anywhere; MCC's Rou
   // Its slug comes from the name it had when this database first imported it (renamed since): by key.
   const slug = await slugOf("CHETTINADSUPERSPECIALITYHOSPITALTAMILNAD#603103");
   await page.goto(`/decide/institutes/${slug}?${PROFILE}`);
-  await expect(page.getByText(/MD\/MS · Fee see terms/)).toBeVisible();
+  const fee1 = (h: string) => page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: h, exact: true }) }).getByRole("definition").first();
+  await expect(fee1("MD/MS")).toHaveText("See text"); // the Overview's Fee cell: words only, no ₹
   await page.goto(`/decide/institutes/${slug}?${PROFILE}&tab=fees`);
   const group = page.getByRole("region", { name: "MD/MS", exact: true }).getByRole("region", { name: "Deemed/Paid seats" });
   await expect(group).toContainText("Seatora shows no fee figure here");
@@ -418,12 +430,24 @@ test("fees: a fee in the profile's own words shows no figure anywhere; MCC's Rou
   await expect(group.getByRole("link", { name: /MCC institute profile, read/ })).toHaveAttribute("href", /mcc\.admissions\.nic\.in/);
   // Goa MC: ₹70,324 at admission, later years not stated: no whole-course figure; the Round 2 forfeit ₹8,432.
   await page.goto(`/decide/institutes/goa-medical-college-403202?${PROFILE}`);
-  await expect(page.getByText(/MD\/MS · Fee ₹70,324 at admission, later yrs not stated/)).toBeVisible();
+  await expect(fee1("MD/MS")).toHaveText(/^₹70,324\s*at admission$/);
   await page.goto(`/decide/institutes/goa-medical-college-403202?${PROFILE}&tab=fees`);
   const md = page.getByRole("region", { name: "MD/MS", exact: true });
   await expect(md.getByRole("row", { name: /^Whole course/ })).toHaveCount(0);
   await expect(md).toContainText("₹8,432 forfeited if you resign or don't join from Round 2");
   await expect(md.getByRole("definition").filter({ hasText: "What MCC lets the college keep" })).toContainText("₹8,432");
+});
+
+test("removing a filter chip moves focus to the chip now in its place, and with none left to the results heading", async ({ page }) => {
+  await page.goto(`/decide/fees?${PROFILE}&maxfee=5&minstip=60000`);
+  const chips = page.getByRole("group", { name: "Active filters" });
+  await chips.getByRole("link", { name: /^Remove filter: Fee up to/ }).click();
+  await expect(page).not.toHaveURL(/maxfee=/);
+  const stipend = chips.getByRole("link", { name: /^Remove filter: Stipend at least/ });
+  await expect(stipend).toBeFocused();
+  await stipend.press("Enter");
+  await expect(page).not.toHaveURL(/minstip=/);
+  await expect(page.locator("#results")).toBeFocused();
 });
 
 test("hospital facts: self-reported values with their sources, the disclosed stipend, block flags said once", async ({ page }) => {
@@ -438,13 +462,14 @@ test("hospital facts: self-reported values with their sources, the disclosed sti
 });
 
 test("seats matrix: a row's Details drawer has the course's terms and the beds as the source prints them", async ({ page }) => {
-  await page.goto(`/decide/seats?${PROFILE}&inst=bombay-hospital-452010&course=dnb-anaesthesiology`);
+  await page.goto(`/decide/seats?${PROFILE}&inst=bombay-hospital-452010&course=dnb-anaesthesiology&layout=table`); // phones open on cards
   const matrix = page.locator("#seat-matrix");
   await expect(matrix.getByRole("row", { name: /Bombay Hospital/ })).toContainText("270+");
   await matrix.getByRole("button", { name: /^Details ?: DNB Anaesthesiology/ }).click();
   const drawer = page.getByRole("dialog", { name: "Bombay Hospital" });
-  await expect(drawer).toContainText("DNB · Fee up to ₹1.25 L/yr (NBEMS max)");
-  await expect(drawer).toContainText("No bond (NBEMS rule");
+  // The row's own stat cells: Fee ₹1.25 L max (NBEMS), Bond "No bond", NBEMS rule.
+  await expect(drawer.getByRole("heading", { name: /: DNB$/ })).toBeVisible();
+  for (const v of ["₹1.25 L", "max", "No bond", "NBEMS rule"]) await expect(drawer).toContainText(v);
   await expect(drawer.getByText("270+", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
@@ -458,7 +483,7 @@ test("seat trends and rank scan on the final 2026 R1", async ({ page }) => {
 
   await page.goto(`/decide/rank-scan?${PROFILE}&scan=42,284&year=2026`);
   await expect(page.getByRole("heading", { name: /2026 R1/ })).not.toContainText("Provisional");
-  await expect(page.getByLabel("Year")).toHaveValue("2026");
+  await expect(page.locator('select[name="year"]')).toHaveValue("2026"); // (getByLabel("Year") also finds "Fee per year, at most")
 });
 
 test("related data is linked: institute → course last ranks → allotments → rank scan", async ({ page }) => {

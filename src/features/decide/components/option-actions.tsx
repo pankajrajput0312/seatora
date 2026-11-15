@@ -9,12 +9,17 @@ import { cn } from "@/lib/cn";
 import { MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
 import type { DecideLinks } from "../lib/links";
 import { useChoices, useCompare, useDecideLinks } from "../lib/use-decide-store";
-import type { SeatList } from "../types";
-import { ReachBadge } from "./bits";
-import { TermsSummary } from "./fees";
+import { statKeys, statLabel } from "../lib/stat-format";
+import { roundLabel, type SeatList } from "../types";
+import { Dash, HistoryNote, Provisional, ReachBadge } from "./bits";
 import { FocusItem } from "./focus-item";
-import { ClosingCell, courseName, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, toChoiceItem, type ListRow } from "./options-view";
+import { Beds } from "./pages/beds";
+import { cardClosing, ClosingCell, courseName, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, seatKindShort, toChoiceItem, type ListRow } from "./options-view";
+import { ResultCard, ResultCards } from "./result-card";
+import { TermStatCells } from "./stat-cells";
+import { TypeBadge } from "./type-badge";
 import { smallLink, tbl } from "./ui";
+import { ViewPanes, ViewToggle } from "./view-toggle";
 
 export function ChoiceStar({ item }: { item: ChoiceItem }) {
   const [state, setState] = useChoices();
@@ -82,11 +87,103 @@ const summary = "inline-flex min-h-11 cursor-pointer items-center text-sky";
 const stick = "sticky left-0 z-[1] bg-card";
 const stickName = "sticky left-12 z-[1] min-w-52 max-w-72 border-r border-border bg-card";
 
+
+/** The table row header's type badge and beds (the cards put them in their meta line); nothing when the import has neither. */
+function HospitalLine({ h, of }: { h: ListRow["hospital"]; of: string }) {
+  if (!h?.type && !h?.beds) return null;
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+      {h.type && <TypeBadge type={h.type} of={of} />}
+      {h.beds && <Beds b={h.beds} inst={of} unit />}
+    </span>
+  );
+}
+
+type Open = { open: ReadonlySet<string>; toggle: (id: string, on: boolean) => void };
+const gridCaption = (r: ListRow) => `${r.college.name}, ${courseName(r)}, ${r.quota}: closing ranks by year and round`;
+const rowLabel = (r: ListRow) => `${r.college.name}, ${courseName(r)}, ${r.quota}`;
+
 /**
- * Options as a table (md and up) and as cards (phones). A row's "Rounds by year" grid is rendered only once she opens
- * it (it is most of a row's markup). `start` = rows before these, for data-item numbering (focus after Show more).
+ * One option as a ResultCard: the closing's year · round, quota and seat category on top (a new option: the round's
+ * seats); the closing rank big with her label under it; institute, course, state • type • beds; the past two years'
+ * deepest closings; the round's seats per list; the term stat cells; Rounds by year and the cross-links.
  */
-function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeLatest, seatLists }: { rows: ListRow[]; caption: string; start: number; L: DecideLinks } & Years) {
+function OptionCard({ r, L, n, latestYear, pastYears, includeLatest, seatLists, open, toggle }: { r: ListRow; L: DecideLinks; n: number } & Years & Open) {
+  const c = cardClosing(r, latestYear, pastYears, includeLatest);
+  const [older, last] = pastYears;
+  const list = seatLists[0];
+  const strip = !!(r.byYear[last] || r.byYear[older]);
+  const mcc = r.hospital?.mccProfileUrl;
+  return (
+    <div data-item={n} tabIndex={-1} className="grid min-w-0 rounded-xl">
+      <ResultCard
+        chips={[
+          c ? `${c.year} · ${roundLabel[c.d.round]}` : list && `${list.year} ${roundLabel[list.round]} seats`,
+          r.quota,
+          c && `${c.d.category} seat`,
+          c?.d.provisional && <Provisional when />,
+        ]}
+        actions={<><ChoiceStar item={toChoiceItem(r)} /><CompareToggle id={r.id} label={rowLabel(r)} /></>}
+        stat={{
+          label: "Closing rank",
+          value: (
+            <>
+              <span className="numeric">{c ? formatRank(c.d.closing) : <Dash />}</span>
+              <span className="mt-1 block max-w-28 text-xs leading-normal font-normal tracking-normal">
+                <ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} />
+              </span>
+            </>
+          ),
+        }}
+        title={r.college.name}
+        href={L.institute(r.college.slug)}
+        external={mcc ? { href: mcc, label: `${r.college.name} on MCC` } : undefined}
+        subtitle={courseName(r)}
+        meta={[r.college.state ?? "State not listed", r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />, r.hospital?.beds && <Beds b={r.hospital.beds} inst={r.college.name} unit />]}
+        footer={
+          <>
+            {/* The past years' deepest closings, as the table's columns (the big number is the newest); none at all: left out. */}
+            {strip && (
+              <dl className="grid grid-cols-2 gap-x-4 px-4 py-2 text-sm">
+                {[last, older].map((y) => (
+                  <div key={y}><dt className="text-xs text-muted-foreground">{y} deepest</dt><dd><ClosingCell d={r.byYear[y]} /></dd></div>
+                ))}
+              </dl>
+            )}
+            {list && (
+              <p className={cn("flex flex-wrap items-center gap-x-3 px-4 text-xs", strip && "border-t border-border")}>
+                <span className="text-muted-foreground">{roundLabel[list.round]} seats</span>
+                {seatLists.map((l) => (
+                  <span key={l.key} className="inline-flex items-center gap-1">
+                    <span className="text-muted-foreground">{seatKindShort(l.kind)}</span>
+                    <SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} end={false} />
+                  </span>
+                ))}
+              </p>
+            )}
+            {r.seatsBelow?.length ? <div className="px-4 pb-2"><SeatsBelowNote r={r} includeLatest={includeLatest} /></div> : null}
+            {/* Nothing above the cells: they sit on the footer's own rule (one line, not two). */}
+            <TermStatCells t={r.fees} of={rowLabel(r)} className={strip || list || r.seatsBelow?.length ? undefined : "-mt-px"} />
+            <div className="flex flex-wrap items-center gap-x-4 border-t border-border px-4 text-xs">
+              <details open={open.has(r.id)} onToggle={(e) => toggle(r.id, e.currentTarget.open)} className="min-w-0 max-w-full open:basis-full">
+                <summary className={summary}>Rounds by year</summary>
+                {open.has(r.id) && <div className="pb-2"><RoundGrid row={r} caption={gridCaption(r)} /></div>}
+              </details>
+              <Related r={r} L={L} />
+            </div>
+          </>
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * Options as cards and as a table (ViewPanes: cards below md, the table from md up, unless she picks one). A row's
+ * "Rounds by year" grid is rendered only once she opens it (it is most of a row's markup). `start` = rows before these,
+ * for data-item numbering (focus after Show more: FocusItem picks the visible pane's).
+ */
+function OptionsList({ rows, caption, start, L, latestYear, pastYears, includeLatest, seatLists }: { rows: ListRow[]; caption: string; start: number; L: DecideLinks } & Years) {
   const [older, last] = pastYears;
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string, on: boolean) =>
@@ -97,110 +194,79 @@ function OptionsTable({ rows, caption, start, L, latestYear, pastYears, includeL
       else next.delete(id);
       return next;
     });
-  const gridCaption = (r: ListRow) => `${r.college.name}, ${courseName(r)}, ${r.quota}: closing ranks by year and round`;
-  const label = (r: ListRow) => `${r.college.name}, ${courseName(r)}, ${r.quota}`;
-  return (
-    <>
-      <div role="region" aria-label={caption} tabIndex={0} className={cn("relative hidden rounded-xl border border-border bg-card md:block", tbl.scroll, "scroll-pl-72")}>
-        <table className="w-full text-sm">
-          <caption className="sr-only">{caption}</caption>
-          <thead className={tbl.head}>
-            <tr className="text-left text-xs font-semibold text-muted-foreground">
-              <th scope="col" className={cn(stick, "w-12 px-2 py-3")}><span className="sr-only">Add to choices</span></th>
-              <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course</th>
-              <th scope="col" className="px-3 py-3">Reach</th>
-              {seatLists.map((l) => <th key={l.key} scope="col" className="px-1.5 py-3 text-right"><SeatsHead list={l} short /></th>)}
-              <th scope="col" className="px-3 py-3 text-right">{latestYear} R1 closing</th>
-              <th scope="col" className="px-3 py-3 text-right">{last} deepest</th>
-              <th scope="col" className="hidden px-3 py-3 text-right xl:table-cell">{older} deepest</th>
-              <th scope="col" className="min-w-56 px-3 py-3">Fee, stipend, bond and leaving penalty</th>
-              <th scope="col" className="px-3 py-3">Details</th>
-              <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Compare</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.flatMap((r, i) => [
-              <tr key={r.id} data-item={start + i + 1} tabIndex={-1} className="border-t border-border align-top hover:bg-muted/40">
-                <td className={cn(stick, "px-2 py-2")}><ChoiceStar item={toChoiceItem(r)} /></td>
-                {/* Row header: only what names the option, so it reads short for every cell. */}
-                <th scope="row" className={cn(stickName, "px-3 py-3 text-left font-normal")}>
-                  <Link href={L.institute(r.college.slug)} className="font-semibold hover:text-sky hover:underline">{r.college.name}</Link>
-                  <span className="block">{courseName(r)}<span className="text-muted-foreground">, {r.quota}, {r.college.state ?? "state not listed"}</span></span>
-                </th>
-                <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /><SeatsBelowNote r={r} includeLatest={includeLatest} /></td>
-                {seatLists.map((l) => <td key={l.key} className="px-1.5 py-1 text-right"><SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} /></td>)}
-                <td className="px-3 py-3 text-right"><ClosingCell d={r.latest} /></td>
-                <td className="px-3 py-3 text-right"><ClosingCell d={r.byYear[last]} /></td>
-                <td className="hidden px-3 py-3 text-right xl:table-cell"><ClosingCell d={r.byYear[older]} /></td>
-                <td className="px-3 py-3"><TermsSummary t={r.fees} className="text-xs" /></td>
-                <td className="px-3 py-1 text-xs">
-                  <span className="flex min-w-[10rem] flex-wrap items-center gap-x-4">
-                    {/* Opens the grid in the full-width row below, so this row stays narrow. */}
-                    <details open={open.has(r.id)} onToggle={(e) => toggle(r.id, e.currentTarget.open)}>
-                      <summary className={summary}>Rounds by year</summary>
-                    </details>
-                    <Related r={r} L={L} />
-                  </span>
-                </td>
-                <td className="px-2 py-2"><CompareToggle id={r.id} label={label(r)} /></td>
-              </tr>,
-              open.has(r.id) && (
-                <tr key={`${r.id}-rounds`} className="bg-muted/30">
-                  <td />
-                  <td colSpan={8 + seatLists.length} className="px-3 pb-4"><RoundGrid row={r} caption={gridCaption(r)} /></td>
-                </tr>
-              ),
-            ])}
-          </tbody>
-        </table>
-      </div>
-
-      <ul className="grid gap-3 md:hidden" aria-label={caption}>
-        {rows.map((r, i) => (
-          <li key={r.id} data-item={start + i + 1} tabIndex={-1} className="min-w-0">
-            <article className="rounded-xl border border-border bg-card p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="font-medium"><Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link></h2>
-                  <p className="text-xs text-muted-foreground">{courseName(r)} · {r.college.state ?? "state not listed"} · {r.quota}</p>
-                </div>
-                <div className="flex shrink-0">
-                  <ChoiceStar item={toChoiceItem(r)} />
-                  <CompareToggle id={r.id} label={label(r)} />
-                </div>
-              </div>
-              <div className="mt-2"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /><SeatsBelowNote r={r} includeLatest={includeLatest} /></div>
-              {seatLists.length > 0 && (
-                <dl className="mt-2 grid grid-cols-3 gap-2 text-sm">
-                  {seatLists.map((l) => (
-                    <div key={l.key}><dt className="text-xs text-muted-foreground"><SeatsHead list={l} short /></dt><dd><SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} end={false} /></dd></div>
-                  ))}
-                </dl>
-              )}
-              <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                <div><dt className="text-xs text-muted-foreground">{latestYear} R1 closing</dt><dd><ClosingCell d={r.latest} /></dd></div>
-                <div><dt className="text-xs text-muted-foreground">{last} deepest</dt><dd><ClosingCell d={r.byYear[last]} /></dd></div>
-                <div><dt className="text-xs text-muted-foreground">{older} deepest</dt><dd><ClosingCell d={r.byYear[older]} /></dd></div>
-              </dl>
-              <p className="mt-3"><TermsSummary t={r.fees} /></p>
-              <details open={open.has(r.id)} onToggle={(e) => toggle(r.id, e.currentTarget.open)} className="mt-1 text-xs">
-                <summary className={summary}>Rounds by year</summary>
-                {open.has(r.id) && <div className="mt-1"><RoundGrid row={r} caption={gridCaption(r)} /></div>}
-              </details>
-              <p className="flex flex-wrap gap-x-4 text-xs"><Related r={r} L={L} /></p>
-            </article>
-          </li>
-        ))}
-      </ul>
-    </>
+  const years = { latestYear, pastYears, includeLatest, seatLists };
+  const table = (
+    <div role="region" aria-label={caption} tabIndex={0} className={cn("relative rounded-xl border border-border bg-card", tbl.scroll, "scroll-pl-72")}>
+      <table className="w-full text-sm">
+        <caption className="sr-only">{caption}</caption>
+        <thead className={tbl.head}>
+          {/* Fee…Leaving sit right after Reach (tight px-2 cells), so they are in view from 1280px wide; the seat lists and closings follow. */}
+          <tr className="text-left text-xs font-semibold text-muted-foreground">
+            <th scope="col" className={cn(stick, "w-12 px-2 py-3")}><span className="sr-only">Add to choices</span></th>
+            <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course</th>
+            <th scope="col" className="px-3 py-3">Reach</th>
+            {statKeys.map((k) => <th key={k} scope="col" data-col={k} className="px-2 py-3 text-right">{statLabel[k]}</th>)}
+            {seatLists.map((l) => <th key={l.key} scope="col" className="px-1.5 py-3 text-right"><SeatsHead list={l} short /></th>)}
+            <th scope="col" className="px-3 py-3 text-right">{latestYear} R1 closing</th>
+            <th scope="col" className="px-3 py-3 text-right">{last} deepest</th>
+            <th scope="col" className="hidden px-3 py-3 text-right xl:table-cell">{older} deepest</th>
+            <th scope="col" className="px-3 py-3">Details</th>
+            <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Compare</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.flatMap((r, i) => [
+            <tr key={r.id} data-item={start + i + 1} tabIndex={-1} className="border-t border-border align-top hover:bg-muted/40">
+              <td className={cn(stick, "px-2 py-2")}><ChoiceStar item={toChoiceItem(r)} /></td>
+              {/* Row header: only what names the option, so it reads short for every cell. */}
+              <th scope="row" className={cn(stickName, "px-3 py-3 text-left font-normal")}>
+                <Link href={L.institute(r.college.slug)} className="font-semibold hover:text-sky hover:underline">{r.college.name}</Link>
+                <span className="block">{courseName(r)}<span className="text-muted-foreground">, {r.quota}, {r.college.state ?? "state not listed"}</span></span>
+                <HospitalLine h={r.hospital} of={r.college.name} />
+              </th>
+              <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /><SeatsBelowNote r={r} includeLatest={includeLatest} /></td>
+              <TermStatCells t={r.fees} variant="table" of={rowLabel(r)} tdClassName="px-2!" />
+              {seatLists.map((l) => <td key={l.key} className="px-1.5 py-1 text-right"><SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} /></td>)}
+              <td className="px-3 py-3 text-right"><ClosingCell d={r.latest} /></td>
+              <td className="px-3 py-3 text-right"><ClosingCell d={r.byYear[last]} /></td>
+              <td className="hidden px-3 py-3 text-right xl:table-cell"><ClosingCell d={r.byYear[older]} /></td>
+              <td className="px-3 py-1 text-xs">
+                <span className="flex min-w-[10rem] flex-wrap items-center gap-x-4">
+                  {/* Opens the grid in the full-width row below, so this row stays narrow. */}
+                  <details open={open.has(r.id)} onToggle={(e) => toggle(r.id, e.currentTarget.open)}>
+                    <summary className={summary}>Rounds by year</summary>
+                  </details>
+                  <Related r={r} L={L} />
+                </span>
+              </td>
+              <td className="px-2 py-2"><CompareToggle id={r.id} label={rowLabel(r)} /></td>
+            </tr>,
+            open.has(r.id) && (
+              <tr key={`${r.id}-rounds`} className="bg-muted/30">
+                <td />
+                <td colSpan={7 + statKeys.length + seatLists.length} className="px-3 pb-4"><RoundGrid row={r} caption={gridCaption(r)} /></td>
+              </tr>
+            ),
+          ])}
+        </tbody>
+      </table>
+    </div>
   );
+  const cards = (
+    <ResultCards title={caption} hideTitle>
+      {rows.map((r, i) => <OptionCard key={r.id} r={r} L={L} n={start + i + 1} {...years} open={open} toggle={toggle} />)}
+    </ResultCards>
+  );
+  return <ViewPanes page="options" cards={cards} table={table} />;
 }
 
 /**
  * One server-rendered page of options; "Show more" appends the next page from /api/v1/options (`query` = the same
  * profile and filters) and moves focus to the first new row. The page never holds more rows than she asked to see.
+ * `tools`: page links beside the count and the Cards | Table toggle (the CSV download). `historyMore`: what the closing
+ * ranks count, behind the history note's (i).
  */
-export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, latestYear, pastYears, includeLatest, seatLists }: {
+export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, tools, historyMore, latestYear, pastYears, includeLatest, seatLists }: {
   initial: ListRow[];
   page: number;
   pageSize: number;
@@ -208,6 +274,8 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
   query: string;
   caption: string;
   firstPageHref?: string;
+  tools?: React.ReactNode;
+  historyMore?: React.ReactNode;
 } & Years) {
   const L = useDecideLinks();
   const [rows, setRows] = useState(initial);
@@ -235,11 +303,20 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
 
   return (
     <>
-      <p id="options-count" aria-live="polite" className="text-sm text-muted-foreground">
-        Showing <span className="numeric font-semibold text-foreground">{formatRank(start + 1)}–{formatRank(shown)}</span> of <span className="numeric">{formatRank(total)}</span> options
-        {firstPageHref && <> · <Link href={firstPageHref} className={`${smallLink} text-sky`}>Back to the first</Link></>}
-      </p>
-      <OptionsTable rows={rows} caption={caption} start={start} L={L} latestYear={latestYear} pastYears={pastYears} includeLatest={includeLatest} seatLists={seatLists} />
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="grid">
+          <p id="options-count" aria-live="polite" className="text-sm text-muted-foreground">
+            Showing <span className="numeric font-semibold text-foreground">{formatRank(start + 1)}–{formatRank(shown)}</span> of <span className="numeric">{formatRank(total)}</span> options
+            {firstPageHref && <> · <Link href={firstPageHref} className={`${smallLink} text-sky`}>Back to the first</Link></>}
+          </p>
+          <HistoryNote more={historyMore} />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {tools}
+          <ViewToggle page="options" />
+        </div>
+      </div>
+      <OptionsList rows={rows} caption={caption} start={start} L={L} latestYear={latestYear} pastYears={pastYears} includeLatest={includeLatest} seatLists={seatLists} />
       {shown < total && (
         <div className="grid justify-items-center gap-2">
           {/* aria-disabled, not disabled: the button keeps focus while the next page loads. */}

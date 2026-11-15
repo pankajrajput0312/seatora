@@ -1,8 +1,12 @@
 import "server-only";
 import { z } from "zod";
 import { pageValue, parseSearchParams, rankValue } from "../../lib/params";
+import { anyTermFilter, feeValue, termFilterLists, termFilters, termFilterShape } from "../../lib/term-filters";
 import { getCollege, getMeta, listAllotments } from "../../service";
 import { baseCategories, roundLabel, rounds, termLabel, type Allotment, type PrevSeat, type Source, type Term } from "../../types";
+import { collegeTypeLabel } from "../institute/college-type";
+import { reportedCount } from "../institute/hospital-bits";
+import { hospitalInfo } from "../institute/institute-data";
 import { csvLine } from "../seats/find-seats";
 
 // The Allotments page's filters (src/app/decide/allotments), read the same lenient way by the page and its CSV
@@ -22,6 +26,8 @@ const schema = z.object({
   from: rankValue.optional(),
   to: rankValue.optional(),
   page: pageValue.default(1),
+  /** Fee, stipend, bond, leaving, college type and `nd` on each allotment's course and quota (lib/term-filters.ts; an absent cap is no cap). */
+  ...termFilterShape,
 });
 
 /** MCC's remark in that round (Allotment.status). */
@@ -34,7 +40,7 @@ export const prevRemarkLabel: Record<PrevSeat["remark"], string> = { reported: "
  * applied. No filter at all = the latest year's latest round (`latest`). null: an unknown `inst` (a 404).
  */
 export async function allotmentsView(params: URLSearchParams, pageSize: number) {
-  const f = parseSearchParams(schema, params);
+  const f = parseSearchParams(schema, params, termFilterLists);
   const [meta, inst] = await Promise.all([getMeta(), f.inst ? getCollege(f.inst) : null]);
   if (f.inst && !inst) return null;
   // A rank typed with commas ("30,000") is fine; anything else that isn't a rank is reported, not silently dropped.
@@ -47,6 +53,7 @@ export async function allotmentsView(params: URLSearchParams, pageSize: number) 
         ? "“Rank from” is above “Rank to”. That range was not applied."
         : null;
   // With no filter at all the page opens on the latest year's latest round (not all 2,09,571 rows); "All years" is year=all.
+  // A term filter (fee, type…) alone keeps that default.
   const pristine = !["inst", "course", "year", "round", "aq", "acat", "state", "from", "to"].some((k) => params.get(k)?.trim());
   const latest = pristine ? meta.years[0] : undefined;
   const filters = {
@@ -58,9 +65,19 @@ export async function allotmentsView(params: URLSearchParams, pageSize: number) 
     state: f.state,
     from: rankError ? undefined : f.from,
     to: rankError ? undefined : f.to,
+    terms: termFilters(f),
   };
-  const r = await listAllotments(filters, { page: f.page, pageSize }, inst?.key);
-  return { f, meta, inst, typed, rankError, latest, filters, r };
+  // `unknownTerms`: the rows "Include not declared" (nd=keep) would add, i.e. left out only because a filtered figure is
+  // not declared (keep is a superset: it only lets unknown values through). Counted only when that box is unticked.
+  const keep = anyTermFilter(filters.terms) && !filters.terms.keepUnknown ? { ...filters, terms: { ...filters.terms, keepUnknown: true } } : null;
+  const [r, info, all] = await Promise.all([
+    listAllotments(filters, { page: f.page, pageSize }, inst?.key),
+    hospitalInfo(),
+    keep && listAllotments(keep, { page: 1, pageSize: 1 }, inst?.key),
+  ]);
+  // Each row's MCC institute profile (the card's external link); null when the import has none.
+  const rows = r.rows.map((a) => ({ ...a, mccProfileUrl: info.get(a.college.key)?.mccProfileUrl ?? null }));
+  return { f, meta, inst, typed, rankError, latest, filters, r: { ...r, rows, unknownTerms: all ? all.total - r.total : 0 } };
 }
 export type AllotmentRow = NonNullable<Awaited<ReturnType<typeof allotmentsView>>>["r"]["rows"][number];
 
@@ -70,7 +87,8 @@ const docOf = (s: Term["source"] | undefined) => s && (s.url ? `${s.name} (${s.u
 
 /**
  * Rows as CSV (no BOM: the route adds it), in the page's order: the seat, the candidate's own category, choice no.,
- * MCC's status, the seat one round back with its remark, and the course's terms as published, each with its document.
+ * MCC's status, the seat one round back with its remark, the course's terms as plain numbers (feeValue: the stat cells'
+ * figures; bond 0 = no bond on record), the college type and beds, and the terms as published, each with its document.
  * After a blank row: `notes` and the result PDFs behind the rows (each term's document is in the column beside it).
  * "—" = not available.
  */
@@ -78,12 +96,15 @@ export function allotmentsCsv(rows: AllotmentRow[], results: Source[], notes: st
   const head = [
     "Year", "Round", "Rank", "Quota", "Seat category", "Candidate category", "Choice no.", "Status", "Institute", "State", "Course",
     "Previous seat institute", "Previous seat course", "Previous seat quota", "Previous seat remark",
+    "Fee year 1 ₹", "Stipend year 1 ₹/month", "Bond years", "Bond ₹ (highest)", "Leaving penalty ₹ (highest)", "Type (not official)", "Beds (self-reported)",
     ...kinds.flatMap((k) => [termLabel[kindOf[k]], `${termLabel[kindOf[k]]} source`]),
   ];
   const body = rows.map((a) => [
     a.year, `${roundLabel[a.round]}${a.provisional ? " (provisional)" : ""}`, a.rank, a.quota, a.category, a.candidateCategory, a.optionNo, statusLabel[a.status] ?? a.status,
     a.college.name, a.college.state, a.courseName,
     a.prev?.collegeName, a.prev?.courseName, a.prev?.quota, a.prev && prevRemarkLabel[a.prev.remark],
+    feeValue.fee1(a.fees), feeValue.stip1(a.fees), feeValue.bondyrs(a.fees), feeValue.bond(a.fees), feeValue.leave(a.fees),
+    a.hospital?.type && collegeTypeLabel[a.hospital.type.value], a.hospital?.beds && reportedCount(a.hospital.beds).text,
     ...kinds.flatMap((k) => [a.terms[k]?.text, docOf(a.terms[k]?.source)]),
   ]);
   const used = new Set(rows.map((a) => `${a.year}|${a.round}`));

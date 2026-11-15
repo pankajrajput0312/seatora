@@ -1,0 +1,180 @@
+import { z } from "zod";
+import { formatInrShort } from "./format";
+import { parseSearchParams } from "./params";
+import { collegeTypeLabel, type CollegeType } from "../components/institute/college-type";
+import { BOND_YEAR_CHOICES, FEE_LAKH_CHOICES, type Profile } from "../profile";
+import type { ProgrammeTerms } from "../server/terms";
+
+// The ONE place for the fee, stipend, bond, leaving-penalty and college-type filters: their URL params (shared by
+// Options, Seats, Allotments and Fees, page, CSV and JSON API), what they mean in ₹, and the test every list applies to
+// a row's course terms (server/terms.ts ProgrammeTerms: the same figures the stat cells and the Fees page show).
+//
+// Unknown values (not declared, in words only, a bond whose status is unknown, years not stated) never pass a filter
+// silently: a row whose filtered value is unknown is left out (and counted: `unknownTerms` on the lists) unless the
+// "Include not declared" box is ticked (nd=keep). "No bond" (bondyrs=0) only ever lists a record that says no bond (one
+// adding that a state law's service may apply counts as unknown), and a type filter never lists a college with no type
+// in the data, ticked or not.
+
+export type TypeValue = CollegeType["value"];
+export const typeValues = Object.keys(collegeTypeLabel) as [TypeValue, ...TypeValue[]];
+
+/**
+ * Page params (never a profile key: fee, bond…). Absent = her profile's cap where the page applies her profile
+ * (Options, Fees), else no filter; "any" = no cap. `ctype`: repeated (ctype=govt&ctype=esic, what the form sends) or
+ * comma-joined.
+ */
+export const termFilterShape = {
+  /** College types (inferred from name and quota, not official), any of. */
+  ctype: z.preprocess((v) => (typeof v === "string" ? v.split(",").map((x) => x.trim()).filter(Boolean) : v), z.array(z.enum(typeValues)).optional()),
+  /** Fee ₹ lakh a year (year 1) at most. */
+  maxfee: z.union([z.literal("any"), z.coerce.number().positive().max(1000)]).optional(),
+  /** Stipend ₹ a month (year 1) at least. */
+  minstip: z.coerce.number().int().positive().max(1000000).optional(),
+  /** Bond years at most; 0 = No bond. */
+  bondyrs: z.union([z.literal("any"), z.coerce.number().int().min(0).max(20)]).optional(),
+  /** Bond ₹ lakh at most (the course's highest bond figure; no bond = 0). */
+  maxbond: z.coerce.number().positive().max(100000).optional(),
+  /** Leaving penalty ₹ lakh at most (the course's highest). */
+  maxleave: z.coerce.number().positive().max(100000).optional(),
+  /** keep: rows whose filtered value is not declared pass the caps too ("Include not declared"); absent or hide: left out. */
+  nd: z.enum(["keep", "hide"]).optional(),
+};
+/** List params of the shape (readParams `lists`); optional, `ctype` also reads a single comma-joined value. */
+export const termFilterLists = ["ctype"] as const;
+export const termParamsSchema = z.object(termFilterShape);
+export type TermParams = z.infer<typeof termParamsSchema>;
+
+/**
+ * Caps in ₹ on one course's terms. `maxBondYears` 0 = No bond (a record says so, never an unknown one). `keepUnknown`:
+ * a capped value that is not declared passes (default: it fails).
+ */
+export type TermFilters = {
+  types?: TypeValue[];
+  maxFee?: number | null;
+  minStipend?: number | null;
+  maxBondYears?: number | null;
+  maxBondInr?: number | null;
+  maxLeavingInr?: number | null;
+  keepUnknown?: boolean;
+};
+
+const lakh = (v: number | null | undefined) => (v == null ? null : Math.round(v * 100000));
+
+/** The params as ₹ filters. `profile`: her caps where the page applies her profile (an absent maxfee / bondyrs is hers). */
+export function termFilters(f: TermParams, profile?: Pick<Profile, "maxFeeLakh" | "maxBondYears"> | null): TermFilters {
+  return {
+    types: f.ctype?.length ? f.ctype : undefined,
+    maxFee: f.maxfee === "any" ? null : lakh(f.maxfee ?? profile?.maxFeeLakh),
+    minStipend: f.minstip ?? null,
+    maxBondYears: f.bondyrs === "any" ? null : (f.bondyrs ?? profile?.maxBondYears ?? null),
+    maxBondInr: lakh(f.maxbond),
+    maxLeavingInr: lakh(f.maxleave),
+    keepUnknown: f.nd === "keep",
+  };
+}
+
+/** Pages: the term params of a URL, leniently (a bad one is dropped), and their filters (`profile`: as termFilters). */
+export function readTermFilters(p: URLSearchParams, profile?: Pick<Profile, "maxFeeLakh" | "maxBondYears"> | null) {
+  const params = parseSearchParams(termParamsSchema, p, termFilterLists);
+  return { params, filters: termFilters(params, profile) };
+}
+
+/** Her profile's own caps (fee, bond years) as filters: what Options applies when the page sets none. */
+export const profileTermFilters = (p: Pick<Profile, "maxFeeLakh" | "maxBondYears">): TermFilters => termFilters({}, p);
+
+export const anyTermFilter = (f: TermFilters | null | undefined) =>
+  !!f && (!!f.types?.length || [f.maxFee, f.minStipend, f.maxBondYears, f.maxBondInr, f.maxLeavingInr].some((v) => v != null));
+
+/** The number each sort, cap and CSV uses; null = not declared, or declared in words only. Ranges: the highest (cautious) figure. */
+export const feeValue = {
+  fee1: (t: ProgrammeTerms) => t.years[0]?.fee?.inr ?? null,
+  feetotal: (t: ProgrammeTerms) => t.wholeCourseFee,
+  stip1: (t: ProgrammeTerms) => t.years[0]?.stipend?.inr ?? null,
+  /** 0 = no bond on record, null = not declared or not stated (or "no bond" where a state law's service may still apply). */
+  bondyrs: (t: ProgrammeTerms) => t.bond.years,
+  /** 0 = no bond on record (as bondyrs). */
+  bond: (t: ProgrammeTerms) => (t.bond.status === "none" ? (t.bond.years === 0 ? 0 : null) : t.bond.status === "declared" ? t.bond.amount.max : null),
+  leave: (t: ProgrammeTerms) => t.bond.leavingAmount.max,
+};
+
+/** pass; fail (a known value is outside a cap, "No bond" not on record, no or another type); unknown: passes but for a value not declared. */
+export type TermVerdict = "pass" | "fail" | "unknown";
+
+export function termVerdict(t: ProgrammeTerms, type: TypeValue | null | undefined, f: TermFilters): TermVerdict {
+  if (f.types?.length && (type == null || !f.types.includes(type))) return "fail";
+  // "No bond": a record saying so. One that adds a state law's service may apply (years unknown) is unknown, not a fail.
+  if (f.maxBondYears === 0 && t.bond.years !== 0 && t.bond.status !== "none") return "fail";
+  const s = t.years[0]?.stipend;
+  // A stipend range (by subject): its lowest figure meets a floor; a fee range's highest a cap (feeValue).
+  const checks: [number | null | undefined, number | null, (v: number, cap: number) => boolean][] = [
+    [f.maxFee, feeValue.fee1(t), (v, cap) => v <= cap],
+    [f.minStipend, s ? (s.min ?? s.inr) : null, (v, cap) => v >= cap],
+    [f.maxBondYears, feeValue.bondyrs(t), (v, cap) => v <= cap],
+    [f.maxBondInr, feeValue.bond(t), (v, cap) => v <= cap],
+    [f.maxLeavingInr, feeValue.leave(t), (v, cap) => v <= cap],
+  ];
+  let unknown = false;
+  for (const [cap, v, ok] of checks) {
+    if (cap == null) continue;
+    if (v == null) unknown = true;
+    else if (!ok(v, cap)) return "fail";
+  }
+  return unknown ? "unknown" : "pass";
+}
+
+/** Whether one course's terms (and its college's type) pass the filters: an unknown value only with `keepUnknown`. */
+export function termsPass(t: ProgrammeTerms, type: TypeValue | null | undefined, f: TermFilters): boolean {
+  const v = termVerdict(t, type, f);
+  return v === "pass" || (v === "unknown" && !!f.keepUnknown);
+}
+
+/**
+ * Rows by the filters: `kept` pass; `unknown` are left out only because a filtered value is not declared (what the
+ * "Include not declared" box would add; empty when it is ticked). No filter: every row kept.
+ */
+export function splitByTerms<T>(rows: T[], f: TermFilters | null | undefined, terms: (x: T) => ProgrammeTerms, type: (x: T) => TypeValue | null | undefined) {
+  if (!f || !anyTermFilter(f)) return { kept: rows, unknown: [] as T[] };
+  const kept: T[] = [];
+  const unknown: T[] = [];
+  for (const x of rows) {
+    const v = termVerdict(terms(x), type(x), f);
+    if (v === "pass" || (v === "unknown" && f.keepUnknown)) kept.push(x);
+    else if (v === "unknown") unknown.push(x);
+  }
+  return { kept, unknown };
+}
+
+/** The choices the filter controls offer (TermFilterControls), plus a current value that isn't one of them (withCurrent). */
+export const termChoices = {
+  maxfee: FEE_LAKH_CHOICES,
+  minstip: [40000, 60000, 80000, 100000, 125000],
+  bondyrs: BOND_YEAR_CHOICES,
+  maxbond: [5, 10, 25, 50],
+  maxleave: [1, 5, 10, 25],
+};
+export const withCurrent = (xs: number[], v: number | null | undefined) => (v != null && !xs.includes(v) ? [...xs, v].sort((a, b) => a - b) : xs);
+
+const lakhText = (v: number) => formatInrShort(v * 100000);
+/** Each value as one self-describing phrase (select options and chips). */
+export const termValueLabel = {
+  maxfee: (v: number) => `Fee up to ${lakhText(v)}/yr`,
+  minstip: (v: number) => `Stipend at least ${formatInrShort(v)}/mo`,
+  bondyrs: (v: number) => (v === 0 ? "No bond" : `Bond up to ${v} ${v === 1 ? "year" : "years"}`),
+  maxbond: (v: number) => `Bond ₹ up to ${lakhText(v)}`,
+  maxleave: (v: number) => `Leaving penalty up to ${lakhText(v)}`,
+};
+
+/** One chip per applied filter param (ActiveFilters: the page builds each href without `key`). A cap that is her profile's has no chip. */
+export function termChips(f: TermParams): { key: keyof TermParams; label: string }[] {
+  const out: { key: keyof TermParams; label: string }[] = [];
+  if (f.ctype?.length) out.push({ key: "ctype", label: f.ctype.map((t) => collegeTypeLabel[t]).join(", ") });
+  for (const k of ["maxfee", "minstip", "bondyrs", "maxbond", "maxleave"] as const) {
+    const v = f[k];
+    if (typeof v === "number") out.push({ key: k, label: termValueLabel[k](v) });
+  }
+  if (f.nd === "keep") out.push({ key: "nd", label: "Including not declared" });
+  return out;
+}
+
+/** Whether a folded control (stipend, bond ₹, leaving, include not declared) is set: MoreFilters `open`. */
+export const termMoreOpen = (f: TermParams) => f.minstip != null || f.maxbond != null || f.maxleave != null || f.nd === "keep";

@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { X, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { EmptyState as AstryxEmptyState } from "@astryxdesign/core/EmptyState";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 import { keepProfileParams } from "../profile";
 import { FilterForm } from "./filter-form";
 import { FocusOnChange } from "./focus-item";
+import { InfoTip } from "./info-tip";
 
 // Shared building blocks so every Decide screen reads the same way (docs/APP_DESIGN_SYSTEM.md, "Inside-app primitives").
 
@@ -25,7 +26,8 @@ export const tbl = {
    * sticky first column stay in view; scroll-pt keeps a focused cell clear of the header. On paper the box lets every
    * row through (a window-high box would cut the rest off).
    */
-  scroll: "overflow-auto overscroll-x-contain scroll-pt-40 [@media(min-height:40rem)]:max-h-[calc(100dvh-9rem)] print:max-h-none print:overflow-visible",
+  // Screen only: a media variant like this one comes after print:, so print:max-h-none would lose to it on paper.
+  scroll: "overflow-auto overscroll-x-contain scroll-pt-40 [@media_screen_and_(min-height:40rem)]:max-h-[calc(100dvh-9rem)] print:overflow-visible",
   head: "sticky top-0 z-[2] bg-card shadow-[0_1px_0_var(--color-border)] print:static",
 };
 
@@ -70,24 +72,7 @@ export function MoreFilters({ open }: { open: boolean }) {
   );
 }
 
-/**
- * The filters a page applies, as chips: each removes its filter in one click (`href` = this page without it), and
- * "Clear all" (`clear`) when there are two or more. Nothing when none is set.
- */
-export function ActiveFilters({ items, clear }: { items: { label: string; href: string }[]; clear: string }) {
-  if (!items.length) return null;
-  return (
-    <div role="group" aria-label="Active filters" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-      <span className="text-muted-foreground">Filtered by</span>
-      {items.map((i) => (
-        <Link key={i.label} href={i.href} scroll={false} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border bg-card px-3 hover:border-foreground/70">
-          <span className="sr-only">Remove filter: </span>{i.label}<X className="size-4 text-muted-foreground" aria-hidden />
-        </Link>
-      ))}
-      {items.length > 1 && <Link href={clear} scroll={false} className={cn(smallLink, "px-1 text-sky")}>Clear all</Link>}
-    </div>
-  );
-}
+export { ActiveFilters } from "./active-filters";
 
 /** Text inputs and selects in filter bars and forms (same focus and invalid states as the Input primitive). */
 export const control = "h-11 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-sky aria-invalid:border-ember";
@@ -124,11 +109,14 @@ export function EmptyState({ title, description, icon: Icon, href, action, child
   );
 }
 
-/** One cell of a StatStrip. Big standalone numbers use proportional figures; pass them through formatRank (Indian grouping). */
-export function StatCell({ label, value, note }: { label: string; value: React.ReactNode; note?: React.ReactNode }) {
+/**
+ * One cell of a StatStrip. Big standalone numbers use proportional figures; pass them through formatRank (Indian
+ * grouping). `note`: one short line under the number. `info`: what the number counts, behind an (i) beside the label.
+ */
+export function StatCell({ label, value, note, info }: { label: string; value: React.ReactNode; note?: React.ReactNode; info?: React.ReactNode }) {
   return (
     <div className="bg-card p-4 sm:p-5">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dt className="flex items-center gap-1 text-sm text-muted-foreground">{label}{info && <InfoTip label={label}>{info}</InfoTip>}</dt>
       <dd className="mt-1 text-3xl leading-tight font-bold tracking-tight sm:text-[2.5rem]">{value}</dd>
       {note && <dd className="text-xs text-muted-foreground">{note}</dd>}
     </div>

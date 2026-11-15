@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import Link from "next/link";
 import { z } from "zod";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { gridRounds } from "@/features/decide/api";
 import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
-import { Dash, HISTORY_CAPTION, PageHead, ReachBadge, TermText } from "@/features/decide/components/bits";
+import { Dash, HistoryNote, PageHead, ReachBadge } from "@/features/decide/components/bits";
 import { CompareFromDevice, RemoveFromCompare } from "@/features/decide/components/compare-controls";
-import { ClosingCell, courseName, FeeText, RoundGrid } from "@/features/decide/components/options-view";
+import { ClosingCell, courseName, RoundGrid } from "@/features/decide/components/options-view";
+import { Beds } from "@/features/decide/components/pages/beds";
+import { TermStatCells } from "@/features/decide/components/stat-cells";
+import { TypeBadge } from "@/features/decide/components/type-badge";
 import { EmptyState, smallLink, tbl } from "@/features/decide/components/ui";
 import { MAX_COMPARE } from "@/features/decide/lib/choices";
 import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
+import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { currentOptionIds, getMeta, getOptionsByIds, LATEST_YEAR, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
-import { termLabel } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Compare" };
 
@@ -34,11 +38,17 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const L = decideLinks(params);
   const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
   const [older, last] = PAST_YEARS;
+  // Each option's stat cells (one <td> per stat key, statKeys order), each placed in its key's row; left-aligned like
+  // the column's other rows (`!`: the cell says text-right). ponytail: called as a function to split its <td>s across
+  // rows; a one-cell export from stat-cells.tsx would replace it.
+  const terms = new Map(options.map((r) => [r.id, TermStatCells({ t: r.fees, variant: "table", of: `${r.college.name}, ${courseName(r)}, ${r.quota}`, tdClassName: "p-3! text-left!" }) as React.ReactElement[]]));
 
-  const rows: { label: string; cell: (r: OptionRow) => React.ReactNode }[] = [
-    { label: "Course", cell: (r) => courseName(r) },
+  // `td`: a row whose cells come whole (the stat cells), else `cell`, the content of a plain cell.
+  const rows: { label: string; cell?: (r: OptionRow) => React.ReactNode; td?: (r: OptionRow) => React.ReactElement }[] = [
     { label: "Quota", cell: (r) => r.quota },
     { label: "State", cell: (r) => r.college.state ?? <Dash /> },
+    { label: "Type", cell: (r) => (r.hospital?.type ? <TypeBadge type={r.hospital.type} of={r.college.name} /> : <Dash />) },
+    { label: "Beds (as reported)", cell: (r) => (r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} of={`${r.college.name}, ${courseName(r)}, ${r.quota}`} /> : <Dash />) },
     {
       label: "Your reach",
       cell: (r) =>
@@ -48,6 +58,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           <Link href={L.with("/decide/compare", { editProfile: "1" })} className={`${smallLink} text-sky`}>Set your rank to see</Link>
         ),
     },
+    ...statKeys.map((k, i) => ({ label: statLabel[k], td: (r: OptionRow) => terms.get(r.id)![i] })),
     { label: `${LATEST_YEAR} R1 closing`, cell: (r) => <ClosingCell d={r.latest} /> },
     { label: `${last} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[last]} /> },
     { label: `${older} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[older]} /> },
@@ -56,24 +67,29 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       label: "Allotments made (all rounds, all categories)",
       cell: (r) => (
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 text-sm">
-          {YEARS.flatMap((y) => [
+          {[...YEARS].sort((a, b) => b - a).flatMap((y) => [
             <dt key={`t${y}`} className="text-muted-foreground">{yearLabel(y)}</dt>,
             <dd key={`d${y}`} className="numeric text-right font-semibold">{r.allotmentsByYear[y] != null ? formatRank(r.allotmentsByYear[y]) : <Dash />}</dd>,
           ])}
         </dl>
       ),
     },
-    { label: termLabel.FEE, cell: (r) => <FeeText t={r.terms.fee} /> },
-    { label: termLabel.STIPEND, cell: (r) => <TermText term={r.terms.stipend} /> },
-    { label: termLabel.BOND, cell: (r) => <TermText term={r.terms.bond} /> },
-    { label: termLabel.PENALTY, cell: (r) => <TermText term={r.terms.penalty} /> },
-    { label: "Clinical load", cell: () => <span className="text-muted-foreground">Not collected yet</span> },
+    {
+      label: "More",
+      cell: (r) =>
+        r.reach !== "new" && (
+          <span className="flex flex-wrap gap-x-4 text-xs">
+            <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className={`${smallLink} text-sky`}>Last ranks</Link>
+            <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={`${smallLink} text-sky`}>Allotments</Link>
+          </span>
+        ),
+    },
   ];
 
   return (
     <AppPage className="py-6">
       <CompareFromDevice validIds={known.map((o) => o.id)} requested={ids} />
-      <PageHead title="Compare">Up to {MAX_COMPARE} options side by side. Add them with the compare button on Options, Choices or an institute page.</PageHead>
+      <PageHead title="Compare" about={`Up to ${MAX_COMPARE} options side by side. Add them with the compare button on Options, Choices or an institute page.`} />
 
       {options.length === 0 ? (
         <EmptyState
@@ -95,13 +111,8 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                     <div className="flex items-start justify-between gap-2">
                       <span>
                         <Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link>
-                        <span className="block text-xs font-normal text-muted-foreground">{courseName(r)}, {r.quota}</span>
-                        {r.reach !== "new" && (
-                          <span className="flex flex-wrap gap-x-4 text-xs font-normal">
-                            <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className={`${smallLink} text-sky`}>Last ranks</Link>
-                            <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={`${smallLink} text-sky`}>Allotments</Link>
-                          </span>
-                        )}
+                        {/* The quota is the first row; screen readers hear it with each cell's column name. */}
+                        <span className="block text-xs font-normal text-muted-foreground">{courseName(r)}<span className="sr-only">, {r.quota}</span></span>
                       </span>
                       <RemoveFromCompare id={r.id} label={`${r.college.name}, ${courseName(r)}, ${r.quota}`} nextFocus={options[i + 1]?.id ?? options[i - 1]?.id ?? null} />
                     </div>
@@ -113,7 +124,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
               {rows.map((s) => (
                 <tr key={s.label} className="border-b border-border align-top last:border-0">
                   <th scope="row" className="sticky left-0 z-[1] bg-card p-3 text-left text-xs font-normal text-muted-foreground">{s.label}</th>
-                  {options.map((r) => <td key={r.id} className="numeric p-3">{s.cell(r)}</td>)}
+                  {options.map((r) => (s.td ? <Fragment key={r.id}>{s.td(r)}</Fragment> : <td key={r.id} className="numeric p-3">{s.cell?.(r)}</td>))}
                 </tr>
               ))}
             </tbody>
@@ -121,16 +132,19 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         </div>
       )}
       <div className="mt-6 grid gap-2 text-xs text-muted-foreground">
-        <p>{HISTORY_CAPTION}</p>
-        {options.length > 0 && (
-          <p>
-            {profile
-              ? `Closing ranks are on ${eligibleCategories(profile.category, profile.pwd).join(" or ")} seats, the seat categories you can take; each says which.`
-              : "No rank set, so closing ranks are the deepest on any seat category; each says which."}{" "}
-            Allotments count every category and round, not the seat matrix.
-          </p>
-        )}
-        <DataSource used={gridRounds(options)} terms={options.flatMap((o) => [o.terms.fee, o.terms.stipend, o.terms.bond, o.terms.penalty].map((t) => t?.source))} />
+        <HistoryNote
+          more={
+            options.length > 0 && (
+              <>
+                {profile
+                  ? `Closing ranks are on ${eligibleCategories(profile.category, profile.pwd).join(" or ")} seats, the seat categories you can take; each says which.`
+                  : "No rank set, so closing ranks are the deepest on any seat category; each says which."}{" "}
+                Allotments count every category and round, not the seat matrix.
+              </>
+            )
+          }
+        />
+        <DataSource used={gridRounds(options)} />
       </div>
     </AppPage>
   );
