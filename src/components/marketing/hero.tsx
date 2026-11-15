@@ -18,7 +18,7 @@ export function Hero() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link href="#preview">See residents <ArrowRight className="size-4" /></Link>
+              <Link href="/signup">See residents <ArrowRight className="size-4" /></Link>
             </Button>
             <Button asChild size="lg" variant="ghost">
               <Link href="/signup">Get Seatora — Free</Link>
