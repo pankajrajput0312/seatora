@@ -16,8 +16,6 @@ import { HideableRow } from "@/features/decide/components/residents/hideable-row
 import { flagShort, reportedCount, SELF_REPORTED, ValueSource } from "@/features/decide/components/institute/hospital-bits";
 import { allotmentMixAt, clinicalAt, headerLists, hospitalInfo, optionSeats, roundSeatsAt, roundSeatTotals, websiteUrl } from "@/features/decide/components/institute/institute-data";
 import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, HospitalFacts } from "@/features/decide/components/institute/institute-parts";
-import { KeyFacts } from "@/features/decide/components/institute/key-facts";
-import { keyRows } from "@/features/decide/components/institute/key-facts-data";
 import { courseName, RoundGrid, SeatsBelowNote, seatKindShort, toChoiceItem } from "@/features/decide/components/options-view";
 import { ResultCard } from "@/features/decide/components/result-card";
 import { listSeats, listTitle, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
@@ -43,12 +41,12 @@ import { hideResidentAction } from "./actions";
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 const tabs = [
   { key: "overview", label: "Overview" },
+  { key: "residents", label: "Residents", accent: true }, // the main feature: second, in its own colour
   { key: "courses", label: "Courses" },
   { key: "seats", label: "Seats" },
   { key: "fees", label: "Fees & bond" },
   { key: "clinical", label: "Hospital facts" },
   { key: "allotments", label: "Allotments" },
-  { key: "residents", label: "Residents" },
 ] as const;
 const PAGE_SIZE = 50;
 const schema = z.object({
@@ -221,10 +219,9 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           {/* On paper the tip doesn't open: the address prints in full. */}
           {college.address && <p className="hidden text-sm print:block">Address as printed by MCC: {college.address}</p>}
         </div>
-        <KeyFacts rows={keyRows(options, profile ? yours : null)} total={options.length} mine={!!profile && yours.length > 0} cats={!!profile} list={inst.seatList} name={college.name} slug={slug} L={L} />
       </div>
 
-      <SubTabs label="Institute sections" current={tab} items={tabs.map((t) => ({ key: t.key, label: t.label, href: L.to(`/decide/institutes/${slug}`, { tab: t.key }) }))} />
+      <SubTabs label="Institute sections" current={tab} items={tabs.map((t) => ({ key: t.key, label: t.label, accent: "accent" in t && t.accent, href: L.to(`/decide/institutes/${slug}`, { tab: t.key }) }))} />
 
       {tab === "overview" && (
         <>
