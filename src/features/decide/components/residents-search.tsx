@@ -25,9 +25,11 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames }:
     const t = typed.trim();
     if (t.length < 2) return setFound({ colleges: [], names: [] });
     let live = true;
-    const timer = setTimeout(async () => {
-      const [c, n] = await Promise.all([findColleges(t), findNames(t)]);
-      if (live) setFound({ colleges: c ?? [], names: n ?? [] });
+    // Each list shows as soon as it arrives: names search more rows and come back later.
+    const timer = setTimeout(() => {
+      findColleges(t).then((c) => live && setFound((f) => ({ ...f, colleges: c ?? [] })));
+      if (t.length >= 3) findNames(t).then((n) => live && setFound((f) => ({ ...f, names: n ?? [] })));
+      else setFound((f) => ({ ...f, names: [] }));
     }, 250);
     return () => {
       live = false;
