@@ -160,7 +160,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         active={chips.length}
         clear={L.to("/decide/fees")}
         search={
-          <label className="grid min-w-56 flex-1 text-sm">
+          <label className="grid min-w-0 flex-1 basis-32 text-sm md:min-w-56">
             <span className="sr-only">Institute or state</span>
             <input name="q" type="search" defaultValue={f.q ?? ""} placeholder="Search institute or state" className={control} />
           </label>

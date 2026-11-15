@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   const { sellerName } = business;
   return (
-    <Container className="py-20 md:py-28">
+    <Container className="py-10 md:py-28">
       <article className="max-w-prose">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">About</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">About Us</h1>

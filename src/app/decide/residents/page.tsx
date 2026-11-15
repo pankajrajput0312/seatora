@@ -101,7 +101,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         active={chips.length}
         clear={clear}
         search={
-          <label className="min-w-56 flex-1">
+          <label className="min-w-0 flex-1 basis-32 md:min-w-56">
             <span className="sr-only">Name or college</span>
             <input type="search" name="q" defaultValue={query.q} maxLength={60} placeholder="Search a name or college" className={control} />
           </label>

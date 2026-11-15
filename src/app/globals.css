@@ -359,3 +359,34 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
     --color-type-trust: #f08ac8;
   }
 }
+
+/* Decide on phones. The Filters sheet (FiltersPanel) open: the page behind it neither scrolls nor shows the bottom bar
+   (which would cover Apply), and is dimmed. Paragraphs take the size of their text-xs / text-sm block: Astryx's reset
+   gives every <p> the body size (its own layer, below base), which made source lines and captions body-sized. */
+@media (width < 48rem) {
+  html:has(.app details[data-filters][open]) { overflow: hidden; }
+  .app:has(details[data-filters][open]) [data-bottom-bar] { display: none; }
+  .app details[data-filters][open] > [role="group"] { box-shadow: 0 0 0 100vmax color-mix(in oklab, var(--color-foreground) 45%, transparent); }
+}
+@layer base {
+  .app :where(.text-xs, .text-sm) p { font-size: inherit; }
+}
+/* A row of filter chips (Options' reach labels, Seats' views): one line that scrolls sideways on phones, edge to edge,
+   instead of five rows of chips above the results. */
+@media (width < 48rem) {
+  .app .chip-row { flex-wrap: nowrap; overflow-x: auto; margin-inline: -1rem; padding-inline: 1rem; scrollbar-width: none; }
+  .app .chip-row > * { flex-shrink: 0; white-space: nowrap; }
+}
+@layer base {
+  .app { padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
+}
+/* Laptop sidebar: its list scrolls under the rank card, and macOS hides the scrollbar, so a shadow on the bottom edge
+   says there is more (gone at the end of the list: the cover scrolls with it). */
+@media (min-width: 48rem) {
+  .app nav.astryx-side-nav > :last-child {
+    background:
+      linear-gradient(transparent, var(--color-card) 70%) 0 100% / 100% 2.5rem no-repeat local,
+      linear-gradient(transparent, color-mix(in oklab, var(--color-foreground) 16%, transparent)) 0 100% / 100% 0.75rem no-repeat scroll;
+    scrollbar-width: thin;
+  }
+}

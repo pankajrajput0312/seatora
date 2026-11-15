@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 import { submitFeatureRequest } from "../actions";
 import { featureRequestSchema, REQUEST_KINDS, requestKindLabel, type FeatureRequestInput } from "../validations";
+import { navigating } from "@/features/decide/components/nav-pending";
 
 const MAX = 2000;
 // Signed out there is no account to reply to, so the email is required.
@@ -51,7 +52,10 @@ export function RequestForm({ email, page }: { email?: string; page: string }) {
       if (res.ok) {
         reset({ kind: "feature", message: "", email: values.email, page, website: "" }); // her email stays for the next one
         setResult({ ok: true, message: "Thanks — we reply within 2 working days.", at: Date.now() });
-        if (email) router.refresh(); // "Your requests" on the page
+        if (email) {
+          navigating(true); // inside Decide: the shell keeps the refresh moving (decide-shell.tsx)
+          router.refresh(); // "Your requests" on the page
+        }
       } else {
         setResult({ ok: false, message: res.error, at: Date.now() }); // her message stays in the form
       }

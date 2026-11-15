@@ -87,7 +87,7 @@ test("the invited account signs up (or in), signs out, and signs back in", async
   await page.goto("/account");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Hi, .+\.$/);
   await expect(page.getByText(invited.email)).toBeVisible();
-  await expect(page.locator('header a[href="/account"]')).toHaveCount(1);
+  await expect(page.locator('header a[href="/account"]:not(dialog a)')).toHaveCount(1); // (the phone menu <dialog> has its own)
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/$/);

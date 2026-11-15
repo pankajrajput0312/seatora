@@ -185,7 +185,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         active={chips.length}
         clear={clear}
         search={
-          <label className="min-w-56 flex-1">
+          <label className="min-w-0 flex-1 basis-32 md:min-w-56">
             <span className="sr-only">Search institutes by name or state</span>
             <input type="search" name="q" defaultValue={f.q} placeholder="Search name or state" className={control} />
           </label>

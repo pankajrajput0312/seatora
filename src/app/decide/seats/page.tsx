@@ -158,7 +158,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
   return (
     <>
       <SeatListPicker lists={all} current={list.key} href={(key) => here({ list: key })} />
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="chip-row flex flex-wrap items-center gap-2">
         <nav aria-label="Seats view" className="flex flex-wrap gap-2">
           <Link href={here({ view: null })} aria-current={matrix ? "true" : undefined} className={chip(matrix)}>Seat matrix</Link>
           <Link href={here({ view: "list", rounds: null, has: null })} aria-current={f.view === "list" ? "true" : undefined} className={chip(f.view === "list")}>One list</Link>
@@ -183,7 +183,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         <ViewField />
         {(["inst", "course", "squota"] as const).map((k) => f[k] && <input key={k} type="hidden" name={k} value={f[k]} />)}
         <Fragment key={params.toString()}>
-          <label className="min-w-56 flex-1">
+          <label className="min-w-0 flex-1 basis-32 md:min-w-56">
             <span className="sr-only">Search institute or state</span>
             <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Search institute or state" className={control} />
           </label>

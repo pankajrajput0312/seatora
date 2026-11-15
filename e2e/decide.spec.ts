@@ -398,8 +398,9 @@ test("Allotments' R2 columns, Display and CSV: 2023 rank 23 upgraded in R2 to Se
 test("print: every table box lets all its rows onto paper", async ({ page }) => {
   test.setTimeout(90_000);
   for (const path of [
-    `/decide/options?${PROFILE}`, `/decide/seats?${PROFILE}`, `/decide/allotments?${PROFILE}&course=md-anaesthesiology&year=2025&round=R2&layout=table`,
-    `/decide/last-ranks?${PROFILE}&course=dnb-anaesthesiology`, `/decide/compare?${new URLSearchParams({ ids: [OPT_KOKILA_ANAES, OPT_GMC_NAGPUR].join(",") })}&${PROFILE}`,
+    // layout=table: phones open on cards (no table box).
+    `/decide/options?${PROFILE}&layout=table`, `/decide/seats?${PROFILE}&layout=table`, `/decide/allotments?${PROFILE}&course=md-anaesthesiology&year=2025&round=R2&layout=table`,
+    `/decide/last-ranks?${PROFILE}&course=dnb-anaesthesiology&layout=table`, `/decide/compare?${new URLSearchParams({ ids: [OPT_KOKILA_ANAES, OPT_GMC_NAGPUR].join(",") })}&${PROFILE}`,
   ]) {
     await page.goto(path);
     await page.emulateMedia({ media: "print" });

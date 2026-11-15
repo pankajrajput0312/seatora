@@ -30,7 +30,7 @@ export default function HomeV2() {
     <>
       <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur-md">
         <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-6 px-5 md:px-8">
-          <Link href="/v2" className="flex items-center gap-2.5 text-lg font-bold tracking-tight">
+          <Link href="/v2" className="flex min-h-11 items-center gap-2.5 text-lg font-bold tracking-tight">
             <LogoMark className="size-7 [&_path]:fill-foreground" /> Seatora
           </Link>
           <nav aria-label="Primary" className="hidden items-center gap-8 text-[15px] text-muted-foreground md:flex">
@@ -60,7 +60,7 @@ export default function HomeV2() {
               <button type="submit" className="h-11 shrink-0 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Search<span className="hidden sm:inline"> hospitals</span></button>
             </form>
             <p className="mt-4 text-[15px] text-muted-foreground">
-              Or <a href="#plan" className="font-semibold text-foreground underline underline-offset-4 hover:decoration-2">start with your rank</a>
+              Or <a href="#plan" className="py-3 font-semibold text-foreground underline underline-offset-4 hover:decoration-2">start with your rank</a>
             </p>
           </div>
           <div className="mt-14"><Roster /></div>

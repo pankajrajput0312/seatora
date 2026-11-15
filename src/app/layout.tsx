@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { GeistPixelSquare } from "geist/font/pixel";
+import { GeistPixelSquare } from "geist/font/pixel/square"; // not "geist/font/pixel": that preloads all five pixel faces
 import { siteConfig } from "@/config/site";
 import "./globals.css";
 

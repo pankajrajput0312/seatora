@@ -8,12 +8,12 @@ const statuses = ["comparing previous-year rounds", "checking the seat matrix", 
 export function AuthShell({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
   return (
     <section className="bg-[radial-gradient(ellipse_at_top_right,var(--color-muted),transparent_60%)]">
-      <Container className="grid items-center gap-12 py-12 md:py-16 lg:min-h-[calc(100vh-4rem)] lg:grid-cols-2">
+      <Container className="grid items-center gap-12 py-6 sm:py-12 md:py-16 lg:min-h-[calc(100vh-4rem)] lg:grid-cols-2">
         <div className="mx-auto w-full max-w-sm lg:mx-0">
-          <PixelEmblem className="bob mb-8 w-20 lg:hidden" animated />
+          <PixelEmblem className="bob mb-8 hidden w-20 sm:block lg:hidden" animated />{/* phones: the form comes first */}
           <p className="font-mono text-xs uppercase tracking-widest text-sky">{eyebrow}</p>
           <h1 className="glow mt-4 font-pixel text-4xl leading-none tracking-tight md:text-5xl">{title}</h1>
-          <div className="mt-8">{children}</div>
+          <div className="mt-6 flex flex-col sm:mt-8">{children}</div>
         </div>
 
         <div className="relative mx-auto hidden w-full max-w-md py-12 lg:block" aria-hidden>

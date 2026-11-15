@@ -9,6 +9,14 @@ import { cn } from "@/lib/cn";
  * when the route changes, so until the new view arrives the page dims under a pulsing bar, as DecideShell does for a
  * followed link. Ends when the address changes (or after 10 s: an Apply that changed nothing keeps the address).
  */
+/**
+ * Tell the shell a Decide navigation started that no link click shows (router.push / replace in code): it dims the page
+ * until the address changes and keeps the navigation moving (DecideShell). `refresh`: a router.refresh(), same address,
+ * so no dimming.
+ */
+export const NAV_EVENT = "decide:navigating";
+export const navigating = (refresh = false) => window.dispatchEvent(new CustomEvent(NAV_EVENT, { detail: { refresh } }));
+
 export function NavPending({ children }: { children: React.ReactNode }) {
   const here = `${usePathname()}?${useSearchParams()}`;
   const [from, setFrom] = useState<string | null>(null);
