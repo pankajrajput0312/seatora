@@ -3,11 +3,12 @@ import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { business } from "@/config/business";
+import { FreePrice } from "@/components/marketing/free-price";
 import { formatINR } from "@/features/cutoffs/lib/format";
 
 export const metadata: Metadata = {
   title: "Pricing — Seatora NEET PG 2026 Season Pass",
-  description: `Seatora costs ${formatINR(business.price)} ${business.period}: a one-time payment for that season, with no subscription or auto-renewal.`,
+  description: `The Seatora NEET PG 2026 Season Pass is free: ${formatINR(business.price)} (regular price ${formatINR(business.regularPrice)}) ${business.period}, with no subscription or auto-renewal.`,
 };
 
 export default function PricingPage() {
@@ -17,22 +18,23 @@ export default function PricingPage() {
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Pricing</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Seatora NEET PG 2026 Season Pass</h1>
         <p className="mt-3 text-2xl font-semibold">
-          <span className="numeric">{formatINR(business.price)}</span> <span className="text-base font-normal text-muted-foreground">{business.period}, one-time payment</span>
+          <FreePrice /> <span className="text-base font-normal text-muted-foreground">{business.period}</span>
         </p>
         <p className="mt-3 text-muted-foreground">
           Online NEET PG counselling planner for MCC All India counselling: Round 2 seats, past closing ranks, fees, stipends and bonds, and
-          residents at each college, from official MCC, NBEMS and NMC documents. Access is switched on immediately after payment.
+          residents at each college, from official MCC, NBEMS and NMC documents. Create a free account and access is switched on immediately.
         </p>
         <Button asChild className="mt-5">
-          <a href={`mailto:${business.email}?subject=${encodeURIComponent("Seatora Season Pass 2026")}`}>Buy now — {formatINR(business.price)}</a>
+          <Link href="/signup">Create free account</Link>
         </Button>
-        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-14">14 November 2026</time></p>
+        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-15">15 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
           <section>
             <h2>What you pay</h2>
             <p className="mt-2">
-              {formatINR(business.price)} {business.period}, paid once for that season. There is no subscription and nothing renews
-              automatically. Prices are in Indian Rupees (INR).
+              The Season Pass is free right now: {formatINR(business.price)} {business.period} (regular price{" "}
+              {formatINR(business.regularPrice)}). No payment or card is needed, there is no subscription and nothing renews
+              automatically. Any price is in Indian Rupees (INR).
             </p>
             <p className="mt-2">{business.season}</p>
           </section>
@@ -54,19 +56,19 @@ export default function PricingPage() {
           <section>
             <h2>Refunds</h2>
             <p className="mt-2">
-              Once access has been granted, the payment is not refundable. See our{" "}
+              The Season Pass is free right now, so nothing is charged. For any future paid purchase, the payment is not refundable once
+              access has been granted. See our{" "}
               <Link href="/refund-policy" className="text-sky underline">Refund &amp; Cancellation Policy</Link> for the exceptions.
             </p>
           </section>
           <section>
-            <h2>How to buy</h2>
+            <h2>How to get it</h2>
             <p className="mt-2">
-              Click Buy now and email us with the subject &quot;Seatora Season Pass 2026&quot;. We reply with a secure payment link, and access
-              is switched on for your account immediately after the payment is confirmed.
+              Click Create free account and sign up with your email address. Access is switched on for your account immediately.
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
               <Button asChild>
-                <a href={`mailto:${business.email}?subject=${encodeURIComponent("Seatora Season Pass 2026")}`}>Buy now — {formatINR(business.price)}</a>
+                <Link href="/signup">Create free account</Link>
               </Button>
               <Button asChild variant="ghost">
                 <Link href="/contact">Contact us</Link>

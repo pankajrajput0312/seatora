@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { business } from "@/config/business";
+import { formatINR } from "@/features/cutoffs/lib/format";
 
 export const metadata: Metadata = {
   title: "Terms & Conditions",
@@ -16,7 +17,7 @@ export default function TermsPage() {
       <article className="max-w-prose">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Legal</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Terms &amp; Conditions</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-14">14 November 2026</time></p>
+        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-15">15 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
           <section>
             <h2>About these terms</h2>
@@ -38,8 +39,7 @@ export default function TermsPage() {
           <section>
             <h2>Who may use it</h2>
             <p className="mt-2">
-              Seatora is for NEET PG candidates and people helping them choose a seat. You must be at least 18 years old. Access is by
-              invitation only at present.
+              Seatora is for NEET PG candidates and people helping them choose a seat. You must be at least 18 years old.
             </p>
           </section>
           <section>
@@ -62,7 +62,9 @@ export default function TermsPage() {
           <section>
             <h2>Payments and refunds</h2>
             <p className="mt-2">
-              The price is on our <Link href="/pricing" className="text-sky underline">Pricing</Link> page. {business.season} Refunds and
+              The Seatora NEET PG 2026 Season Pass is currently free ({formatINR(business.price)}, regular price{" "}
+              {formatINR(business.regularPrice)}); see our <Link href="/pricing" className="text-sky underline">Pricing</Link> page.{" "}
+              {business.season} Refunds for any future paid purchase and
               cancellations are covered by our <Link href="/refund-policy" className="text-sky underline">Refund &amp; Cancellation Policy</Link>.
             </p>
           </section>

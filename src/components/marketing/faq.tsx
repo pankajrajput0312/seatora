@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { Container } from "@/components/layout/container";
+import { FreePrice } from "./free-price";
 import { SectionHeading } from "./section-heading";
 
 const faqs = [
@@ -21,7 +22,11 @@ const faqs = [
   },
   {
     q: "How do I get access?",
-    a: "Buy the Seatora NEET PG 2026 Season Pass (₹499, one payment for the 2026 counselling season) from the Pricing page. Access is switched on immediately after payment.",
+    a: (
+      <>
+        The Seatora NEET PG 2026 Season Pass is <FreePrice /> for the 2026 counselling season. Create a free account from the Pricing page and access is switched on immediately.
+      </>
+    ),
   },
 ];
 

@@ -175,7 +175,7 @@ export function ResidentsAbout({ rows }: { rows: ResidentRow[] }) {
   const email = siteConfig.contactEmail;
   return (
     <>
-      <strong>Names</strong> are as printed in MCC&apos;s official admitted-candidates lists (each row names its list). No contact details are held.
+      <strong>Names</strong> are as printed in MCC&apos;s official admitted-candidates lists (each row names its list), which MCC publishes. Any signed-in member can see them; visitors who are not signed in and search engines cannot. No contact details are held.
       <br /><br />
       <strong>Ranks</strong> are All India Ranks from that year&apos;s NBEMS NEET PG result
       {years.length ? ` (on this page: ${years.join(", ")})` : " (none on this page has one)"}, where one could be matched; a dash where none is known. A rank is where one person got in, not a closing rank or a prediction.

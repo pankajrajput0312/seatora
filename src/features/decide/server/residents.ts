@@ -57,9 +57,9 @@ export async function listResidents(collegeKey: string, f: { course?: string; ye
 }
 
 /**
- * Names are shown only to the signed-in, allowlisted user holding a valid access cookie for that same account, checked
- * here as well as in src/middleware.ts so removing the middleware can never make them public. Refuses when the gate is
- * off (no SITE_ACCESS_SECRET / SEATORA_ALLOWED_EMAILS), even in development.
+ * Names are shown only to a signed-in member (any account with SEATORA_OPEN_ACCESS=1, else an allowlisted one) holding a
+ * valid access cookie for that same account, checked here as well as in src/middleware.ts so removing the middleware can
+ * never make them public. Refuses when the gate is off (no SITE_ACCESS_SECRET), even in development.
  */
 export const canSeeResidents = hasSiteAccess;
 

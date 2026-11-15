@@ -243,7 +243,11 @@ cd "$D" && DATABASE_URL="$TARGET" npx prisma migrate deploy
 
 ## 3. Rotate the access secret or change the allowed email
 
-The gate (`src/middleware.ts`, docs/ARCHITECTURE.md "Access gate") lets only a signed-in account on `SEATORA_ALLOWED_EMAILS` into `/decide` and `/api/v1`. The access cookie is an HMAC keyed with `SITE_ACCESS_SECRET` plus the allowlist, so changing either one voids every cookie. Production needs both variables, or it denies everything. Env changes reach the site only with a new deployment.
+The gate (`src/middleware.ts`, docs/ARCHITECTURE.md "Access gate") lets only a signed-in member into `/decide` and `/api/v1`: with `SEATORA_OPEN_ACCESS=1` any account (anyone may sign up, no invite code; Residents' names included), else an account on `SEATORA_ALLOWED_EMAILS`.
+
+**Open or close the site.** Set `SEATORA_OPEN_ACCESS=1` in Vercel (needs only `SITE_ACCESS_SECRET`) and redeploy: sign-up is open to anyone, 5 per IP per hour, and every account gets Decide. Before opening, make sure every `SEATORA_OWNER_EMAILS` address already has the owner's own account (open sign-up refuses owner addresses, so nobody else can claim one, but the owner can't sign up then either). Remove the variable (or set anything but `1`) and redeploy to go back to invite only. Either switch voids every access cookie, so everyone signs in again; accounts made while open stay in the database but can't sign in once closed unless allowlisted. A name-hiding request (privacy notice): hide it with Hide on the resident's row, signed in, or as in DATA_INTEGRITY "Admitted-list residents".
+
+In invite-only mode: The access cookie is an HMAC keyed with `SITE_ACCESS_SECRET` plus the allowlist, so changing either one voids every cookie. Production needs both variables, or it denies everything. Env changes reach the site only with a new deployment.
 
 Set the variables in Vercel → Seatora project → Settings → Environment Variables (Production), or with the CLI from a snapshot directory with the IDs loaded (1.3 b and d). Update `~/.config/seatora/vercel.env` to match.
 
@@ -268,7 +272,7 @@ npx --yes vercel@latest deploy --prod --yes                 # redeploy the live 
 
 **Delete an account on request.** Deleting a `User` row keeps its feature requests, unlinked (`onDelete: SetNull`), and the privacy notice says they go with the account, so delete them first: `DELETE FROM "FeatureRequest" WHERE "userId" = '<id>' OR lower(email) = lower('<email>')`.
 
-**Set the owner** (`SEATORA_OWNER_EMAILS`, who reads every request and its email on `/decide/requests`): only an address whose account the owner created themselves. Check its `User` row as in step 2 first, and never add an address without an account while `SEATORA_INVITE_CODE` is set: nothing verifies sign-up emails, so whoever holds the code could claim it.
+**Set the owner** (`SEATORA_OWNER_EMAILS`, who reads every request and its email on `/decide/requests`; open access never makes anyone an owner): only an address whose account the owner created themselves. Check its `User` row as in step 2 first, and never add an address without an account while `SEATORA_INVITE_CODE` is set: nothing verifies sign-up emails, so whoever holds the code could claim it.
 
 Her profile and choice lists live in her browser, not in the account, so changing the account doesn't move or delete them.
 
@@ -296,5 +300,5 @@ Her profile and choice lists live in her browser, not in the account, so changin
 | `db:import` validation | Nothing written until every file's sha256 and row count match the manifest and every row passes its schema | A corrupted or hand-edited bundle | Re-export |
 | `db:import` spot checks (inside the transaction) | `Committed. Spot checks passed`: Kokilaben closing ranks (1.4), GMC Nagpur 12 allotments with OBC 17,213, no provisional 2026 R1, every seat list sums to its PDF total, every newest virtual vacancy has an earlier allotment, NBEMS top score, previous seats one round back (and 2023 R2 rank 23's journey), retired keys resolve, every DB count = the bundle's, User/Session/Waitlist counts unchanged | Any import that would change known facts or touch accounts | Rolled back, nothing written: fix the data, re-export |
 | `db:import-residents` | `rejected: 0`, `2 spot checks passed` (two known 2025 residents from the private manifest) | Names on missing colleges or courses (rejected and listed, never guessed); a bundle with phones, e-mails or rolls (strict schema) | Run `db:import` first, or re-export residents |
-| App tests (code changes) | `npm run typecheck && npm run lint && npm run test` clean; `npm run test:e2e` with `E2E_EMAIL`, `E2E_PASSWORD`, `SEATORA_INVITE_CODE` | Regressions before deploy | Fix before 1.3 d |
+| App tests (code changes) | `npm run typecheck && npm run lint && npm run test` clean; `npm run test:e2e` with `E2E_EMAIL`, `E2E_PASSWORD`, and `SEATORA_INVITE_CODE` (invite only) or `SEATORA_OPEN_ACCESS=1` (as the server; adds `e2e/open-access.spec.ts`) | Regressions before deploy | Fix before 1.3 d |
 | Live checks (1.4) | `/decide` 307 to login, `/api/v1/meta` 401, public pages 200, signed-in screens show the new round | The gate open, or a deploy or import that didn't land | Redeploy or re-import; restore only as in 2 |

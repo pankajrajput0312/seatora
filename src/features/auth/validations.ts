@@ -15,6 +15,9 @@ export const signUpSchema = z.object({
   invite: z.string().trim().min(1, "Enter your invite code").max(128),
 });
 
+/** Sign-up with SEATORA_OPEN_ACCESS=1: no invite code. */
+export const openSignUpSchema = signUpSchema.omit({ invite: true });
+
 export const changePasswordSchema = z
   .object({
     current: z.string().min(1, "Enter your current password").max(128),
@@ -24,5 +27,6 @@ export const changePasswordSchema = z
   .refine((d) => d.password === d.confirm, { message: "The new passwords don't match", path: ["confirm"] });
 
 export type SignInInput = z.input<typeof signInSchema>;
-export type SignUpInput = z.input<typeof signUpSchema>;
+/** `invite` only without open access. */
+export type SignUpInput = z.input<typeof openSignUpSchema> & { invite?: string };
 export type ChangePasswordInput = z.input<typeof changePasswordSchema>;

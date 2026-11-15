@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ACCESS_COOKIE, accessCookieUser, siteGate } from "@/lib/site-access";
 
-// Access gate for /decide and /api/v1: a valid seatora_access cookie, which only an allowlisted sign-in sets.
+// Access gate for /decide and /api/v1: a valid seatora_access cookie, which only a member's sign-in sets (any account with
+// SEATORA_OPEN_ACCESS=1, else an allowlisted one).
 // Server Actions can be POSTed to any route, so Decide actions re-check access themselves. See docs/ARCHITECTURE.md "Access gate".
 
 let warned = false;
@@ -13,14 +14,14 @@ export async function middleware(req: NextRequest) {
     if (!warned) {
       warned = true;
       if (gate.state === "off") console.warn("SITE_ACCESS_SECRET and SEATORA_ALLOWED_EMAILS are not set: /decide and /api/v1 are OPEN (development only).");
-      else console.error("SITE_ACCESS_SECRET (32+ characters) and SEATORA_ALLOWED_EMAILS are both required: denying /decide and /api/v1.");
+      else console.error("SITE_ACCESS_SECRET (32+ characters) and SEATORA_ALLOWED_EMAILS (or SEATORA_OPEN_ACCESS=1) are required: denying /decide and /api/v1.");
     }
     if (gate.state === "off") return pass(api, req.method);
     return api ? denied(503, "access_unconfigured", "Access is not configured.") : redirect(req, "/login?error=unavailable");
   }
 
   if (await accessCookieUser(req.cookies.get(ACCESS_COOKIE)?.value, gate.key)) return pass(api, req.method);
-  if (api) return denied(401, "unauthorized", "Sign in with an allowed account.");
+  if (api) return denied(401, "unauthorized", gate.open ? "Sign in to use the Decide API." : "Sign in with an allowed account.");
   return redirect(req, `/login?${new URLSearchParams({ next: req.nextUrl.pathname + req.nextUrl.search })}`);
 }
 

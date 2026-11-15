@@ -21,7 +21,7 @@ export function Hero() {
               <Link href="#preview">See residents <ArrowRight className="size-4" /></Link>
             </Button>
             <Button asChild size="lg" variant="ghost">
-              <Link href="/pricing">Get Seatora — ₹499</Link>
+              <Link href="/pricing">Get Seatora — Free</Link>
             </Button>
           </div>
         </div>

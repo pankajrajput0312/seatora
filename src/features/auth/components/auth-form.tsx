@@ -8,18 +8,21 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signIn, signUp } from "../actions";
-import { signInSchema, signUpSchema, type SignUpInput } from "../validations";
+import { openSignUpSchema, signInSchema, signUpSchema, type SignUpInput } from "../validations";
 
 type Mode = "signin" | "signup";
 
-/** `next`: the page's ?next=, passed through (the actions sanitise it) and kept on the sign-in / sign-up link. */
-export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
+/**
+ * `next`: the page's ?next=, passed through (the actions sanitise it) and kept on the sign-in / sign-up link. `open`:
+ * SEATORA_OPEN_ACCESS=1, so sign-up has no invite code field.
+ */
+export function AuthForm({ mode, next, open = false }: { mode: Mode; next?: string; open?: boolean }) {
   const isSignUp = mode === "signup";
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors } } = useForm<SignUpInput>({
     // Sign-in ignores `name`; one form type keeps the field helper simple.
-    resolver: (isSignUp ? zodResolver(signUpSchema) : zodResolver(signInSchema)) as unknown as Resolver<SignUpInput>,
+    resolver: (isSignUp ? zodResolver(open ? openSignUpSchema : signUpSchema) : zodResolver(signInSchema)) as unknown as Resolver<SignUpInput>,
     defaultValues: { name: "", email: "", password: "", invite: "" },
   });
 
@@ -56,14 +59,14 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
         autoComplete: isSignUp ? "new-password" : "current-password",
         placeholder: isSignUp ? "At least 8 characters" : undefined,
       })}
-      {isSignUp && field("invite", "Invite code", { autoComplete: "off", spellCheck: false })}
+      {isSignUp && !open && field("invite", "Invite code", { autoComplete: "off", spellCheck: false })}
       {error && <p role="alert" className="rounded-md border border-ember/30 bg-ember/10 px-3 py-2 text-sm text-ember">{error}</p>}
       <Button type="submit" size="lg" disabled={pending} className="mt-2">
         {pending && <Loader2 className="size-4 animate-spin" />}
         {isSignUp ? "Create account" : "Sign in"}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
-        {isSignUp ? "Already have an account? " : "Invited, and new here? "}
+        {isSignUp ? "Already have an account? " : open ? "New here? " : "Invited, and new here? "}
         <Link
           href={{ pathname: isSignUp ? "/login" : "/signup", query: next ? { next } : undefined }}
           className="text-foreground underline hover:text-sky"

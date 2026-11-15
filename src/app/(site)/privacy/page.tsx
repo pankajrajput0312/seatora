@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { business } from "@/config/business";
+import { openAccess } from "@/lib/site-access";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   const { email, sellerName } = business;
+  const open = openAccess();
   const mail = email && <a href={`mailto:${email}`} className="text-sky underline">{email}</a>;
   return (
     <Container className="py-20 md:py-28">
@@ -27,7 +29,7 @@ export default function PrivacyPage() {
           <section>
             <h2>What we collect</h2>
             <p className="mt-2">
-              Accounts are by invitation only. For an account we store your name, your email address and a one-way hash of your password
+              {open ? "Anyone can create a free account." : "Accounts are by invitation only."} For an account we store your name, your email address and a one-way hash of your password
               (never the password itself), a record of each sign-in session (when it started and when it expires), and a count of recent
               failed sign-in attempts, used to protect your account.
             </p>
@@ -68,13 +70,17 @@ export default function PrivacyPage() {
             <p className="mt-2">
               Seatora shows the names of residents at each college, with their course, their year and, where NBEMS has published it, their
               NEET PG All India Rank. The names come from MCC&apos;s official admitted-candidates lists and the ranks from that year&apos;s NBEMS
-              NEET PG result, both public documents. We hold no contact details for anyone on them. Names are shown only to signed-in accounts that
-              have been given access. We never show a category beside a name, but a rank shown with a name can be looked up in MCC&apos;s public
+              NEET PG result, both public documents. We hold no contact details for anyone on them.{" "}
+              {open
+                ? "Any signed-in member can see these names (anyone can create a free account); they are never shown to visitors who are not signed in or to search engines."
+                : "Names are shown only to signed-in accounts that have been given access."}{" "}
+              We never show a category beside a name, but a rank shown with a name can be looked up in MCC&apos;s public
               allotment results, which Seatora also shows and which list each rank&apos;s seat and candidate category, PwD included.
             </p>
             <p className="mt-2">
-              If your name is listed and you want it removed, email us{mail && <> at {mail}</>}. We will hide it from the site and keep it
-              hidden when the lists are refreshed.
+              If your name is listed and you want it hidden, email us{mail && <> at {mail}</>} with your name and college, or use
+              {" "}<strong>Hide</strong> beside it on the Residents pages. We will hide it from the site for every year and course at that
+              college and keep it hidden when the lists are refreshed.
             </p>
           </section>
           <section>

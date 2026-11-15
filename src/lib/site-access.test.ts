@@ -1,10 +1,10 @@
 import { expect, it } from "vitest";
-import { ACCESS_MAX_AGE_S, accessCookie, accessCookieUser, inviteMatches, isAllowed, parseAllowlist, safeNext, siteGate } from "./site-access";
+import { ACCESS_MAX_AGE_S, accessCookie, accessCookieUser, inviteMatches, isAllowed, isMember, openAccess, parseAllowlist, safeNext, siteGate } from "./site-access";
 
 const secret = "s".repeat(32) + "-correct-horse";
 const allowed = "her@seatora.test";
-const keyOf = (s: string, a: string) => {
-  const gate = siteGate(s, a, true);
+const keyOf = (s: string, a: string, open = false) => {
+  const gate = siteGate(s, a, true, open);
   if (gate.state !== "on") throw new Error("gate not on");
   return gate.key;
 };
@@ -21,15 +21,31 @@ it("parses the allowlist: trimmed, lowercased, no empties, deduplicated, sorted"
 });
 
 it("is off only in development with neither variable set, and fails closed otherwise", () => {
-  expect(siteGate("", "", false)).toEqual({ state: "off" });
-  expect(siteGate("", "", true)).toEqual({ state: "closed" });
-  expect(siteGate(secret, "", false)).toEqual({ state: "closed" }); // no allowlist
-  expect(siteGate(secret, " , ", true)).toEqual({ state: "closed" });
-  expect(siteGate("", allowed, false)).toEqual({ state: "closed" }); // no secret
-  expect(siteGate("s".repeat(31), allowed, false)).toEqual({ state: "closed" }); // too short
-  expect(siteGate(secret, ` ${allowed.toUpperCase()} `, true)).toEqual({ state: "on", key: `${secret}|${allowed}`, allowlist: [allowed] });
+  expect(siteGate("", "", false, false)).toEqual({ state: "off" });
+  expect(siteGate("", "", true, false)).toEqual({ state: "closed" });
+  expect(siteGate(secret, "", false, false)).toEqual({ state: "closed" }); // no allowlist
+  expect(siteGate(secret, " , ", true, false)).toEqual({ state: "closed" });
+  expect(siteGate("", allowed, false, false)).toEqual({ state: "closed" }); // no secret
+  expect(siteGate("s".repeat(31), allowed, false, false)).toEqual({ state: "closed" }); // too short
+  expect(siteGate(secret, ` ${allowed.toUpperCase()} `, true, false)).toEqual({ state: "on", key: `${secret}|${allowed}`, open: false, allowlist: [allowed] });
   // Order and case don't change the key; membership does.
   expect(keyOf(secret, "b@x.test,A@x.test")).toBe(keyOf(secret, "a@x.test, b@x.test"));
+});
+
+it("open mode (SEATORA_OPEN_ACCESS=1) needs only the secret, admits every account and has its own cookie key", () => {
+  expect(openAccess("1")).toBe(true);
+  expect(openAccess(" 1 ")).toBe(true);
+  for (const raw of [undefined, "", "0", "true", "yes"]) expect(openAccess(raw)).toBe(false);
+  expect(siteGate(secret, "", true, true)).toEqual({ state: "on", key: `${secret}|*open*`, open: true, allowlist: [] });
+  expect(siteGate("", "", false, true)).toEqual({ state: "closed" }); // no secret: closed, even in development
+  expect(siteGate("s".repeat(31), allowed, true, true)).toEqual({ state: "closed" });
+  // Switching the mode voids every cookie, both ways.
+  expect(keyOf(secret, allowed, true)).not.toBe(keyOf(secret, allowed, false));
+  expect(keyOf(secret, allowed, true)).toBe(keyOf(secret, "", true));
+  // Membership: anyone when open, else only the allowlist.
+  expect(isMember("someone@seatora.test", true, [])).toBe(true);
+  expect(isMember("someone@seatora.test", false, [allowed])).toBe(false);
+  expect(isMember(" HER@seatora.test", false, [allowed])).toBe(true);
 });
 
 it("issues a cookie bound to one user that lasts 30 days and dies on tampering or a new secret or allowlist", async () => {

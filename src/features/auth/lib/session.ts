@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { ACCESS_COOKIE, ACCESS_MAX_AGE_S, accessCookie, accessCookieUser, isAllowed, parseAllowlist, siteGate } from "@/lib/site-access";
+import { ACCESS_COOKIE, ACCESS_MAX_AGE_S, accessCookie, accessCookieUser, isAllowed, isMember, parseAllowlist, siteGate } from "@/lib/site-access";
 
 const COOKIE = "medpath_session";
 /** Readable by JS so the static header can show "Account". Carries no secret; auth uses COOKIE only. */
@@ -13,8 +13,8 @@ const MAX_AGE_S = ACCESS_MAX_AGE_S; // 30 days, like the access cookie
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 /**
- * Creates a session for the user and sets the cookie. The DB only ever sees the token's hash. An allowlisted user also
- * gets the seatora_access cookie that src/middleware.ts checks (only while the gate is on).
+ * Creates a session for the user and sets the cookie. The DB only ever sees the token's hash. A member (anyone in open
+ * mode, else an allowlisted user) also gets the seatora_access cookie that src/middleware.ts checks (only while the gate is on).
  */
 export async function createSession({ id: userId, email }: { id: string; email: string }) {
   const token = randomBytes(32).toString("base64url");
@@ -35,7 +35,7 @@ export async function createSession({ id: userId, email }: { id: string; email: 
     maxAge: MAX_AGE_S,
   });
   const gate = siteGate();
-  if (gate.state === "on" && isAllowed(email, gate.allowlist)) {
+  if (gate.state === "on" && isMember(email, gate.open, gate.allowlist)) {
     (await cookies()).set(ACCESS_COOKIE, await accessCookie(gate.key, userId), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -47,8 +47,8 @@ export async function createSession({ id: userId, email }: { id: string; email: 
 }
 
 /**
- * The signed-in user, or null. Expired sessions are treated as signed out, and so are accounts not on the allowlist:
- * only allowlisted accounts can sign in, so this covers sessions from before the lock or an email since removed.
+ * The signed-in user, or null. Expired sessions are treated as signed out, and so (unless SEATORA_OPEN_ACCESS=1) are
+ * accounts not on the allowlist: only members can sign in, so this covers sessions from before the lock or an email since removed.
  */
 export async function getCurrentUser() {
   const token = (await cookies()).get(COOKIE)?.value;
@@ -63,7 +63,7 @@ export async function getCurrentUser() {
     await db.session.deleteMany({ where: { userId: session.userId, expiresAt: { lt: new Date() } } });
     return null;
   }
-  return isAllowed(session.user.email) ? session.user : null;
+  return isMember(session.user.email) ? session.user : null;
 }
 
 /** This browser's session id (the token's hash), so a password change can keep it and delete the others. */
@@ -83,7 +83,7 @@ export async function deleteSession() {
 
 /**
  * Decide access, checked on the server (defense in depth behind src/middleware.ts): a valid access cookie, and a signed-in
- * (so still allowlisted) user who is that cookie's user. False whenever the gate isn't on, even in development.
+ * (so still a member) user who is that cookie's user. False whenever the gate isn't on, even in development.
  */
 export async function hasSiteAccess() {
   const gate = siteGate();
@@ -115,8 +115,8 @@ export async function requireDecideAccess(next = "/decide") {
 }
 
 /**
- * The owner reads and triages feature requests (features/requests): a signed-in (so allowlisted) user whose email is on
- * SEATORA_OWNER_EMAILS (comma-separated, read like the allowlist). Unset or empty: nobody.
+ * The owner reads and triages feature requests (features/requests): a signed-in user whose email is on
+ * SEATORA_OWNER_EMAILS (comma-separated, read like the allowlist). Unset or empty: nobody. Open access changes nothing here.
  */
 export async function isOwner() {
   const owners = parseAllowlist(process.env.SEATORA_OWNER_EMAILS);

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { LogoMark } from "@/components/layout/logo";
 import { legalLinks } from "@/components/layout/site-footer";
+import { business } from "@/config/business";
 import { EcgLine } from "@/components/home-v2/ecg-line";
 import { RankCard } from "@/components/home-v2/rank-card";
 import { Roster } from "@/components/home-v2/roster";
@@ -118,6 +119,7 @@ export default function HomeV2() {
               <Link key={l.href} href={l.href} className="inline-flex min-h-11 items-center hover:text-foreground">{l.label}</Link>
             ))}
           </nav>
+          <span className="font-mono text-xs">© {new Date().getFullYear()}{business.sellerName && ` ${business.sellerName}`}</span>
         </div>
       </footer>
     </>

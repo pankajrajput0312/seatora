@@ -1,5 +1,5 @@
-// Access gate (src/middleware.ts): /decide and /api/v1 need a signed-in account on SEATORA_ALLOWED_EMAILS, proven at the
-// edge by the seatora_access cookie that sign-in sets. Web Crypto only, so this runs in the Edge middleware and in Node
+// Access gate (src/middleware.ts): /decide and /api/v1 need a signed-in account (any account with SEATORA_OPEN_ACCESS=1,
+// else one on SEATORA_ALLOWED_EMAILS), proven at the edge by the seatora_access cookie that sign-in sets. Web Crypto only, so this runs in the Edge middleware and in Node
 // tests alike. See docs/ARCHITECTURE.md "Access gate".
 
 export const ACCESS_COOKIE = "seatora_access";
@@ -11,23 +11,36 @@ export function parseAllowlist(raw: string | undefined) {
   return [...new Set((raw ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean))].sort();
 }
 
+/** SEATORA_OPEN_ACCESS=1: the site is open to everyone: anyone may sign up (no invite code), every account gets Decide. */
+export const openAccess = (raw = process.env.SEATORA_OPEN_ACCESS) => raw?.trim() === "1";
+
 export const isAllowed = (email: string, allowlist = parseAllowlist(process.env.SEATORA_ALLOWED_EMAILS)) =>
   allowlist.includes(email.trim().toLowerCase());
 
-/** "off": development with neither variable set (private paths open). "closed": private paths are always denied. */
-export type SiteGate = { state: "off" } | { state: "closed" } | { state: "on"; key: string; allowlist: string[] };
+/**
+ * "off": development with neither variable set (private paths open). "closed": private paths are always denied.
+ * "on" with `open`: every signed-in account gets in (SEATORA_OPEN_ACCESS=1, needs only the secret), else the allowlist's.
+ */
+export type SiteGate = { state: "off" } | { state: "closed" } | { state: "on"; key: string; open: boolean; allowlist: string[] };
 
 export function siteGate(
   secret = process.env.SITE_ACCESS_SECRET,
   allowed = process.env.SEATORA_ALLOWED_EMAILS,
   production = process.env.NODE_ENV === "production",
+  open = openAccess(),
 ): SiteGate {
   const allowlist = parseAllowlist(allowed);
-  // The allowlist is part of the HMAC key, so changing it voids every cookie.
-  if (secret && secret.length >= MIN_SECRET_LENGTH && allowlist.length) return { state: "on", key: `${secret}|${allowlist.join(",")}`, allowlist };
+  const strong = !!secret && secret.length >= MIN_SECRET_LENGTH;
+  // The mode and allowlist are part of the HMAC key, so switching either voids every cookie.
+  if (strong && open) return { state: "on", key: `${secret}|*open*`, open, allowlist };
+  if (strong && allowlist.length) return { state: "on", key: `${secret}|${allowlist.join(",")}`, open, allowlist };
   // Half-configured (or a short secret) is a mistake: fail closed even in development.
-  return secret || allowlist.length || production ? { state: "closed" } : { state: "off" };
+  return secret || allowlist.length || open || production ? { state: "closed" } : { state: "off" };
 }
+
+/** May this account sign in and use Decide: any account in open mode, else one on the allowlist. */
+export const isMember = (email: string, open = openAccess(), allowlist = parseAllowlist(process.env.SEATORA_ALLOWED_EMAILS)) =>
+  open || isAllowed(email, allowlist);
 
 const enc = new TextEncoder();
 

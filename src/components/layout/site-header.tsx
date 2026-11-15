@@ -27,7 +27,7 @@ export function SiteHeader() {
               <AuthLink />
             </Button>
             <Button asChild size="sm">
-              <Link href="/pricing">Get Seatora — ₹499</Link>
+              <Link href="/pricing">Get Seatora — Free</Link>
             </Button>
           </div>
           <MobileNav />

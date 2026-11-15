@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/features/auth/lib/password";
-import { freshIp, hasInvite, invited, signIn, signUpOrIn } from "./auth";
+import { freshIp, hasInvite, invited, openAccess, signIn, signUpOrIn } from "./auth";
 
 // No waitlist test: the landing page has no waitlist form (the gateway-ready site). Writes to the database: the extra
 // accounts here are @seatora.test and deleted afterwards (and any waitlist row of theirs). The
@@ -33,6 +33,21 @@ test("landing page renders key sections", async ({ page }) => {
   for (const id of new Set(hashes)) await expect(page.locator(`#${id}`), `#${id}`).toBeAttached();
 });
 
+test("the Season Pass shows as free: ₹0, ₹499 struck, a free sign-up, and the policy links", async ({ page }) => {
+  await page.goto("/pricing");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Seatora NEET PG 2026 Season Pass");
+  await expect(page.locator("main s").first()).toHaveText("₹499");
+  await expect(page.getByText("Was ₹499, now free").first()).toBeAttached();
+  await expect(page.locator('main a[href="/signup"]', { hasText: "Create free account" })).toHaveCount(2);
+  await expect(page.locator('main a[href^="mailto:"]')).toHaveCount(0);
+  await expect(page.locator("header a", { hasText: "Get Seatora — Free" }).first()).toBeAttached();
+  for (const href of ["/terms", "/privacy", "/refund-policy", "/shipping-policy", "/contact"]) await expect(page.locator(`footer a[href="${href}"]`)).toHaveCount(1);
+  for (const path of ["/", "/pricing", "/terms", "/refund-policy", "/shipping-policy", "/about", "/v2"]) {
+    await page.goto(path);
+    await expect(page.locator("body"), path).not.toContainText(/\b(beta|waitlist|early access|demo|coming soon|invite-only|invitation only)\b/i, { useInnerText: true });
+  }
+});
+
 test("resident finder takes a rank and shows hospitals or an honest empty state", async ({ page }) => {
   await page.goto("/");
   const finder = page.locator("#preview");
@@ -45,6 +60,7 @@ test("resident finder takes a rank and shows hospitals or an honest empty state"
 
 test("sign-up needs the invited email and the invite code; nothing is created otherwise", async ({ page }) => {
   needsInvite();
+  test.skip(openAccess, "open access: sign-up needs no invite (e2e/open-access.spec.ts)");
   const outsider = testEmail("outsider");
   const fill = async (email: string, invite: string, password = "a-long-password") => {
     await page.getByLabel("Name").fill("Test Aspirant");
@@ -157,7 +173,7 @@ test("change password: checks the current one, keeps this session, signs out the
   }
 });
 
-/** An account that isn't on the allowlist: its right password says "no access", which a locked account never says. */
+/** An account that isn't on the allowlist (invite only): its right password says "no access", which a locked account never says. */
 async function outsiderAccount() {
   const email = testEmail("lock");
   made.push(email);
@@ -168,8 +184,10 @@ async function outsiderAccount() {
 test("an account locks after 5 failed sign-ins", async ({ page }) => {
   needsDb();
   const email = await outsiderAccount();
-  await signIn(page, email, "a-long-password");
-  await expect(alert(page)).toContainText("This account doesn't have access.");
+  if (!openAccess) {
+    await signIn(page, email, "a-long-password");
+    await expect(alert(page)).toContainText("This account doesn't have access.");
+  } // (open access: every account is a member, so the right password would sign in; the lock below still refuses it)
   for (let i = 0; i < 5; i++) {
     await signIn(page, email, `wrong-${i}`);
     await expect(alert(page)).toContainText("Incorrect email or password");

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AuthForm } from "@/features/auth/components/auth-form";
 import { AuthShell } from "@/features/auth/components/auth-shell";
 import { hasSiteAccess } from "@/features/auth/lib/session";
-import { safeNext } from "@/lib/site-access";
+import { openAccess, safeNext } from "@/lib/site-access";
 
 export const metadata: Metadata = { title: "Sign in", robots: { index: false } };
 
@@ -21,7 +21,7 @@ export default async function LoginPage({ searchParams }: Props) {
           The planner is unavailable right now. Please try again later.
         </p>
       )}
-      <AuthForm mode="signin" next={to} />
+      <AuthForm mode="signin" next={to} open={openAccess()} />
     </AuthShell>
   );
 }

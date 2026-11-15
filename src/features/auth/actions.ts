@@ -5,11 +5,12 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { allow, isLimited, reset } from "@/lib/rate-limit";
-import { inviteMatches, isAllowed, safeNext } from "@/lib/site-access";
+import { inviteMatches, isAllowed, isMember, openAccess, parseAllowlist, safeNext } from "@/lib/site-access";
 import { dummyHash, hashPassword, verifyPassword } from "./lib/password";
 import { createSession, currentSessionId, deleteSession, getCurrentUser } from "./lib/session";
 import {
   changePasswordSchema,
+  openSignUpSchema,
   signInSchema,
   signUpSchema,
   type ChangePasswordInput,
@@ -26,6 +27,8 @@ const PAIR_LIMIT = 5;
 const PAIR_WINDOW_MS = 15 * 60 * 1000;
 const ACCOUNT_LIMIT = 20;
 const LOCK_MS = 15 * 60 * 1000;
+// Accounts created per IP per hour (on top of rateLimited): sign-up is open to anyone with SEATORA_OPEN_ACCESS=1.
+const SIGNUPS_PER_HOUR = 5;
 
 async function clientIp() {
   const h = await headers();
@@ -57,15 +60,24 @@ async function recordFailure(pairKey: string, userId?: string) {
   }
 }
 
-// Invite-only: one allowlisted account (SEATORA_ALLOWED_EMAILS) may sign up and sign in. Sign-up also needs
-// SEATORA_INVITE_CODE, since nothing verifies the email. `next` is ?next= from the page.
+// SEATORA_OPEN_ACCESS=1: anyone may sign up, no invite code; an owner address (SEATORA_OWNER_EMAILS) can't be claimed,
+// since nothing verifies the email. Otherwise invite-only: an allowlisted account (SEATORA_ALLOWED_EMAILS) with
+// SEATORA_INVITE_CODE. Either way at most SIGNUPS_PER_HOUR tries reach the database per IP. `next` is ?next= from the page.
 export async function signUp(input: SignUpInput, next?: string): Promise<AuthResult> {
   if (await rateLimited("signup")) return { ok: false, error: "Too many attempts. Please wait a minute." };
-  const parsed = signUpSchema.safeParse(input);
+  const open = openAccess();
+  const parsed = open ? openSignUpSchema.safeParse(input) : signUpSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  // One message for both, so it doesn't reveal which emails are allowlisted.
-  if (!isAllowed(parsed.data.email) || !(await inviteMatches(parsed.data.invite))) {
+  if (open) {
+    if (isAllowed(parsed.data.email, parseAllowlist(process.env.SEATORA_OWNER_EMAILS))) {
+      return { ok: false, error: "This email can't be used to sign up. Sign in instead." };
+    }
+  } else if (!isAllowed(parsed.data.email) || !(await inviteMatches("invite" in parsed.data ? parsed.data.invite : undefined))) {
+    // One message for both, so it doesn't reveal which emails are allowlisted.
     return { ok: false, error: "That email and invite code don't match an invite. Buy the Season Pass on the Pricing page to get an access code." };
+  }
+  if (!allow(`signup-hour:${await clientIp()}`, SIGNUPS_PER_HOUR, 60 * 60 * 1000)) {
+    return { ok: false, error: "Too many accounts from this network. Please try again in an hour." };
   }
 
   try {
@@ -106,7 +118,7 @@ export async function signIn(input: SignInInput, next?: string): Promise<AuthRes
       await db.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null } });
     }
     // Only after the password checks out, so this reveals nothing to a guesser.
-    if (!isAllowed(user.email)) return { ok: false, error: "This account doesn't have access." };
+    if (!isMember(user.email)) return { ok: false, error: "This account doesn't have access." };
     await createSession(user);
   } catch (err) {
     console.error("signIn failed", err);
