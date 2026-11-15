@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Fragment } from "react";
-import { Download, LayoutGrid } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CSV_MAX_ROWS } from "@/features/decide/api";
 import { AppPage } from "@/features/decide/components/app-page";
+import { CsvLink, toolbarRow } from "@/features/decide/components/csv-link";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HistoryNote, PageHead } from "@/features/decide/components/bits";
@@ -18,13 +18,14 @@ import { PAST_ROUNDS, parseSeatsParams, seatCategories, seatSorts, seatsView, ty
 import { SeatCards } from "@/features/decide/components/seats/seat-cards";
 import { listTitle, SeatListPicker, SeatTable, seatKindNote } from "@/features/decide/components/seats/seat-lists";
 import { SeatMatrix, type ClosingYear, type MatrixRow, type SeatGroup } from "@/features/decide/components/seats/seat-matrix";
-import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { ViewField, ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { chosenView } from "@/features/decide/server/view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, MoreFilters, Pager, rangeLabel, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { reachWindow } from "@/features/decide/lib/reach";
-import { termChips, termMoreOpen } from "@/features/decide/lib/term-filters";
+import { termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, type Profile } from "@/features/decide/profile";
 import { allotmentTrends, getMeta, LATEST_YEAR, PAST_YEARS, YEARS } from "@/features/decide/service";
 import { fmtDay, listDay } from "@/features/decide/lib/format";
@@ -67,7 +68,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
     <AppPage className="grid grid-cols-1 gap-6">
       <PageHead
         title="Seats"
-        about={<>MCC&apos;s seat lists for a round, as each PDF printed them: the seat matrix (every list of the round with every closing rank, fee and bond per row), one list, or the round&apos;s lists side by side.{profile && " Filtered to the courses, quotas, states and seat categories in your profile."}</>}
+        about={<>MCC&apos;s seat lists for a round, as each PDF printed them: the seat matrix (every list of the round with every closing rank, fee and bond per row), one list, or the round&apos;s lists side by side.{profile && " Filtered to the courses, quotas, states, seat categories and fee and bond caps in your profile."}</>}
       />
       <SubTabs label="Seats" current={f.tab} items={[{ key: "matrix", label: "Seat lists", href: L.to("/decide/seats", { tab: "matrix" }) }, { key: "trends", label: "Allotment trends", href: L.to("/decide/seats", { tab: "trends" }) }]} />
       {f.tab === "trends" ? <Trends profile={profile} page={f.page} L={L} /> : <SeatLists f={f} profile={profile} params={params} L={L} />}
@@ -112,6 +113,9 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
     f.st.length > 0 && { label: listed("State", f.st), href: here({ st: null }) },
     matrix && f.has.length > 0 && { label: `${round}: ${f.has.map((k) => hasWords[k].toLowerCase()).join(" or ")}`, href: here({ has: null }) },
     f.scat && { label: f.scat === "all" ? "All seat categories" : `${f.scat} seats`, href: here({ scat: null }) },
+    // Her profile's caps apply here as on Options (find-seats.ts seatsView); "any" lifts one on this page.
+    profile?.maxFeeLakh != null && f.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: here({ maxfee: "any" }) },
+    profile?.maxBondYears != null && f.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: here({ bondyrs: "any" }) },
     ...termChips(f).map((c) => ({ label: c.label, href: here({ [c.key]: null }) })),
   ].filter((x) => !!x);
   const strong = (t: string) => <span className="font-semibold">{t}</span>;
@@ -175,6 +179,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         {!matrix && <input type="hidden" name="view" value={f.view} />}
         {allRounds && <input type="hidden" name="rounds" value="all" />}
         {f.nohist && <input type="hidden" name="nohist" value="1" />}
+        <ViewField />
         {(["inst", "course", "squota"] as const).map((k) => f[k] && <input key={k} type="hidden" name={k} value={f[k]} />)}
         <Fragment key={params.toString()}>
           <label className="min-w-56 flex-1">
@@ -208,7 +213,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
               noneNote={`None ticked means every row. Ticked: rows with seats in any ticked ${round} list.`}
             />
           )}
-          <TermFilterControls f={f} />
+          <TermFilterControls f={f} caps={profile} />
           <label className="more-filter w-72 max-w-full">
             <span className="sr-only">Seat category</span>
             <select name="scat" defaultValue={f.scat ?? ""} className={control}>
@@ -244,7 +249,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         </p>
       )}
       <div className="grid gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className={toolbarRow}>
           <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
             {matrix ? (
               <>
@@ -263,22 +268,12 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             )}
             {r.total > 0 && <> · rows <span className="numeric">{rangeLabel(r)}</span></>}
           </p>
-          <div className="flex flex-wrap items-center gap-2">
-            {r.total > 0 && <ViewToggle page="seats" />}
-            {r.total > CSV_MAX_ROWS ? (
-              <p className="text-sm text-muted-foreground">
-                Narrow the filters to download a CSV (<span className="numeric">{formatRank(CSV_MAX_ROWS)}</span> rows at most).
-              </p>
-            ) : (
-              r.total > 0 && (
-                <Button asChild variant="secondary">
-                  <a href={L.with("/api/v1/seats/export", { tab: null, page: null })} download>
-                    <Download className="size-4" aria-hidden />CSV<span className="sr-only"> of {matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row</span>
-                  </a>
-                </Button>
-              )
-            )}
-          </div>
+          {r.total > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <ViewToggle page="seats" />
+              <CsvLink href={L.with("/api/v1/seats/export", { tab: null, page: null })} what={`${matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row`} total={r.total} />
+            </div>
+          )}
         </div>
         {r.unknownTerms > 0 && f.nd !== "keep" && (
           <p className="text-sm text-muted-foreground">
@@ -301,7 +296,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         <EmptyState
           title="No seats match"
           description={`Nothing in ${several ? `the ${round} lists` : "this list"} matches these filters. Pick another list, or widen the filters.`}
-          href={here({ list: list.key, inst: null, course: null, squota: null, sp: null, deg: null, c: null, quota: profile ? meta.quotas.join(",") : null, st: null, q: null, scat: "all", nohist: null, has: null, sort: null, ...noTerms })}
+          href={here({ list: list.key, inst: null, course: null, squota: null, sp: null, deg: null, c: null, quota: profile ? meta.quotas.join(",") : null, st: null, q: null, scat: "all", nohist: null, has: null, sort: null, ...noTerms, maxfee: "any", bondyrs: "any" })}
           action={several ? "Show every seat in these lists" : "Show every seat in this list"}
         />
       ) : matrix ? (
@@ -315,6 +310,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
           <HistoryNote more={closingNote} />
           <ViewPanes
             page="seats"
+            view={await chosenView(params, "seats")}
             cards={<SeatCards rows={r.rows} list={list} lists={several ? roundLists : [list]} ranked={!!profile} L={L} title={caption} />}
             table={<SeatTable rows={r.rows} lists={r.lists} current={list.key} sort={sort} ranked={!!profile} L={L} caption={caption} />}
           />

@@ -60,17 +60,35 @@ describe("filters", () => {
     expect(termsPass(known, null, { types: ["govt"], keepUnknown: true })).toBe(false);
   });
 
-  it("fee per year: year 1 at most; a range by its highest; an NBEMS maximum counts as the cap it is", () => {
+  it("fee per year: year 1 at most; a range by its highest; an NBEMS maximum passes under the cap, is unknown over it", () => {
     expect(termVerdict(known, null, { maxFee: 200000 })).toBe("pass");
     expect(termVerdict(known, null, { maxFee: 199999 })).toBe("fail");
     expect(termVerdict(terms(fig(500000, { min: 100000 }), null), null, { maxFee: 300000 })).toBe("fail");
-    expect(termVerdict(terms(fig(125000, { kind: "maximum" }), null), null, { maxFee: 200000 })).toBe("pass");
+    const ceiling = terms(fig(125000, { kind: "maximum" }), null);
+    expect(termVerdict(ceiling, null, { maxFee: 200000 })).toBe("pass");
+    // The most NBEMS allows is not her fee: it may be lower. Left out unless "Include not declared".
+    expect(termVerdict(ceiling, null, { maxFee: 100000 })).toBe("unknown");
+    expect(termsPass(ceiling, null, { maxFee: 100000, keepUnknown: true })).toBe(true);
+    // Seatora took the GST off a declared ₹1,47,500: a cap between the two is unknown; under both a fail, over both a pass.
+    const gst = terms(fig(125000, { declared: 147500 }), null);
+    expect(termVerdict(gst, null, { maxFee: 130000 })).toBe("unknown");
+    expect(termVerdict(gst, null, { maxFee: 120000 })).toBe("fail");
+    expect(termVerdict(gst, null, { maxFee: 150000 })).toBe("pass");
   });
 
-  it("stipend per month: year 1 at least; a range by its lowest", () => {
+  it("stipend per month: year 1 at least; a range by its lowest; an NBEMS minimum passes over the floor, is unknown under it", () => {
     expect(termVerdict(known, null, { minStipend: 100000 })).toBe("pass");
     expect(termVerdict(known, null, { minStipend: 100001 })).toBe("fail");
     expect(termVerdict(terms(null, fig(120000, { min: 60000 })), null, { minStipend: 80000 })).toBe("fail");
+    const floor = terms(null, fig(43000, { kind: "minimum" }));
+    expect(termVerdict(floor, null, { minStipend: 40000 })).toBe("pass");
+    expect(termVerdict(floor, null, { minStipend: 60000 })).toBe("unknown");
+    // A declared figure under the floor is known: it fails.
+    expect(termVerdict(terms(null, fig(35000, { below: true })), null, { minStipend: 40000 })).toBe("fail");
+    // A basic stipend "+ DA" under the floor: the pay with DA may meet it, so unknown; over it, it passes.
+    const da = terms(null, fig(55200, { plusDa: true }));
+    expect(termVerdict(da, null, { minStipend: 60000 })).toBe("unknown");
+    expect(termVerdict(da, null, { minStipend: 40000 })).toBe("pass");
   });
 
   it("bond years at most; No bond (0) only where a record says no bond", () => {
@@ -112,16 +130,17 @@ describe("unknown values", () => {
     expect(termVerdict(words, null, { maxBondYears: 3 })).toBe("unknown");
     expect(termVerdict(words, null, { maxBondInr: 5000000 })).toBe("unknown");
     expect(termVerdict(terms(null, null, { status: "not_declared", text: "Not clear" }), null, { maxBondYears: 1 })).toBe("unknown");
-    // No bond, but a state law's service may still apply: its years and ₹ are not known.
-    const caveat = terms(null, null, { status: "none", basis: "document", years: null, caveat: "A state law's service may apply" });
+    // No bond, but a state law's service may still apply (server/terms.ts: not_declared with its caveat): years and ₹ not known.
+    const caveat = terms(null, null, { status: "not_declared", years: null, text: "No bond; Karnataka law: 1 yr service may apply", caveat: "Karnataka law: 1 yr service may apply" });
     expect(termVerdict(caveat, null, { maxBondInr: 100000 })).toBe("unknown");
   });
 
   it("No bond never lists an unknown bond, ticked or not; a no-bond record where a state law may apply is unknown", () => {
     expect(termVerdict(blank, null, { maxBondYears: 0 })).toBe("fail");
     expect(termsPass(blank, null, { maxBondYears: 0, keepUnknown: true })).toBe(false);
-    const caveat = terms(null, null, { status: "none", basis: "document", years: null, caveat: "A state law's service may apply" });
+    const caveat = terms(null, null, { status: "not_declared", years: null, text: "No bond; Karnataka law: 1 yr service may apply", caveat: "Karnataka law: 1 yr service may apply" });
     expect(termVerdict(caveat, null, { maxBondYears: 0 })).toBe("unknown");
+    expect(termVerdict(caveat, null, { maxBondYears: 1 })).toBe("unknown");
     expect(termsPass(caveat, null, { maxBondYears: 0 })).toBe(false);
     expect(termsPass(caveat, null, { maxBondYears: 0, keepUnknown: true })).toBe(true);
   });

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
+import { toolbarRow } from "@/features/decide/components/csv-link";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HistoryNote, PageHead, Provisional } from "@/features/decide/components/bits";
@@ -9,15 +10,16 @@ import { InfoTip } from "@/features/decide/components/info-tip";
 import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
 import { bigClosing, cardMeta } from "@/features/decide/components/ranks/rank-cards";
 import { ResultCard, ResultCards } from "@/features/decide/components/result-card";
-import { TermStatCells } from "@/features/decide/components/stat-cells";
+import { StatHead, TermStatCells } from "@/features/decide/components/stat-cells";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { chosenView } from "@/features/decide/server/view";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
-import { anyTermFilter, readTermFilters, splitByTerms, termChips, termMoreOpen } from "@/features/decide/lib/term-filters";
+import { statKeys } from "@/features/decide/lib/stat-format";
+import { anyTermFilter, readTermFilters, splitByTerms, termChips, termMoreOpen, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
 import { baseCategories, roundLabel, rounds, type Round } from "@/features/decide/types";
@@ -114,7 +116,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const profile = profileFromParams(params);
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
-  const tp = readTermFilters(params);
+  const tp = readTermFilters(params, profile);
   const meta = await getMeta();
   // Default: one of her courses (when she named any), MD/MS first, then DNB, then the rest (meta sorts Diploma first).
   const order = (d: string) => (["MD", "MS", "DNB"].includes(d) ? ["MD", "MS", "DNB"].indexOf(d) : 3);
@@ -154,7 +156,12 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const sortHref = (key: string) => L.with("/decide/last-ranks", { sort: key, dir: f.sort === key && f.dir === "desc" ? "asc" : "desc", page: null });
   const pinned = at >= 0 ? lr.rows[at] : null;
   const mcc = (r: OptionRow) => info.get(r.college.key)?.mccProfileUrl;
-  const chips = termChips(tp.params).map((c) => ({ label: c.label, href: L.with("/decide/last-ranks", { [c.key]: null, page: null }) }));
+  const chips = [
+    // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
+    ...(profile?.maxFeeLakh != null && tp.params.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: L.with("/decide/last-ranks", { maxfee: "any", page: null }) }] : []),
+    ...(profile?.maxBondYears != null && tp.params.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: L.with("/decide/last-ranks", { bondyrs: "any", page: null }) }] : []),
+    ...termChips(tp.params).map((c) => ({ label: c.label, href: L.with("/decide/last-ranks", { [c.key]: null, page: null }) })),
+  ];
   const clear = L.with("/decide/last-ranks", { ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
   const about = (
     <>
@@ -179,7 +186,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
               </th>
             ))}
             {/* The course's terms after the closing ranks (the page's figures come first; the cards lead with both). */}
-            {statKeys.map((k) => <th key={k} rowSpan={2} scope="col" className="px-2 py-2 text-right text-xs font-semibold">{statLabel[k]}</th>)}
+            {statKeys.map((k) => <th key={k} rowSpan={2} scope="col" className="px-2 py-2 text-right text-xs font-semibold whitespace-nowrap"><StatHead k={k} /></th>)}
           </tr>
           <tr className="text-xs text-muted-foreground">
             {cols.flatMap((c) =>
@@ -217,7 +224,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                     </td>
                   )),
                 )}
-                <TermStatCells t={r.fees} variant="table" short of={`${r.college.name}, ${courseLabel}`} tdClassName="px-2 py-2" />
+                <TermStatCells t={r.fees} variant="compact" of={`${r.college.name}, ${courseLabel}`} tdClassName="px-2 py-2" />
               </tr>
             );
           })}
@@ -236,7 +243,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         <Field label="Seat category"><Select name="lcat" value={category} options={categories.map((c) => ({ value: c, label: c }))} /></Field>
         <Field label="Quota" className="more-filter"><Select name="lquota" value={quota} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
         <Field label="From year" className="more-filter"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
-        <TermFilterControls f={tp.params} />
+        <TermFilterControls f={tp.params} caps={profile} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
 
@@ -245,7 +252,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
           {hidden ? (
             <>
               {inst.name} doesn&apos;t match these filters.{" "}
-              <Link href={clear} className={`${smallLink} text-sky`}>Show it without them</Link>
+              <Link href={L.with("/decide/last-ranks", { ctype: null, maxfee: "any", minstip: null, bondyrs: "any", maxbond: null, maxleave: null, nd: null, page: null })} className={`${smallLink} text-sky`}>Show it without them</Link>
             </>
           ) : (
             <>
@@ -257,7 +264,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         </p>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={toolbarRow}>
         {/* The results' sources here, before the panes: MCC results are numbered first (the cards' term (i)s come after). */}
         <div className="grid gap-0.5">
           <p id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
@@ -285,10 +292,11 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       )}
 
       {lr.total === 0 ? (
-        <EmptyState title={filtered && all?.total ? "No options match these filters" : `No ${category}-seat closings for ${courseLabel}${quota ? `, ${quota}` : ""}`} description="Try another seat category, quota or filter." href={L.to("/decide/last-ranks", { course: course.slug })} />
+        <EmptyState title={filtered && all?.total ? "No options match these filters" : `No ${category}-seat closings for ${courseLabel}${quota ? `, ${quota}` : ""}`} description="Try another seat category, quota or filter." href={L.to("/decide/last-ranks", { course: course.slug, maxfee: "any", bondyrs: "any" })} />
       ) : (
         <ViewPanes
           page={VIEW}
+          view={await chosenView(params, VIEW)}
           cards={
             <ResultCards title={caption} hideTitle>
               {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} course={courseRef} mine={inst?.slug === r.college.slug} />)}

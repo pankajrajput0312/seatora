@@ -3,7 +3,7 @@
 import { memo, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowDown, ArrowUp, Check, GripVertical, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Download, GripVertical, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -174,7 +174,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
       await navigator.clipboard.writeText(toMccText(list));
       setCopyMsg(`Copied ${n} choices in MCC order.`);
     } catch {
-      setCopyMsg("Couldn't copy. Use Download CSV or Print instead.");
+      setCopyMsg("Couldn't copy. Use CSV or Print instead.");
     }
     setTimeout(() => setCopyMsg(null), 4000);
   };
@@ -284,6 +284,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
               stat={{ label: "Choice", value: formatRank(i + 1) }}
               title={item.institute}
               href={L.institute(item.slug)}
+              external={lr?.hospital?.mccProfileUrl ? { href: lr.hospital.mccProfileUrl, label: `MCC profile: ${item.institute}` } : undefined}
               subtitle={item.course}
               meta={[item.state ?? "State not listed", lr?.hospital?.type && <TypeBadgeM type={lr.hospital.type} of={item.institute} />, lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />]}
               footer={
@@ -313,8 +314,6 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
 
   const th = cn(tbl.th, "whitespace-nowrap");
   const kindShort = { clear: "Clear", virtual: "Virtual", new: "New" } as const;
-  // A long figure ("1 + 1 = 2 years", a ₹ range) may wrap, so the five cells fit beside the names at laptop widths.
-  const statTd = "px-3! [&>span]:whitespace-normal";
   // Every row control sits in the sticky Choice cell, so a move never scrolls the table sideways; the round's seat
   // lists share one column.
   const table = (
@@ -369,7 +368,7 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
                   </td>
                 )}
                 {lr ? (
-                  <StatCellsM t={lr.fees} variant="table" of={name(item)} tdClassName={statTd} />
+                  <StatCellsM t={lr.fees} variant="table" of={name(item)} tdClassName="px-3" />
                 ) : (
                   <td colSpan={statKeys.length} className={cn(tbl.td, "text-xs text-muted-foreground")}>{fresh || failed === liveKey || !reachFor ? <Dash /> : "Loading terms…"}</td>
                 )}
@@ -400,9 +399,11 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
         </Button>
       </div>
 
+      {/* As on every results page: Cards | Table, then the CSV. */}
       <div className="flex flex-wrap items-center gap-2" data-print-hide>
+        <ViewToggle page="choices" />
+        <Button variant="secondary" disabled={!n} onClick={download} aria-label={`Download CSV of ${list.name}`}><Download className="size-4" aria-hidden />CSV</Button>
         <Button variant="secondary" disabled={!n} onClick={copy}>Copy in MCC order</Button>
-        <Button variant="secondary" disabled={!n} onClick={download}>Download CSV</Button>
         <Button variant="secondary" disabled={!n} onClick={() => window.print()}>Print</Button>
         <label className="inline-flex min-h-11 items-center gap-2 text-sm">
           Typed into the MCC portal up to #
@@ -414,7 +415,6 @@ export function ChoicesView({ reachFor }: { reachFor?: ReachFor }) {
             />
           </span>
         </label>
-        <ViewToggle page="choices" className="ml-auto" />
       </div>
       {copyMsg && <p className="text-sm" data-print-hide>{copyMsg}</p>}
       {missingTyped > 0 && (

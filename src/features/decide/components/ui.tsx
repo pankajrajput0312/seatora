@@ -9,6 +9,7 @@ import { keepProfileParams } from "../profile";
 import { FilterForm } from "./filter-form";
 import { FocusOnChange } from "./focus-item";
 import { InfoTip } from "./info-tip";
+import { ViewField } from "./view-toggle";
 
 // Shared building blocks so every Decide screen reads the same way (docs/APP_DESIGN_SYSTEM.md, "Inside-app primitives").
 
@@ -35,12 +36,13 @@ export const tbl = {
  * GET filter form that keeps the profile params (every repeated value, comma-joined). The form and its Apply button
  * stay mounted across navigations so focus stays on Apply (Enter in a field moves it there); only the fields remount
  * to show the applied values. `more`: a MoreFilters box with that `open`, kept mounted too.
- * Submitting drops `page`, so results start at page 1.
+ * Submitting drops `page`, so results start at page 1, and keeps the address's Cards | Table choice (ViewField).
  */
 export function FilterBar({ action, params, children, cols = "md:grid-cols-4", more }: { action: string; params: URLSearchParams; children: React.ReactNode; cols?: string; more?: boolean }) {
   return (
     <FilterForm action={action} scroll={false} role="search" className={cn("grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2", cols, "md:items-end")}>
       {[...keepProfileParams(params)].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+      <ViewField />
       <Fragment key={params.toString()}>{children}</Fragment>
       {more != null && <MoreFilters open={more} />}
       <Button type="submit">Apply</Button>

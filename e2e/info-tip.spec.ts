@@ -56,3 +56,24 @@ test("one collapsed Sources footer per page; a numbered ref opens it at its entr
   const ns = await footer.locator("li[id^=source-]").evaluateAll((els) => els.map((e) => Number(e.id.slice(7))));
   expect(ns).toEqual(ns.map((_, i) => i + 1));
 });
+
+test("a stat cell's (i) opens by keyboard; its source number opens the page's Sources footer at that entry", async ({ page }) => {
+  // Kokilaben's DNB fee is the NBEMS maximum: the Fee (i) says so and cites the NBEMS document by its page number.
+  await page.goto("/decide/fees?rank=42284&cat=OBC&sp=ANAESTHESIOLOGY,FAMILYMEDICINE&q=Kokilaben&layout=cards");
+  const footer = page.locator("details#page-sources");
+  await expect(footer).toBeAttached(); // client-rendered: the refs are numbered from here on
+  const btn = page.getByRole("button", { name: "About fee, Kokilaben Dhirubhai Ambani Hospital, DNB", exact: true }).filter({ visible: true }).first();
+  await btn.focus();
+  await page.keyboard.press("Enter");
+  const tip = page.getByRole("dialog", { name: "fee, Kokilaben Dhirubhai Ambani Hospital, DNB", exact: true }).filter({ visible: true });
+  await expect(tip).toBeFocused();
+  await expect(tip).toContainText("NBEMS");
+  const ref = tip.getByRole("link", { name: /^Source \d+: / }).first();
+  const n = (await ref.getAttribute("href"))!.replace("#source-", "");
+  await page.keyboard.press("Tab"); // into the panel: its first link
+  await expect(ref).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(tip).toBeHidden();
+  await expect(footer).toHaveAttribute("open", "");
+  await expect(page.locator(`#source-${n}`)).toBeFocused();
+});

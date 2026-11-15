@@ -40,11 +40,12 @@ export async function SeatSource({ list, L }: { list: SeatList | null; L: Decide
   const doc: SourceDoc = { key: `seat-list|${list.key}`, name: `${list.name}, PDF${dated ? ` (${dated})` : ""}`, url: list.url, type: "OFFICIAL" };
   return (
     <div className="grid gap-1 text-xs text-muted-foreground">
-      {/* The later and same-day notices are in the page's Sources too (the warning below stays in view). */}
-      <RegisterSources docs={[...later, ...sameDay].map((n) => ({ name: `${n.title}, ${fmtDay(n.date)}`, url: n.url, type: "OFFICIAL" as const }))} />
-      {/* gap-x-3: the (i)'s 44px hit area never covers the source number. */}
-      <p className="flex flex-wrap items-center gap-x-3">
-        <span>Seats: the {listTitle(list)} list as its PDF printed it<SourceRef doc={doc} /></span>
+      {/* The later and same-day notices are in the page's Sources too (the warning below stays in view). The page's
+          own MCC documents are numbered first (`first`), before the term documents its rows cite. */}
+      <RegisterSources first docs={[...later, ...sameDay].map((n) => ({ name: `${n.title}, ${fmtDay(n.date)}`, url: n.url, type: "OFFICIAL" as const }))} />
+      {/* gap-x-3: the (i)'s 44px hit area never covers the source number; before:top-0: nor the line above's (i) (stacked lists). */}
+      <p className="flex flex-wrap items-center gap-x-3 [&_button]:before:top-0">
+        <span>Seats: the {listTitle(list)} list as its PDF printed it<SourceRef doc={doc} first /></span>
         <InfoTip label={`the ${listTitle(list)} list`}>
           {list.name}{dated && `, ${dated}`}. Seats MCC added or removed after it are not applied here.
           {sameDay.length > 0 && <> Published the same day as the list, so it may already include {sameDay.length === 1 ? "this notice" : "these notices"}: {noticeLinks(sameDay)}.</>}{" "}
@@ -67,7 +68,8 @@ type Used = { year: number; round?: string };
  * at that document: the MCC allotment-result PDFs it draws on (one entry a year, a link a round, each Provisional while
  * MCC's result is: Source.provisional, also marked on the line) and the documents its fee, stipend, bond and penalty
  * texts come from. `used`: the years (all rounds) or year+round pairs shown; omit for every result PDF.
- * `results={false}` for blocks with no allotment numbers (fees only).
+ * `results={false}` for blocks with no allotment numbers (fees only). Its documents are the page's first Sources,
+ * wherever on the page it sits.
  */
 export async function DataSource({ used, terms, results = true }: { used?: Used[]; terms?: (Term["source"] | null | undefined)[]; results?: boolean }) {
   const meta = await getMeta();
@@ -87,7 +89,7 @@ export async function DataSource({ used, terms, results = true }: { used?: Used[
   const provisional = pdfs.filter((s) => s.provisional).sort((a, b) => b.year - a.year || rounds.indexOf(a.round) - rounds.indexOf(b.round));
   return (
     <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-      <SourceRefs docs={docs} className="" />
+      <SourceRefs docs={docs} first className="" />
       {provisional.length > 0 && (
         <span className="inline-flex items-center gap-1">
           <Provisional when />

@@ -64,6 +64,8 @@ export type FeeTableRecord = Pick<MccFeesStructured, "programme" | "seat_groups"
   fee_text_src?: MccFeesStructured["fee_text_src"] | null;
   fee_whole_course: MccFeesStructured["fee_whole_course"] | null;
   counselling_forfeit: MccFeesStructured["counselling_forfeit"] | null;
+  /** The NBEMS minimum stipend by year, where the record compares a declared one with it (below_nbems_minimum). */
+  stipend_nbems_minimum?: MccFeesStructured["stipend_nbems_minimum"] | null;
   /** The MCC quotas the record covers; absent in an older import (then every record stands for the programme). */
   quotas?: string[];
 };

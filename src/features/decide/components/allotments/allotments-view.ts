@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { pageValue, parseSearchParams, rankValue } from "../../lib/params";
 import { anyTermFilter, feeValue, termFilterLists, termFilters, termFilterShape } from "../../lib/term-filters";
+import { profileFromParams } from "../../profile";
 import { getCollege, getMeta, listAllotments } from "../../service";
 import { baseCategories, roundLabel, rounds, termLabel, type Allotment, type PrevSeat, type Source, type Term } from "../../types";
 import { collegeTypeLabel } from "../institute/college-type";
@@ -26,7 +27,7 @@ const schema = z.object({
   from: rankValue.optional(),
   to: rankValue.optional(),
   page: pageValue.default(1),
-  /** Fee, stipend, bond, leaving, college type and `nd` on each allotment's course and quota (lib/term-filters.ts; an absent cap is no cap). */
+  /** Fee, stipend, bond, leaving, college type and `nd` on each allotment's course and quota (lib/term-filters.ts; an absent fee / bond cap is her profile's). */
   ...termFilterShape,
 });
 
@@ -65,7 +66,7 @@ export async function allotmentsView(params: URLSearchParams, pageSize: number) 
     state: f.state,
     from: rankError ? undefined : f.from,
     to: rankError ? undefined : f.to,
-    terms: termFilters(f),
+    terms: termFilters(f, profileFromParams(params)),
   };
   // `unknownTerms`: the rows "Include not declared" (nd=keep) would add, i.e. left out only because a filtered figure is
   // not declared (keep is a superset: it only lets unknown values through). Counted only when that box is unticked.

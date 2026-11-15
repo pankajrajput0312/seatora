@@ -21,9 +21,11 @@ describe("without a database", () => {
 // Real import against the bundle it came from (local DATABASE_URL exported, see seats.test.ts).
 const dir = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
 type Years<T> = { years: Record<string, T> };
+// A skipped suite's body still runs (vitest collects its tests): read the bundle only when it is there.
+const read = (f: string) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8") : "[]");
 describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "score_rank.json")))("NBEMS aggregates on the real import", { timeout: 60_000 }, () => {
-  const sr: Years<{ max_marks: number; candidates: number; rows: [number, number, number, number][] }> = JSON.parse(readFileSync(join(dir, "score_rank.json"), "utf8"));
-  const mp: Years<{ cols: string[]; rows: number[][]; qualified: Record<string, number> }> = JSON.parse(readFileSync(join(dir, "merit_position.json"), "utf8"));
+  const sr: Years<{ max_marks: number; candidates: number; rows: [number, number, number, number][] }> = JSON.parse(read("score_rank.json"));
+  const mp: Years<{ cols: string[]; rows: number[][]; qualified: Record<string, number> }> = JSON.parse(read("merit_position.json"));
   const row = (r: [number, number, number, number]) => ({ score: r[0], bestRank: r[1], worstRank: r[2], count: r[3] });
 
   it("lists the years with their totals; only years with a category merit list have categories", async () => {

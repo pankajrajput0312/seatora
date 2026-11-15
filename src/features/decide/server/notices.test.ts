@@ -15,10 +15,12 @@ describe("without a database", () => {
 
 // Real import against the bundle it came from (local DATABASE_URL exported, see seats.test.ts).
 const dir = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
+// A skipped suite's body still runs (vitest collects its tests): read the bundle only when it is there.
+const read = (f: string) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8") : "[]");
 describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "notices.json")))("MCC notices on the real import", { timeout: 60_000 }, () => {
   type FileNotice = { title: string; date: string; url: string; kind: string; year: number; round: string | null };
-  const notices: FileNotice[] = JSON.parse(readFileSync(join(dir, "notices.json"), "utf8"));
-  const rs = JSON.parse(readFileSync(join(dir, "round_status.json"), "utf8"));
+  const notices: FileNotice[] = JSON.parse(read("notices.json"));
+  const rs = JSON.parse(read("round_status.json"));
 
   it("has every notice, newest first, filterable by kind, round and year", async () => {
     const all = await listNotices();

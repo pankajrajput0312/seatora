@@ -37,14 +37,14 @@ export async function withRowInfo<T extends { college: string; degree: string; s
 export const subLink = "relative inline-flex min-h-6 items-center hover:text-sky hover:underline";
 
 /**
- * The five term columns of a rank table (TermStatCells variant="table", statKeys headers): tight padding and full
- * values that wrap, so they fit beside the row's institute at about 1,024px; the last cell keeps 12px for its (i)'s
- * 44px hit area.
+ * The five term columns of a rank table (TermStatCells variant="table", statKeys headers): tight padding (the cells
+ * break only after a range's dash, the marker on its own line), so they fit beside the row's institute at about
+ * 1,024px; the last cell keeps 12px for its (i)'s 44px hit area.
  */
 export const termCol = {
   /** Bond at least 104px, so "2 years" or "No bond" never breaks beside its (i). */
   th: (k: StatKey) => `px-2 py-3 text-right text-xs font-semibold text-muted-foreground last:pr-3${k === "bond" ? " min-w-26" : ""}`,
-  td: "px-2 last:pr-3 [&>span]:whitespace-normal",
+  td: "px-2 last:pr-3",
 };
 
 /** A card's meta line: state, the type badge, beds (each left out when not known). `of`: the institute, naming the beds (i). */

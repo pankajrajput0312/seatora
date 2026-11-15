@@ -409,7 +409,8 @@ function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }
                         <>
                           <span><span className="numeric font-semibold">{reportedCount(r.hospital.beds).text}</span>{r.hospital.beds.kind && <span className="text-muted-foreground"> · {r.hospital.beds.kind}</span>}</span>
                           {r.hospital.beds.meta?.period && <span className="text-xs text-muted-foreground">Period: {r.hospital.beds.meta.period}</span>}
-                          <ValueSource m={r.hospital.beds.meta} />
+                          {/* Only the count's own flags: the block's others may be about another figure. */}
+                          <ValueSource m={reportedCount(r.hospital.beds).meta} />
                           <span className="text-xs text-muted-foreground">{SELF_REPORTED}.</span>
                         </>
                       ) : (

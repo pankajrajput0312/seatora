@@ -129,7 +129,7 @@ function Step({ s }: { s: StepNow }) {
 
 async function Announcements({ f, params, L }: { f: Filters; params: URLSearchParams; L: DecideLinks }) {
   const [all, matching] = await Promise.all([listNotices(), listNotices({ kind: f.kind, round: f.round, year: f.year })]);
-  const years = [...new Set(all.map((n) => n.year))];
+  const years = [...new Set(all.map((n) => n.year))].sort((a, b) => b - a);
   const page = Math.min(f.page, Math.max(1, Math.ceil(matching.length / PAGE_SIZE)));
   const res = { rows: matching.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total: matching.length, page, pageSize: PAGE_SIZE };
 

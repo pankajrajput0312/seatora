@@ -23,5 +23,9 @@ export function PrevSeatCell({ prev, L }: { prev: NamedPrev | null; L: DecideLin
   );
 }
 
-/** "1,538 beds" as the hospital reports it: the one Beds (pages/beds.tsx). `of`: the institute. */
-export const Beds = ({ beds, of }: { beds: ReportedBeds; of: string }) => <OneBeds b={beds} inst={of} unit />;
+/**
+ * "1,538 beds" as the hospital reports it: the one Beds (pages/beds.tsx). `of`: the institute. Its (i)'s hit area
+ * reaches down and sideways, not up: where the type badge and beds wrap onto two lines (the table's institute cell),
+ * the type's (i) above stays its own (a later button paints over an earlier one).
+ */
+export const Beds = ({ beds, of }: { beds: ReportedBeds; of: string }) => <span className="[&_button]:before:top-0"><OneBeds b={beds} inst={of} unit /></span>;

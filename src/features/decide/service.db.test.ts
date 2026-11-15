@@ -114,8 +114,8 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     expect(trends.total).toBeGreaterThan(10000);
     expect(trends.rows).toHaveLength(50);
     const inst = await timed("listInstitutes her", () => svc.listInstitutes(her, {}));
-    const files = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")).files;
-    expect(inst.total).toBe(files["colleges.ndjson"].count + files["seat_colleges.ndjson"].count); // every college of the bundle
+    const files = JSON.parse(read("manifest.json")).files; // (no bundle here: not checked)
+    if (files) expect(inst.total).toBe(files["colleges.ndjson"].count + files["seat_colleges.ndjson"].count); // every college of the bundle
     const firstPage = await timed("listInstitutes her, page 1", () => svc.listInstitutes(her, {}, { page: 1, pageSize: 48 }));
     expect(firstPage.rows).toHaveLength(48);
     // best reach (per-year maxima in SQL) agrees with the institute page, over the options in her profile only
@@ -134,10 +134,12 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
 // Options' round view on the real import, reconciled with the bundle's seats.ndjson (the MCC lists of 12–13 Nov 2026).
 const dir = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
 type FileSeat = { kind: SeatKind; ikey: string; degree: string; specialty: string; quota: string | null; category: string; seats: number; src: string };
+// A skipped suite's body still runs (vitest collects its tests): read the bundle only when it is there.
+const read = (f: string) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8") : "[]");
 describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "seats.ndjson")))("Options' round view on real MCC data", { timeout: 120_000 }, () => {
-  const file: FileSeat[] = readFileSync(join(dir, "seats.ndjson"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  const file: FileSeat[] = read("seats.ndjson").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   // An import older than the bundle can hold college keys the bundle has since retired: compare through key_aliases.json.
-  const aliases: { old?: string; old_sha256?: string; new: string | null }[] = JSON.parse(readFileSync(join(dir, "key_aliases.json"), "utf8"));
+  const aliases: { old?: string; old_sha256?: string; new: string | null }[] = JSON.parse(read("key_aliases.json"));
   const renamed = new Map(aliases.map((a) => [a.old ?? a.old_sha256!, a.new]));
   const fileId = (id: string) => {
     const [k, ...rest] = id.split("~");
@@ -237,7 +239,7 @@ describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "seats.ndjson
 
 // College keys the bundle retired (key_aliases.json → RetiredCollegeKey): old links and saved ids reach the college now.
 describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "key_aliases.json")))("retired college keys on real MCC data", { timeout: 60_000 }, () => {
-  const aliases: { old?: string; old_sha256?: string; new: string | null }[] = JSON.parse(readFileSync(join(dir, "key_aliases.json"), "utf8"));
+  const aliases: { old?: string; old_sha256?: string; new: string | null }[] = JSON.parse(read("key_aliases.json"));
   it("every retired key of the bundle maps to its college; option ids and old slugs follow it", async () => {
     const map = await svc.retiredKeys();
     const colleges = (await svc.getDecideData()).colleges;

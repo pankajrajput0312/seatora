@@ -167,7 +167,8 @@ describe("service on the test fixture", () => {
     const capped = await svc.listFees({ maxFee: 100000 });
     expect(capped.rows.every((r) => fee1(r) != null && fee1(r)! <= 100000)).toBe(true);
     const kept = await svc.listFees({ maxFee: 100000, keepUnknown: true });
-    expect(kept.rows.every((r) => fee1(r) == null || fee1(r)! <= 100000)).toBe(true);
+    // An NBEMS maximum over the cap is unknown (not the college's fee): kept.
+    expect(kept.rows.every((r) => fee1(r) == null || r.terms.years[0]?.fee?.kind === "maximum" || fee1(r)! <= 100000)).toBe(true);
     expect(kept.total).toBe(capped.total + capped.unknownTerms);
     expect(kept.unknownTerms).toBe(0);
     expect((await svc.listFees({ bond: "none" })).rows.every((r) => r.terms.bond.status !== "declared")).toBe(true);
