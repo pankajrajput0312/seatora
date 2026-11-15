@@ -34,7 +34,7 @@ export function MobileNav() {
             <AuthLink onClick={() => setOpen(false)} className="border-b border-border py-3.5 text-base" />
           </nav>
           <Button asChild size="lg" className="mt-5 w-full">
-            <Link href="/pricing" onClick={() => setOpen(false)}>Get Seatora — Free</Link>
+            <Link href="/signup" onClick={() => setOpen(false)}>Get Seatora — Free</Link>
           </Button>
         </Dialog.Content>
       </Dialog.Portal>
