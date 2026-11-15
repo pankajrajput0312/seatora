@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { ViewField } from "@/app/decide/fees/view-field";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
 import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
@@ -87,7 +86,6 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
       <FilterBar action="/decide/residents" params={params} cols="grid-cols-2 md:grid-cols-4 xl:grid-cols-6" more={!!(query.college || query.year || query.quota || query.hasRank || query.sort !== "rank")}>
         {/* Apply states the rank range (both fields empty then means all ranks), except from her default, which it keeps. */}
         {!around && <input type="hidden" name="ranks" value="all" />}
-        <ViewField />
         <Field label="Name" className="col-span-2"><input type="search" name="q" defaultValue={query.q} maxLength={60} placeholder="Part of a name" className={control} /></Field>
         <Field label="Course" className="col-span-2">
           <Select
