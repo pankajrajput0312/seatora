@@ -92,8 +92,8 @@ const summary = "inline-flex min-h-11 cursor-pointer items-center text-sky";
 // The star and the row header stay in view while the table scrolls sideways (the star column is w-12, 3rem; on phones
 // both scale with the spacing). Phones: the row header is narrow (tbl.pin: the short name, the course) and carries the
 // latest closing rank, so swiping to the fee or stipend keeps the star, the option and its closing rank in view.
-const stick = "sticky left-0 z-[1] bg-card";
-const stickName = cn("sticky left-12 z-[1] min-w-52 max-w-72 border-r border-border bg-card", tbl.pin);
+const stick = "sticky left-0 z-[1] bg-card max-md:w-11 max-md:min-w-11 max-md:max-w-11 max-md:px-0!";
+const stickName = cn("sticky left-12 z-[1] min-w-52 max-w-72 border-r border-border bg-card max-md:left-11", tbl.pin);
 // Phones: the deepest closing comes right after the row header (from md, after the terms and seats, where it was).
 const phoneOnly = "px-3 py-3 text-right md:hidden";
 const notPhone = "px-3 py-3 text-right max-md:hidden";

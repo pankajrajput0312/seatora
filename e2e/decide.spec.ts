@@ -173,7 +173,7 @@ test("Cards | Table writes `layout`, keeps the page's own `view`, renders only t
 const openFilters = async (page: import("@playwright/test").Page) => {
   if (!(await page.getByRole("dialog", { name: "Filters" }).isVisible())) await page.getByRole("button", { name: /^Filters/ }).click();
 };
-/** The sheet's submit: "Show N results" (or "Show results" once a field changed). */
+/** The sheet's submit: "Show N results" ("Show results" while a changed field's count loads). */
 const showResults = (page: import("@playwright/test").Page) => page.getByRole("dialog", { name: "Filters" }).getByRole("button", { name: /^Show/ }).click();
 
 test("filters sit behind a Filters button: its count, a sheet with sections, Escape closes it with focus back on it, Show results keeps them; a chip opens its filter", async ({ page }) => {

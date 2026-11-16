@@ -275,10 +275,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       <ActiveFilters items={active} clear={showAll} />
       {fromProfile && (
         <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-          <span>
-            From your profile: {fromProfile.courses.length ? fromProfile.courses.map(courseLabel).join(", ") : "every course"}, every year and round, ranks{" "}
-            <span className="numeric">{formatRank(fromProfile.from)}–{formatRank(fromProfile.to)}</span> (your rank ±25%).
-          </span>
+          <span>{fromProfile.courses.length ? fromProfile.courses.map(courseLabel).join(", ") : "Every course"}, every year and round, your rank ±25%.</span>
           <Link href={showAll} className={`${smallLink} text-sky`}>Show all</Link>
         </p>
       )}

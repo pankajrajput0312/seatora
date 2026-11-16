@@ -249,7 +249,7 @@ function SaveDefaults({ sheet }: { sheet: React.RefObject<HTMLDialogElement | nu
     const form = sheet.current?.closest("form");
     const base = saved ?? profileFromParams(new URLSearchParams(location.search));
     if (!form || !base) return;
-    const q = formQuery(form);
+    const q = new URLSearchParams([...formQuery(form)].filter(([, v]) => v !== ""));
     const fields = new Set([...form.elements].flatMap((e) => ((e as HTMLInputElement).name && (e as HTMLInputElement).type !== "hidden" ? [(e as HTMLInputElement).name] : [])));
     const next = profileWithFilters(base, q, fields);
     setStored(next);

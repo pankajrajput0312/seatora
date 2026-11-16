@@ -41,7 +41,7 @@ it("without() takes one value out of a filter, the others and the rest kept", ()
 });
 
 it("remembers a page's own filters (not the profile, not the page number) and brings them back to a nav link", () => {
-  const saved = pageFilters("rank=1&sp=A,B&st=Kerala&ctype=govt&ctype=central&maxfee=5&page=3&editProfile=1");
+  const saved = pageFilters("rank=1&sp=A,B&st=Kerala&q=&ctype=govt&ctype=central&maxfee=5&bondyrs=&page=3&editProfile=1");
   expect(saved).toBe("ctype=govt&ctype=central&maxfee=5");
   expect(withFilters("/decide/options?rank=1&sp=A%2CB", saved)).toBe("/decide/options?rank=1&sp=A%2CB&ctype=govt&ctype=central&maxfee=5");
   expect(withFilters("/decide/options", saved)).toBe("/decide/options?ctype=govt&ctype=central&maxfee=5");
