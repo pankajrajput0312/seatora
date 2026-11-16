@@ -9,9 +9,16 @@ import { useEffect } from "react";
  */
 export function ScrollToHash() {
   useEffect(() => {
-    const id = decodeURIComponent(window.location.hash.slice(1));
-    // Instant: the page's smooth scrolling would add its glide to the browser's own jump (it overshot by a screen).
-    if (id) document.getElementById(id)?.scrollIntoView({ block: "start", behavior: "instant" });
+    const el = document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
+    if (!el) return;
+    // Instant, now and once the browser's own (smooth) jump has run: two glides at once overshot by a screen.
+    const go = () => el.scrollIntoView({ block: "start", behavior: "instant" });
+    go();
+    const t = setTimeout(() => {
+      const top = el.getBoundingClientRect().top;
+      if (top < 48 || top > window.innerHeight / 2) go();
+    }, 800);
+    return () => clearTimeout(t);
   }, []);
   return null;
 }
