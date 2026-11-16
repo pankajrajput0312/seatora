@@ -158,7 +158,8 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <SeatListPicker lists={all} current={list.key} href={(key) => here({ list: key })} />
+      {/* A list's chip filters to it: one list's seats (One list, Compare), or in the matrix the rows with seats in it. */}
+      <SeatListPicker lists={all} current={list.key} href={(key) => here({ list: key, has: matrix ? all.find((l) => l.key === key)?.kind ?? null : null })} />
       <div className="chip-row flex flex-wrap items-center gap-2">
         <nav aria-label="Seats view" className="flex flex-wrap gap-2">
           <Link href={here({ view: null })} aria-current={matrix ? "true" : undefined} className={chip(matrix)}>Seat matrix</Link>
@@ -193,7 +194,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             </label>
           </Fragment>
         </ToolbarSearch>
-        <FiltersPanel count={active.length} clear={clearAll} total={r.total}>
+        <FiltersPanel count={active.length} clear={clearAll} total={r.total} saveDefaults={!!profile}>
         <Fragment key={params.toString()}>
           {f.c.length ? (
             <FilterDropdown label="Course" name="c" options={pairChoices(meta.courses)} selected={f.c} />

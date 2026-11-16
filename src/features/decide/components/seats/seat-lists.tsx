@@ -35,7 +35,9 @@ const groupOf = (l: SeatList) => `${l.year} ${roundLabel[l.round]}`;
 export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; current: string; href: (key: string) => string }) {
   const [latest, ...earlier] = [...new Set(lists.map(groupOf))];
   const group = (g: string, first?: boolean) => (
-    <div key={g} className={cn("chip-row flex flex-wrap items-center gap-2", first && "max-md:min-w-0 max-md:flex-1 max-md:mr-0! max-md:pr-0!")}>
+    // Phones: the latest round's row scrolls sideways and fades at an edge with more (fade-x), so a chip under the
+    // edge reads as "more this way", not as cut off by "Earlier".
+    <div key={g} className={cn("chip-row flex flex-wrap items-center gap-2", first && "fade-x max-md:min-w-0 max-md:flex-1 max-md:mr-0! max-md:pr-0!")}>
       <span className="numeric text-sm font-semibold sm:w-20 sm:shrink-0" aria-hidden>{g}</span>
       {lists.filter((l) => groupOf(l) === g).map((l, _, xs) => (
         <Link
