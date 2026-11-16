@@ -3,6 +3,7 @@ import { HISTORY_CAPTION } from "@/features/decide/components/bits";
 import { parseSeatsParams, seatsCsv, seatsView } from "@/features/decide/components/seats/find-seats";
 import { readParams } from "@/features/decide/lib/params";
 import { profileFromParams } from "@/features/decide/profile";
+import { planCap, planRequired } from "@/features/plans/usage";
 
 /**
  * The Seats page's current view as CSV: the same params (her profile params plus the page's filters, read leniently as
@@ -12,6 +13,7 @@ import { profileFromParams } from "@/features/decide/profile";
  */
 export async function GET(req: Request) {
   return handle(async () => {
+    if (!(await planCap("csv"))) return planRequired("CSV export");
     const p = new URL(req.url).searchParams;
     const f = { ...parseSeatsParams(p), page: 1 };
     // One page one row past the cap: every row when they fit, and only that many with history when they don't.

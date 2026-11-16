@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/features/auth/lib/session";
 import { choicesSchema, parseChoices } from "@/features/decide/lib/choices";
 import { profileSchema } from "@/features/decide/profile";
+import { planCap } from "@/features/plans/usage";
 import { db } from "@/lib/db";
 
 // The profile and choice lists of the signed-in account (components/account-sync.tsx). Signed out: null, and the
@@ -45,6 +46,15 @@ export async function saveSynced(kind: SyncKind, value: unknown, base: number | 
   const json = (k.data === "profile" ? parsed.data : parseChoices(value)) as Prisma.InputJsonValue;
   const user = await getCurrentUser();
   if (!user) return null;
+  // The plan's saved lists (features/plans): more lists than the plan gives and than the account already holds are not
+  // saved (the Choices page offers no "Duplicate" past the cap; lists kept from a bigger plan stay editable).
+  if (k.data === "choices") {
+    const lists = parseChoices(value).lists.length;
+    if (lists > (await planCap("choiceLists"))) {
+      const saved = await read("choices", user.id);
+      if (lists > (saved ? parseChoices(saved.value).lists.length : 1)) return null;
+    }
+  }
   const now = new Date();
   const t = table(k.data);
   try {

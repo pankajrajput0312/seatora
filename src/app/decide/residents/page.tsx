@@ -17,6 +17,8 @@ import type { ResidentsQuery } from "@/features/decide/residents-search";
 import { canSeeResidents } from "@/features/decide/server/residents";
 import { listResidentsAll, RESIDENTS_MAX_PAGE, residentColleges, residentQuota, residentYears, ResidentsDenied } from "@/features/decide/server/residents-all";
 import { chosenView } from "@/features/decide/server/view";
+import { Paywall } from "@/features/plans/components/paywall";
+import { currentPlan } from "@/features/plans/usage";
 import { getDecideData, getMeta } from "@/features/decide/service";
 import { hideResidentAction } from "../institutes/[slug]/actions";
 import { findResidentColleges, findResidentNames, listResidentColleges } from "./actions";
@@ -38,16 +40,21 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     <PageHead title="Residents" about={about}>Who got in where, from MCC&apos;s admitted-candidates lists. Contact people respectfully; ask to be hidden and we will.</PageHead>
   );
 
-  const denied = (why: "locked" | "rate_limited") => (
+  const denied = async (why: ResidentsDenied["code"]) => {
+    const me = why === "plan_limit" ? await currentPlan() : null;
+    return (
     <AppPage className="grid grid-cols-1 gap-3">
       {head()}
-      {why === "locked" ? (
+      {me ? (
+        <Paywall feature="residents" eff={me.eff} />
+      ) : why === "locked" ? (
         <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.to("/decide/institutes")} action="See the institutes" />
       ) : (
         <EmptyState title="Too many requests" description="Residents were opened too many times from this network or account. Try again in an hour, or tomorrow." href={L.to("/decide/institutes")} action="See the institutes" />
       )}
     </AppPage>
-  );
+    );
+  };
   if (!(await canSeeResidents())) return denied("locked");
 
   const profile = profileFromParams(params);

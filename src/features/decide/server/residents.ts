@@ -1,6 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import { getCurrentUser, hasSiteAccess } from "@/features/auth/lib/session";
+import { checkAndCount } from "@/features/plans/usage";
 import { db } from "@/lib/db";
 import { allow } from "@/lib/rate-limit";
 import { profileHasCourse, type Profile } from "../profile";
@@ -63,26 +64,19 @@ export async function listResidents(collegeKey: string, f: { course?: string; ye
  */
 export const canSeeResidents = hasSiteAccess;
 
-/** Name reads per account per (UTC) day, on top of 300 per hour per IP: a copied cookie gets no fresh budget from a new IP. */
-export const RESIDENTS_READS_PER_DAY = 200;
-
 /**
- * Budget for reading or hiding names. False once spent. Reads: 300 per hour per IP (in memory, per instance, as
- * @/lib/rate-limit) and RESIDENTS_READS_PER_DAY per account, counted in the database (ResidentsRead), so parallel
- * instances share it. Hides: 20 per hour per IP.
+ * Why reading or hiding names is refused now, else null. Reads: "rate_limited" past 300 per hour per IP (in memory, per
+ * instance, as @/lib/rate-limit) or signed out; "plan_limit" past the plan's residents reads a day (features/plans,
+ * UsageDaily, so parallel instances share it and a copied cookie gets no fresh budget from a new IP). Hides: 20 per hour per IP.
  */
-export async function residentsBudget(kind: "read" | "hide") {
+export async function residentsDenied(kind: "read" | "hide"): Promise<null | "rate_limited" | "plan_limit"> {
   const h = await headers();
   const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (kind === "hide") return allow(`residents-hide:${ip}`, 20, 60 * 60 * 1000);
-  if (!allow(`residents:${ip}`, 300, 60 * 60 * 1000)) return false;
+  if (kind === "hide") return allow(`residents-hide:${ip}`, 20, 60 * 60 * 1000) ? null : "rate_limited";
+  if (!allow(`residents:${ip}`, 300, 60 * 60 * 1000)) return "rate_limited";
   const user = await getCurrentUser();
-  if (!user) return false;
-  // One atomic upsert (raw SQL, as hideResident): parallel reads can't race past the cap.
-  const [{ count }] = await db.$queryRaw<{ count: number }[]>`
-    INSERT INTO "ResidentsRead" ("userId", "day", "count") VALUES (${user.id}, (now() AT TIME ZONE 'UTC')::date, 1)
-    ON CONFLICT ("userId", "day") DO UPDATE SET "count" = "ResidentsRead"."count" + 1 RETURNING "count"`;
-  return count <= RESIDENTS_READS_PER_DAY;
+  if (!user) return "rate_limited";
+  return (await checkAndCount(user.id, "residents", undefined, { account: user })).allowed ? null : "plan_limit";
 }
 
 /**

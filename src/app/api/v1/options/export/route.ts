@@ -6,6 +6,7 @@ import { seatChanges, seatLists } from "@/features/decide/server/seats";
 import { getMeta, LATEST_YEAR, listOptions } from "@/features/decide/service";
 import { parseOptionsQuery } from "../query";
 import { optionsCsv, roundViewNote } from "./csv";
+import { planCap, planRequired } from "@/features/plans/usage";
 
 /**
  * The Options view as a CSV download: the same profile and filters as /api/v1/options, every matching row (`page` and
@@ -13,6 +14,7 @@ import { optionsCsv, roundViewNote } from "./csv";
  */
 export async function GET(req: Request) {
   return handle(async () => {
+    if (!(await planCap("csv"))) return planRequired("CSV export");
     const q = parseOptionsQuery(new URL(req.url).searchParams);
     if (!q.ok) return invalid(...q.errors);
     // One page one row past the cap: every row when they fit, and only that many built when they don't.

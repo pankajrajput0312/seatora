@@ -13,7 +13,7 @@ import { typeValues, type TermFilters } from "@/features/decide/lib/term-filters
 import { profileQuotas, type Profile } from "@/features/decide/profile";
 import { meritLists, scoreToRank } from "@/features/decide/server/merit";
 import { listNotices, roundStatus } from "@/features/decide/server/notices";
-import { canSeeResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
+import { canSeeResidents, listResidents, residentsDenied } from "@/features/decide/server/residents";
 import { optionSeats, pickLists, seatLists } from "@/features/decide/server/seats";
 import { eligibleCategories } from "@/features/decide/lib/reach";
 import { choiceOptions, getDecideData, getInstitute, getMeta, lastRanks, listOptions, seatsByKind, type OptionRow } from "@/features/decide/service";
@@ -25,6 +25,7 @@ import { saveReport } from "./reports";
 import { BAND_RULES, bandOf, seatChange, trendOf, type Band } from "./chances";
 import { getPreferences, setPreference } from "./memory";
 import { PREF_KEYS } from "./prefs";
+import { planCapFor } from "@/features/plans/usage";
 
 // The assistant's tools: thin, validated wrappers over Decide's service (the same reads the pages make). Each returns
 // compact JSON (rows capped, page links and source names included). Inputs come from the model: every one is parsed
@@ -480,7 +481,8 @@ const handlers: Handlers = {
   async residents_at(i) {
     const c = await oneCollege(i.college);
     if (!(await canSeeResidents())) fail("Residents' names need a signed-in member session.");
-    if (!(await residentsBudget("read"))) fail("Daily residents read limit reached. Try tomorrow or open the page.");
+    const no = await residentsDenied("read");
+    if (no) fail(no === "plan_limit" ? "Her plan's residents reads for today are used up (more at 00:00 IST; the Season Pass on /pricing gives more)." : "Residents read limit reached. Try later or open the page.");
     const pair = i.course ? (await coursesOf([i.course]))[0] : undefined;
     const slug = pair ? (await meta()).courses.find((x) => `${x.degree}~${x.specialty}` === pair)?.slug : undefined;
     const r = await listResidents(c.key, { course: slug, year: i.year }, { page: 1, pageSize: 60 });
@@ -766,6 +768,7 @@ const handlers: Handlers = {
     const row = await db.userChoices.findUnique({ where: { userId } });
     const state: ChoicesState = row ? parseChoices(row.json) : defaultChoices;
     const old = state.lists.find((l) => l.id === listId);
+    if (!old && state.lists.length >= (await planCapFor(userId, "choiceLists"))) fail("Not saved: her plan's saved choice lists are full. She can replace an existing list (same listName) or get the Season Pass (/pricing).");
     const kept = i.mode === "append" && old ? [...old.items, ...items.filter((x) => !old.items.some((o) => o.id === x.id))] : items;
     const list = { id: listId, name, items: kept, typedIds: i.mode === "append" && old ? old.typedIds : [] };
     const next: ChoicesState = { lists: old ? state.lists.map((l) => (l.id === listId ? list : l)) : [...state.lists, list], activeId: listId };
@@ -783,6 +786,7 @@ const handlers: Handlers = {
   },
 
   async create_report(i, { userId, profile, refs: known }) {
+    if (!(await planCapFor(userId, "reports"))) fail("Plan reports are part of the Season Pass (/pricing); her plan has none. Give the plan in chat instead.");
     const p = profileWith(profile, {});
     const refs = await refIds(i.choices, known);
     const { rows } = await choiceOptions([...new Set(refs.ids.filter((x): x is string => !!x))], p);

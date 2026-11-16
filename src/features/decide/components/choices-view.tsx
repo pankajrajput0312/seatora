@@ -43,7 +43,8 @@ const BedsM = memo(Beds);
 type ReachFor = (ids: string[], profile: string) => Promise<{ lists: SeatList[]; options: Live } | null>;
 
 /** `view`: Cards or table on show (chosenView "choices"). Only that one is rendered: its controls carry the ids focus moves to. */
-export function ChoicesView({ reachFor, view }: { reachFor?: ReachFor; view: View }) {
+/** `maxLists`: the plan's saved lists (features/plans); at it, "Duplicate" gives way to a Season Pass link. Unset: no cap (signed out). */
+export function ChoicesView({ reachFor, view, maxLists = Infinity }: { reachFor?: ReachFor; view: View; maxLists?: number }) {
   const [state, setState, hydrated] = useChoices();
   const L = useDecideLinks();
   const sp = useSearchParams();
@@ -379,15 +380,19 @@ export function ChoicesView({ reachFor, view }: { reachFor?: ReachFor; view: Vie
             {l.name} <span className="opacity-70">({l.items.length})</span>
           </Button>
         ))}
-        <Button
-          variant="ghost"
-          onClick={() => {
-            setState((s) => duplicateList(s, list.id));
-            setAnnounce(`Duplicated ${list.name} as ${duplicateList(state, list.id).lists.at(-1)!.name}; now showing it.`);
-          }}
-        >
-          Duplicate for next round
-        </Button>
+        {state.lists.length < maxLists ? (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setState((s) => duplicateList(s, list.id));
+              setAnnounce(`Duplicated ${list.name} as ${duplicateList(state, list.id).lists.at(-1)!.name}; now showing it.`);
+            }}
+          >
+            Duplicate for next round
+          </Button>
+        ) : (
+          <Link href="/pricing" className="inline-flex min-h-11 items-center text-sm text-sky underline">More lists with the Season Pass</Link>
+        )}
       </div>
 
       {/* As on every results page: Cards | Table, then the CSV. */}

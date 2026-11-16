@@ -35,7 +35,9 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, optionsView, PAST_YEARS, renamedCollege } from "@/features/decide/service";
 import { feesFor } from "@/features/decide/server/facts";
 import { programmes } from "@/features/decide/server/terms";
-import { canSeeResidents, groupResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
+import { canSeeResidents, groupResidents, listResidents, residentsDenied } from "@/features/decide/server/residents";
+import { Paywall } from "@/features/plans/components/paywall";
+import { checkAndCount, currentPlan } from "@/features/plans/usage";
 import { roundLabel, seatKindLabel } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 
@@ -85,6 +87,17 @@ export default async function InstitutePage({ params, searchParams }: Props) {
     notFound();
   }
   const { college, options, yours, allotmentsByYear, fees, unlistedBy } = inst;
+  // The plan's distinct institutes a day (features/plans): opening one again today, or any tab of it, is free.
+  const me = await currentPlan();
+  const view = me && (await checkAndCount(me.user.id, "institutes", college.key, { account: me.user }));
+  if (me && view && !view.allowed) {
+    return (
+      <AppPage className="grid grid-cols-1 gap-3">
+        <PageHead title={college.name} />
+        <Paywall feature="institutes" eff={me.eff} used={view.used} />
+      </AppPage>
+    );
+  }
   const tab = f.tab;
   const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
   const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n ?? 0));
@@ -99,7 +112,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // Allotments tab: one page from SQL; a page past the end shows the last page.
   const allot = tab === "allotments" ? await listAllotments({ year: allotYear, course: allotCourse }, { page: f.page, pageSize: PAGE_SIZE }, college.key) : null;
   // ponytail: every row on one page (largest institute ~930 rows, ~1.6 MB HTML); add a course filter if that grows.
-  const residentsAccess = tab !== "residents" ? null : !(await canSeeResidents()) ? "locked" : !(await residentsBudget("read")) ? "limited" : "ok";
+  const residentsAccess = tab !== "residents" ? null : !(await canSeeResidents()) ? "locked" : ((await residentsDenied("read")) ?? "ok");
   const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
   // The tab's own filters: course and year, one or more of each (rcourse / ryear), over this college's residents.
   const rCourses = sp.getAll("rcourse");
@@ -584,7 +597,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       {residentsAccess === "locked" && (
         <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.institute(slug, "courses")} action="See the courses here" />
       )}
-      {residentsAccess === "limited" && (
+      {residentsAccess === "plan_limit" && me && <Paywall feature="residents" eff={me.eff} />}
+      {residentsAccess === "rate_limited" && (
         <EmptyState title="Too many requests" description="Residents were opened too many times from this network or account. Try again in an hour, or tomorrow." href={L.institute(slug, "courses")} action="See the courses here" />
       )}
       {tab === "residents" && residents && (

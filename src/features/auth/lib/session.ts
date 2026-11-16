@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -49,13 +50,14 @@ export async function createSession({ id: userId, email }: { id: string; email: 
 /**
  * The signed-in user, or null. Expired sessions are treated as signed out, and so (unless SEATORA_OPEN_ACCESS=1) are
  * accounts not on the allowlist: only members can sign in, so this covers sessions from before the lock or an email since removed.
+ * Read once per server render (React cache): the layout, the page and the plan checks share it.
  */
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const session = await db.session.findUnique({
     where: { id: hashToken(token) },
-    include: { user: { select: { id: true, email: true, name: true } } },
+    include: { user: { select: { id: true, email: true, name: true, role: true, premiumUntil: true } } },
   });
   if (!session) return null;
   if (session.expiresAt < new Date()) {
@@ -63,8 +65,14 @@ export async function getCurrentUser() {
     await db.session.deleteMany({ where: { userId: session.userId, expiresAt: { lt: new Date() } } });
     return null;
   }
-  return isMember(session.user.email) ? session.user : null;
-}
+  if (!isMember(session.user.email)) return null;
+  // SEATORA_OWNER_EMAILS bootstraps the OWNER role: an owner address is promoted the first time it is seen signed in.
+  if (session.user.role !== "OWNER" && isAllowed(session.user.email, parseAllowlist(process.env.SEATORA_OWNER_EMAILS))) {
+    await db.user.update({ where: { id: session.user.id }, data: { role: "OWNER" } });
+    return { ...session.user, role: "OWNER" as const };
+  }
+  return session.user;
+});
 
 /** This browser's session id (the token's hash), so a password change can keep it and delete the others. */
 export async function currentSessionId() {
@@ -115,12 +123,16 @@ export async function requireDecideAccess(next = "/decide") {
 }
 
 /**
- * The owner reads and triages feature requests (features/requests): a signed-in user whose email is on
- * SEATORA_OWNER_EMAILS (comma-separated, read like the allowlist). Unset or empty: nobody. Open access changes nothing here.
+ * The owner (feature requests, Ask, /decide/admin): a signed-in user with role OWNER. SEATORA_OWNER_EMAILS is the
+ * bootstrap (getCurrentUser promotes those addresses) and stays a fallback. Open access changes nothing here.
  */
 export async function isOwner() {
-  const owners = parseAllowlist(process.env.SEATORA_OWNER_EMAILS);
-  if (!owners.length) return false;
   const user = await getCurrentUser();
-  return !!user && isAllowed(user.email, owners);
+  return !!user && (user.role === "OWNER" || isAllowed(user.email, parseAllowlist(process.env.SEATORA_OWNER_EMAILS)));
+}
+
+/** OWNER or ADMIN (the admin page): the signed-in user, else null. */
+export async function staffUser() {
+  const user = await getCurrentUser();
+  return user && (user.role === "OWNER" || user.role === "ADMIN") ? user : null;
 }

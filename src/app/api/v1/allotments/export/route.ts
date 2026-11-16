@@ -1,6 +1,7 @@
 import { CSV_MAX_ROWS, handle, notFound, tooManyRows } from "@/features/decide/api";
 import { allotmentsCsv, allotmentsView } from "@/features/decide/components/allotments/allotments-view";
 import { roundLabel } from "@/features/decide/types";
+import { planCap, planRequired } from "@/features/plans/usage";
 
 /**
  * The Allotments page's current view as CSV: the same params read the same lenient way (`page` ignored), every matching
@@ -9,6 +10,7 @@ import { roundLabel } from "@/features/decide/types";
  */
 export async function GET(req: Request) {
   return handle(async () => {
+    if (!(await planCap("csv"))) return planRequired("CSV export");
     const p = new URL(req.url).searchParams;
     p.delete("page");
     // One row past the cap: every row when they fit, and only that many built when they don't.

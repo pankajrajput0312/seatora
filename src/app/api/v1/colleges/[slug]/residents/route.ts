@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { handle, invalid, ok, pageSchema, parseQuery, renamedOr404 } from "@/features/decide/api";
-import { canSeeResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
+import { canSeeResidents, listResidents, residentsDenied } from "@/features/decide/server/residents";
 import { getCollege } from "@/features/decide/service";
 
 const querySchema = pageSchema.extend({ course: z.string().max(100).optional(), year: z.coerce.number().int().min(2000).max(2100).optional() });
@@ -14,7 +14,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   return handle(async () => {
     const noStore = { "Cache-Control": "private, no-store" };
     if (!(await canSeeResidents())) return Response.json({ ok: false, error: { code: "locked", message: "Sign in with an allowed account." } }, { status: 401, headers: noStore });
-    if (!(await residentsBudget("read"))) return Response.json({ ok: false, error: { code: "rate_limited", message: "Too many requests. Try again later." } }, { status: 429, headers: noStore });
+    const no = await residentsDenied("read");
+    if (no) return Response.json({ ok: false, error: { code: no, message: no === "plan_limit" ? "Today's residents reads on your plan are used up (more at 00:00 IST). See /pricing for the Season Pass." : "Too many requests. Try again later." } }, { status: 429, headers: noStore });
     const q = parseQuery(querySchema, new URL(req.url).searchParams);
     if (!q.success) return invalid(q.error);
     const slug = (await params).slug;

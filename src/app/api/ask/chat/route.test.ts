@@ -8,12 +8,13 @@ import { parseSse } from "@/features/ask/sse";
 // told apart.
 
 const m = vi.hoisted(() => ({
-  user: null as null | { id: string; email: string; name: string },
-  start: vi.fn(), finish: vi.fn(), stream: vi.fn(),
+  user: null as null | { id: string; email: string; name: string; role: "OWNER"; premiumUntil: null },
+  start: vi.fn(), finish: vi.fn(), stream: vi.fn(), plan: vi.fn(async () => ({ allowed: true, used: 1, limit: 50, resetAt: new Date() })),
   startTurn: vi.fn(), claimRun: vi.fn(), finishTurn: vi.fn(), saveProgress: vi.fn(), saveCheckpoint: vi.fn(), turnState: vi.fn(),
 }));
 vi.mock("@/features/ask/access", () => ({ askUser: async () => m.user }));
 vi.mock("@/features/ask/budget", async (orig) => ({ ...(await orig<object>()), startAsk: m.start, finishAsk: m.finish }));
+vi.mock("@/features/plans/usage", () => ({ checkAndCount: m.plan }));
 vi.mock("@/features/ask/client", () => ({ askClient: () => ({ messages: { stream: m.stream } }) }));
 vi.mock("@/features/ask/memory", async (orig) => ({
   ...(await orig<object>()),
@@ -59,7 +60,7 @@ const events = async (res: Response) => parseSse(await res.text()).events;
 const settled = () => vi.waitFor(() => expect(m.finish).toHaveBeenCalled(), { timeout: 5000 });
 
 beforeEach(() => {
-  m.user = { id: "owner1", email: "owner@seatora.test", name: "Owner" };
+  m.user = { id: "owner1", email: "owner@seatora.test", name: "Owner", role: "OWNER", premiumUntil: null };
   m.start.mockReset().mockResolvedValue({ ok: true, id: "log1" });
   m.finish.mockReset().mockResolvedValue(undefined);
   m.stream.mockReset();
@@ -97,6 +98,15 @@ describe("gating and request checks", () => {
     expect(res.status).toBe(429);
     expect(m.finishTurn).toHaveBeenCalledWith("ans1", expect.objectContaining({ status: "error" }));
     expect(m.stream).not.toHaveBeenCalled();
+  });
+
+  it("429s a question past the plan's daily questions before spending budget", async () => {
+    m.plan.mockResolvedValueOnce({ allowed: false, used: 3, limit: 3, resetAt: new Date() });
+    const res = await post(ask("hi"));
+    expect(res.status).toBe(429);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("plan_limit");
+    expect(m.start).not.toHaveBeenCalled();
+    expect(m.finishTurn).toHaveBeenCalledWith("ans1", expect.objectContaining({ status: "error" }));
   });
 
   it("replays a repeated request instead of running it again", async () => {

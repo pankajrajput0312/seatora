@@ -8,7 +8,7 @@ import { listResidentsAll, RESIDENTS_MAX_PAGE } from "./residents-all";
 // Residents across institutes on the real import, against the private bundle (read only; names are never printed:
 // assertions compare ids and counts). Run with DATABASE_URL set (and RESIDENTS_BUNDLE when not ../neetpg-planner):
 //   set -a; . ./.env; set +a; npx vitest run src/features/decide/server/residents-all.db.test.ts
-vi.mock("./residents", async (orig) => ({ ...(await orig<typeof import("./residents")>()), canSeeResidents: async () => true, residentsBudget: async () => true }));
+vi.mock("./residents", async (orig) => ({ ...(await orig<typeof import("./residents")>()), canSeeResidents: async () => true, residentsDenied: async () => null }));
 
 const bundle = join(resolve(process.env.RESIDENTS_BUNDLE ?? "../neetpg-planner/data/medpath-private"), "residents.ndjson");
 const list = (q: Partial<ResidentsQuery>) => listResidentsAll(residentsQuery.parse(q));

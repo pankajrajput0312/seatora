@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { canSeeResidents, hideResident, residentsBudget } from "@/features/decide/server/residents";
+import { canSeeResidents, hideResident, residentsDenied } from "@/features/decide/server/residents";
 
 const idSchema = z.string().min(1).max(40);
 
@@ -11,7 +11,7 @@ export async function hideResidentAction(id: string): Promise<{ ok: true; data: 
   if (!input.success) return { ok: false, error: "invalid_id" };
   try {
     if (!(await canSeeResidents())) return { ok: false, error: "locked" };
-    if (!(await residentsBudget("hide"))) return { ok: false, error: "rate_limited" };
+    if (await residentsDenied("hide")) return { ok: false, error: "rate_limited" };
     const hidden = await hideResident(input.data);
     if (hidden) console.info("[residents] hidden", input.data);
     return hidden ? { ok: true, data: null } : { ok: false, error: "not_found" };

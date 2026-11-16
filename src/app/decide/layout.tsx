@@ -7,6 +7,7 @@ import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
 import "@astryxdesign/theme-neutral/theme.css";
 import { askUser } from "@/features/ask/access";
+import { staffUser } from "@/features/auth/lib/session";
 import { AppPage } from "@/features/decide/components/app-page";
 import { AstryxProvider } from "@/features/decide/components/astryx-provider";
 import { DecideShell } from "@/features/decide/components/decide-shell";
@@ -43,10 +44,12 @@ export default async function DecideLayout({ children }: { children: React.React
   const phone = deviceView(h.get("user-agent"), h.get("sec-ch-ua-mobile")) === "cards";
   // Ask Seatora's nav entry: only for the owner while ASK_ENABLED=1 (no database read otherwise).
   const ask = !!meta && (await askUser().catch(() => null)) != null;
+  // Admin's nav entry: only for an owner or admin.
+  const admin = !!meta && (await staffUser().catch(() => null)) != null;
   return (
     <div className={`app ${app.variable} min-h-screen`}>
       <AstryxProvider>
-        <DecideShell phone={phone} ask={ask} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
+        <DecideShell phone={phone} ask={ask} admin={admin} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (
             <NavPending>{children}</NavPending>
           ) : (

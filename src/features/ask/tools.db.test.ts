@@ -47,7 +47,7 @@ describe.skipIf(!dbUrl)("tools on the real import", async () => {
     const { db } = await import("@/lib/db");
     const { getReport } = await import("./reports");
     const { parseChoices } = await import("@/features/decide/lib/choices");
-    const user = await db.user.create({ data: { email: `ask-tools-${Date.now()}@seatora.test`, name: "Tools test", passwordHash: "x" } });
+    const user = await db.user.create({ data: { email: `ask-tools-${Date.now()}@seatora.test`, name: "Tools test", passwordHash: "x", role: "PREMIUM" } });
     const me = { ...ctx, userId: user.id, refs: new Map<string, string>() };
     try {
       const d = (await runTool("draft_choice_list", { courses: ["DNB Anaesthesiology"], limit: 10 }, me, 15_000)) as { ok: true; data: { realistic: { ref: string; college: string; state: string; pin: string; course: string; quota: string }[] } };

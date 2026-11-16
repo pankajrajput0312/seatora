@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RESIDENTS_PAGE_SIZE, residentsQuery } from "../residents-search";
-import { RESIDENTS_READS_PER_DAY } from "./residents";
 import { listResidentsAll, RESIDENTS_MAX_PAGE, ResidentsDenied } from "./residents-all";
 
 // Gates, read budget and paging of the search across institutes, on a mocked database (no names: one made-up row).
@@ -9,14 +8,17 @@ const m = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   allow: vi.fn(),
   reads: vi.fn(),
+  plan: vi.fn(),
   count: vi.fn(),
   findMany: vi.fn(),
   sources: vi.fn(),
+  colleges: vi.fn(),
 }));
 vi.mock("@/features/auth/lib/session", () => ({ hasSiteAccess: m.hasSiteAccess, getCurrentUser: m.getCurrentUser }));
 vi.mock("@/lib/rate-limit", () => ({ allow: m.allow }));
+vi.mock("@/features/plans/usage", () => ({ checkAndCount: m.plan }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-real-ip": "203.0.113.9" }) }));
-vi.mock("@/lib/db", () => ({ db: { $queryRaw: m.reads, resident: { count: m.count, findMany: m.findMany }, dataSource: { findMany: m.sources } } }));
+vi.mock("@/lib/db", () => ({ db: { $queryRaw: m.reads, resident: { count: m.count, findMany: m.findMany }, college: { findMany: m.colleges }, dataSource: { findMany: m.sources } } }));
 
 const row = {
   id: "r1",
@@ -34,16 +36,18 @@ const list = (q: Record<string, unknown> = {}) => listResidentsAll(residentsQuer
 const denied = (q: Record<string, unknown> = {}) => list(q).then(() => null, (e: ResidentsDenied) => e.code);
 const where = () => m.findMany.mock.lastCall![0].where;
 
+const LIMIT = 10;
 let readsToday = 0;
 beforeEach(() => {
   vi.clearAllMocks();
   readsToday = 0;
+  m.plan.mockImplementation(async () => ({ allowed: ++readsToday <= LIMIT, used: Math.min(readsToday, LIMIT), limit: LIMIT, resetAt: new Date() }));
   m.hasSiteAccess.mockResolvedValue(true);
   m.getCurrentUser.mockResolvedValue({ id: "u1", email: "x@seatora.test", name: "X" });
   m.allow.mockReturnValue(true);
-  m.reads.mockImplementation(async () => [{ count: ++readsToday }]);
   m.count.mockResolvedValue(120);
   m.findMany.mockResolvedValue([row]);
+  m.colleges.mockResolvedValue([{ id: "c1" }]);
   m.sources.mockResolvedValue([{ key: row.sourceKey, name: "MCC admitted candidates list (up to Round 3)", url: null, counsellingYear: 2025 }]);
 });
 
@@ -54,26 +58,26 @@ describe("gates and budget", () => {
     expect(m.allow).not.toHaveBeenCalled(); // no budget spent on a refused read
     m.allow.mockReturnValueOnce(false);
     expect(await denied()).toBe("rate_limited");
-    expect(m.reads).not.toHaveBeenCalled();
+    expect(m.plan).not.toHaveBeenCalled();
     expect(m.count).not.toHaveBeenCalled();
     expect(m.findMany).not.toHaveBeenCalled();
   });
 
-  it("spends one read per call, per IP and per account per day; past the daily cap rate_limited from any IP", async () => {
+  it("spends one read per call, per IP and per account per day; past the plan's daily reads plan_limit from any IP", async () => {
     await list();
     expect(m.allow.mock.calls).toEqual([["residents:203.0.113.9", 300, 3_600_000]]);
-    expect(m.reads).toHaveBeenCalledTimes(1);
-    expect(m.reads.mock.lastCall!.slice(1)).toEqual(["u1"]); // the account's row, counted in the database
-    readsToday = RESIDENTS_READS_PER_DAY - 1;
+    expect(m.plan).toHaveBeenCalledTimes(1);
+    expect(m.plan.mock.lastCall!.slice(0, 2)).toEqual(["u1", "residents"]); // the account's count, in the database
+    readsToday = LIMIT - 1;
     expect(await denied()).toBeNull(); // the cap-th read
-    expect(await denied()).toBe("rate_limited");
+    expect(await denied()).toBe("plan_limit");
     m.getCurrentUser.mockResolvedValueOnce(null);
     expect(await denied()).toBe("rate_limited");
   });
 });
 
-// A search token: in the resident's name, or the college's name or city.
-const anyOf = (t: object) => ({ OR: [{ name: t }, { college: { name: t } }, { college: { city: t } }] });
+// A search token: in the resident's name, or one of the colleges whose name or city has it (looked up first: c1).
+const anyOf = (t: object) => ({ OR: [{ name: t }, { collegeId: { in: ["c1"] } }] });
 
 describe("query", () => {
   it("filters: name tokens, colleges, state, courses, year, quota; never hidden, never by rank", async () => {
@@ -87,6 +91,7 @@ describe("query", () => {
       AND: ["aB", "cD"].map((t) => anyOf({ contains: t, mode: "insensitive" })),
     });
     expect(m.count.mock.calls.map((c) => c[0].where)).toEqual([where()]);
+    expect(m.colleges.mock.calls.map((c) => c[0].where)).toEqual(["aB", "cD"].map((t) => ({ OR: [{ name: { contains: t, mode: "insensitive" } }, { city: { contains: t, mode: "insensitive" } }] })));
     expect(m.findMany.mock.lastCall![0].select).not.toHaveProperty("rank");
     expect(m.findMany.mock.lastCall![0].select).not.toHaveProperty("rankBasis");
     await list({ q: "50%_a\\" }); // LIKE wildcards are matched literally

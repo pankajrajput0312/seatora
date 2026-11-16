@@ -1,5 +1,6 @@
 import { compareQuerySchema, gridRounds, handle, invalid, ok, parseOptionalProfile, parseQuery, sourcesFor } from "@/features/decide/api";
 import { currentOptionIds, getMeta, getOptionsByIds } from "@/features/decide/service";
+import { planCap, planRequired } from "@/features/plans/usage";
 
 /** 1–4 different options side by side (ids from /options, an old link's retired college keys renamed; repeats count once); reach labels when a profile is given. */
 export async function GET(req: Request) {
@@ -8,6 +9,7 @@ export async function GET(req: Request) {
     const profile = parseOptionalProfile(p);
     const q = parseQuery(compareQuerySchema, p, ["ids"]);
     if (!profile.success || !q.success) return invalid(profile.error, q.error);
+    if (q.data.ids.length > (await planCap("compare"))) return planRequired(`Comparing ${q.data.ids.length} options`);
     const [meta, rows] = await Promise.all([getMeta(), currentOptionIds(q.data.ids).then((ids) => getOptionsByIds([...new Set(ids)], profile.data))]);
     return ok(rows, { sources: sourcesFor(meta.sources, gridRounds(rows)) });
   });

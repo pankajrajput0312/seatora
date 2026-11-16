@@ -71,16 +71,12 @@ describe("submitFeatureRequest without the database", () => {
     now.mockRestore();
   });
 
-  it("denies the owner tools when signed out, or with no owner configured", async () => {
+  // Owner is a role now (User.role, features/plans): with a session it takes a database read, covered below.
+  it("denies the owner tools when signed out", async () => {
     ctx.token = undefined;
     expect(await isOwner()).toBe(false);
     expect(await listAllRequests()).toBeNull();
     expect(await setRequestStatus("x", "done")).toEqual({ ok: false, error: "You don't have access to this." });
-    vi.stubEnv("SEATORA_OWNER_EMAILS", " , ");
-    ctx.token = "anything";
-    expect(await isOwner()).toBe(false); // empty list: nobody, without a database read
-    vi.stubEnv("SEATORA_OWNER_EMAILS", OWNER);
-    ctx.token = undefined;
   });
 });
 
@@ -138,6 +134,11 @@ describe.skipIf(!dbUrl)("requests on a scratch database", { timeout: 30_000 }, (
 
     as("owner");
     expect(await isOwner()).toBe(true);
+    expect((await db.user.findUniqueOrThrow({ where: { id: ids.owner } })).role).toBe("OWNER"); // SEATORA_OWNER_EMAILS promoted the account
+    vi.stubEnv("SEATORA_OWNER_EMAILS", "");
+    as("owner");
+    expect(await isOwner()).toBe(true); // the role holds without the env
+    vi.stubEnv("SEATORA_OWNER_EMAILS", OWNER);
     const all = await listAllRequests();
     expect([all?.total, all?.page, all?.pageSize, all?.rows.map((r) => r.kind)]).toEqual([2, 1, 50, ["data", "feature"]]);
     expect(typeof all?.rows[0].createdAt).toBe("string");

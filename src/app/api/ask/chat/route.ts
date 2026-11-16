@@ -10,6 +10,7 @@ import { claimRun, finishTurn, getPreferences, saveCheckpoint, saveProgress, sta
 import { sseFrame } from "@/features/ask/sse";
 import { profileFromParams } from "@/features/decide/profile";
 import { getDecideData } from "@/features/decide/service";
+import { checkAndCount } from "@/features/plans/usage";
 
 // Ask Seatora's chat (owner only, ASK_ENABLED=1). POST a question { conversationId?, requestId, message, profile, deep }
 // or a continue { continue: { conversationId, requestId, segment }, profile, deep } → text/event-stream of `data: {...}`
@@ -79,6 +80,16 @@ export async function POST(req: Request) {
     // The same request again (a retry after a dropped connection): never run twice.
     if (turn.existing) return replay(stateEvents(meta, { ...turn.existing, phase: null }));
     run = { conversationId: turn.conversationId, requestId: body.requestId, segment: 0, answerId: turn.answerId, question: body.message, history: turn.history, shown: "", thinking: "", checkpoint: null, startedAt: Date.now() };
+  }
+
+  // The plan's questions a day (features/plans): new questions only; owner and admins are unlimited (still counted).
+  if (!run.segment) {
+    const q = await checkAndCount(user.id, "ask", undefined, { account: user });
+    if (!q.allowed) {
+      const message = `You've asked today's ${q.limit} questions on your plan. More at 00:00 IST, or get the Season Pass on the Pricing page.`;
+      await finishTurn(run.answerId, { content: message, thinking: null, status: "error" });
+      return json(429, { ok: false, error: { code: "plan_limit", message } });
+    }
   }
 
   const effort = chooseEffort(run.question, body.deep);

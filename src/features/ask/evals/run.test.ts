@@ -18,7 +18,7 @@ const { live, replay, record } = vi.hoisted(() => {
   return { replay, record: process.env.ASK_EVAL_RECORD === "1", live: replay || (process.env.ASK_EVAL === "1" && db && !!process.env.AWS_BEARER_TOKEN_BEDROCK) };
 });
 // Outside a request there is no session: let residents_at read (the route checks the owner in production).
-vi.mock("@/features/decide/server/residents", async (orig) => ({ ...(await orig<object>()), canSeeResidents: async () => true, residentsBudget: async () => true }));
+vi.mock("@/features/decide/server/residents", async (orig) => ({ ...(await orig<object>()), canSeeResidents: async () => true, residentsDenied: async () => null }));
 
 const HER = "rank=42284&cat=OBC&sp=ANAESTHESIOLOGY&sp=FAMILYMEDICINE";
 // USD per million tokens at Anthropic's list prices for Claude Opus 5.5 (Bedrock bills its own rates).

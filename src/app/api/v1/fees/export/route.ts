@@ -5,6 +5,7 @@ import { parseSearchParams } from "@/features/decide/lib/params";
 import { termFilterLists } from "@/features/decide/lib/term-filters";
 import { profileFromParams } from "@/features/decide/profile";
 import { getDecideData, listFees } from "@/features/decide/service";
+import { planCap, planRequired } from "@/features/plans/usage";
 
 /**
  * The Fees & bond page's current view as CSV: the same params read the same lenient way (her profile's defaults
@@ -12,6 +13,7 @@ import { getDecideData, listFees } from "@/features/decide/service";
  */
 export async function GET(req: Request) {
   return handle(async () => {
+    if (!(await planCap("csv"))) return planRequired("CSV export");
     const p = new URL(req.url).searchParams;
     const f = parseSearchParams(feesParamsSchema, p, termFilterLists);
     const { courses } = await getDecideData();

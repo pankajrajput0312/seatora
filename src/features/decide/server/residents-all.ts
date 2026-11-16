@@ -2,14 +2,14 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { RESIDENTS_PAGE_SIZE, type ResidentRow, type ResidentsPage, type ResidentsQuery } from "../residents-search";
-import { canSeeResidents, residentsBudget, type ResidentSource } from "./residents";
+import { canSeeResidents, residentsDenied, type ResidentSource } from "./residents";
 
 // Residents across institutes (the Residents tab): one filtered, sorted page at a time. Same gate and read budget as the
 // institute tab; hidden rows are never read; no reservation category is held, so none can be returned.
 
-/** Names may not be read: "locked" (no access, as canSeeResidents) or "rate_limited" (read budget spent). */
+/** Names may not be read: "locked" (no access, as canSeeResidents), "rate_limited" (per IP) or "plan_limit" (the plan's reads a day). */
 export class ResidentsDenied extends Error {
-  constructor(readonly code: "locked" | "rate_limited") {
+  constructor(readonly code: "locked" | "rate_limited" | "plan_limit") {
     super(`residents: ${code}`);
     this.name = "ResidentsDenied";
   }
@@ -34,8 +34,13 @@ export const residentQuota = (quota: string) => (RELIGIOUS.includes(quota) ? MIN
 /** Each token (any case and spacing) must occur in the field; a typed % or _ is literal (Prisma passes `contains` to ILIKE unescaped). */
 const tokens = (q: string | undefined) => (q?.split(/\s+/).filter(Boolean) ?? []).map((t) => ({ contains: t.replace(/[\\%_]/g, "\\$&"), mode: "insensitive" as const }));
 
-/** The WHERE for a query: each search token (any case and spacing) occurs in the name or the college's name or city ("Pudukkottai"); never hidden rows. */
-function residentsWhere(q: ResidentsQuery): Prisma.ResidentWhereInput {
+/**
+ * The WHERE for a query: each search token (any case and spacing) occurs in the name or the college's name or city
+ * ("Pudukkottai"); never hidden rows. `places[i]`: the ids of the colleges whose name or city has token i, looked up
+ * first (collegesWith), so the token's OR is two indexes (the name's trigram index, collegeId) instead of a scan of
+ * every resident joined to its college (about 55 ms → 3 ms on the 2025 data).
+ */
+function residentsWhere(q: ResidentsQuery, places: string[][]): Prisma.ResidentWhereInput {
   const cq = tokens(q.cq);
   return {
     hidden: false,
@@ -44,11 +49,15 @@ function residentsWhere(q: ResidentsQuery): Prisma.ResidentWhereInput {
     college: q.college?.length || q.state || cq.length ? { slug: q.college?.length ? { in: q.college } : undefined, state: q.state?.length ? { in: q.state } : undefined, AND: cq.length ? cq.map((name) => ({ name })) : undefined } : undefined,
     specialty: q.course?.length ? { slug: { in: q.course } } : undefined,
     AND: [
-      ...tokens(q.q).map((t) => ({ OR: [{ name: t }, { college: { name: t } }, { college: { city: t } }] })),
+      ...tokens(q.q).map((t, i) => ({ OR: [{ name: t }, { collegeId: { in: places[i] } }] })),
       ...(q.name?.length ? [{ OR: q.name.map((n) => ({ name: { equals: n, mode: "insensitive" as const } })) }] : []),
     ],
   };
 }
+
+/** Per search token, the ids of the colleges whose name or city has it (about 2,000 colleges: a quick scan each). */
+const collegesWith = (ts: ReturnType<typeof tokens>) =>
+  Promise.all(ts.map(async (t) => (await db.college.findMany({ where: { OR: [{ name: t }, { city: t }] }, select: { id: true } })).map((c) => c.id)));
 
 /** The years that have residents, newest first (the Year filter: no admitted list yet for the year in counselling). */
 export const residentYears = async () =>
@@ -82,8 +91,9 @@ export const residentColleges = (by: { q: string } | { slugs: string[] }, take =
  */
 export async function listResidentsAll(q: ResidentsQuery): Promise<ResidentsPage & { sources: ResidentSource[] }> {
   if (!(await canSeeResidents())) throw new ResidentsDenied("locked");
-  if (!(await residentsBudget("read"))) throw new ResidentsDenied("rate_limited");
-  const where = residentsWhere(q);
+  const no = await residentsDenied("read");
+  if (no) throw new ResidentsDenied(no);
+  const where = residentsWhere(q, await collegesWith(tokens(q.q)));
   const [total, found] = await Promise.all([
     db.resident.count({ where }),
     q.page > RESIDENTS_MAX_PAGE ? [] : db.resident.findMany({

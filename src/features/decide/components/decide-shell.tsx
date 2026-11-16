@@ -5,13 +5,14 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, IndianRupee, LayoutDashboard, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { MessageCircle, Pencil, Sparkles } from "lucide-react";
+import { MessageCircle, Pencil, ShieldCheck, Sparkles } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { LogoMark } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { PlanChip } from "@/features/plans/components/plan-chip";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { MAX_COMPARE } from "../lib/choices";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
@@ -58,7 +59,8 @@ const bottom = [
 
 /** `phone`: the server's guess from the user agent (layout.tsx), so the first paint has the right layout. */
 /** `ask`: the server says she is the owner with Ask Seatora on (layout.tsx); only then is its nav entry rendered. */
-export function DecideShell({ meta, phone, ask, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; children: React.ReactNode }) {
+/** `admin`: the server says she is an owner or admin (layout.tsx); only then is the Admin nav entry rendered. */
+export function DecideShell({ meta, phone, ask, admin, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; children: React.ReactNode }) {
   const pathname = usePathname();
   const sp = useSearchParams();
   const router = useRouter();
@@ -166,6 +168,7 @@ export function DecideShell({ meta, phone, ask, children }: { meta: ProfileMeta;
             heading={<TopNavHeading logo={<LogoMark className="size-6" />} heading="Seatora Decide" headingHref={L.to("/decide")} />}
             endContent={
               <span className="flex items-center gap-1">
+                <PlanChip />
                 {/* Compare tray: in the sticky header (phones: the bottom bar), never floating over the page and the focused control. */}
                 {compare.length > 0 && (
                   <span className="hidden md:block" data-print-hide>
@@ -209,7 +212,7 @@ export function DecideShell({ meta, phone, ask, children }: { meta: ProfileMeta;
               </div>
             }
           >
-            {(ask ? [...sections.slice(0, -1), { ...sections.at(-1)!, items: [...sections.at(-1)!.items, { href: "/decide/ask", label: "Ask Seatora", icon: Sparkles }] }] : sections).map((sec) => (
+            {(ask || admin ? [...sections.slice(0, -1), { ...sections.at(-1)!, items: [...sections.at(-1)!.items, ...(ask ? [{ href: "/decide/ask", label: "Ask Seatora", icon: Sparkles }] : []), ...(admin ? [{ href: "/decide/admin", label: "Admin", icon: ShieldCheck }] : [])] }] : sections).map((sec) => (
               <SideNavSection key={sec.title} title={sec.title}>
                 {sec.items.map(({ href, label, icon }) => (
                   <SideNavItem key={href} label={label} icon={icon} href={L.to(href)} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className="rounded-full bg-[#6d28d9] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">77K NAMES</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">BETA</span> })} />

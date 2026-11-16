@@ -18,6 +18,8 @@ import { parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { statCells, statKeys, statLabel } from "@/features/decide/lib/stat-format";
+import { Paywall } from "@/features/plans/components/paywall";
+import { currentPlan } from "@/features/plans/usage";
 import { currentOptionIds, getMeta, getOptionsByIds, LATEST_YEAR, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
 
 export const metadata: Metadata = { title: "Compare" };
@@ -32,8 +34,10 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
   const ids = [...new Set(await currentOptionIds([...new Set(parseSearchParams(paramsSchema, params, ["ids"]).ids)].slice(0, 5 * MAX_COMPARE)))];
-  const [known, meta] = await Promise.all([getOptionsByIds(ids, profile), getMeta()]);
-  const options = known.slice(0, MAX_COMPARE);
+  const [known, meta, me] = await Promise.all([getOptionsByIds(ids, profile), getMeta(), currentPlan()]);
+  // The plan's cap (features/plans): Free compares fewer; past it, the paywall says so above the table.
+  const cap = Math.min(MAX_COMPARE, me?.eff.limits.compare ?? MAX_COMPARE);
+  const options = known.slice(0, cap);
   const L = decideLinks(params);
   const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
   const [older, last] = PAST_YEARS;
@@ -96,6 +100,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         />
       ) : (
         <>
+        {me && known.length > cap && <Paywall feature="compare" eff={me.eff} className="mt-6" />}
         {/* Phones: a narrower label column and 10rem columns, so the next option peeks in at the edge, and this line. */}
         {options.length > 1 && <p className="mt-6 text-sm text-muted-foreground md:hidden">Swipe the table sideways for all {options.length} options; the labels stay put.</p>}
         <div role="region" aria-label="Comparison" tabIndex={0} className={`relative mt-3 md:mt-8 rounded-xl border border-border bg-card [scroll-padding-inline-start:11rem] ${tbl.scroll}`}>

@@ -68,7 +68,8 @@ counselling-basics · reading-closing-ranks · fees-stipend-bond · choice-list-
 ## Env
 | Variable | Default | |
 | --- | --- | --- |
-| `ASK_ENABLED` | off | `1` turns it on (owner only regardless) |
+| `ASK_ENABLED` | off | `1` turns it on (owner only unless `ASK_FOR_MEMBERS=1`) |
+| `ASK_FOR_MEMBERS` | off | `1` opens it to every signed-in member; their plan's questions a day apply (docs/PLANS_AND_ROLES.md; owner and admins unlimited) |
 | `AWS_BEARER_TOKEN_BEDROCK` | — | Bedrock API key (sensitive) |
 | `AWS_REGION` | `us-east-1` | |
 | `ASK_MODEL` | `anthropic.claude-opus-5-5` | |

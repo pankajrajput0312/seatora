@@ -210,6 +210,10 @@ model Resident {
   @@index([collegeId, year])
   @@index([specialtyId])
   @@index([year, rank])
+  /// Residents search (ILIKE '%token%'); pg_trgm, created by the migration (schema "extensions" on Supabase).
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Resident_name_trgm_idx")
+  @@index([name, year(sort: Desc), id])
+  @@index([hidden, year])
 }
 
 /// A person who asked not to be shown (the Residents tab "Hide"). Apart from Resident, which the imports replace or
@@ -224,8 +228,8 @@ model HiddenResident {
   @@id([name, place])
 }
 
-/// Name reads per account per day (residentsBudget's daily cap), in the database so every server instance counts
-/// them. Written by one raw-SQL upsert; no foreign key (a row per account and day, nothing else).
+/// Unused since plans (UsageDaily feature "residents" counts name reads now); kept so the deploy that adds plans can't
+/// break the previous one mid-rollout. Drop in a later migration.
 model ResidentsRead {
   userId String
   day    DateTime @db.Date
@@ -440,6 +444,15 @@ model WaitlistEntry {
   createdAt DateTime @default(now())
 }
 
+/// Who an account is (features/plans/plans.ts): OWNER and ADMIN run the site (/decide/admin), PREMIUM holds the Season
+/// Pass, FREE everyone else. The plan a user gets also depends on premiumUntil and FREE_FOR_ALL_UNTIL.
+enum Role {
+  OWNER
+  ADMIN
+  PREMIUM
+  FREE
+}
+
 model User {
   id           String            @id @default(cuid())
   email        String            @unique
@@ -449,6 +462,13 @@ model User {
   failedLogins Int               @default(0)
   lockedUntil  DateTime?
   createdAt    DateTime          @default(now())
+  role         Role              @default(FREE)
+  /// Season Pass expiry: Premium limits until then, whatever the role.
+  premiumUntil DateTime?
+  /// How the account came to be, e.g. "signup", "admin"; free text.
+  createdVia   String?
+  /// Owner's notes on the account (the admin page).
+  notes        String?
   sessions     Session[]
   requests     FeatureRequest[]
   profile      UserProfile?
@@ -486,6 +506,41 @@ model Session {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+/// Counted uses per account per IST day and feature (features/plans/usage.ts checkAndCount): "ask", "residents".
+/// One atomic upsert per use; no foreign key (counters only).
+model UsageDaily {
+  userId  String
+  /// The day in India (Asia/Kolkata): limits reset at 00:00 IST.
+  day     DateTime @db.Date
+  feature String
+  count   Int      @default(0)
+
+  @@id([userId, day, feature])
+}
+
+/// Distinct things an account opened per IST day (feature "institutes": key = College.key). Insert-ignore, then count.
+model UsageDistinct {
+  userId  String
+  day     DateTime @db.Date
+  feature String
+  key     String
+
+  @@id([userId, day, feature, key])
+}
+
+/// What an owner or admin changed on an account (/decide/admin): who, whom, and the fields before and after.
+model AdminAudit {
+  id        String   @id @default(cuid())
+  actorId   String
+  targetId  String
+  action    String
+  before    Json
+  after     Json
+  createdAt DateTime @default(now())
+
+  @@index([targetId, createdAt])
 }
 
 /// "Request a feature" (src/features/requests): a feature, a customization, a data correction or anything else. Plain text,

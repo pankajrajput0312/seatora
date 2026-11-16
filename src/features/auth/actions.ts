@@ -82,7 +82,7 @@ export async function signUp(input: SignUpInput, next?: string): Promise<AuthRes
 
   try {
     const user = await db.user.create({
-      data: { name: parsed.data.name, email: parsed.data.email, passwordHash: await hashPassword(parsed.data.password) },
+      data: { name: parsed.data.name, email: parsed.data.email, passwordHash: await hashPassword(parsed.data.password), createdVia: "signup" },
     });
     await createSession(user);
   } catch (err) {
