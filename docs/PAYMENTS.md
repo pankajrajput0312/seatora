@@ -1,6 +1,6 @@
 # Payments (Razorpay Standard Checkout)
 
-A signed-in user buys the Season Pass (₹499, ₹399 with a referral: docs/REFERRALS.md) from Pricing (`/pricing#buy`), the planner's home card, the paywall or the account page, all through `SeasonPassButton` (components/season-pass-button.tsx). Code: `src/features/payments`, routes in `src/app/api/payments`.
+A signed-in user buys the Season Pass (₹499, ₹399 with a referral: docs/REFERRALS.md) from the plan cards (Pricing `/pricing#buy`, the planner's `/decide/plan`, the sign-in pop-up, the paywall, the account page) or the planner's home card, all through `SeasonPassButton` (components/season-pass-button.tsx). Code: `src/features/payments`, routes in `src/app/api/payments`.
 
 ## What the button shows (`SeasonPassButton`, by `passState` in features/plans/plans.ts)
 | She is | Shows |

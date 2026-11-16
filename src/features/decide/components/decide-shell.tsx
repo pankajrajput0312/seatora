@@ -5,14 +5,13 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, House, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { CircleArrowUp, Gift, MessageCircle, Pencil, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { CircleArrowUp, Gift, MessageCircle, Pencil, ShieldCheck, Sparkles } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { LogoMark } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { PlanChip } from "@/features/plans/components/plan-chip";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { MAX_COMPARE } from "../lib/choices";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
@@ -61,8 +60,8 @@ const bottom = [
 /** `phone`: the server's guess from the user agent (layout.tsx), so the first paint has the right layout. */
 /** `ask`: the server says she is the owner with Ask Seatora on (layout.tsx); only then is its nav entry rendered. */
 /** `admin`: the server says she is an owner or admin (layout.tsx); only then is the Admin nav entry rendered. */
-/** `upgrade`: she is on the Free plan (layout.tsx), so the Account group offers "Upgrade" (Pricing's buy section). */
-export function DecideShell({ meta, phone, ask, admin, upgrade, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; upgrade?: boolean; children: React.ReactNode }) {
+/** `account`: the signed-in user (layout.tsx) for the sidebar's footer and the header's plan chip; null signed out. */
+export function DecideShell({ meta, phone, ask, admin, account, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; account: ShellAccount | null; children: React.ReactNode }) {
   const pathname = usePathname();
   const sp = useSearchParams();
   const router = useRouter();
@@ -157,19 +156,12 @@ export function DecideShell({ meta, phone, ask, admin, upgrade, children }: { me
   }, []);
 
   const isCurrent = (href: string) => (href === "/decide" ? pathname === href : pathname.startsWith(href));
-  // The sidebar: the Plan … Research groups, then Account (Refer & earn, Upgrade on the Free plan, the account page), then
-  // Help with Ask and Admin for those who have them.
+  // The sidebar: the Plan … Research groups, then Account (Refer & earn), then Help with Ask and Admin for those who have
+  // them. Her name, plan and "Upgrade" are the footer (AccountFooter), pinned to the sidebar's and the menu's bottom.
   const help = sections.at(-1)!;
   const nav = [
     ...sections.slice(0, -1),
-    {
-      title: "Account",
-      items: [
-        { href: "/decide/refer", label: "Refer & earn", icon: Gift },
-        ...(upgrade ? [{ href: "/pricing#buy", label: "Upgrade", icon: CircleArrowUp }] : []),
-        { href: "/account", label: "Your plan", icon: UserRound },
-      ],
-    },
+    { title: "Account", items: [{ href: "/decide/refer", label: "Refer & earn", icon: Gift }] },
     { ...help, items: [...help.items, ...(ask ? [{ href: "/decide/ask", label: "Ask Seatora", icon: Sparkles }] : []), ...(admin ? [{ href: "/decide/admin", label: "Admin", icon: ShieldCheck }] : [])] },
   ];
 
@@ -185,7 +177,13 @@ export function DecideShell({ meta, phone, ask, admin, upgrade, children }: { me
             heading={<TopNavHeading logo={<LogoMark className="size-6" />} heading="Seatora Decide" headingHref={L.to("/decide")} />}
             endContent={
               <span className="flex items-center gap-1">
-                <PlanChip />
+                {account && (
+                  <Link href={L.to("/decide/plan")} title={account.plan} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap">
+                    <span className="sr-only">Your plan: </span>
+                    <span className="font-semibold">{account.upgrade ? "Free" : account.plan.split(" · ")[0]}</span>
+                    {account.upgrade && <span className="-mr-1.5 rounded-full bg-[#5ccfe6] px-2 py-0.5 font-semibold text-[#0b0e12]">Upgrade</span>}
+                  </Link>
+                )}
                 {/* Compare tray: in the sticky header (phones: the bottom bar), never floating over the page and the focused control. */}
                 {compare.length > 0 && (
                   <span className="hidden md:block" data-print-hide>
@@ -211,6 +209,7 @@ export function DecideShell({ meta, phone, ask, admin, upgrade, children }: { me
         sideNav={
           <SideNav
             aria-label="Decide"
+            footer={<AccountFooter account={account} href={L.to("/decide/plan")} current={pathname === "/decide/plan"} />}
             header={
               <div className="rounded-lg border border-border bg-card p-3">
                 <p className="text-xs text-muted-foreground">Your rank</p>
@@ -277,5 +276,41 @@ export function DecideShell({ meta, phone, ask, admin, upgrade, children }: { me
         />
       )}
     </>
+  );
+}
+
+export type ShellAccount = { name: string; plan: string; upgrade: boolean; freeTill: string | null };
+
+const cyan = "flex min-h-11 flex-col items-center justify-center rounded-md bg-[#5ccfe6] px-3 py-1 text-[#0b0e12] hover:bg-[#7fdcef]";
+
+/**
+ * The sidebar's (and the phone menu's) bottom: her initial, name and plan line, both to /decide/plan, and above it a cyan
+ * "Upgrade" without the Season Pass ("Free till 20 Nov" in the free period). Signed out: Create free account and Sign in.
+ * `data-nav-footer`: globals.css pins it to the menu's bottom (Astryx pins it in the sidebar).
+ */
+function AccountFooter({ account, href, current }: { account: ShellAccount | null; href: string; current: boolean }) {
+  if (!account)
+    return (
+      <div data-nav-footer className="grid gap-2 border-t border-border pt-2">
+        <Link href="/signup?next=%2Fdecide" className={cn(cyan, "text-sm font-bold")}>Create free account</Link>
+        <Link href="/login?next=%2Fdecide" className="inline-flex min-h-11 items-center justify-center rounded-md border border-input text-sm font-semibold">Sign in</Link>
+      </div>
+    );
+  return (
+    <div data-nav-footer className="grid gap-1.5 border-t border-border pt-2">
+      {account.upgrade && (
+        <Link href={href} className={cyan}>
+          <span className="flex items-center gap-1.5 text-sm font-bold"><CircleArrowUp className="size-4" aria-hidden />Upgrade</span>
+          {account.freeTill && <span className="text-xs font-semibold">Free till {account.freeTill}</span>}
+        </Link>
+      )}
+      <Link href={href} aria-current={current ? "page" : undefined} className={cn("flex min-h-12 items-center gap-2.5 rounded-md px-2 hover:bg-muted", current && "bg-muted")}>
+        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-[#0b0e12] text-sm font-bold text-[#5ccfe6]">{account.name[0]?.toUpperCase()}</span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold">{account.name}</span>
+          <span className="block truncate text-xs text-muted-foreground">{account.plan}</span>
+        </span>
+      </Link>
+    </div>
   );
 }

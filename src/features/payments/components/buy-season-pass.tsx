@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { applyReferralCode } from "@/features/referrals/actions";
@@ -41,6 +41,7 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const failed = useRef(false);
+  const codeId = useId(); // the plan cards and a page's own button can both be on screen
 
   const label = `${verb} · ${formatPaise(offer.amount)}${offer.inviter ? ` with ${offer.inviter}'s invite` : ""}`;
 
@@ -128,8 +129,8 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
         <details className={cn("mt-2 text-xs", noteClassName)}>
           <summary className="cursor-pointer">Have a referral code?</summary>
           <form action={apply} className="mt-1.5 flex gap-2">
-            <label htmlFor="ref-code" className="sr-only">Referral code</label>
-            <input id="ref-code" name="code" required maxLength={8} autoComplete="off" spellCheck={false} placeholder="CODE" className="h-9 w-28 rounded-md border border-input bg-transparent px-2 text-sm uppercase text-foreground" />
+            <label htmlFor={codeId} className="sr-only">Referral code</label>
+            <input id={codeId} name="code" required maxLength={8} autoComplete="off" spellCheck={false} placeholder="CODE" className="h-9 w-28 rounded-md border border-input bg-transparent px-2 text-sm uppercase text-foreground" />
             <button type="submit" className="h-9 rounded-md border border-input px-3 text-sm font-semibold text-foreground">Apply</button>
           </form>
         </details>

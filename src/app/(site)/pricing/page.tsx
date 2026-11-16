@@ -8,9 +8,8 @@ import { FreePrice } from "@/components/marketing/free-price";
 import { formatINR } from "@/features/cutoffs/lib/format";
 import { askConfig } from "@/features/ask/config";
 import { getCurrentUser } from "@/features/auth/lib/session";
-import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import { paymentsOn } from "@/features/payments/plans";
-import { PlanTable } from "@/features/plans/components/plan-table";
+import { PlanCards } from "@/features/plans/components/plan-cards";
 import { freeNow, longDate, shortDate } from "@/features/plans/plans";
 import { SEASON_PASS_UNTIL } from "@/features/payments/grant";
 import { InviteBanner } from "@/features/referrals/components/invite-banner";
@@ -21,8 +20,6 @@ export const metadata: Metadata = {
   title: "Pricing — Seatora NEET PG 2026 Season Pass",
   description: `The Seatora NEET PG 2026 Season Pass: ${formatINR(business.regularPrice)} ${business.period}, paid once, with no subscription or auto-renewal. Free and Season Pass limits compared.`,
 };
-
-const buyClass = "h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90";
 
 /** Rendered per request: her price (a referral), her Season Pass, and whether the free period and payments are on. */
 export default async function PricingPage() {
@@ -44,19 +41,16 @@ export default async function PricingPage() {
           Online NEET PG counselling planner for MCC All India counselling: Round 2 seats, past closing ranks, fees, stipends and bonds, and
           residents at each college, from official MCC, NBEMS and NMC documents. A free account opens the planner straight away.
         </p>
-        <div id="buy" className="mt-5 scroll-mt-24">
-          <SeasonPassButton className={buyClass} noteClassName="text-muted-foreground" />
-        </div>
+        <section id="buy" aria-labelledby="plans-h" className="mt-8 scroll-mt-24 md:w-[44rem]">
+          <h2 id="plans-h" className="text-lg font-medium">Free and Season Pass</h2>
+          <PlanCards className="mt-3" />
+          <p className="mt-3 text-sm text-muted-foreground">
+            Limits reset at 00:00 IST. {free && `Everything has Season Pass limits till ${shortDate(free)}. `}
+            {!askOpen && "Ask Seatora is in beta and opens to members later."}
+          </p>
+        </section>
         <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-16">16 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
-          <section aria-labelledby="plans-h">
-            <h2 id="plans-h">Free and Season Pass</h2>
-            <PlanTable className="mt-3" />
-            <p className="mt-2 text-sm">
-              Limits reset at 00:00 IST. {free && `Everything has Season Pass limits till ${shortDate(free)}. `}
-              {!askOpen && "Ask Seatora is in beta and opens to members later."}
-            </p>
-          </section>
           <section>
             <h2>What you pay</h2>
             {paying ? (

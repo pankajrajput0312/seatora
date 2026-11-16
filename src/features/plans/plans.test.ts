@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { effectivePlan, freeForAllUntil, istDay, passState, planLimits } from "./plans";
+import { effectivePlan, freeForAllUntil, istDay, passState, planLimits, planLine } from "./plans";
 
 const now = new Date("2026-11-20T06:00:00Z");
 const free = { role: "FREE" as const, premiumUntil: null };
@@ -41,6 +41,10 @@ describe("passState", () => {
     expect(passState({ role: "PREMIUM", premiumUntil: null }, after, env).state).toBe("pass");
     expect(passState({ role: "ADMIN", premiumUntil: null }, after, env).state).toBe("staff");
     expect(passState(free, after, {}).state).toBe("free");
+  });
+  it("planLine names each state", () => {
+    expect([free, { ...free, premiumUntil: end }, { ...free, premiumUntil: paid }, { role: "OWNER" as const, premiumUntil: null }].map((a) => planLine(a, before, env)))
+      .toEqual(["Free plan", "Season Pass · free till 20 Nov", "Season Pass · till 31 Mar 2027", "Owner"]);
   });
 });
 

@@ -4,9 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { claimFreeSeasonPass } from "../actions";
-import { PLAN_EVENT } from "./plan-chip";
 
-/** "Upgrade to Season Pass, free till 20 Nov": the free upgrade (claim.ts), then the page and the plan chip read it again. */
+/** "Upgrade to Season Pass, free till 20 Nov": the free upgrade (claim.ts), then the page (and the layout: the sidebar and the plan chip) reads it again. */
 export function ClaimFreePass({ label, className, noteClassName }: { label: string; className?: string; noteClassName?: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -16,7 +15,6 @@ export function ClaimFreePass({ label, className, noteClassName }: { label: stri
       setError(null);
       const r = await claimFreeSeasonPass().catch(() => ({ ok: false as const, error: "Couldn't upgrade. Try again." }));
       if (!r.ok) return setError(r.error);
-      window.dispatchEvent(new Event(PLAN_EVENT));
       router.refresh();
     });
   return (

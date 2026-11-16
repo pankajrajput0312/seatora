@@ -1,0 +1,34 @@
+import { createElement as h } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { limitLine, PlanCardsView } from "./plan-cards";
+
+const text = (html: string) => html.replace(/<[^>]+>/g, "");
+const card = (html: string, plan: "FREE" | "PREMIUM") => html.split(`data-plan="${plan}"`)[1].split("data-plan=")[0];
+
+describe("PlanCardsView", () => {
+  const render = (current: "FREE" | "PREMIUM" | null, free: Date | null) =>
+    renderToStaticMarkup(h(PlanCardsView, { current, free, cta: h("button", null, "CTA"), freeCta: h("a", { href: "/signup" }, "Create free account") }));
+
+  it("a Free user: the badge and a disabled Current plan on Free; the free period's ribbon and ₹0 on the Season Pass", () => {
+    const html = render("FREE", new Date("2026-11-20T18:29:59Z"));
+    expect(text(card(html, "FREE"))).toContain("Your plan");
+    expect(card(html, "FREE")).toMatch(/<button type="button" disabled=""[^>]*>Current plan<\/button>/);
+    expect(text(card(html, "PREMIUM"))).not.toContain("Your plan");
+    const pass = text(card(html, "PREMIUM"));
+    expect(pass).toContain("Free till 20 Nov");
+    expect(pass).toContain("₹499₹0till 20 Nov");
+    expect(pass).toContain("Then ₹499 (₹399 with an invite), valid till 31 Mar 2027.");
+    expect(pass).toContain("CTA");
+  });
+
+  it("lines come from the plans config; after the free period ₹499 and no ribbon; signed out gets the Free card's CTA", () => {
+    const html = render(null, null);
+    expect(text(card(html, "FREE"))).toContain("10 institute pages a day10 residents searches a day2 options in Compare1 saved choice listNo CSV exportsNo plan reports");
+    expect(text(card(html, "PREMIUM"))).toContain("Unlimited institute pages200 residents searches a day4 options in Compare10 saved choice listsUnlimited CSV exportsUnlimited plan reports");
+    expect(text(html)).not.toMatch(/Your plan|Free till|Current plan/);
+    expect(text(card(html, "PREMIUM"))).toContain("₹499paid once");
+    expect(card(html, "FREE")).toContain('<a href="/signup">Create free account</a>');
+    expect(limitLine("ask", 0)).toBe("No Ask Seatora questions a day");
+  });
+});

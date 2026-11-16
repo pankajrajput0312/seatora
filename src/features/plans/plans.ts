@@ -103,3 +103,15 @@ export function istDay(now = new Date()) {
 export const shortDate = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
 /** "Season Pass active till 31 Mar 2027" style date (IST). */
 export const longDate = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+
+/** Her plan in one line (the sidebar, the plan page, the account page): "Free plan", "Season Pass · free till 20 Nov", "Season Pass · till 31 Mar 2027", "Owner". */
+export function planLine(a: Account, now = new Date(), env: Record<string, string | undefined> = process.env) {
+  const s = passState(a, now, env);
+  if (s.state === "staff") return a.role === "OWNER" ? "Owner" : "Admin";
+  if (s.state === "claimed") return `Season Pass · free till ${shortDate(s.until!)}`;
+  if (s.state === "pass") return s.until ? `Season Pass · till ${longDate(s.until)}` : "Season Pass";
+  return "Free plan";
+}
+
+/** Today's use against a limit: "3/10", or "3" when unlimited. */
+export const usedOf = (n: number, limit: number) => (limit === Infinity ? String(n) : `${n}/${limit}`);

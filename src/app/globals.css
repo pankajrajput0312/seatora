@@ -382,10 +382,10 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
 @layer base {
   .app { padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
 }
-/* Laptop sidebar: its list scrolls under the rank card, and macOS hides the scrollbar, so a shadow on the bottom edge
-   says there is more (gone at the end of the list: the cover scrolls with it). */
+/* Laptop sidebar: its list scrolls between the rank card and the account footer, and macOS hides the scrollbar, so a
+   shadow on the list's bottom edge says there is more (gone at the end of the list: the cover scrolls with it). */
 @media (min-width: 48rem) {
-  .app nav.astryx-side-nav > :last-child {
+  .app nav.astryx-side-nav > :nth-last-child(2) {
     background:
       linear-gradient(transparent, var(--color-card) 70%) 0 100% / 100% 2.5rem no-repeat local,
       linear-gradient(transparent, color-mix(in oklab, var(--color-foreground) 16%, transparent)) 0 100% / 100% 0.75rem no-repeat scroll;
@@ -453,6 +453,12 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
   .filter-row > .toolbar { display: contents; }
   .filter-row > .toolbar > :first-child { order: 1; flex-basis: 100%; }
   .filter-row > .toolbar > :last-child:not(:first-child) { display: contents; }
+}
+
+/* The phone menu: the account footer (decide-shell.tsx AccountFooter) stays at the drawer's bottom while the list scrolls
+   (the sidebar's own footer is pinned by Astryx). -0.5rem: over the drawer's own 8px bottom padding, which sticky keeps. */
+@media (width < 48rem) {
+  .app :has(> [data-nav-footer]) { position: sticky; bottom: -0.5rem; z-index: 1; background: var(--color-card); padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)); }
 }
 
 /* Residents, the main feature: its own colour in the sidebar (SideNavItem data-accent) as on the institute tab. */

@@ -16,13 +16,10 @@ import type { ProfileMeta } from "@/features/decide/components/profile-dialog";
 import { EmptyState } from "@/features/decide/components/ui";
 import { deviceView } from "@/features/decide/components/view-toggle";
 import { getMeta } from "@/features/decide/service";
-import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
+import { PlanCards } from "@/features/plans/components/plan-cards";
 import { PlanPrompt } from "@/features/plans/components/plan-prompt";
-import { PlanTable } from "@/features/plans/components/plan-table";
-import { freeNow, passState, shortDate, type Feature } from "@/features/plans/plans";
+import { freeNow, passState, planLine, shortDate } from "@/features/plans/plans";
 import { PLAN_PROMPT_COOKIE } from "@/features/plans/prompt";
-
-const PROMPT_FEATURES: Feature[] = ["institutes", "residents", "csv", "reports", "compare", "choiceLists"];
 
 // Inside app uses its own "case sheet" system (docs/APP_DESIGN_SYSTEM.md): light, hyperlegible numerals.
 const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
@@ -53,16 +50,17 @@ export default async function DecideLayout({ children }: { children: React.React
   const ask = !!meta && (await askUser().catch(() => null)) != null;
   // Admin's nav entry: only for an owner or admin.
   const admin = !!meta && (await staffUser().catch(() => null)) != null;
-  // "Upgrade" in the nav: signed in without the Season Pass (the free upgrade in the free period, the paid one after).
+  // The sidebar's account footer and the header's plan chip: her name, her plan, and "Upgrade" without the Season Pass.
   const me = meta ? await getCurrentUser().catch(() => null) : null;
   const upgrade = !!me && ["claimable", "free"].includes(passState(me).state);
+  const free = freeNow();
+  const account = me && { name: me.name.trim() || me.email.split("@")[0], plan: planLine(me), upgrade, freeTill: free && shortDate(free) };
   // The plan pop-up: once right after signing in (the cookie createSession sets), only without the Season Pass.
   const prompt = upgrade && !!(await cookies()).get(PLAN_PROMPT_COOKIE);
-  const free = freeNow();
   return (
     <div className={`app ${app.variable} min-h-screen`}>
       <AstryxProvider>
-        <DecideShell phone={phone} ask={ask} admin={admin} upgrade={upgrade} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
+        <DecideShell phone={phone} ask={ask} admin={admin} account={account} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (
             <NavPending>{children}</NavPending>
           ) : (
@@ -78,16 +76,13 @@ export default async function DecideLayout({ children }: { children: React.React
           )}
         </DecideShell>
         {prompt && (
-          <PlanPrompt title={free ? "Upgrade to the Season Pass, free" : "Upgrade to the Season Pass"}>
+          <PlanPrompt title="Choose your plan">
             <p className="mt-1 text-sm text-muted-foreground">
               {free
-                ? `You're on the Free plan. Everything is free till ${shortDate(free)}: upgrade now, no card needed.`
+                ? `You're on the Free plan. The Season Pass is free till ${shortDate(free)}: upgrade now, no card needed.`
                 : "You're on the Free plan. The Season Pass lifts the daily limits for the whole counselling season."}
             </p>
-            <PlanTable features={PROMPT_FEATURES} className="mt-4" />
-            <div className="mt-4">
-              <SeasonPassButton className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-foreground px-4 text-sm font-semibold text-background" noteClassName="text-muted-foreground" />
-            </div>
+            <PlanCards className="mt-4" />
           </PlanPrompt>
         )}
       </AstryxProvider>
