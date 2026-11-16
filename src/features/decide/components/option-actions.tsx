@@ -234,7 +234,7 @@ function OptionsList({ rows, caption, start, L, view, latestYear, pastYears, inc
               <td className={cn(stick, "px-2 py-2 print:hidden")}><ChoiceStar item={toChoiceItem(r)} /></td>
               {/* Row header: only what names the option, so it reads short for every cell. */}
               <th scope="row" className={cn(stickName, "px-3 py-3 text-left font-normal")}>
-                <Link href={L.institute(r.college.slug)} title={r.college.name} className={cn("font-semibold hover:text-sky hover:underline", tbl.clamp)}><InstName name={r.college.name} state={r.college.state} /></Link>
+                <Link href={L.institute(r.college.slug)} title={r.college.name} className="font-semibold hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
                 <span className={cn("block max-md:text-xs", tbl.clamp)}>{courseName(r)}<span className="text-muted-foreground">, {r.quota}<span className="max-md:hidden">, {r.college.state ?? "state not listed"}</span></span></span>
                 <span className="block max-md:hidden"><HospitalLine h={r.hospital} of={r.college.name} /></span>
                 <span className="mt-1 block text-xs text-muted-foreground md:hidden">

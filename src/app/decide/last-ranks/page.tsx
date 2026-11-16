@@ -228,7 +228,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
             return (
               <tr key={r.id} className={`border-b border-border last:border-0 hover:bg-muted/50 ${here ? "bg-sky/10" : ""}`}>
                 <th scope="row" className={`sticky left-0 z-[1] max-w-64 px-3 py-2 text-left font-normal ${here ? "bg-mist" : "bg-card"} ${tbl.pin}`}>
-                  <Link href={L.institute(r.college.slug)} title={r.college.name} className={`font-medium hover:text-sky hover:underline ${tbl.clamp}`}><InstName name={r.college.name} state={r.college.state} /></Link>
+                  <Link href={L.institute(r.college.slug)} title={r.college.name} className="font-medium hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
                   <span className="block text-xs">{courseName(r)}</span>
                   <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                     <span>{r.college.state ?? <Dash />}, {r.quota}</span>

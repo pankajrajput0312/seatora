@@ -167,7 +167,16 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
             </AboutData>
             {groups.length > 0 && <ViewToggle page={VIEW} view={view} />}
           </div>
-          {groups.length === 0 && <EmptyState title="No allotments in this range" description="No seat was allotted to these ranks that year, or none passed the filters. Try a wider range, another year or fewer filters." />}
+          {groups.length === 0 && (
+            // The real controls: a wider range, every course, every seat category (her profile's are the default).
+            <EmptyState title="No allotments in this range" description={`No seat ${cf.slugs ? "in your courses " : ""}was allotted to ranks ${formatRank(Math.max(1, rank - window))}–${formatRank(rank + window)} in ${year.year}, or none passed the filters.`}>
+              <span className="flex flex-wrap justify-center gap-x-6">
+                {window < MAX_WINDOW && <Link href={L.with(R, { w: String(MAX_WINDOW), page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Widen to ± {formatRank(MAX_WINDOW)}</Link>}
+                {cf.slugs && <Link href={L.with(R, { course: "all", page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Every course</Link>}
+                {cats && <Link href={L.with(R, { scat: "all", page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Every seat category</Link>}
+              </span>
+            </EmptyState>
+          )}
           {groups.map((g) => {
             const label = `${year.year} ${roundLabel[g.round]} allotments`;
             const courseLink = (a: Row) => L.allotments({ course: course(a)?.slug, inst: a.collegeSlug, year: year.year, round: g.round });
@@ -225,7 +234,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                               <td className={`${tbl.num} sticky left-0 z-[1] bg-card max-md:text-left ${tbl.pin}`}>
                                 {formatRank(a.rank)}
                                 <span className="block text-xs font-normal md:hidden">{a.category} seat</span>
-                                <span title={a.collegeName} className={`block text-xs font-normal text-muted-foreground md:hidden ${tbl.clamp}`}><InstName name={a.collegeName} state={a.state} /></span>
+                                <span title={a.collegeName} className="block text-xs font-normal text-muted-foreground md:hidden"><InstName name={a.collegeName} state={a.state} /></span>
                               </td>
                               <td className={`${tbl.td} max-md:hidden`}>{a.category}</td>
                               <td className={`${tbl.td} min-w-52`}>

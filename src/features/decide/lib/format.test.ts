@@ -26,7 +26,7 @@ describe("shortName", () => {
     expect(shortName("Jawaharlal Institute of Medical Sciences", "Manipur")).toBe("Jawaharlal IMS, MN");
     expect(shortName("Government Medical College and Associated Group of Hospitals", "Rajasthan")).toBe("GMC & Assoc. Group of Hosps, RJ");
     expect(shortName("All India Institute of Medical Sciences, Jodhpur", "Rajasthan")).toBe("AIIMS Jodhpur, RJ");
-    expect(shortName("ESIC MEDICAL COLLEGE", "Telangana")).toBe("ESIC Medical College, TG");
-    expect(shortName("Silchar Medical College", null)).toBe("Silchar Medical College");
+    expect(shortName("ESIC MEDICAL COLLEGE", "Telangana")).toBe("ESIC Med. College, TG");
+    expect(shortName("Silchar Medical College", null)).toBe("Silchar Med. College");
   });
 });

@@ -30,6 +30,7 @@ const SHORT: [RegExp, string][] = [
   [/\bAll India Institute of Medical Sciences\b/gi, "AIIMS"],
   [/\b(?:Government|Govt\.?) Medical College\b/gi, "GMC"],
   [/\bInstitute of Medical Sciences\b/gi, "IMS"],
+  [/\bMedical College\b/gi, "Med. College"],
   [/\b(?:Government|Govt\.?)(?=\s)/gi, "Govt"],
   [/\bInstitute\b/gi, "Inst."],
   [/\bHospitals\b/gi, "Hosps"],
