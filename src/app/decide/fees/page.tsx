@@ -13,6 +13,8 @@ import { hospitalInfo } from "@/features/decide/components/institute/institute-d
 import { ResultCard, ResultCards } from "@/features/decide/components/result-card";
 import { TermStatCells } from "@/features/decide/components/stat-cells";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
+import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
+import { courseFilter } from "@/features/decide/lib/course-filter";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { AboutData } from "@/features/decide/components/filter-form";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, tbl } from "@/features/decide/components/ui";
@@ -44,16 +46,22 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const profile = profileFromParams(params);
   const [meta, { courses }, info] = await Promise.all([getMeta(), getDecideData(), hospitalInfo()]);
   const d = feeDefaults(profile, courses);
-  const [res, view] = await Promise.all([listFees(feesFilters(f, d), { page: f.page, pageSize: await pageSizeFor(PAGE_SIZE) }), chosenView(params, "fees")]);
+  // Her courses by default (one row per institute × course, its own terms), "All courses" for whole programmes.
+  const cf = courseFilter(params, profile, meta.courses);
+  const [res, view] = await Promise.all([listFees({ ...feesFilters(f, d), courses: cf.slugs ?? undefined }, { page: f.page, pageSize: await pageSizeFor(PAGE_SIZE) }), chosenView(params, "fees")]);
+  const noun = cf.slugs ? "courses" : "programmes";
+  /** The row's course ("DNB Family Medicine"), else its whole programme ("DNB, every course"). */
+  const rowTitle = (r: (typeof rows)[number]) => (r.course ? `${r.course.degree} ${r.course.name}` : `${programmeTitle(r.terms)}, every course`);
   const { rows } = res;
   const dir = f.dir ?? natural(f.sort);
   const byName = f.sort === "name";
   const sortHref = (k: FeeSort) => L.with("/decide/fees", { sort: k, dir: f.sort === k ? (dir === "asc" ? "desc" : "asc") : natural(k), page: null });
   const ariaSort = (on: boolean) => (on ? (dir === "asc" ? "ascending" : "descending") : undefined);
   const years = (r: (typeof rows)[number]) => `${L.institute(r.college.slug, "fees")}#fees-${programmes[r.terms.programme].slug}`;
-  const of = (r: (typeof rows)[number]) => `${r.college.name}, ${r.terms.programme}`;
+  const of = (r: (typeof rows)[number]) => `${r.college.name}, ${rowTitle(r)}`;
   const without = (k: string) => L.with("/decide/fees", { [k]: null, page: null });
   const chips = [
+    ...cf.chips((v) => L.with("/decide/fees", { course: v, page: null }), (s) => L.without("/decide/fees", "course", s)),
     // Her profile's caps apply here (absent maxfee / bondyrs): a chip each, removed by "any".
     ...(d.maxFeeLakh != null && f.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(d.maxFeeLakh)}`, param: "maxfee", href: L.with("/decide/fees", { maxfee: "any", page: null }) }] : []),
     ...(d.maxBondYears != null && f.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(d.maxBondYears)}`, param: "bondyrs", href: L.with("/decide/fees", { bondyrs: "any", page: null }) }] : []),
@@ -78,11 +86,11 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         const h = info.get(r.college.key);
         return (
           <ResultCard
-            key={`${r.college.key}-${t.programme}`}
+            key={`${r.college.key}-${t.programme}-${r.course?.slug ?? ""}`}
             title={r.college.name}
             href={years(r)}
             external={h?.mccProfileUrl ? { href: h.mccProfileUrl, label: `MCC profile: ${r.college.name}` } : undefined}
-            subtitle={programmeTitle(t)}
+            subtitle={rowTitle(r)}
             meta={[
               r.college.state ?? "State not listed",
               h?.type && <TypeBadge type={h.type} of={r.college.name} />,
@@ -119,12 +127,12 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             const t = r.terms;
             const type = info.get(r.college.key)?.type;
             return (
-              <tr key={`${r.college.key}-${t.programme}`} className={tbl.row}>
+              <tr key={`${r.college.key}-${t.programme}-${r.course?.slug ?? ""}`} className={tbl.row}>
                 {/* z-[1]: above the cells' (i) buttons (positioned) as they scroll under it. */}
                 {/* Phones: narrow (tbl.pin), the name on two lines, the programme, no state line. */}
                 <th scope="row" className={`${tbl.td} sticky left-0 z-[1] min-w-48 max-w-72 bg-card text-left font-medium ${tbl.pin}`}>
                   <Link href={years(r)} title={r.college.name} className={`hover:text-sky hover:underline ${tbl.clamp}`}>{r.college.name}</Link>
-                  <span className="mt-0.5 block font-normal max-md:text-xs">{programmeTitle(t)}</span>
+                  <span className="mt-0.5 block font-normal max-md:text-xs">{rowTitle(r)}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs font-normal text-muted-foreground max-md:hidden">
                     {r.college.state ?? <NotDeclared what="state not available" />}
                     {type && <TypeBadge type={type} of={r.college.name} />}
@@ -174,7 +182,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         active={chips.length}
         clear={L.to("/decide/fees")}
         total={res.total}
-        noun="programmes"
+        noun={noun}
         search={
           <label className="grid min-w-0 text-sm">
             <span className="sr-only">Institute or state</span>
@@ -182,6 +190,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           </label>
         }
       >
+        <FilterDropdown label="Course" name="course" search options={cf.choices} selected={cf.selected} none={cf.none} info={cf.mine.length ? "None ticked means your courses: a row per institute and course, with that course's own terms. Tick All courses for whole programmes." : undefined} />
         <Field label="Programme">
           <Select name="program" value={f.program} all={d.programmes ? `Your profile: ${d.programmes.join(", ")}` : "All programmes"}
             options={[...(d.programmes ? [{ value: "all", label: "All programmes" }] : []), ...programmeNames.map((p) => ({ value: programmes[p].slug, label: p }))]} />
@@ -204,7 +213,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       <div className={toolbarRow}>
         <AboutData>
         <h2 id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm font-normal text-muted-foreground">
-          <span><span className="numeric font-semibold text-foreground">{rangeLabel(res)}</span> programmes</span>
+          <span><span className="numeric font-semibold text-foreground">{rangeLabel(res)}</span> {noun}</span>
           {res.undeclared > 0 && <InfoTip label="these programmes"><span className="numeric">{formatRank(res.undeclared)}</span> of them have no published figures (every figure is —).</InfoTip>}
           {res.unknownTerms > 0 && (
             <span>
@@ -217,14 +226,14 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         {res.total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle page="fees" view={view} />
-            <CsvLink href={`/api/v1/fees/export?${params}`} what={`these ${formatRank(res.total)} programmes`} />
+            <CsvLink href={`/api/v1/fees/export?${params}`} what={`these ${formatRank(res.total)} ${noun}`} />
           </div>
         )}
       </div>
       </div>
 
       {res.total === 0 ? (
-        <EmptyState title="Nothing matches these filters." href={L.to("/decide/fees", { program: "all", state: "all", maxfee: "any", bondyrs: "any" })} />
+        <EmptyState title="Nothing matches these filters." href={L.to("/decide/fees", { course: "all", program: "all", state: "all", maxfee: "any", bondyrs: "any" })} />
       ) : (
         <div><ViewPanes page="fees" view={view} cards={cards} table={table} /></div>
       )}

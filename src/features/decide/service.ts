@@ -855,6 +855,8 @@ export type FeeSort = (typeof feeSorts)[number];
  * unless `keepUnknown`). `bond`: declared, or "none" = no bond on record (a record says so; never an unknown one).
  */
 export type FeeFilters = TermFilters & {
+  /** Course slugs (lib/course-filter.ts: her courses by default): one row per institute × course, its own terms. */
+  courses?: Set<string>;
   programmes?: Programme[];
   states?: string[];
   search?: string;
@@ -862,7 +864,23 @@ export type FeeFilters = TermFilters & {
   sort?: FeeSort;
   dir?: "asc" | "desc";
 };
-export type FeeRow = { college: Pick<College, "key" | "slug" | "name" | "state">; terms: ProgrammeTerms };
+/** `course`: the row's course (with a course filter), else the row is the whole programme (every course of it there). */
+export type FeeRow = { college: Pick<College, "key" | "slug" | "name" | "state">; course?: Pick<Course, "slug" | "degree" | "name">; terms: ProgrammeTerms };
+
+/** Each college's courses (its CollegeSpecialty pairs), once per catalog. */
+const coursesByCollege = new WeakMap<Catalog, Map<string, Course[]>>();
+function collegeCourses(cat: Catalog, college: string) {
+  let m = coursesByCollege.get(cat);
+  if (!m) {
+    m = new Map();
+    for (const p of cat.pairs.values()) {
+      const c = cat.courseOf.get(`${p.degree}|${p.specialty}`);
+      if (c) (m.get(p.college) ?? m.set(p.college, []).get(p.college)!).push(c);
+    }
+    coursesByCollege.set(cat, m);
+  }
+  return m.get(college) ?? [];
+}
 
 /** Nothing declared for the programme: no fee, stipend, bond or Round 2 forfeit. */
 export const nothingDeclared = (t: ProgrammeTerms) => !t.years.some((y) => y.fee || y.stipend) && t.bond.status === "not_declared" && !t.resignForfeit && !t.resignForfeitText && !t.unread.length;
@@ -879,7 +897,15 @@ export async function listFees(f: FeeFilters, pg?: PageQuery) {
   const { kept: rows, unknown } = splitByTerms(
     cat.colleges
       .filter((c) => (!f.states?.length || (c.state != null && f.states.includes(c.state))) && (!q || `${c.name} ${c.state ?? ""}`.toLowerCase().includes(q)))
-      .flatMap((c) => collegeTerms(cat, c.key).map((terms): FeeRow => ({ college: { key: c.key, slug: c.slug, name: c.name, state: c.state }, terms })))
+      .flatMap((c): FeeRow[] => {
+        const college = { key: c.key, slug: c.slug, name: c.name, state: c.state };
+        // With courses: a row per course there, with that course's own terms (its bond by specialty, its fee variant).
+        if (f.courses)
+          return [...new Map(collegeCourses(cat, c.key).filter((x) => f.courses!.has(x.slug)).map((x) => [x.slug, x])).values()].map((x) => ({
+            college, course: { slug: x.slug, degree: x.degree, name: x.name }, terms: courseTerms(cat, c.key, x.degree, x.specialty),
+          }));
+        return collegeTerms(cat, c.key).map((terms) => ({ college, terms }));
+      })
       .filter(({ terms: t }) => (!f.programmes?.length || f.programmes.includes(t.programme)) && (!f.bond || t.bond.status === (f.bond === "declared" ? "declared" : "none"))),
     f,
     (r) => r.terms,
