@@ -10,7 +10,8 @@ import { useEffect } from "react";
 export function ScrollToHash() {
   useEffect(() => {
     const id = decodeURIComponent(window.location.hash.slice(1));
-    if (id) document.getElementById(id)?.scrollIntoView({ block: "start" });
+    // Instant: the page's smooth scrolling would add its glide to the browser's own jump (it overshot by a screen).
+    if (id) document.getElementById(id)?.scrollIntoView({ block: "start", behavior: "instant" });
   }, []);
   return null;
 }
