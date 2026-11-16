@@ -37,6 +37,7 @@ import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, options
 import { feesFor } from "@/features/decide/server/facts";
 import { programmes } from "@/features/decide/server/terms";
 import { canSeeResidents, groupResidents, listResidents, residentsDenied } from "@/features/decide/server/residents";
+import { residentYears } from "@/features/decide/server/residents-all";
 import { deviceAid } from "@/features/funnel/service";
 import { Paywall } from "@/features/plans/components/paywall";
 import { checkAndCount, currentPlan } from "@/features/plans/usage";
@@ -117,6 +118,23 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // ponytail: every row on one page (largest institute ~930 rows, ~1.6 MB HTML); add a course filter if that grows.
   const residentsAccess = tab !== "residents" ? null : !(await canSeeResidents()) ? "locked" : ((await residentsDenied("read")) ?? "ok");
   const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
+  // Few batches here: say why before she wonders ("only 5 residents?"): from the years MCC's admitted lists cover and the
+  // years with names here. "First allotted" only when this page's allotment counts show zero in an earlier year (a year
+  // outside the allotment data is unknown, not zero).
+  const residentsNote = residents && residents.total > 0 ? await (async () => {
+    const listYears = await residentYears();
+    const have = [...new Set(residents.rows.map((r) => r.year))].sort((a, b) => a - b);
+    const missing = listYears.filter((y) => !have.includes(y)).sort((a, b) => a - b);
+    if (!missing.length) return null;
+    const first = have[0];
+    const pending = listYears.includes(LATEST_YEAR) ? "" : ` The ${LATEST_YEAR} batch shows once MCC publishes this year's admitted lists.`;
+    if (missing.every((y) => y < first)) {
+      const firstAllot = allotmentsByYear.filter((a) => (a.n ?? 0) > 0).map((a) => a.year).sort((a, b) => a - b)[0];
+      const started = firstAllot === first && allotmentsByYear.some((a) => a.year < first && a.n === 0) ? ` (MCC first allotted seats here in ${first})` : "";
+      return `Names here start in ${first}${started}: ${have.length === 1 ? "one batch" : `${have.length} batches`} on MCC's admitted lists so far.${pending}`;
+    }
+    return `No names here on MCC's admitted lists for ${missing.join(", ")}.${pending}`;
+  })() : null;
   // The tab's own filters: course and year, one or more of each (rcourse / ryear), over this college's residents.
   const rCourses = sp.getAll("rcourse");
   const rYears = sp.getAll("ryear").map(Number).filter(Number.isFinite);
@@ -627,6 +645,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <EmptyState title="No residents listed here" description="MCC's admitted-candidates lists have no names at this institute, or they were hidden." href={L.institute(slug, "courses")} action="See the courses here" />
           ) : (
             <>
+              {residentsNote && <p className="text-sm text-muted-foreground">{residentsNote}</p>}
               {residentGroups.map((g) => (
                 <section key={g.course.slug} aria-labelledby={`res-${g.course.slug}`} className="grid gap-2">
                   <h3 id={`res-${g.course.slug}`} tabIndex={-1} className="flex flex-wrap items-center gap-2 text-base font-semibold">
