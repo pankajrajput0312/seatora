@@ -1,9 +1,10 @@
 import { after } from "next/server";
+import { asTrustedServer } from "@/features/decide/server/catalog";
 import { handleMessage } from "@/features/whatsapp/bot";
 import { incoming, validSignature } from "@/features/whatsapp/cloud-api";
 
 // WhatsApp Cloud API webhook (docs/WHATSAPP.md). GET: Meta's one-time verification. POST: messages, signed with the app
-// secret; answered 200 at once (Meta redelivers anything slower) and replied to after the response.
+// secret (so Decide data is read as trusted server work, catalog.ts asTrustedServer); answered 200 at once (Meta redelivers anything slower) and replied to after the response.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -23,6 +24,6 @@ export async function POST(req: Request) {
   } catch {
     return new Response("bad json", { status: 400 });
   }
-  for (const m of incoming(body)) after(() => handleMessage(m).catch((e) => console.error("[whatsapp] failed", e instanceof Error ? e.message : e)));
+  for (const m of incoming(body)) after(() => asTrustedServer(() => handleMessage(m)).catch((e) => console.error("[whatsapp] failed", e instanceof Error ? e.message : e)));
   return new Response("ok");
 }

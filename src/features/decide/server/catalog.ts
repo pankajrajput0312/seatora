@@ -1,4 +1,5 @@
 import "server-only";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { cache as perRequest } from "react";
 import { requireDecideAccess } from "@/features/auth/lib/session";
 import { db } from "@/lib/db";
@@ -191,7 +192,13 @@ async function loadCatalog(version: string): Promise<Catalog> {
 // Multi-instance deploys each hold their own copy, which is fine.
 let cache: { version: string; catalog: Promise<Catalog> } | null = null;
 let testCatalog: Catalog | null = null;
-const access = perRequest(() => requireDecideAccess());
+const trusted = new AsyncLocalStorage<true>();
+/**
+ * Runs `fn` with Decide's data readable without a browser session: only for server work that has checked its caller
+ * itself (the WhatsApp webhook verifies Meta's signature). Pages and the API still go through requireDecideAccess.
+ */
+export const asTrustedServer = <T>(fn: () => Promise<T>) => trusted.run(true, fn);
+const access = perRequest(() => (trusted.getStore() ? undefined : requireDecideAccess()));
 export const dataVersion = perRequest(() => markerOf(db));
 
 /** No database configured or reachable: Decide shows "Data unavailable", never stand-in data. */
