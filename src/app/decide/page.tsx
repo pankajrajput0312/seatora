@@ -163,7 +163,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <h2 id="next-h" className="text-title font-semibold">None of these reached your rank in {counted}: what you can still do</h2>
           <ul className="mt-2 grid list-disc gap-1.5 pl-5 text-sm">
             {list && sum && sum.fresh > 0 && (
-              <li><Link href={L.options({ reach: "new" })} className={smallLink}>{formatRank(sum.fresh)} new {sum.fresh === 1 ? "option" : "options"} in the {roundWords} lists</Link> have no past allotment, so no closing rank to compare. Look at them.</li>
+              <li><Link href={L.options({ reach: "new" })} className={smallLink}>{formatRank(sum.fresh)} {sum.fresh === 1 ? "option" : "options"} in the {roundWords} lists never allotted before</Link>: no closing rank to compare. Look at them.</li>
             )}
             {list && <li><Link href={L.to("/decide/options", { seats: "virtual" })} className={smallLink}>Virtual vacancy seats</Link>: seats held now that free up when someone upgrades this round. Fill them as choices too.</li>}
             {r.counts["stray-only"] > 0 && <li><Link href={L.options({ reach: "stray-only" })} className={smallLink}>{formatRank(r.counts["stray-only"])} reached your rank only in a stray round</Link>, after R1 to R3 had closed far earlier.</li>}

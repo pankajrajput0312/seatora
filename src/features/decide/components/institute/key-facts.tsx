@@ -17,7 +17,7 @@ import { KEY_ROWS_PHONE, newestClosing } from "./key-facts-data";
 // else the main ones) with Fee, Stipend, Bond, Bond ₹, Leaving (each (i): years 1-2-3 and the exact words), the newest
 // round's seats here and the newest closing rank. A table from md up, cards below it (CSS picks; both are in the page).
 
-const kindText = { clear: "clear", virtual: "virtual", new: "+ new" } as const;
+const kindText = { clear: "clear", virtual: "virtual", new: "newly added" } as const;
 const kindClass = { clear: "text-leaf", virtual: "text-sun", new: "text-sky" } as const;
 
 /** "3 clear · 1 virtual · 2 + new" in the round's lists (each kind apart: they overlap, never added); "None" when its lists print none here. */
@@ -37,7 +37,7 @@ function Seats({ r }: { r: OptionRow }) {
 }
 
 /** A course and quota with seats this round but no past allotment here (service.ts newOptions). */
-const New = ({ r }: { r: OptionRow }) => (r.reach === "new" ? <span className="ml-1.5 text-xs font-semibold text-sky">New<span className="sr-only">: no past allotment</span></span> : null);
+const New = ({ r }: { r: OptionRow }) => (r.reach === "new" ? <span className="ml-1.5 text-xs font-semibold text-sky">Never allotted before</span> : null);
 
 function Last({ r }: { r: OptionRow }) {
   const c = newestClosing(r.grid);

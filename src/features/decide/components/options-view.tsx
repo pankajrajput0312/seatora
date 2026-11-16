@@ -34,8 +34,8 @@ export function toChoiceItem(r: ListRow): ChoiceItem {
   };
 }
 
-/** A seat list's kind in a few letters: "clear", "virtual", "+ new" (newly added seats). */
-export const seatKindShort = (k: SeatList["kind"]) => (k === "new" ? "+ new" : k);
+/** A seat list's kind in a few letters: "clear", "virtual", "newly added" (MCC's newly added seat list; never "new", which reads as "never allotted"). */
+export const seatKindShort = (k: SeatList["kind"]) => (k === "new" ? "newly added" : k);
 
 /**
  * Column heading for an option's seats in one list, e.g. "R2 seats" over "clear vacancy" (`short`: "R2" over "clear";
@@ -91,7 +91,7 @@ export function RoundGrid({ row, caption }: { row: Pick<OptionRow, "grid" | "rea
   if (!years.length)
     return (
       <p className="text-xs text-muted-foreground">
-        {row.reach === "new" ? "No past allotment: MCC allotted nobody to this course and quota here in any result Seatora has, in any round or seat category." : "No closing rank on these seat categories in any round."}
+        {row.reach === "new" ? "Never allotted before: MCC allotted nobody to this course and quota here in any result Seatora has, in any round or seat category." : "No closing rank on these seat categories in any round."}
       </p>
     );
   return (

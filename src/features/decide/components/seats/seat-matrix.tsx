@@ -59,7 +59,7 @@ function ClosingValue({ c }: { c: PastClosing | undefined }) {
 }
 
 /**
- * "+3 new" per newly added list that prints seats for the row (most are also in the clear vacancy list: never added).
+ * "+3 newly added" per newly added list that prints seats for the row (most are also in the clear vacancy list: never added).
  * A round with two newly added PDFs dates the badge (listDay), so the two can be told apart.
  */
 function AddedBadges({ r, added }: { r: MatrixRow; added: SeatList[] }) {
@@ -67,7 +67,7 @@ function AddedBadges({ r, added }: { r: MatrixRow; added: SeatList[] }) {
     const day = added.length > 1 ? listDay(l) : undefined;
     return (r.byList[l.key] ?? 0) > 0 ? (
       <Badge key={l.key} tone="info" className="mt-1 whitespace-nowrap">
-        {`+${formatRank(r.byList[l.key])} new${day ? ` (${fmtDay(day)})` : ""}`}
+        {`+${formatRank(r.byList[l.key])} newly added${day ? ` (${fmtDay(day)})` : ""}`}
         <span className="sr-only"> in the {listName(l)} list, never added to the other lists</span>
       </Badge>
     ) : null;

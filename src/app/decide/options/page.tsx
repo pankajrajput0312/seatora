@@ -154,7 +154,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats,
             the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${openQuotas.join(", ")})`}. Within 10%: in a past round the closing rank was at
             least 90% of yours (AIR <span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or later) but before your rank.
-            {roundView && <> New: no past allotment = MCC allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years)}), in any round or seat category, so there is no closing rank to compare.</>}
+            {roundView && <> Never allotted before = MCC allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years)}), in any round or seat category, so there is no closing rank to compare.</>}
           </>
         }
       >
@@ -169,12 +169,13 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <span className="max-md:hidden">{n(sum.clear)} clear,</span>
             <span className="max-md:hidden">{n(sum.virtualOnly)} virtual only{sum.newOnly > 0 && <>, {n(sum.newOnly)} only newly added</>},</span>
             <span className="md:hidden">·</span>
-            {sum.fresh > 0 ? <Link href={here({ reach: "new", seats: null, q: null })} aria-label={`${formatRank(sum.fresh)} new: no past allotment`} className={`${smallLink} text-sky`}>{n(sum.fresh)} new<span className="sr-only">: no past allotment</span></Link> : <span>none new</span>}
+            {/* "Never allotted before" (no past allotment), never "new": "newly added" is only MCC's newly added seat list. */}
+            {sum.fresh > 0 ? <Link href={here({ reach: "new", seats: null, q: null })} className={`${smallLink} text-sky`}>{n(sum.fresh)} never allotted before</Link> : <span>all allotted before</span>}
             <InfoTip label={`${round} seats`}>
               {formatRank(sum.options)} {sum.options === 1 ? "option has" : "options have"} {roundWords} seats in your courses: {formatRank(sum.clear)} in the clear vacancy list,{" "}
               {formatRank(sum.virtualOnly)} virtual only (seats there fall vacant only if their holder upgrades or leaves){sum.newOnly > 0 && `, ${formatRank(sum.newOnly)} only newly added`};{" "}
-              {formatRank(sum.withNew)} with newly added seats; {sum.fresh > 0 ? `${formatRank(sum.fresh)} new: no past allotment` : "none new (every one has a past allotment)"}. {listsTip}{" "}
-              Sorted by label (reached, then within 10%, then new and no allotment in your categories, closed before your rank last), then {round} clear vacancy seats, then the deepest{" "}
+              {formatRank(sum.withNew)} with seats in MCC&apos;s newly added list; {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}. {listsTip}{" "}
+              Sorted by label (reached, then within 10%, then never allotted before and no allotment in your categories, closed before your rank last), then {round} clear vacancy seats, then the deepest{" "}
               {PAST_YEARS[1]} closing.
               <span className="mt-2 flex flex-col items-start md:hidden">{viewLinks}</span>
             </InfoTip>

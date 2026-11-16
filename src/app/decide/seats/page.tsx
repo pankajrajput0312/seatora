@@ -142,7 +142,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
     <>
       Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category, as rank (allotments made in that round, not seats); &quot;—&quot; means no allotment there in that
       round, or no MCC result for it in the data.
-      {profile && <> Your chances is Options&apos; label on that one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round); &quot;New&quot; when MCC never allotted the course and quota; no label on a row whose PDF prints no quota.</>}
+      {profile && <> Your chances is Options&apos; label on that one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round); &quot;Never allotted before&quot; when MCC never allotted the course and quota; no label on a row whose PDF prints no quota.</>}
       {" "}A card&apos;s deepest closing is the deepest of every round of {reachWindow(LATEST_YEAR, PAST_YEARS)}, Stray included, with its year and round (as Options and Compare).
     </>
   ) : (
@@ -252,7 +252,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
       {f.nohist && (
         <p className="flex flex-wrap items-center gap-x-1 rounded-lg border border-border bg-card px-4 py-1 text-sm">
           Only seats with no past MCC allotments
-          <InfoTip label="seats with no past allotments">Seats at courses and quotas with no past MCC allotments, so they are not on Options (no closing rank to compare).</InfoTip>
+          <InfoTip label="seats never allotted before">Seats at courses and quotas MCC never allotted before (no past allotment in any result Seatora has), so they are not on Options (no closing rank to compare). Not the same as MCC&apos;s newly added seat list.</InfoTip>
           <Link href={here({ list: list.key, nohist: null })} className={`${smallLink} ml-2 text-muted-foreground`}>Show every seat</Link>
         </p>
       )}

@@ -12,6 +12,6 @@ description: How to read closing ranks, allotments and Seatora's reach labels co
 6. **Reach labels** (Seatora's, history only; counted on 2024, 2025 and 2026 R1, rounds R1-R3):
    - Reached in 2026 R1 / Reached in 2024 and 2025 / Reached in 2024 or 2025: her rank was within the closing rank of that round.
    - Within 10% in a past round: the closing was at least 90% of her rank (just short).
-   - Reached only in stray rounds; Closed before your rank; No allotment in your categories; New: no past allotment (listed only because the current round's seat lists print seats for it).
+   - Reached only in stray rounds; Closed before your rank; No allotment in your categories; Never allotted before (no past allotment; listed only because the current round's seat lists print seats for it).
 7. **Judging reach for a choice list**: dream = closed a little before her rank (within 10%, or a bit further) in recent rounds; realistic = reached in 2026 R1 or in 2025; safe = reached comfortably in both past years. More rounds reached = steadier.
 8. Always add the page link (Last ranks, Options or the institute) so she can check the numbers.

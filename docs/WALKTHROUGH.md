@@ -57,7 +57,7 @@ This is the main working screen. Each row is one option: an institute, a course 
 - **Reached in 2024 and 2025** / **Reached in 2024 or 2025:** it closed at or beyond your rank in some round of both years, or of one year.
 - **Within 10% in a past round:** it closed a little before your rank (within about 4,200 ranks).
 - **Closed before your rank:** every counted round closed before 42,284. The Round 2 view still shows these rows, because Round 2 seats can go deeper. Use "Hide them" to hide them.
-- **New: no past allotment:** MCC never allotted this course and quota here, so there is no history to compare. Judge it by the college.
+- **Never allotted before:** MCC never allotted this course and quota here, so there is no history to compare. Judge it by the college.
 - **No allotment in your categories:** past allotments here were only on other seat categories.
 
 **Each row shows** the label, the Round 2 seats in each list, the 2026 R1 closing rank, the deepest 2025 and 2024 closing ranks (with the round and seat category), and a one-line fee, stipend, bond and leaving-penalty summary. Its **Details** link to Rounds by year (every round of every year), Last ranks, Allotments and Fees & bond for that option.

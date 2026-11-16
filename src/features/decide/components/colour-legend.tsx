@@ -49,12 +49,12 @@ export function ColourLegend({ className }: { className?: string }) {
         <Row head="Seats in the round">
           <Val c="text-leaf">clear</Val>
           <Val c="text-sun">virtual</Val>
-          <Val c="text-sky">+ new</Val>
+          <Val c="text-sky">newly added</Val>
         </Row>
         <Row head="Your reach">
           <span className={cn(badge, "bg-sky/10 text-sky")}>Reached</span>
           <span className={cn(badge, "bg-sun/10 text-sun")}>Within 10%</span>
-          <span className={cn(badge, "bg-muted text-muted-foreground")}>Closed before / no data / new</span>
+          <span className={cn(badge, "bg-muted text-muted-foreground")}>Closed before / no data / never allotted before</span>
         </Row>
       </InfoTip>
     </span>

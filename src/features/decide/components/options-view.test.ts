@@ -2,7 +2,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { OptionRow } from "../service";
-import { cardClosing, listRow, RoundGrid } from "./options-view";
+import { reachLabel } from "../lib/reach";
+import { cardClosing, listRow, RoundGrid, seatKindShort } from "./options-view";
 
 describe("listRow", () => {
   it("drops the published terms and flat texts the Options list never reads, and keeps the rest", () => {
@@ -32,5 +33,16 @@ describe("RoundGrid", () => {
     const html = renderToStaticMarkup(createElement(RoundGrid, { row: { grid, reach: "reached-latest" }, caption: "x" }));
     const years = [...html.matchAll(/<th scope="row"[^>]*>(\d{4})<\/th>/g)].map((m) => m[1]);
     expect(years).toEqual(["2026", "2024", "2023"]);
+  });
+});
+
+describe("'never allotted before' vs 'newly added': two meanings, two words", () => {
+  it("an option with no past allotment is 'Never allotted before'; 'newly added' is only MCC's newly added seat list", () => {
+    expect(reachLabel("new", 2026, [2024, 2025])).toBe("Never allotted before");
+    expect(seatKindShort("new")).toBe("newly added");
+    expect([seatKindShort("clear"), seatKindShort("virtual")]).toEqual(["clear", "virtual"]);
+    const html = renderToStaticMarkup(createElement(RoundGrid, { row: { grid: {}, reach: "new" }, caption: "x" }));
+    expect(html).toContain("Never allotted before");
+    expect(html).not.toMatch(/\bnew\b/i);
   });
 });

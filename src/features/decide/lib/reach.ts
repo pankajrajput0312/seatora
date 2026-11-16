@@ -132,6 +132,12 @@ export function classifyReach(
   return "closed-before";
 }
 
+/**
+ * The label of an option MCC never allotted in any result in the data ("new" internally). Not "new": that word is only
+ * MCC's newly added seat list (seatKindShort "newly added").
+ */
+export const NEVER_ALLOTTED = "Never allotted before";
+
 /** The rounds the labels count, e.g. "2024, 2025 and 2026 R1" (older years show in the grids but are not counted). */
 export const reachWindow = (latestYear: number, [a, b]: [number, number], includeLatest = true, or = false) =>
   includeLatest ? `${a}, ${b} ${or ? "or" : "and"} ${latestYear} R1` : `${a} ${or ? "or" : "and"} ${b}`;
@@ -149,7 +155,7 @@ export function reachLabel(reach: Reach, latestYear: number, pastYears: [number,
     "stray-only": "Reached only in stray rounds",
     "closed-before": "Closed before your rank",
     "no-data": `No allotment ${on ? `on ${on} seats` : "in your categories"} in ${reachWindow(latestYear, pastYears, includeLatest, true)}`,
-    new: "New: no past allotment",
+    new: NEVER_ALLOTTED,
   }[reach];
 }
 
