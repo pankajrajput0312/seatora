@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { searchAlternatives } from "../lib/college-aliases";
 import { RESIDENTS_PAGE_SIZE, type ResidentRow, type ResidentsPage, type ResidentsQuery } from "../residents-search";
 import { canSeeResidents, residentsDenied, type ResidentSource } from "./residents";
 
@@ -31,17 +32,21 @@ const MINORITY = "Minority";
 /** A quota as the Residents views show it. */
 export const residentQuota = (quota: string) => (RELIGIOUS.includes(quota) ? MINORITY : quota);
 
-/** Each token (any case and spacing) must occur in the field; a typed % or _ is literal (Prisma passes `contains` to ILIKE unescaped). */
-const tokens = (q: string | undefined) => (q?.split(/\s+/).filter(Boolean) ?? []).map((t) => ({ contains: t.replace(/[\\%_]/g, "\\$&"), mode: "insensitive" as const }));
+/** The field contains `w` (any case); a typed % or _ is literal (Prisma passes `contains` to ILIKE unescaped). */
+const word = (w: string) => ({ contains: w.replace(/[\\%_]/g, "\\$&"), mode: "insensitive" as const });
+/** Each token (any case and spacing) must occur in the field. */
+const tokens = (q: string | undefined) => (q?.split(/\s+/).filter(Boolean) ?? []).map(word);
 
 /**
- * The WHERE for a query: each search token (any case and spacing) occurs in the name or the college's name or city
- * ("Pudukkottai"); never hidden rows. `places[i]`: the ids of the colleges whose name or city has token i, looked up
- * first (collegesWith), so the token's OR is two indexes (the name's trigram index, collegeId) instead of a scan of
- * every resident joined to its college (about 55 ms → 3 ms on the 2025 data).
+ * The WHERE for a query: each search word (any case and spacing) occurs in the name or the college's name or address
+ * (its city: "Mumbai", "Pudukkottai"), a short name ("KEM") also as its official words (searchAlternatives: any one
+ * list of words may match); never hidden rows. `places[a][i]`: the ids of the colleges whose name or address has word
+ * i of alternative a, looked up first (collegesWith), so the word's OR is two indexes (the name's trigram index,
+ * collegeId) instead of a scan of every resident joined to its college (about 55 ms → 3 ms on the 2025 data).
  */
-function residentsWhere(q: ResidentsQuery, places: string[][]): Prisma.ResidentWhereInput {
+function residentsWhere(q: ResidentsQuery, places: string[][][]): Prisma.ResidentWhereInput {
   const cq = tokens(q.cq);
+  const alts = searchAlternatives(q.q);
   return {
     hidden: false,
     year: q.year?.length ? { in: q.year } : undefined,
@@ -49,15 +54,18 @@ function residentsWhere(q: ResidentsQuery, places: string[][]): Prisma.ResidentW
     college: q.college?.length || q.state || cq.length ? { slug: q.college?.length ? { in: q.college } : undefined, state: q.state?.length ? { in: q.state } : undefined, AND: cq.length ? cq.map((name) => ({ name })) : undefined } : undefined,
     specialty: q.course?.length ? { slug: { in: q.course } } : undefined,
     AND: [
-      ...tokens(q.q).map((t, i) => ({ OR: [{ name: t }, { collegeId: { in: places[i] } }] })),
+      ...(alts.length > 1 ? [{ OR: alts.map((alt, a) => ({ AND: alt.map((w, i) => anyWord(w, places[a][i])) })) }] : (alts[0] ?? []).map((w, i) => anyWord(w, places[0][i]))),
       ...(q.name?.length ? [{ OR: q.name.map((n) => ({ name: { equals: n, mode: "insensitive" as const } })) }] : []),
     ],
   };
 }
 
-/** Per search token, the ids of the colleges whose name or city has it (about 2,000 colleges: a quick scan each). */
-const collegesWith = (ts: ReturnType<typeof tokens>) =>
-  Promise.all(ts.map(async (t) => (await db.college.findMany({ where: { OR: [{ name: t }, { city: t }] }, select: { id: true } })).map((c) => c.id)));
+/** One search word: in the resident's name, or one of `colleges` (those whose name or address has it). */
+const anyWord = (w: string, colleges: string[]) => ({ OR: [{ name: word(w) }, { collegeId: { in: colleges } }] });
+
+/** Per word of each search alternative, the ids of the colleges whose name or address has it (about 2,000 colleges: a quick scan each). */
+const collegesWith = (alts: string[][]) =>
+  Promise.all(alts.map((alt) => Promise.all(alt.map(async (w) => (await db.college.findMany({ where: { OR: [{ name: word(w) }, { address: word(w) }] }, select: { id: true } })).map((c) => c.id)))));
 
 /** The years that have residents, newest first (the Year filter: no admitted list yet for the year in counselling). */
 export const residentYears = async () =>
@@ -70,19 +78,32 @@ export const residentNames = async (q: string, take = 10) =>
 /** Every college with residents (not hidden): the search box's list before she types. Government first (govt, central, ESIC, municipal, armed forces, railway, PSU), then the others, each by name. */
 const PUBLIC = new Set(["govt", "central", "esic", "municipal", "armed_forces", "railway", "psu"]);
 export async function allResidentColleges() {
-  const rows = await db.college.findMany({ where: { residents: { some: { hidden: false } } }, select: { slug: true, name: true, state: true, type: true }, orderBy: { name: "asc" } });
+  const rows = await db.college.findMany({ where: { residents: { some: { hidden: false } } }, select: { slug: true, name: true, state: true, type: true, address: true }, orderBy: { name: "asc" } });
   const gov = (t: string | null) => (t && PUBLIC.has(t) ? 0 : 1);
-  return rows.sort((a, b) => gov(a.type) - gov(b.type)).map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name, group: gov(c.type) ? "Other hospitals" : "Government hospitals" }));
+  // `find`: the address too, so typing a city finds its colleges in the loaded list.
+  return rows.sort((a, b) => gov(a.type) - gov(b.type)).map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name, group: gov(c.type) ? "Other hospitals" : "Government hospitals", find: c.address ?? undefined }));
 }
 
-/** Colleges with residents (not hidden) whose name has every token of `q` (or, by `slugs`, those colleges), by name: the College filter's choices. Names of colleges only. */
+/**
+ * Colleges with residents (not hidden) whose name or address has every word of `q` (a short name as its official words:
+ * searchAlternatives), or by `slugs` those colleges, by name: the search box's hospitals. Names of colleges only.
+ */
 export const residentColleges = (by: { q: string } | { slugs: string[] }, take = 20) =>
   db.college.findMany({
-    where: "q" in by ? { residents: { some: { hidden: false } }, AND: tokens(by.q).map((name) => ({ name })) } : { slug: { in: by.slugs } },
+    where:
+      "q" in by
+        ? { residents: { some: { hidden: false } }, OR: searchAlternatives(by.q).map((alt) => ({ AND: alt.map((w) => ({ OR: [{ name: word(w) }, { address: word(w) }] })) })) }
+        : { slug: { in: by.slugs } },
     select: { slug: true, name: true, state: true },
     orderBy: { name: "asc" },
     take,
   });
+
+/** How many residents match (the Filters sheet's count as she ticks): no names, so no read of the budget. Null without access. */
+export async function countResidentsAll(q: ResidentsQuery) {
+  if (!(await canSeeResidents())) return null;
+  return db.resident.count({ where: residentsWhere(q, await collegesWith(searchAlternatives(q.q))) });
+}
 
 /**
  * One page (RESIDENTS_PAGE_SIZE rows; none past RESIDENTS_MAX_PAGE) of residents matching the query, with the total and
@@ -93,7 +114,7 @@ export async function listResidentsAll(q: ResidentsQuery): Promise<ResidentsPage
   if (!(await canSeeResidents())) throw new ResidentsDenied("locked");
   const no = await residentsDenied("read");
   if (no) throw new ResidentsDenied(no);
-  const where = residentsWhere(q, await collegesWith(tokens(q.q)));
+  const where = residentsWhere(q, await collegesWith(searchAlternatives(q.q)));
   const [total, found] = await Promise.all([
     db.resident.count({ where }),
     q.page > RESIDENTS_MAX_PAGE ? [] : db.resident.findMany({

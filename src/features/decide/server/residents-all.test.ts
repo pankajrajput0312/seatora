@@ -76,7 +76,7 @@ describe("gates and budget", () => {
   });
 });
 
-// A search token: in the resident's name, or one of the colleges whose name or city has it (looked up first: c1).
+// A search token: in the resident's name, or one of the colleges whose name or address has it (looked up first: c1).
 const anyOf = (t: object) => ({ OR: [{ name: t }, { collegeId: { in: ["c1"] } }] });
 
 describe("query", () => {
@@ -88,14 +88,18 @@ describe("query", () => {
       quota: "All India",
       college: { slug: { in: ["x-college", "y-college"] }, state: { in: ["Kerala"] } },
       specialty: { slug: { in: ["md-paediatrics", "ms-obg"] } },
-      AND: ["aB", "cD"].map((t) => anyOf({ contains: t, mode: "insensitive" })),
+      AND: ["ab", "cd"].map((t) => anyOf({ contains: t, mode: "insensitive" })),
     });
     expect(m.count.mock.calls.map((c) => c[0].where)).toEqual([where()]);
-    expect(m.colleges.mock.calls.map((c) => c[0].where)).toEqual(["aB", "cD"].map((t) => ({ OR: [{ name: { contains: t, mode: "insensitive" } }, { city: { contains: t, mode: "insensitive" } }] })));
+    expect(m.colleges.mock.calls.map((c) => c[0].where)).toEqual(["ab", "cd"].map((t) => ({ OR: [{ name: { contains: t, mode: "insensitive" } }, { address: { contains: t, mode: "insensitive" } }] })));
     expect(m.findMany.mock.lastCall![0].select).not.toHaveProperty("rank");
     expect(m.findMany.mock.lastCall![0].select).not.toHaveProperty("rankBasis");
     await list({ q: "50%_a\\" }); // LIKE wildcards are matched literally
     expect(where().AND).toEqual([anyOf({ contains: "50\\%\\_a\\\\", mode: "insensitive" })]);
+    // A short name: the word as typed, or the official words it stands for (KEM: Seth Gordhandas Sunderdas).
+    await list({ q: "KEM" });
+    const w = (t: string) => anyOf({ contains: t, mode: "insensitive" });
+    expect(where().AND).toEqual([{ OR: [{ AND: [w("kem")] }, { AND: [w("gordhandas"), w("sunderdas")] }] }]);
     await list();
     expect([where().college, where().specialty, where().AND]).toEqual([undefined, undefined, []]);
     await list({ state: ["Kerala"] });

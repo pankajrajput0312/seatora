@@ -1,8 +1,25 @@
 "use server";
 
 import { z } from "zod";
+import { residentsFilters } from "@/features/decide/components/residents-results";
+import { profileFromParams } from "@/features/decide/profile";
 import { canSeeResidents } from "@/features/decide/server/residents";
-import { allResidentColleges, residentColleges, residentNames } from "@/features/decide/server/residents-all";
+import { allResidentColleges, countResidentsAll, residentColleges, residentNames } from "@/features/decide/server/residents-all";
+import { getMeta } from "@/features/decide/service";
+
+/** The Filters sheet's "Show N results" as she ticks (FiltersPanel `recount`): the page's query string, counted. Null without access. */
+export async function countResidents(query: string) {
+  const input = z.string().max(4000).safeParse(query);
+  if (!input.success) return null;
+  try {
+    const params = new URLSearchParams(input.data);
+    const { query: q } = residentsFilters(params, profileFromParams(params), (await getMeta()).courses);
+    return await countResidentsAll(q);
+  } catch (e) {
+    console.error("[residents] count", e);
+    return null;
+  }
+}
 
 /** Every college with residents, Government first: the search box's list before she types. Null without access. */
 export async function listResidentColleges() {

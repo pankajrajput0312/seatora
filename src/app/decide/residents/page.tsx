@@ -8,7 +8,7 @@ import { PageHead } from "@/features/decide/components/bits";
 import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
 import { residentsFilters, ResidentsAbout, ResidentsCards, ResidentsTable, type ResidentTypes } from "@/features/decide/components/residents-results";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
-import { ResidentsSearch } from "@/features/decide/components/residents-search";
+import { ResidentsCollegeFilter, ResidentsPicks, ResidentsSearch } from "@/features/decide/components/residents-search";
 import { ActiveFilters, EmptyState, Field, FilterBar, Pager, Select, smallLink } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { decideLinks } from "@/features/decide/lib/links";
@@ -22,7 +22,8 @@ import { Paywall } from "@/features/plans/components/paywall";
 import { currentPlan } from "@/features/plans/usage";
 import { getDecideData, getMeta } from "@/features/decide/service";
 import { hideResidentAction } from "../institutes/[slug]/actions";
-import { findResidentColleges, findResidentNames, listResidentColleges } from "./actions";
+import { iniCetIn } from "@/features/decide/lib/college-aliases";
+import { countResidents, findResidentColleges, findResidentNames, listResidentColleges } from "./actions";
 
 // People's names: never indexed.
 export const metadata: Metadata = { title: "Residents", robots: { index: false, follow: false } };
@@ -38,7 +39,9 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   const L = decideLinks(params);
   const here = (changes: Record<string, string | null>) => L.with("/decide/residents", { page: null, ...changes });
   const head = (about?: React.ReactNode) => (
-    <PageHead title="Residents" about={about}>Who got in where, from MCC&apos;s admitted-candidates lists. Contact people respectfully; ask to be hidden and we will.</PageHead>
+    <PageHead title="Residents" about={about} note={about && "From MCC's admitted lists: seats filled through MCC counselling only (state-quota seats aren't included)."}>
+      Who got in where, from MCC&apos;s admitted-candidates lists. Contact people respectfully; ask to be hidden and we will.
+    </PageHead>
   );
 
   const denied = async (why: ResidentsDenied["code"]) => {
@@ -80,7 +83,10 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     return c ? `${c.degree} ${c.name}` : slug;
   };
   const collegeName = (slug: string) => pickedColleges.find((c) => c.slug === slug)?.name ?? slug;
-  const typedCourses = !allCourses && params.has("course") ? query.course ?? [] : [];
+  // Her courses ticked one by one are still "Your courses" (the sheet ticks them when the filter defaults to them).
+  const mine = yours?.map((c) => c.slug) ?? [];
+  const sameAsYours = !!yours && mine.length === (query.course ?? []).length && mine.every((c) => query.course?.includes(c));
+  const typedCourses = !allCourses && params.has("course") && !sameAsYours ? query.course ?? [] : [];
   const R = "/decide/residents";
   // One chip per value (college, name, course, state, year): the × takes that one out.
   const chips = [
@@ -96,6 +102,15 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     query.sort !== "year" && { label: `Sorted by ${sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`, param: "sort", href: here({ sort: null }) },
   ].filter((x) => !!x);
   const clear = L.to("/decide/residents", { course: "all" });
+  const collegeOpts = pickedColleges.map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name }));
+  // Why nothing matched: a search found nothing (never "hidden": that is rare), or the filters together leave none.
+  const ini = query.q ? iniCetIn(query.q) : null;
+  const inCourses = query.course?.length ? (typedCourses.length ? " in the ticked courses" : " in your courses") : "";
+  const emptyWhy = ini
+    ? `${ini} admits through INI-CET, not MCC's NEET PG counselling, so it is in none of MCC's admitted lists.`
+    : query.q
+      ? `No name or hospital matches “${query.q}”${inCourses}. Search finds one name or hospital (its name, city or short name, like KEM); for several hospitals use Filters → College.`
+      : `MCC's admitted lists have no names for these filters${inCourses}.`;
   // A name taken off: by email when the site has a contact address (as the page's (i) says), else the request form.
   const removal = siteConfig.contactEmail
     ? `mailto:${siteConfig.contactEmail}?${new URLSearchParams({ subject: "Residents: request removal", body: "Please hide this name from Seatora's Residents.\n\nName:\nCollege:\nCourse and year:\n" }).toString().replace(/\+/g, "%20")}`
@@ -110,6 +125,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
       <div className="filter-row">
+      <ResidentsPicks key={picked.join("\n")} colleges={collegeOpts} listColleges={listResidentColleges}>
       <FilterBar
         action="/decide/residents"
         params={params}
@@ -117,15 +133,16 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         clear={clear}
         total={total}
         noun="residents"
-        search={
-          <ResidentsSearch q={query.q} colleges={pickedColleges.map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name }))} names={query.name ?? []} findColleges={findResidentColleges} findNames={findResidentNames} listColleges={listResidentColleges} />
-        }
+        recount={countResidents}
+        search={<ResidentsSearch q={query.q} colleges={collegeOpts} names={query.name ?? []} findColleges={findResidentColleges} findNames={findResidentNames} />}
       >
-        <FilterDropdown label="Course" name="course" search options={courseChoices} selected={allCourses ? ["all"] : typedCourses} none={yours ? `Your courses (${yours.length})` : "All courses"} info={yours ? "None ticked means your courses. Tick All courses for every one." : undefined} />
+        <ResidentsCollegeFilter />
+        <FilterDropdown label="Course" name="course" search options={courseChoices} selected={allCourses ? ["all"] : typedCourses.length ? typedCourses : mine} none={yours ? `Your courses (${yours.length})` : "All courses"} info={yours ? "Your profile's courses are ticked. None ticked also means your courses; tick All courses for every one." : undefined} />
         <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={query.state ?? []} none="All states" />
         <FilterDropdown label="Year" name="year" options={years.map((y) => ({ value: String(y), label: String(y) }))} selected={(query.year ?? []).map(String)} none="All years" />
         <Field label="Sort by"><Select name="sort" value={query.sort} options={sorts} /></Field>
       </FilterBar>
+      </ResidentsPicks>
       <ActiveFilters items={chips} clear={clear} />
 
       <div className={toolbarRow}>
@@ -138,7 +155,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
       </div>
 
       {total === 0 ? (
-        <EmptyState title="No residents match these filters" description="MCC's admitted-candidates lists have no such names, or they were hidden." href={clear} action="Clear filters" />
+        <EmptyState title="No residents match these filters" description={emptyWhy} href={clear} action="Clear filters" />
       ) : (
         <ViewPanes
           page="residents"
@@ -154,7 +171,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         </p>
       )}
       <footer className="flex flex-wrap items-center gap-x-3 text-caption text-muted-foreground">
-        <span>From MCC&apos;s official admitted lists{years.length > 0 && <>, <span className="numeric">{years.length > 1 ? `${years.at(-1)}–${years[0]}` : years[0]}</span></>}.</span>
+        <span>From MCC&apos;s official admitted lists{years.length > 0 && <>, <span className="numeric">{years.length > 1 ? `${years.at(-1)}–${years[0]}` : years[0]}</span></>}: seats filled through MCC counselling only. Year: the year of admission.</span>
         <a href={removal} className={`${smallLink} text-sky`}>Request removal</a>
       </footer>
     </AppPage>

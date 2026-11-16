@@ -49,33 +49,40 @@ const collegeLink = "inline-flex min-h-6 items-center font-medium hover:text-sky
 const th = `${tbl.th} px-3`;
 const td = "px-3 py-1.5 align-top";
 
-/** One page of residents as a table; the College cell opens that institute's Residents tab. */
+/**
+ * One page of residents as a table; the College cell opens that institute's Residents tab. Phones: two columns that fit
+ * (large text too): the name pinned, with its course and year under it, then the college.
+ */
 export function ResidentsTable({ rows, L, hide, caption, types }: { rows: ResidentRow[]; L: DecideLinks; hide: Hide; caption: string; types?: ResidentTypes }) {
+  const pin = `max-md:sticky max-md:left-0 max-md:z-[1] max-md:border-r max-md:border-border max-md:bg-card ${tbl.pin}`;
   return (
     <ScrollTable label="Residents table">
       <table className={tbl.table}>
         <caption className="sr-only">{caption}</caption>
         <thead className={tbl.head}><tr className="text-left">
-          <th scope="col" className={th}>Name</th>
+          <th scope="col" className={`${th} ${pin}`}>Name<span className="md:hidden">, course, year</span></th>
           <th scope="col" className={th}>College</th>
-          <th scope="col" className={th}>Course</th>
-          <th scope="col" className={th}>Year</th>
+          <th scope="col" className={`${th} max-md:hidden`}>Course</th>
+          <th scope="col" className={`${th} max-md:hidden`}>Year</th>
         </tr></thead>
         <tbody>
           {rows.map((r) => {
             const type = types?.get(r.college.slug);
             return (
               <SyncedHideableRow key={r.id} id={r.id} name={r.name} hide={hide} colSpan={4} className={tbl.row}>
-                <th scope="row" className={`${td} min-w-36 text-left font-medium`}>{r.name}</th>
-                <td className={`${td} min-w-48`}>
+                <th scope="row" className={`${td} min-w-36 text-left font-medium ${pin}`}>
+                  {r.name}
+                  <span className="block text-xs font-normal text-muted-foreground md:hidden">{courseName(r)}, <span className="numeric">{r.year}</span></span>
+                </th>
+                <td className={`${td} min-w-48 max-md:min-w-40`}>
                   <Link href={tabHref(L, r)} className={collegeLink}>{r.college.name}<span className="sr-only">: its residents</span></Link>
                   <span className="ml-2 inline-flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                     {r.college.state ?? <Dash />}
                     {type && <TypeBadge type={type} of={r.college.name} />}
                   </span>
                 </td>
-                <td className={`${td} min-w-32`}>{courseName(r)}</td>
-                <td className={`${td} numeric`}>{r.year}</td>
+                <td className={`${td} min-w-32 max-md:hidden`}>{courseName(r)}</td>
+                <td className={`${td} numeric max-md:hidden`}>{r.year}</td>
               </SyncedHideableRow>
             );
           })}
@@ -124,9 +131,9 @@ export function ResidentsAbout() {
     <>
       <strong>Names</strong> are as printed in MCC&apos;s official admitted-candidates lists (each row names its list), which MCC publishes. Any signed-in member can see them; visitors who are not signed in and search engines cannot. No contact details are held.
       <br /><br />
-      No rank, quota, round, seat category or candidate category is shown here.
+      No rank, quota, round, seat category or candidate category is shown here. <strong>Year</strong> is the year of admission. Only seats filled through MCC&apos;s counselling are in its lists (the All India quota and MCC&apos;s other quotas): state-quota seats are not, so a college&apos;s count here is not its total.
       <br /><br />
-      Filter by <strong>college</strong> (the hospital) or by <strong>course</strong> (the branch), or both: type in either list to find one, and tick one or more.
+      The <strong>search</strong> finds one name or hospital (by its name, city or short name, like KEM); tick hospitals and names in its list to keep several. <strong>Filters</strong> has <strong>College</strong> (find and tick one or more), course, state and year; ticked colleges replace the search box&apos;s text.
       <br /><br />
       To have a name hidden, write to us{email ? <> at <a href={`mailto:${email}`} className="text-sky underline">{email}</a></> : null}: it is hidden for every year and course at that college and stays hidden after updates.
       <br /><br />
