@@ -19,6 +19,10 @@ describe("whatsapp", () => {
     expect(toWhatsApp("## Top\n**KMC** - see [options](/decide/options)\n- one")).toBe("*Top*\n*KMC* - see options: https://www.seatora.co.in/decide/options\n• one");
   });
 
+  it("turns a table into one line per row", () => {
+    expect(toWhatsApp("Top\n\n| No. | College | Closing |\n|---|---|---|\n| 1 | [AIIMS](/decide/institutes/aiims) | 1,234 |\n| 2 | KEM | 2,345 |")).toBe("Top\n\n1 · AIIMS: https://www.seatora.co.in/decide/institutes/aiims · 1,234\n2 · KEM · 2,345");
+  });
+
   it("checks Meta's signature", () => {
     process.env.WHATSAPP_APP_SECRET = "s3cret";
     const sig = `sha256=${createHmac("sha256", "s3cret").update("{}").digest("hex")}`;

@@ -74,7 +74,13 @@ async function post(payload: object) {
  * has no tables or links-with-text; the channel rules ask for neither, this only keeps a stray one readable.
  */
 export function toWhatsApp(md: string) {
-  return md
+  // Tables: the header and |---| rows go, each row becomes one line with its cells joined by " · ".
+  const lines = md.split("\n");
+  const untabled = lines
+    .filter((l, i) => !/^\s*\|[\s:|-]+\|\s*$/.test(l) && !(/^\s*\|/.test(l) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] ?? "")))
+    .map((l) => (/^\s*\|.*\|\s*$/.test(l) ? l.trim().slice(1, -1).split("|").map((c) => c.trim()).filter(Boolean).join(" · ") : l))
+    .join("\n");
+  return untabled
     .replace(/\*\*(.+?)\*\*/g, "*$1*")
     .replace(/^#{1,6}\s+(.+)$/gm, "*$1*")
     .replace(/\[([^\]]+)\]\((\/[^)\s]*)\)/g, `$1: ${SITE}$2`)
