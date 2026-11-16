@@ -305,7 +305,7 @@ function AccountFooter({ account, href, current }: { account: ShellAccount | nul
           {account.freeTill && <span className="text-xs font-semibold">Free till {account.freeTill}</span>}
         </Link>
       )}
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 items-center gap-1">
         <Link href={href} aria-current={current ? "page" : undefined} className={cn("flex min-h-12 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 hover:bg-muted", current && "bg-muted")}>
           <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-[#0b0e12] text-sm font-bold text-[#5ccfe6]">{account.name[0]?.toUpperCase()}</span>
           <span className="min-w-0">
@@ -313,8 +313,8 @@ function AccountFooter({ account, href, current }: { account: ShellAccount | nul
             <span className="block truncate text-xs text-muted-foreground">{account.plan}</span>
           </span>
         </Link>
-        <form action={signOut}>
-          <button type="submit" title="Log out" className="flex min-h-12 min-w-12 flex-col items-center justify-center gap-0.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+        <form action={signOut} className="shrink-0">
+          <button type="submit" title="Log out" className="flex min-h-12 min-w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
             <LogOut className="size-4" aria-hidden />
             <span className="text-[11px] font-semibold">Log out</span>
           </button>
