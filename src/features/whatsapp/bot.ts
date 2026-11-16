@@ -162,7 +162,8 @@ export async function handleMessage(m: Incoming) {
     });
   } catch (e) {
     status = "error";
-    console.error("[whatsapp] ask failed", e instanceof Error ? e.name : "error");
+    const x = e as { name?: string; status?: number; message?: string };
+    console.error("[whatsapp] ask failed", x.name, x.status ?? "", String(x.message ?? e).slice(0, 300));
     text = "Sorry, I couldn't answer that right now. Please send it again in a minute.";
   }
   const offered = choices as z.infer<typeof choicesInput> | null;
