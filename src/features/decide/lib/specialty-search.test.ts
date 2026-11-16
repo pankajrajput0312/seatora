@@ -22,12 +22,26 @@ describe("matchesSpecialty", () => {
     ["Psych", "Psychiatry"],
     ["Anaesthesia", "Anaesthesiology"],
     ["md path", "MD Pathology"],
+    ["eye", "Ophthalmology"],
+    ["child", "Paediatrics"],
+    ["kids", "Paediatrics"],
+    ["bones", "Orthopaedics"],
+    ["women", "Obstetrics and Gynaecology"],
+    ["pregnancy", "Obstetrics and Gynaecology"],
+    ["skin", "DERM.,VENE. and LEPROSY"],
+    ["heart", "General Medicine"],
+    ["mind", "Psychiatry"],
+    ["ear", "MS Otorhinolaryngology"],
+    ["anaesthesia", "Anaesthesiology"],
+    ["x-ray", "Radio-Diagnosis"],
+    ["scan", "Radio-Diagnosis"],
   ];
   it.each(cases)("%s finds %s", (q, label) => expect(matchesSpecialty(q, label)).toBe(true));
   it("does not match unrelated names", () => {
     expect(matchesSpecialty("Radiology", "Pathology")).toBe(false);
     expect(matchesSpecialty("ENT", "Anatomy")).toBe(false);
     expect(matchesSpecialty("zzz", "General Medicine")).toBe(false);
+    expect(matchesSpecialty("eye", "Paediatrics")).toBe(false);
   });
   it("matches everything on an empty query", () => expect(matchesSpecialty("  ", "Anatomy")).toBe(true));
 });

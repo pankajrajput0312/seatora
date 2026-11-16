@@ -32,6 +32,24 @@ const ALIASES: Record<string, string[]> = {
   anaesthesia: ["anaesthesiology"],
   anesthesia: ["anaesthesiology"],
   anesthesiology: ["anaesthesiology"],
+  // Everyday words (a parent searching for his daughter): eye, child, bones…
+  eye: ["ophthalmology"],
+  eyes: ["ophthalmology"],
+  child: ["paediatric"],
+  children: ["paediatric"],
+  kids: ["paediatric"],
+  bone: ["orthopaedics"],
+  bones: ["orthopaedics"],
+  women: ["obst", "gynae"],
+  pregnancy: ["obst"],
+  heart: ["cardio", "generalmedicine"],
+  mind: ["psychiatry"],
+  mental: ["psychiatry"],
+  ear: ["otorhinolaryngology"],
+  nose: ["otorhinolaryngology"],
+  throat: ["otorhinolaryngology"],
+  xray: ["radiodiagnosis"],
+  scan: ["radiodiagnosis"],
 };
 
 /** Does `label` match what she typed: every typed word is in it, or the typed text is (the start of) a common name. */

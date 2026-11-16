@@ -19,8 +19,8 @@ export type ProfileMeta = { courses: { degree: string; specialty: string }[]; sp
 
 const empty: Profile = { rank: 0, category: "Open", pwd: false, specialties: [], degrees: [], quotas: [], states: [], maxFeeLakh: null, maxBondYears: null };
 
-// The first-run setup asks these in order; everything else (states, fee, bond) is in the full editor.
-const steps = ["Rank and category", "Courses", "Quotas"];
+// The first-run setup asks these in order (fee and bond, optional, with the quotas); states are in the full editor.
+const steps = ["Rank and category", "Courses", "Quotas and budget"];
 
 const pill = "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-input bg-secondary px-3 text-sm has-checked:border-sky";
 
@@ -221,13 +221,10 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
       onChange={(v) => set("quotas", v)}
     />
   );
-  const limits = (
-    <>
-      <Checks legend="States" options={meta.states.map((st) => ({ value: st, label: st }))} value={draft.states} onChange={(v) => set("states", v)} />
-
+  const budget = (
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-1.5 text-sm font-medium">
-          Max fee per year
+          Budget per year (fee)
           <select value={draft.maxFeeLakh ?? ""} onChange={(e) => set("maxFeeLakh", e.target.value ? Number(e.target.value) : null)} className={control}>
             <option value="">Any</option>
             {feeChoices(draft.maxFeeLakh).map((l) => <option key={l} value={l}>Up to ₹{l} L</option>)}
@@ -240,7 +237,13 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
             {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? "No bond" : `Up to ${y} ${y === 1 ? "year" : "years"}`}</option>)}
           </select>
         </label>
+        {setup && <p className="text-xs text-muted-foreground sm:col-span-2">Optional: Any shows every seat, whatever its fee or bond.</p>}
       </div>
+  );
+  const limits = (
+    <>
+      <Checks legend="States" options={meta.states.map((st) => ({ value: st, label: st }))} value={draft.states} onChange={(v) => set("states", v)} />
+      {budget}
     </>
   );
 
@@ -283,8 +286,8 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
           {setup && <h3 ref={stepHead} tabIndex={-1} className="sr-only">Step <span className="numeric">{step + 1}</span> of <span className="numeric">{steps.length}</span>: {steps[step]}</h3>}
           {setup ? (
             <>
-              {[rankStep, courseStep, quotaStep][step]}
-              {step === 2 && <p className="text-sm text-muted-foreground">States, fee and bond limits can wait: add them later with Edit, beside your rank.</p>}
+              {[rankStep, courseStep, <>{quotaStep}{budget}</>][step]}
+              {step === 2 && <p className="text-sm text-muted-foreground">States can wait: add them later with Edit, beside your rank.</p>}
             </>
           ) : (
             <>
