@@ -27,7 +27,7 @@ import { eligibleCategories, reachLabel, reachOrder, reachWindow, resultsSpan } 
 import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, LATEST_YEAR, listOptions, optionsView, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
-import { openQuotas, openQuotasNote, quotaScopeNote, optionsViews, roundLabel, seatKindLabel, seatKinds, type SeatKind } from "@/features/decide/types";
+import { openQuotas, openQuotasNote, quotaScopeNote, optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
@@ -46,8 +46,17 @@ const filtersSchema = z.object({
   seats: z.enum(["1", "any", "all", ...seatKinds]).optional(),
   /** "round" or "all" (types.ts optionsViews); absent = the data's default (service.ts optionsView). */
   view: z.enum(optionsViews).optional(),
+  /** types.ts optionSorts; absent = by label. */
+  sort: z.enum(optionSorts).optional(),
   page: pageValue.default(1),
 });
+const sortLabel: Record<OptionSort, string> = {
+  label: "Label (reached first)",
+  deep: `${PAST_YEARS[1]} closing: deepest first`,
+  tight: `${PAST_YEARS[1]} closing: tightest first`,
+  fee: "Fee, year 1: lowest first",
+  stipend: "Stipend, year 1: highest first",
+};
 
 export default async function OptionsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
@@ -58,7 +67,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // Term filters (college type, fee, stipend, bond, leaving): an absent maxfee / bondyrs is her profile's cap.
   const { params: tp, filters: terms } = readTermFilters(params, profile);
   const hasSeats = f.seats === "1" ? "clear" : f.seats === "all" ? false : f.seats;
-  const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms };
+  const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms, sort: f.sort };
   const [meta, r, view] = await Promise.all([getMeta(), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }), chosenView(params, "options")]);
   const lists = r.seatLists;
   const roundView = r.view === "round";
@@ -87,7 +96,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const keep = keepProfileParams(params);
   // Same profile and filters for /api/v1/options, where "Show more" reads the next pages (and the CSV).
   const api = profileToParams(profile);
-  for (const [k, v] of [["q", f.q], ["reach", f.reach], ["prov", f.prov], ["view", r.view], ["showClosed", r.showClosed ? "1" : "0"], ["hasSeats", r.seats ?? "all"]] as const) if (v) api.set(k, v);
+  for (const [k, v] of [["q", f.q], ["reach", f.reach], ["prov", f.prov], ["view", r.view], ["showClosed", r.showClosed ? "1" : "0"], ["hasSeats", r.seats ?? "all"], ["sort", f.sort]] as const) if (v) api.set(k, v);
   for (const [k, v] of Object.entries(tp)) if (v != null) api.set(k, Array.isArray(v) ? v.join(",") : String(v));
   const caption = `Options for AIR ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added` : ""}`;
   // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
@@ -103,6 +112,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     lists.length > 0 && !r.seats && f.seats && { label: `With or without ${round} seats`, param: "seats", href: here({ seats: null }) },
     f.closed && f.closed !== closedDefault && !f.reach && { label: f.closed === "1" ? "Closed before your rank: shown" : "Closed before your rank: hidden", href: here({ closed: null }) },
     f.prov && { label: `Without ${LATEST_YEAR} R1 (provisional)`, param: "prov", href: here({ prov: null }) },
+    f.sort && f.sort !== "label" && { label: `Sorted: ${sortLabel[f.sort]}`, param: "sort", href: here({ sort: null }) },
     // One chip per course (or specialty and degree), quota and state, her profile's for this visit: the × takes that one out.
     ...(profile.pairs?.length
       ? profile.pairs.map((c) => ({ label: pairLabel(c), param: "c", href: L.without("/decide/options", "c", c) }))
@@ -117,7 +127,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: here({ bond: null }) },
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/options", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
-  const clearAll = here({ q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, quota: null, st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
+  const clearAll = here({ q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, sort: null, quota: null, st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const n = (x: number) => <span className="numeric font-semibold">{formatRank(x)}</span>;
@@ -190,8 +200,15 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       {/* None reached her rank: say so first, with what she can still do (Home's panel), not a list of dead ends. */}
       {labelled > 0 && reached === 0 && (
         <>
-          <p className="text-body font-semibold">
-            {n(0)} of {n(labelled)} options reached AIR {n(profile.rank)} in a past round ({counted}).
+          {/* The current results (her courses and filters), never "N options – good": none of them reached her rank. */}
+          <p className="flex flex-wrap items-center gap-x-3 text-body">
+            <span className="font-semibold">None of these reached AIR {n(profile.rank)}: {n(0)} of {n(labelled)} options in a past round ({counted}).</span>
+            {r.counts["closed-before"] > 0 && !f.reach && (
+              // One tap either way; closed ones are never hidden without saying so.
+              <Link href={here({ closed: r.showClosed ? "0" : "1" })} className={`${smallLink} text-sky`}>
+                {r.showClosed ? `Hide the ${formatRank(r.counts["closed-before"])} closed before your rank` : `Show the ${formatRank(r.hiddenClosed)} closed before your rank`}
+              </Link>
+            )}
           </p>
           <StillCanDo L={L} rank={profile.rank} list={roundView ? lists[0] : undefined} fresh={sum?.fresh ?? 0} counts={r.counts} id="still-h" title="What you can still do" />
         </>
@@ -242,6 +259,11 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
                 </select>
               </Field>
             )}
+            <Field label="Sort by">
+              <select name="sort" defaultValue={f.sort ?? "label"} className={control}>
+                {optionSorts.map((s) => <option key={s} value={s}>{sortLabel[s]}</option>)}
+              </select>
+            </Field>
             <TermFilterControls f={tp} caps={profile} />
             {latestProvisional && (
               <span className="flex min-h-12 items-center gap-1 border-b border-border text-sm">

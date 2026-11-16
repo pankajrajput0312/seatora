@@ -11,7 +11,7 @@ import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
 import { hasOption, listSeats, optionSeats, pickLists, seatLists, type OptionSeats } from "./server/seats";
 import { bucketOfDegree, collegeTerms, courseTerms, type Programme, type ProgrammeTerms } from "./server/terms";
-import { optionId, rounds, seatKinds, type Allotment, type Category, type College, type Course, type Cutoff, type Notice, type OptionsView, type Round, type SeatKind, type SeatList, type Source, type Term } from "./types";
+import { optionId, rounds, seatKinds, type OptionSort, type Allotment, type Category, type College, type Course, type Cutoff, type Notice, type OptionsView, type Round, type SeatKind, type SeatList, type Source, type Term } from "./types";
 
 // Data comes from Postgres (MCC import, prisma/import-mcc.ts) through ./server; the small, slow-changing part (colleges,
 // courses, sources, terms, option list) is a per-process catalog, cutoffs and allotments are filtered in SQL per call.
@@ -146,7 +146,7 @@ export function optionsView(asked: OptionsView | undefined, lists: SeatList[], s
  * without; undefined: the view's (round: "any", all: with or without).
  */
 /** `terms`: fee, stipend, bond, leaving and college-type filters (lib/term-filters.ts); given, they replace her profile's fee and bond caps. */
-export type OptionFilters = { search?: string; reach?: Reach[]; includeProvisional?: boolean; showClosed?: boolean; hasSeats?: boolean | SeatKind | "any"; view?: OptionsView; terms?: TermFilters };
+export type OptionFilters = { search?: string; reach?: Reach[]; includeProvisional?: boolean; showClosed?: boolean; hasSeats?: boolean | SeatKind | "any"; view?: OptionsView; terms?: TermFilters; sort?: OptionSort };
 
 /** Seats per kind in one option's own cells (OptionSeats.cells, `lists` order), in `categories` (all when omitted); null = that list prints none. */
 export function seatsByKind(lists: SeatList[], s: Pick<OptionSeats, "cells"> | undefined, categories?: string[]) {
@@ -468,6 +468,17 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   const ranked: Ranked[] = [...labelled, ...fresh.filter(text).map(asNew)];
   const clear = (x: Ranked) => by.get(x.o.id)?.clear ?? 0;
   if (round) ranked.sort((a, b) => roundReachOrder.indexOf(a.reach) - roundReachOrder.indexOf(b.reach) || clear(b) - clear(a) || (b.deepest?.closing ?? 0) - (a.deepest?.closing ?? 0));
+  // Her sort (stable: ties keep the label order); a missing value last either way.
+  const key: Record<Exclude<OptionSort, "label">, (x: Ranked) => number | null | undefined> = {
+    deep: (x) => (x.deepest ? -x.deepest.closing : null),
+    tight: (x) => x.deepest?.closing,
+    fee: (x) => feeValue.fee1(optTerms(cat, x.o)),
+    stipend: (x) => { const v = feeValue.stip1(optTerms(cat, x.o)); return v == null ? null : -v; },
+  };
+  if (f.sort && f.sort !== "label") {
+    const k = key[f.sort];
+    ranked.sort((a, b) => { const [x, y] = [k(a) ?? Infinity, k(b) ?? Infinity]; return x === y ? 0 : x - y; });
+  }
   const has = (x: Ranked, k: SeatKind | "any") => hasSeatsIn(by.get(x.o.id) ?? {}, k);
   const inReach = (x: Ranked) => !f.reach?.length || f.reach.includes(x.reach);
   const inView = (xs: Ranked[]) => (kind ? xs.filter((x) => has(x, kind)) : xs);

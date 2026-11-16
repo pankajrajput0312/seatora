@@ -31,7 +31,7 @@ export function StillCanDo({ L, rank, list, fresh, counts, title, id }: {
         {list && <li><Link href={L.to("/decide/options", { seats: "virtual" })} className={smallLink}>Virtual vacancy seats</Link>: seats held now that free up when someone upgrades this round. Fill them as choices too.</li>}
         {counts["stray-only"] > 0 && <li><Link href={L.options({ reach: "stray-only" })} className={smallLink}>{formatRank(counts["stray-only"])} reached your rank only in a stray round</Link>, after R1 to R3 had closed far earlier.</li>}
         {counts["within-10"] > 0 && <li><Link href={L.options({ reach: "within-10" })} className={smallLink}>{formatRank(counts["within-10"])} closed within 10% of your rank</Link> in a past round.</li>}
-        <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>Widen your courses, quotas or states</Link>: add DNB and Diploma courses of your specialties, or more specialties, and the fee or bond caps.</li>
+        <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>Widen your courses, quotas or states</Link>: other states, Deemed/Paid seats (a quota), DNB and Diploma courses of your specialties, more specialties, or looser fee and bond caps.</li>
         <li>The stray vacancy round comes after Round 3: see the <Link href={L.to("/decide/counselling")} className={smallLink}>schedule and notices</Link>.</li>
         <li><Link href={L.rankScan(rank)} className={smallLink}>Rank scan</Link> shows what ranks near yours were allotted in past rounds.</li>
       </ul>

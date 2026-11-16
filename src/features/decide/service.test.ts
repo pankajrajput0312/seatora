@@ -56,6 +56,22 @@ describe("service on the test fixture", () => {
     expect((await svc.listOptions(her, {}, { page: 999, pageSize: 5 })).page).toBe(Math.ceil(shown.total / 5)); // clamped
   });
 
+  it("sorts Options by closing, fee or stipend when asked; a missing value last; the counts unchanged", async () => {
+    const base = await svc.listOptions(her, { showClosed: true });
+    const asc = (xs: (number | null | undefined)[]) => {
+      const known = xs.filter((x): x is number => x != null);
+      expect(known).toEqual([...known].sort((a, b) => a - b));
+      expect(xs.slice(known.length).every((x) => x == null)).toBe(true); // missing last
+    };
+    const deep = await svc.listOptions(her, { showClosed: true, sort: "deep" });
+    asc(deep.rows.map((r) => (r.byYear[PAST_YEARS[1]] ? -r.byYear[PAST_YEARS[1]]!.closing : null)));
+    asc((await svc.listOptions(her, { showClosed: true, sort: "tight" })).rows.map((r) => r.byYear[PAST_YEARS[1]]?.closing));
+    asc((await svc.listOptions(her, { showClosed: true, sort: "fee" })).rows.map((r) => svc.feeValue.fee1(r.fees)));
+    const st = await svc.listOptions(her, { showClosed: true, sort: "stipend" });
+    asc(st.rows.map((r) => { const v = svc.feeValue.stip1(r.fees); return v == null ? null : -v; }));
+    expect(deep.counts).toEqual(base.counts);
+  });
+
   it("labels from per-year deepest closings agree with labels from every cutoff; deepest 2025 first within a label", async () => {
     const all = await svc.listOptions({ ...her, pwd: true }, { showClosed: true });
     for (const x of reachOrder) expect(all.rows.filter((r) => r.reach === x)).toHaveLength(all.counts[x]);

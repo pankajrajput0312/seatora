@@ -12,7 +12,7 @@ export function parseOptionsQuery(p: URLSearchParams) {
   const profile = parseProfile(p);
   const q = parseQuery(schema, p, ["reach", ...termFilterLists]);
   if (!profile.success || !q.success) return { ok: false as const, errors: [profile.error, q.error] };
-  const { page, pageSize, q: search, reach, prov, showClosed, hasSeats, view, ...t } = q.data;
-  const filters: OptionFilters = { search, reach, includeProvisional: prov, showClosed, hasSeats, view, terms: termFilters(t, profile.data) };
+  const { page, pageSize, q: search, reach, prov, showClosed, hasSeats, view, sort, ...t } = q.data;
+  const filters: OptionFilters = { search, reach, includeProvisional: prov, showClosed, hasSeats, view, sort, terms: termFilters(t, profile.data) };
   return { ok: true as const, profile: profile.data, filters, page, pageSize };
 }

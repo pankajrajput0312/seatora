@@ -145,6 +145,13 @@ export const optionId = (c: { college: string; degree: string; specialty: string
  * clear vacancy list): never add them together; show one kind at a time.
  */
 export const seatKinds = ["clear", "virtual", "new"] as const;
+/**
+ * Options' sort (after the label filter): "label" (default: the view's own order), "deep" / "tight" (the later past
+ * year's deepest closing, deepest or tightest first), "fee" (year 1, lowest first), "stipend" (year 1, highest first).
+ * A missing value goes last either way.
+ */
+export const optionSorts = ["label", "deep", "tight", "fee", "stipend"] as const;
+export type OptionSort = (typeof optionSorts)[number];
 export type SeatKind = (typeof seatKinds)[number];
 export const seatKindLabel: Record<SeatKind, string> = { clear: "Clear vacancy", virtual: "Virtual vacancy", new: "Newly added seats" };
 /**

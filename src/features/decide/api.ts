@@ -5,7 +5,7 @@ import { rankValue, readParams } from "./lib/params";
 import { reachOrder } from "./lib/reach";
 import { profileInput, profileSchema } from "./profile";
 import { renamedCollege } from "./service";
-import { baseCategories, optionsViews, rounds, seatKinds, type SeatList, type Source } from "./types";
+import { baseCategories, optionSorts, optionsViews, rounds, seatKinds, type SeatList, type Source } from "./types";
 
 // Query schemas and response helpers for the /api/v1 route handlers (thin wrappers over service.ts).
 // Lists accept repeated or comma-separated params: ?sp=A&sp=B or ?sp=A,B. Profile params use the URL keys of
@@ -34,6 +34,8 @@ export const optionsQuerySchema = pageSchema.extend({
     .optional(),
   /** "round" or "all" (types.ts optionsViews); absent = the data's default (service.ts optionsView). */
   view: z.enum(optionsViews).optional(),
+  /** types.ts optionSorts; absent = by label. */
+  sort: z.enum(optionSorts).optional(),
 });
 /** Repeated ids count once (deduped before the limit of 4). */
 export const compareQuerySchema = z.object({
