@@ -36,7 +36,7 @@ it("a seat card: the picked list's seats big, the round's other lists beside the
   expect(t).toMatch(/Clear 3 /);
   expect(t).toContain("Virtual 2");
   expect(t).not.toContain("Newly added 0");
-  expect(t).toContain("Deepest closing 52,345 2025 R3");
+  expect(t).toContain("Deepest 2025: 52,345 (R3)");
   expect(t).toContain("Government");
   expect(html.match(/<dt/g)).toHaveLength(5);
   expect(html).toContain('href="https://mcc.example/x"');

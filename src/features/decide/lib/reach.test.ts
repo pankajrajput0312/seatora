@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cutoff, Round } from "../types";
-import { buildGrid, classifyReach, deepestByYear, eligibleCategories, reachEvidence, reachLabel, resultsSpan, seatsBelow, seatsBelowNotes } from "./reach";
+import { buildGrid, classifyReach, deepestByYear, deepestOf, deepestText, eligibleCategories, reachEvidence, reachLabel, resultsSpan, seatsBelow, seatsBelowNotes } from "./reach";
 
 const c = (year: number, round: Round, closing: number, category: Cutoff["category"] = "Open"): Cutoff => ({
   college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY", year, round, quota: "All India", category,
@@ -104,7 +104,11 @@ describe("reachEvidence", () => {
   ] as const;
   it("the deepest R1 to R3 closing the label counts; a stray round only for stray-only", () => {
     expect(classifyReach(42284, [...cs], w)).toBe("stray-only");
-    expect(reachEvidence([...cs], "closed-before", w)).toEqual({ year: 2025, round: "R3", closing: 38120 });
+    // Stray left out of the label's closing comes with it as its own number ("deepest before Stray").
+    expect(reachEvidence([...cs], "closed-before", w)).toEqual({ year: 2025, round: "R3", closing: 38120, stray: { year: 2025, round: "stray", closing: 60000 } });
+    expect(seatsBelowNotes([{ kind: "clear", on: [{ category: "Open", reach: "closed-before", at: reachEvidence([...cs], "closed-before", w) }] }], 2026, [2024, 2025])).toEqual([
+      "In the clear vacancy list, the seats here you can take are Open seats only. On Open seats: deepest before Stray 38,120 in 2025 R3, before your rank. Stray: 60,000 in 2025.",
+    ]);
     expect(reachEvidence([...cs], "stray-only", w)).toEqual({ year: 2025, round: "stray", closing: 60000 });
     expect(reachEvidence([], "no-data", w)).toBeNull();
   });
@@ -115,5 +119,20 @@ describe("resultsSpan", () => {
     expect(resultsSpan([{ year: 2026, rounds: ["R1"] }, { year: 2025, rounds: ["R1", "R2", "R3", "stray"] }, { year: 2023, rounds: ["R1"] }])).toBe("2023 to 2026 R1");
     expect(resultsSpan([{ year: 2025, rounds: ["R1", "stray"] }])).toBe("2025 Stray");
     expect(resultsSpan([])).toBe("");
+  });
+});
+
+describe("deepest closing: one definition on every screen", () => {
+  // CIHSR DNB Family Medicine, DNB Quota, Open: Seats showed 45,182 (2025 R3, Stray left out) while Compare and the
+  // Details sheet showed 60,351 (2025 Stray). Every screen now reads deepestOf: every round, Stray included.
+  const cihsr = [c(2025, "R1", 34413), c(2025, "R2", 38760), c(2025, "R3", 45182), c(2025, "stray", 60351), c(2026, "R1", 38808)];
+  it("Seats (deepestOf over the rounds) and Options/Compare (deepestByYear) agree, Stray included", () => {
+    expect(deepestOf(cihsr)).toMatchObject({ year: 2025, round: "stray", closing: 60351 });
+    expect(deepestByYear(cihsr, new Set()).get(2025)).toMatchObject({ round: "stray", closing: 60351 });
+    expect(deepestText(deepestOf(cihsr)!)).toBe("Deepest 2025: 60,351 (Stray)");
+    expect(deepestOf([])).toBeNull();
+  });
+  it("ties keep the earliest round", () => {
+    expect(deepestOf([c(2025, "R2", 500), c(2025, "R3", 500)])).toMatchObject({ round: "R2" });
   });
 });

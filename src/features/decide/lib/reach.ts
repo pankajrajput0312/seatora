@@ -14,7 +14,17 @@ export function eligibleCategories(category: BaseCategory, pwd: boolean): Catego
 
 export type Deepest = { closing: number; round: Round; category: Category; provisional: boolean };
 
-/** Highest (deepest) closing rank per year across rounds, among the given cutoffs. */
+/**
+ * THE deepest closing (one definition on every screen): the highest closing rank among the given rounds, Stray and
+ * special stray included; ties keep the first (the earliest round, as rounds come oldest first). Always shown with its
+ * year and round (deepestText). A screen that leaves Stray out says "deepest before Stray" and shows Stray beside it.
+ */
+export const deepestOf = <T extends { closing: number }>(xs: T[]): T | null => xs.reduce<T | null>((a, c) => (!a || c.closing > a.closing ? c : a), null);
+
+/** "Deepest 2025: 60,351 (Stray)": a deepest closing with its year and round. */
+export const deepestText = (d: { year: number; round?: Round; closing: number }) => `Deepest ${d.year}: ${formatRank(d.closing)}${d.round ? ` (${roundLabel[d.round]})` : ""}`;
+
+/** Highest (deepest) closing rank per year across rounds (Stray included, as deepestOf), among the given cutoffs. */
 export function deepestByYear(cutoffs: Cutoff[], provisionalSrc: Set<string>): Map<number, Deepest> {
   const out = new Map<number, Deepest>();
   for (const c of cutoffs) {
@@ -80,8 +90,11 @@ type Window = { latestYear: number; pastYears: [number, number]; includeLatest: 
 const inWindow = <T extends ReachInput>(cutoffs: T[], { latestYear, pastYears, includeLatest }: Window) =>
   cutoffs.filter((c) => pastYears.includes(c.year) || (includeLatest && c.year === latestYear && c.round === "R1"));
 
-/** The closing a label rests on, so a second label can say it with its year and round ("2025 R3 closed at 38,120"). */
-export type ReachAt = { year: number; round?: Round; closing: number };
+/**
+ * The closing a label rests on, so a second label can say it with its year and round ("2025 R3 closed at 38,120").
+ * `stray`: when that closing leaves Stray out ("deepest before Stray"), the deepest stray closing beside it.
+ */
+export type ReachAt = { year: number; round?: Round; closing: number; stray?: { year: number; round?: Round; closing: number } };
 /**
  * The deepest closing a label counts (classifyReach's window): R1 to R3, or every round for "stray-only" or when only
  * stray rounds are there. Null: no closing in the window ("no-data").
@@ -90,7 +103,10 @@ export function reachEvidence(cutoffs: ReachInput[], reach: Reach, window: Windo
   const used = inWindow(cutoffs, window);
   const main = used.filter((c) => !isStrayRound(c.round));
   const pool = reach === "stray-only" || !main.length ? used : main;
-  return pool.reduce<ReachAt | null>((a, c) => (!a || c.closing > a.closing ? { year: c.year, round: c.round, closing: c.closing } : a), null);
+  const pick = (c: ReachInput | null) => c && { year: c.year, round: c.round, closing: c.closing };
+  const d = pick(deepestOf(pool));
+  const stray = pool === main ? pick(deepestOf(used.filter((c) => isStrayRound(c.round)))) : null;
+  return d && (stray ? { ...d, stray } : d);
 }
 
 /**
@@ -183,7 +199,9 @@ export function seatsBelowNotes(ns: SeatsBelow[], latestYear: number, pastYears:
     const on = g[0].on;
     const facts = on.map(({ category, reach, at }) => {
       const verdict = atVerdict[reach];
-      if (at && verdict) return `On ${category} seats: deepest closing ${formatRank(at.closing)} in ${at.year}${at.round ? ` ${roundLabel[at.round]}` : ""}, ${verdict}.`;
+      // Stray left out of the label's closing: say so, and give Stray as its own number.
+      const stray = at?.stray ? ` Stray: ${formatRank(at.stray.closing)} in ${at.stray.year}.` : "";
+      if (at && verdict) return `On ${category} seats: deepest ${at.stray ? "before Stray " : "closing "}${formatRank(at.closing)} in ${at.year}${at.round ? ` ${roundLabel[at.round]}` : ""}, ${verdict}.${stray}`;
       if (verdict) return `On ${category} seats alone: ${reachLabel(reach, latestYear, pastYears, includeLatest, category)}.`;
       return `On ${category} seats: no allotment in ${reachWindow(latestYear, pastYears, includeLatest, true)}.`;
     });

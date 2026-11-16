@@ -5,6 +5,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { fmtDay, listDay } from "../../lib/format";
 import type { DecideLinks } from "../../lib/links";
+import { LATEST_YEAR, PAST_YEARS, reachWindow } from "../../lib/reach";
 import { statKeys, statLabel } from "../../lib/stat-format";
 import { openQuotas, roundLabel, rounds, seatKindLabel, type Round, type SeatKind, type SeatList } from "../../types";
 import { Dash, Provisional, ReachBadge } from "../bits";
@@ -93,7 +94,7 @@ export function UnlistedSeats({ u, profile, here, href, options }: { u: { list: 
   );
 }
 
-/** The deepest closing of the shown past rounds (PAST_ROUNDS), and behind a disclosure every round the reach label counts. */
+/** The deepest closing of every round the reach label counts (Stray included, lib/reach.ts deepestOf), and behind a disclosure each of them. */
 function PastClosings({ r, name }: { r: SeatLine; name: string }) {
   if (!r.rounds.length) return <Dash />;
   const d = r.deepest;
@@ -156,7 +157,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
             ))}
             <th scope="col" className={cn(th, "text-right whitespace-nowrap")} aria-sort={sort === "closing" ? "descending" : undefined}>
               Deepest past closing
-              <InfoTip label="deepest past closing">The deepest closing rank on the row&apos;s quota and seat category of {PAST_ROUNDS.map((p) => `${p.year} ${roundLabel[p.round]}`).join(", ")}; every round the reach label counts behind &quot;Every round&quot;.</InfoTip>
+              <InfoTip label="deepest past closing">The deepest closing rank on the row&apos;s quota and seat category in {reachWindow(LATEST_YEAR, PAST_YEARS)}, every round, Stray included, with its year and round; each round behind &quot;Every round&quot;.</InfoTip>
             </th>
             {ranked && <th scope="col" className={cn(th, "min-w-36")}>Reach</th>}
           </tr>

@@ -79,7 +79,8 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails }: {
                 <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                   {d ? (
                     <span>
-                      Deepest closing <span className="numeric font-semibold text-foreground">{formatRank(d.closing)}</span> <span className="numeric">{d.year} {roundLabel[d.round]}</span>
+                      {/* As deepestText: "Deepest 2025: 60,351 (Stray)", every round counted. */}
+                      Deepest <span className="numeric">{d.year}:</span> <span className="numeric font-semibold text-foreground">{formatRank(d.closing)}</span> ({roundLabel[d.round]})
                       {d.provisional && <> <Provisional when /></>}
                     </span>
                   ) : (

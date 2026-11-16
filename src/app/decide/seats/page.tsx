@@ -14,7 +14,7 @@ import { AboutData, FilterForm, FiltersPanel, ToolbarCount, ToolbarSearch } from
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { courseName } from "@/features/decide/components/options-view";
 import { MccLink } from "@/features/decide/components/pages/mcc-link";
-import { PAST_ROUNDS, parseSeatsParams, seatCategories, seatSorts, seatsView, type SeatLine, type SeatSort, type SeatsParams } from "@/features/decide/components/seats/find-seats";
+import { parseSeatsParams, seatCategories, seatSorts, seatsView, type SeatLine, type SeatSort, type SeatsParams } from "@/features/decide/components/seats/find-seats";
 import { SeatCards } from "@/features/decide/components/seats/seat-cards";
 import { listTitle, SeatListPicker, SeatTable, seatKindNote } from "@/features/decide/components/seats/seat-lists";
 import { SeatMatrix, SeatMatrixDisplay, type ClosingYear, type MatrixRow, type SeatGroup } from "@/features/decide/components/seats/seat-matrix";
@@ -143,11 +143,11 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
       Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category, as rank (allotments made in that round, not seats); &quot;—&quot; means no allotment there in that
       round, or no MCC result for it in the data.
       {profile && <> Your chances is Options&apos; label on that one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round); &quot;New&quot; when MCC never allotted the course and quota; no label on a row whose PDF prints no quota.</>}
-      {" "}A card&apos;s deepest closing is the deepest of {PAST_ROUNDS.map((p) => `${p.year} ${roundLabel[p.round]}`).join(", ")}.
+      {" "}A card&apos;s deepest closing is the deepest of every round of {reachWindow(LATEST_YEAR, PAST_YEARS)}, Stray included, with its year and round (as Options and Compare).
     </>
   ) : (
     <>
-      Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category: the deepest of {PAST_ROUNDS.map((p) => `${p.year} ${roundLabel[p.round]}`).join(", ")} in the row,
+      Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category: the deepest of every round of {reachWindow(LATEST_YEAR, PAST_YEARS)}, Stray included, in the row,
       every round behind &quot;Every round&quot;.
       {profile && (
         <> Reach is Options&apos; label on that one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round). Options labels an option on all your seat categories together, and notes when a list&apos;s seats there are all on a seat category with another label: the label these rows show.</>

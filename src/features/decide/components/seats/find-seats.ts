@@ -3,7 +3,7 @@ import { z } from "zod";
 import { listDay } from "../../lib/format";
 import { pageValue, parseSearchParams } from "../../lib/params";
 import { splitByTerms, termFilterLists, termFilters, termFilterShape, type TermFilters } from "../../lib/term-filters";
-import { classifyReach, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachLabel, reachOrder, type Reach } from "../../lib/reach";
+import { classifyReach, deepestOf, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachLabel, reachOrder, type Reach } from "../../lib/reach";
 import { pairSchema, profileCourseFilter, profileQuotas, type Profile } from "../../profile";
 import { getCatalog, type Catalog } from "../../server/catalog";
 import { listNotices } from "../../server/notices";
@@ -33,7 +33,7 @@ export type SeatHistory = {
   rounds: PastClosing[];
   /** Every closing on the row's quota and seat category in every result in the data (all years and rounds), oldest first. */
   closings: PastClosing[];
-  /** The deepest of `rounds` in PAST_ROUNDS; null when none of them has one. */
+  /** The deepest of `rounds` (lib/reach.ts deepestOf: every round, Stray included); null when none. */
   deepest: PastClosing | null;
   /**
    * Options' label (lib/reach.ts) on this row's seat category alone; "new" (as Options) when the course and quota has no
@@ -166,7 +166,6 @@ async function withHistory<T extends SeatRow & Pick<SeatHistory, "terms" | "fees
     (by.get(k) ?? by.set(k, []).get(k)!).push(c);
   }
   const opt = { latestYear: LATEST_YEAR, pastYears: PAST_YEARS };
-  const shown = (c: { year: number; round: Round }) => PAST_ROUNDS.some((p) => p.year === c.year && p.round === c.round);
   const counted = (c: { year: number; round: Round }) => PAST_YEARS.includes(c.year) || (c.year === LATEST_YEAR && c.round === "R1");
   return rows.map((r) => {
     const all = (r.quota != null && by.get(`${optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota })}|${r.category}`)) || [];
@@ -174,7 +173,7 @@ async function withHistory<T extends SeatRow & Pick<SeatHistory, "terms" | "fees
     // The rounds the label counts (as classifyReach): both past years, every round, and the latest year's R1.
     const used = all.filter(counted);
     const rounds = closings.filter(counted);
-    const deepest = rounds.filter(shown).reduce<PastClosing | null>((a, c) => (!a || c.closing > a.closing ? c : a), null);
+    const deepest = deepestOf(rounds);
     // As Options: a course and quota MCC never allotted in any result is "new". A row with no quota printed is no option,
     // so no label. A virtual vacancy is a seat someone holds from an earlier round: with no allotment it is a data gap
     // (one institute under two keys), never "new".
@@ -388,7 +387,7 @@ export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }
     ...r.lists.map((l) => seatsCol(l, r.lists)),
     ...(matrix
       ? closingCols.flatMap((p) => [`${label(p)} closing rank`, `${label(p)} allotted`])
-      : [...PAST_ROUNDS.map((p) => `${label(p)} closing rank`), "Deepest of these", "Deepest round", "Other closing ranks the reach label counts"]),
+      : [...PAST_ROUNDS.map((p) => `${label(p)} closing rank`), "Deepest closing (every round counted, Stray included)", "Deepest round", "Other closing ranks the reach label counts"]),
     "Fee year 1 ₹", "Stipend year 1 ₹/month", "Bond years", "Bond ₹ (highest)", "Leaving penalty ₹ (highest)", "Beds", "Beds note", "Type",
     ...(profile ? [`${matrix ? "Your chances" : "Reach"} at AIR ${profile.rank} (history, not a prediction)`] : []),
     ...kinds.flatMap((k) => [termLabel[kindOf[k]], `${termLabel[kindOf[k]]} source`]),
