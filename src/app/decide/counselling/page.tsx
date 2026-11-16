@@ -10,6 +10,7 @@ import { Dash, PageHead } from "@/features/decide/components/bits";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { MCC_PG, MccLink } from "@/features/decide/components/pages/mcc-link";
 import { NoticeLink } from "@/features/decide/components/round-status";
+import { ScrollToHash } from "@/features/decide/components/scroll-to-hash";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { ActiveFilters, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
@@ -85,15 +86,21 @@ async function Schedule({ L }: { L: DecideLinks }) {
           {mccSite("MCC site")}
         </p>
       </div>
+      <ScrollToHash />
       {rs.rounds.map((r) => (
-        <section key={r.round} aria-labelledby={`round-${r.round}`} className="rounded-xl border border-border bg-card">
+        <section key={r.round} aria-labelledby={`round-${r.round}`} className="scroll-mt-24 rounded-xl border border-border bg-card">
           <div className="flex flex-wrap items-center justify-between gap-x-3 border-b border-border px-4">
-            <h3 id={`round-${r.round}`} className="py-2.5 font-semibold">{roundName[r.round]}</h3>
+            <h3 id={`round-${r.round}`} className="scroll-mt-24 py-2.5 font-semibold">{roundName[r.round]}</h3>
             <Link href={L.to("/decide/counselling", { tab: "announcements", year: rs.year, round: r.round })} className={`${smallLink} text-sm text-sky`}>
               {roundName[r.round]} notices
             </Link>
           </div>
           <ol>{steps.filter((s) => s.round === r.round).map((s) => <Step key={s.step} s={s} />)}</ol>
+          {/* MCC's round status has no reporting or joining step: say so, never a made-up date. */}
+          <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+            Reporting and joining dates: not in Seatora&apos;s schedule data. The round&apos;s MCC result notice gives them:{" "}
+            <Link href={L.to("/decide/counselling", { tab: "announcements", year: rs.year, round: r.round })} className={`${smallLink} text-sky`}>{roundName[r.round]} notices</Link>.
+          </p>
         </section>
       ))}
     </section>
