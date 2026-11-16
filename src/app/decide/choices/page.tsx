@@ -19,7 +19,7 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   return (
     <AppPage>
       <PageHead title="Choices" about="Your list in the order you'll enter it on the MCC portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons." />
-      <ChoicesView reachFor={liveReach} view={view} maxLists={me?.eff.limits.choiceLists} />
+      <ChoicesView reachFor={liveReach} view={view} maxLists={me?.eff.limits.choiceLists} hasLists={lists.length > 0} />
       <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
         <HistoryNote />
         {/* The reach labels read the past years' closing ranks and the latest year's R1; the seat counts these lists. */}

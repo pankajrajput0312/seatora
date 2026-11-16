@@ -177,9 +177,9 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
             label="App"
             heading={<TopNavHeading logo={<LogoMark className="size-6" />} heading="Seatora Decide" headingHref={L.to("/decide")} />}
             endContent={
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-2.5">
                 {account && (
-                  <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap">
+                  <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className="hit inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap">
                     <span className="sr-only">Your plan: </span>
                     <span className="font-semibold">{account.upgrade ? "Free" : account.plan.split(" · ")[0]}</span>
                     {account.upgrade && <span className="-mr-1.5 rounded-full bg-[#5ccfe6] px-2 py-0.5 font-semibold text-[#0b0e12]">Upgrade</span>}
@@ -198,7 +198,7 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
                 )}
                 {/* Phones: the rank and its edit button as one chip here (the sidebar, with its rank card, is in the drawer). */}
                 <button type="button" data-profile-edit aria-label={shown ? `AIR ${formatRank(shown.rank)} ${shown.category}${shown.pwd ? " PwD" : ""}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(true)}
-                  className="inline-flex h-8 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
+                  className="hit inline-flex h-8 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
                   {shown ? <><span className="numeric font-semibold">AIR {formatRank(shown.rank)}</span><span className="text-muted-foreground">· {shown.category}{shown.pwd ? " PwD" : ""}</span></> : hydrated ? "Set your rank" : "Loading…"}
                   <Pencil className="size-3 text-muted-foreground" aria-hidden />
                 </button>
@@ -306,7 +306,7 @@ function AccountFooter({ account, href, current }: { account: ShellAccount | nul
         </Link>
       )}
       <div className="flex min-w-0 items-center gap-1">
-        <Link href={href} aria-current={current ? "page" : undefined} className={cn("flex min-h-12 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 hover:bg-muted", current && "bg-muted")}>
+        <Link href={href} aria-current={current ? "page" : undefined} className={cn("flex min-h-12 max-md:min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 hover:bg-muted", current && "bg-muted")}>
           <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-[#0b0e12] text-sm font-bold text-[#5ccfe6]">{account.name[0]?.toUpperCase()}</span>
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold">{account.name}</span>
@@ -314,7 +314,7 @@ function AccountFooter({ account, href, current }: { account: ShellAccount | nul
           </span>
         </Link>
         <form action={signOut} className="shrink-0">
-          <button type="submit" title="Log out" className="flex min-h-12 min-w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+          <button type="submit" title="Log out" className="flex min-h-12 min-w-12 max-md:min-h-11 max-md:min-w-11 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
             <LogOut className="size-4" aria-hidden />
             <span className="text-[11px] font-semibold">Log out</span>
           </button>

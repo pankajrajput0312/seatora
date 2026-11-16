@@ -60,7 +60,7 @@ function Value({ c, full, nb }: { c: StatCell; full?: boolean; nb?: boolean }) {
  * (`block`: the column stays narrow). A long one ("state law may apply") wraps inside its cell, never past its rule.
  */
 const Marker = ({ c, block }: { c: StatCell; block?: boolean }) =>
-  c.marker && <span className={cn("text-[11px] leading-snug font-normal", block ? "block" : "ml-1 inline-block", c.markerWarn ? "text-sun" : "text-muted-foreground")}>{c.marker}</span>;
+  c.marker && <span className={cn("text-xs leading-snug font-normal", block ? "block" : "ml-1 inline-block", c.markerWarn ? "text-sun" : "text-muted-foreground")}>{c.marker}</span>;
 
 /**
  * One cell's value with its (i), the marker on the line under it (`tip={false}`: no (i), for a table whose header has
@@ -100,7 +100,7 @@ function YearCell({ t, pick, year, className }: { t: ProgrammeTerms; pick: "fee"
             {v.text.replace(/ /g, "\u00a0")}
             {v.text === "—" && <span className="sr-only"> (not stated)</span>}
           </span>
-          {v.marker && <span className="block text-[11px] leading-snug font-normal text-muted-foreground">{v.marker}</span>}
+          {v.marker && <span className="block text-xs leading-snug font-normal text-muted-foreground">{v.marker}</span>}
         </>
       )}
     </td>

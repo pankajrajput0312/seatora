@@ -142,7 +142,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <span>{n(sum.options)} with {round} seats:</span>
             <span>{n(sum.clear)} clear,</span>
             <span>{n(sum.virtualOnly)} virtual only{sum.newOnly > 0 && <>, {n(sum.newOnly)} only newly added</>},</span>
-            {sum.fresh > 0 ? <Link href={here({ reach: "new", seats: null, q: null })} aria-label={`${formatRank(sum.fresh)} new: no past allotment`} className="text-sky underline">{n(sum.fresh)} new<span className="sr-only">: no past allotment</span></Link> : <span>none new</span>}
+            {sum.fresh > 0 ? <Link href={here({ reach: "new", seats: null, q: null })} aria-label={`${formatRank(sum.fresh)} new: no past allotment`} className={`${smallLink} text-sky`}>{n(sum.fresh)} new<span className="sr-only">: no past allotment</span></Link> : <span>none new</span>}
             <InfoTip label={`${round} seats`}>
               {formatRank(sum.options)} {sum.options === 1 ? "option has" : "options have"} {roundWords} seats in your courses: {formatRank(sum.clear)} in the clear vacancy list,{" "}
               {formatRank(sum.virtualOnly)} virtual only (seats there fall vacant only if their holder upgrades or leaves){sum.newOnly > 0 && `, ${formatRank(sum.newOnly)} only newly added`};{" "}

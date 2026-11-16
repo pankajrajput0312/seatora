@@ -230,20 +230,21 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
       <Dialog.Content
-        // Focus lands on the first field, not the Close button; on close the shell puts it on the visible Edit / Set
-        // your rank button.
+        // First run: focus lands on the rank field. Editing: on the sheet itself, so a phone's keyboard doesn't cover
+        // it before she picks what to change. On close the shell puts focus on the visible Edit / Set your rank button.
         onOpenAutoFocus={(e) => {
           e.preventDefault();
-          rankInput.current?.focus();
+          if (setup) rankInput.current?.focus();
+          else (e.currentTarget as HTMLElement | null)?.focus();
         }}
         // First run: a stray tap outside would throw the steps away; Escape and Close still leave.
         onInteractOutside={(e) => setup && e.preventDefault()}
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-xl border border-border bg-popover p-6 shadow-overlay md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-xl border border-border bg-popover p-6 pb-0 shadow-overlay outline-none md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <Dialog.Title className="text-xl font-semibold">{setup ? "Set up Decide" : "Your rank and preferences"}</Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-              Saved to your account, so it follows you to any device you sign in on. Your rank, category, PwD status and filters show in page addresses, so links you share carry them and they stay in browser history.
+              Saved to your account. Your rank, category, PwD status and filters show in page addresses, so shared links and browser history carry them.
             </Dialog.Description>
           </div>
           <Dialog.Close asChild>
@@ -278,7 +279,8 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
           )}
 
           {importError && <p role="alert" className="text-sm text-ember">{importError}</p>}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+          {/* Pinned to the sheet's bottom, so Save (or Next) is always in reach however long the step. */}
+          <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-popover px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pt-5">
             <div className="flex gap-2">
               {setup && step > 0 && <Button type="button" variant="secondary" onClick={() => go(step - 1)}>Back</Button>}
               {!setup && <Button type="button" variant="ghost" onClick={exportJson}>Export JSON</Button>}

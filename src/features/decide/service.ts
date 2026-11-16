@@ -682,13 +682,20 @@ export async function dashboard(profile: Profile) {
     dots += c.points.length;
   }
   const strip = shown.map(({ course, points }) => ({ course, points }));
-  // The round trend needs each option's closing per round of that year: full rows, for the shown courses only.
-  const rows = await rowsFor(cat, shown.flatMap((c) => c.opts), profile, true);
+  // The round trend: each shown option's deepest closing per round of that year on her seat categories (an option row's
+  // grid cell). That year's cutoffs on her categories only, no full rows: reading every year and category of ~1,000
+  // options and building their rows was most of Home's server time.
+  const shownOpts = shown.flatMap((c) => c.opts);
+  const quotas = [...new Set(shownOpts.map((o) => o.quota))];
+  const byOpt = groupByOption(await cutoffsOnce(cat, JSON.stringify({ cs: [...new Set(shownOpts.map((o) => o.cs))], quotas: quotas.length < cat.meta.quotas.length ? quotas : undefined, categories: eligibleCategories(profile.category, profile.pwd), years: [last] } satisfies CutoffQuery)));
   const trendRounds: Round[] = ["R1", "R2", "R3", "stray"];
-  const trend = shown.map(({ course }) => ({
+  const trend = shown.map(({ course, opts }) => ({
     course,
     points: trendRounds.map((round) => {
-      const vals = rows.filter((r) => r.course.slug === course.slug).flatMap((r) => (r.grid[last]?.[round] ? [r.grid[last]![round]!.closing] : []));
+      const vals = opts.flatMap((o) => {
+        const deepest = Math.max(0, ...(byOpt.get(o.id) ?? []).filter((c) => c.round === round).map((c) => c.closing));
+        return deepest ? [deepest] : [];
+      });
       return { round, median: median(vals), n: vals.length };
     }),
   }));

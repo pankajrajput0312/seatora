@@ -30,7 +30,7 @@ describe("GET /r/[code]", () => {
     expect((await open("RHUX234")).headers.get("location")).toBe("/pricing");
     m.signedIn = false;
     const res = await open("ZZZZ999");
-    expect([res.headers.get("location"), res.headers.get("set-cookie")]).toEqual(["/signup", null]);
+    expect([res.headers.get("location"), res.headers.get("set-cookie")]).toEqual(["/signup?invite=bad", null]);
   });
 
   it("limits lookups to 30 a minute per IP", async () => {

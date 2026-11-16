@@ -24,6 +24,7 @@ import { Beds } from "./pages/beds";
 import { ResultCard } from "./result-card";
 import { TermStatCells } from "./stat-cells";
 import { TypeBadge } from "./type-badge";
+import { Skeleton } from "./skeleton";
 import { control, EmptyState, smallLink, tbl } from "./ui";
 import { ViewToggle, type View } from "./view-toggle";
 
@@ -44,7 +45,8 @@ type ReachFor = (ids: string[], profile: string) => Promise<{ lists: SeatList[];
 
 /** `view`: Cards or table on show (chosenView "choices"). Only that one is rendered: its controls carry the ids focus moves to. */
 /** `maxLists`: the plan's saved lists (features/plans); at it, "Duplicate" gives way to a Season Pass link. Unset: no cap (signed out). */
-export function ChoicesView({ reachFor, view, maxLists = Infinity }: { reachFor?: ReachFor; view: View; maxLists?: number }) {
+/** `hasLists`: the server has the newest round's seat lists, so a card keeps room for its seats line while it loads. */
+export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists }: { reachFor?: ReachFor; view: View; maxLists?: number; hasLists?: boolean }) {
   const [state, setState, hydrated] = useChoices();
   const L = useDecideLinks();
   const sp = useSearchParams();
@@ -181,7 +183,10 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity }: { reachFor?
     a.click();
   };
 
-  if (!hydrated) return <div className="mt-8 h-40 animate-pulse rounded-xl bg-muted" />;
+  // A screen tall, so what follows the list stays off-screen until the list is in (no jump when it renders).
+  if (!hydrated) return <Skeleton className="mt-6 h-[100dvh] rounded-xl" />;
+  // Terms and seats still on their way: their room is kept (a placeholder each), so the cards don't grow when they come.
+  const loading = !!reachFor && !fresh && failed !== liveKey;
 
   /** One choice's state: typed, its live label, seats and terms (`lr`), and the warnings shown in view. */
   const rowOf = (item: ChoiceItem, i: number) => {
@@ -281,8 +286,9 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity }: { reachFor?
               meta={[item.state ?? "State not listed", lr?.hospital?.type && <TypeBadgeM type={lr.hospital.type} of={item.institute} />, lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />]}
               footer={
                 <>
-                  {lr && <StatCellsM t={lr.fees} of={name(item)} />}
-                  <div className={cn("grid gap-1 px-4 py-2", lr && "border-t border-border")}>
+                  {lr ? <StatCellsM t={lr.fees} of={name(item)} /> : loading && <Skeleton className="h-[7.75rem] rounded-none sm:h-[4.5rem]" />}
+                  <div className={cn("grid gap-1 px-4 py-2", (lr || loading) && "border-t border-border")}>
+                    {!lr && loading && hasLists && <Skeleton className="h-11 w-48" />}
                     {lr && lists.length > 0 && (
                       <p className="flex flex-wrap items-center gap-x-3 text-xs">
                         <span className="text-muted-foreground">{round} seats:</span>

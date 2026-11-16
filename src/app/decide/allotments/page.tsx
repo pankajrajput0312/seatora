@@ -17,7 +17,7 @@ import { TermFilterControls } from "@/features/decide/components/term-filter-con
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { VIEW_PARAM, ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
-import { chosenView } from "@/features/decide/server/view";
+import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
@@ -25,7 +25,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { roundLabel, rounds } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Allotments" };
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
 // Columns the Display menu can hide (rank, round and institute always show), in table order: the numbers first.
 const cols = [
   ...statKeys.map((k) => ({ key: k, label: statLabel[k] })),
@@ -57,7 +57,8 @@ const about = (
 export default async function AllotmentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
-  const [v, view] = await Promise.all([allotmentsView(params, PAGE_SIZE), chosenView(params, "allotments")]);
+  const pageSize = await pageSizeFor(PAGE_SIZE);
+  const [v, view] = await Promise.all([allotmentsView(params, pageSize), chosenView(params, "allotments")]);
   if (!v) notFound();
   const { f, meta, inst, typed, rankError, latest, filters } = v;
   const { rows, total, page, unknownTerms } = v.r;
@@ -127,7 +128,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
             label: "Rank",
             value: (
               <>
-                {rankLink(a, "numeric hover:text-sky hover:underline")}
+                {rankLink(a, "hit numeric hover:text-sky hover:underline")}
               </>
             ),
           }}
@@ -253,7 +254,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
 
       <div className={toolbarRow}>
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
-          <span className="numeric font-semibold text-foreground">{rangeLabel({ rows, total, page, pageSize: PAGE_SIZE })}</span> allotments
+          <span className="numeric font-semibold text-foreground">{rangeLabel({ rows, total, page, pageSize })}</span> allotments
           {/* The default view (no filter: the latest round) is what Year and Round show; say it for screen readers. */}
           {latest && <span className="sr-only">, the latest round, {latest.year} {roundLabel[latest.rounds.at(-1)!]}</span>}
          <ColourLegend className="ml-1 align-middle" /></p>
@@ -278,7 +279,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       ) : (
         <ViewPanes page="allotments" view={view} cards={cards} table={table} />
       )}
-      <Pager page={page} pageSize={PAGE_SIZE} total={total} href={(n) => L.page("/decide/allotments", n)} focusId="results" label="Allotments" />
+      <Pager page={page} pageSize={pageSize} total={total} href={(n) => L.page("/decide/allotments", n)} focusId="results" label="Allotments" />
       <DataSource
         used={[...new Map(rows.map((a) => [`${a.year}|${a.round}`, { year: a.year, round: a.round }])).values()]}
         terms={termDocs(rows.map((a) => a.fees))}

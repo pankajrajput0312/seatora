@@ -42,7 +42,7 @@ export function HomeHub({ L }: { L: DecideLinks }) {
         <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(#5ccfe6_1px,transparent_1px),linear-gradient(90deg,#5ccfe6_1px,transparent_1px)] [background-size:14px_14px]" />
         <div className="relative grid gap-4 p-4 sm:p-5 md:grid-cols-[1fr_auto] md:items-end">
           <div>
-            <p className="font-mono text-[11px] tracking-[0.25em] text-[#5ccfe6]">▮ RESIDENTS · NEW</p>
+            <p className="font-mono text-xs tracking-[0.25em] text-[#5ccfe6]">▮ RESIDENTS · NEW</p>
             <h2 id="residents-h" className="mt-2 text-2xl font-bold leading-tight tracking-tight sm:text-3xl" style={{ color: "#f1f4f7" }}>
               Know who&apos;s already there.
             </h2>
@@ -60,7 +60,7 @@ export function HomeHub({ L }: { L: DecideLinks }) {
             </Link>
           </div>
           <div data-placement="home_card" className="rounded-lg border border-dashed border-[#2b3a45] px-4 py-3 md:text-right">
-            <p className="font-mono text-[10px] tracking-[0.25em] text-[#a3abb3]">SEASON PASS</p>
+            <p className="font-mono text-xs tracking-[0.25em] text-[#a3abb3]">SEASON PASS</p>
             <p className="mt-1 flex items-baseline gap-2 md:justify-end">
               <s className="text-sm text-[#6b7480]" aria-label={`Was ${formatPaise(PLANS.season_pass.wasAmount)}`}>{formatPaise(PLANS.season_pass.wasAmount)}</s>
               <span className="text-3xl font-extrabold text-[#5fd36f]">{formatPaise(free ? 0 : PLANS.season_pass.amount)}</span>
@@ -81,7 +81,7 @@ export function HomeHub({ L }: { L: DecideLinks }) {
 
       {groups.map((g) => (
         <section key={g.title} aria-label={g.title} className="grid gap-2">
-          <h2 className="font-mono text-[11px] tracking-[0.2em] text-muted-foreground uppercase">{g.title}</h2>
+          <h2 className="font-mono text-xs tracking-[0.2em] text-muted-foreground uppercase">{g.title}</h2>
           <ul className="grid grid-cols-2 gap-2 xl:grid-cols-4">
             {g.tools.map(({ href, label, note, icon: Icon }) => (
               <li key={href}>
@@ -91,7 +91,7 @@ export function HomeHub({ L }: { L: DecideLinks }) {
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold text-foreground">{label}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{note}</span>
+                    <span className="line-clamp-2 text-xs text-muted-foreground">{note}</span>
                   </span>
                   <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" aria-hidden />
                 </Link>

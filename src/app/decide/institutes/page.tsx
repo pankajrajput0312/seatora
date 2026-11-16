@@ -112,11 +112,11 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
                     <div className="grid px-4 py-1">
                       {/* No (i) listing the courses: the count opens them (24 cards of course lists weighed down the page). */}
                       <dt className="pt-1 text-xs text-muted-foreground">Courses</dt>
-                      <dd><Link href={L.institute(r.college.slug, "courses")} className={`${smallLink} numeric font-semibold text-sky`}>{formatRank(r.courses.length)}<span className="sr-only"> courses: see them</span></Link></dd>
+                      <dd><Link href={L.institute(r.college.slug, "courses")} className={`${smallLink} numeric min-w-11 font-semibold text-sky`}>{formatRank(r.courses.length)}<span className="sr-only"> courses: see them</span></Link></dd>
                     </div>
                     <div className="grid border-l border-border px-4 py-1">
                       <dt className="pt-1 text-xs text-muted-foreground">Allotments {PAST_YEARS[1]}</dt>
-                      <dd className="numeric flex min-h-11 items-center font-semibold">{allot(r, `${smallLink} text-sky`)}</dd>
+                      <dd className="numeric flex min-h-11 items-center font-semibold">{allot(r, `${smallLink} min-w-11 text-sky`)}</dd>
                     </div>
                   </dl>
                   <Link href={L.institute(r.college.slug, "fees")} className={`${smallLink} shrink-0 border-l border-border px-4 text-sky`}>Fees & bond</Link>
@@ -184,7 +184,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         search={
           <label className="min-w-0 flex-1 basis-32 md:min-w-56">
             <span className="sr-only">Search institutes by name or state</span>
-            <input type="search" name="q" defaultValue={f.q} placeholder="Search name or state" className={control} />
+            <input type="search" name="q" defaultValue={f.q} placeholder="Name or state" className={control} />
           </label>
         }
       >

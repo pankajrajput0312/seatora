@@ -17,7 +17,7 @@ const writeCookie = (page: string, v: View) => {
   document.cookie = `${viewCookie(page)}=${v}; path=/decide; max-age=31536000; samesite=lax`;
 };
 
-const item = "inline-flex min-h-11 items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground first:rounded-l-md last:rounded-r-md";
+const item = "inline-flex min-h-11 max-md:min-h-[2.375rem] items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground first:rounded-l-md last:rounded-r-md";
 const ON = "bg-sky/10 font-semibold text-sky hover:text-sky";
 
 /**

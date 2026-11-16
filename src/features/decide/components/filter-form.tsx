@@ -61,7 +61,7 @@ export function FiltersPanel({ count, clear, children }: { count: number; clear?
         }
       }}
     >
-      <summary className="inline-flex h-11 cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-secondary px-4 text-sm font-medium hover:bg-raised group-open/filters:border-sky [&::-webkit-details-marker]:hidden">
+      <summary className="inline-flex h-11 max-md:h-[2.375rem] cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-secondary px-4 text-sm font-medium hover:bg-raised group-open/filters:border-sky [&::-webkit-details-marker]:hidden">
         <ListFilter className="size-4" aria-hidden />
         Filters
         {count > 0 && (

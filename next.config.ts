@@ -50,6 +50,10 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }, ...noindex];
   },
+  // The FAQ is a section of the home page.
+  async redirects() {
+    return [{ source: "/faq", destination: "/#faq", permanent: true }];
+  },
 };
 
 export default nextConfig;

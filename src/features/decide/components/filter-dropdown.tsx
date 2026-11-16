@@ -62,7 +62,7 @@ export function FilterDropdown({ label, name, options, selected, none = "All", n
         if (e.currentTarget.open && panel.getBoundingClientRect().right > document.documentElement.clientWidth) panel.dataset.flip = "";
       }}
     >
-      <summary className="flex h-11 cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-card px-3 text-sm whitespace-nowrap hover:border-foreground/70 [&::-webkit-details-marker]:hidden">
+      <summary className="flex h-11 max-md:h-[2.375rem] cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-card px-3 text-sm whitespace-nowrap hover:border-foreground/70 [&::-webkit-details-marker]:hidden">
         <span className="text-muted-foreground">{label}</span>
         <span className="font-semibold">{count ? (count === 1 ? options.find((o) => o.value === selected[0])?.label ?? selected[0] : `${count} selected`) : none}</span>
         <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />

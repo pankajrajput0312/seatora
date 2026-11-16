@@ -190,7 +190,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         <Fragment key={params.toString()}>
           <label className="min-w-0 flex-1 basis-32 md:min-w-56">
             <span className="sr-only">Search institute or state</span>
-            <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Search institute or state" className={control} />
+            <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Institute or state" className={control} />
           </label>
         </Fragment>
         <SearchSubmit />

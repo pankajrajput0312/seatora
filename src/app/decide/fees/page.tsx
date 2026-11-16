@@ -16,7 +16,7 @@ import { TermFilterControls } from "@/features/decide/components/term-filter-con
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, FilterBar, Pager, rangeLabel, Select, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
-import { chosenView } from "@/features/decide/server/view";
+import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { statKeys, statLabel, type StatKey } from "@/features/decide/lib/stat-format";
@@ -26,7 +26,7 @@ import { getDecideData, getMeta, listFees, type FeeSort } from "@/features/decid
 import { programmeNames, programmes } from "@/features/decide/server/terms";
 
 export const metadata: Metadata = { title: "Fees & bond" };
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
 const schema = feesParamsSchema.extend({ page: pageValue.default(1) });
 /** The table's stat columns (TermStatCells order) and the sort each header sets. */
 const sortOf: Record<StatKey, Exclude<FeeSort, "name">> = { fee: "fee1", stipend: "stip1", bond: "bondyrs", bondInr: "bond", leaving: "leave" };
@@ -43,7 +43,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const profile = profileFromParams(params);
   const [meta, { courses }, info] = await Promise.all([getMeta(), getDecideData(), hospitalInfo()]);
   const d = feeDefaults(profile, courses);
-  const [res, view] = await Promise.all([listFees(feesFilters(f, d), { page: f.page, pageSize: PAGE_SIZE }), chosenView(params, "fees")]);
+  const [res, view] = await Promise.all([listFees(feesFilters(f, d), { page: f.page, pageSize: await pageSizeFor(PAGE_SIZE) }), chosenView(params, "fees")]);
   const { rows } = res;
   const dir = f.dir ?? natural(f.sort);
   const byName = f.sort === "name";
@@ -175,7 +175,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         search={
           <label className="grid min-w-0 flex-1 basis-32 text-sm md:min-w-56">
             <span className="sr-only">Institute or state</span>
-            <input name="q" type="search" defaultValue={f.q ?? ""} placeholder="Search institute or state" className={control} />
+            <input name="q" type="search" defaultValue={f.q ?? ""} placeholder="Institute or state" className={control} />
           </label>
         }
       >

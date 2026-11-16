@@ -47,7 +47,7 @@ type Col = { year: number; rounds: Round[]; provisional: boolean };
 /** A closing with the allotments made that round in brackets: "11,842 (20)". `stack`: the count on its own line (cards). */
 function Cell({ c, stack }: { c: OptionRow["grid"][number][Round]; stack?: boolean }) {
   if (!c) return <Dash />;
-  return <>{formatRank(c.closing)} <span className={`${stack ? "block text-[11px]" : "text-xs"} text-muted-foreground`}>({formatRank(c.n)})</span></>;
+  return <>{formatRank(c.closing)} <span className={`${stack ? "block text-xs" : "text-xs"} text-muted-foreground`}>({formatRank(c.n)})</span></>;
 }
 
 /** A card's year × round grid, newest year first, rounds R1 → special stray. */

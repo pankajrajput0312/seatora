@@ -25,7 +25,7 @@ import { TypeBadge } from "@/features/decide/components/type-badge";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
-import { chosenView } from "@/features/decide/server/view";
+import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { fmtDay } from "@/features/decide/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -52,7 +52,7 @@ const tabs = [
   { key: "clinical", label: "Hospital facts" },
   { key: "allotments", label: "Allotments" },
 ] as const;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
 const schema = z.object({
   tab: z.enum(["overview", "courses", "seats", "allotments", "fees", "clinical", "residents"]).default("overview"),
   /** Courses tab seat columns: every seat category instead of hers (as Seats' `scat=all`). */
@@ -111,7 +111,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const nLatest = allotmentsByYear.find((a) => a.year === LATEST_YEAR)?.n ?? null;
 
   // Allotments tab: one page from SQL; a page past the end shows the last page.
-  const allot = tab === "allotments" ? await listAllotments({ year: allotYear, course: allotCourse }, { page: f.page, pageSize: PAGE_SIZE }, college.key) : null;
+  const allot = tab === "allotments" ? await listAllotments({ year: allotYear, course: allotCourse }, { page: f.page, pageSize: await pageSizeFor(PAGE_SIZE) }, college.key) : null;
   // ponytail: every row on one page (largest institute ~930 rows, ~1.6 MB HTML); add a course filter if that grows.
   const residentsAccess = tab !== "residents" ? null : !(await canSeeResidents()) ? "locked" : ((await residentsDenied("read")) ?? "ok");
   const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
@@ -549,7 +549,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               }
             />
           )}
-          <Pager page={allot.page} pageSize={PAGE_SIZE} total={allot.total} href={(n) => L.page(`/decide/institutes/${slug}`, n)} focusId="results" label="Allotments" />
+          <Pager page={allot.page} pageSize={allot.pageSize} total={allot.total} href={(n) => L.page(`/decide/institutes/${slug}`, n)} focusId="results" label="Allotments" />
           <DataSource used={[...new Map(allot.rows.map((a) => [`${a.year}|${a.round}`, { year: a.year, round: a.round }])).values()]} />
         </section>
       )}

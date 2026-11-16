@@ -428,7 +428,7 @@ test("print: every table box lets all its rows onto paper", async ({ page }) => 
   await expect(page.getByText(/^Address as printed by MCC/)).toBeVisible();
 });
 
-test("institute page: MCC address, terms with their sources, paginated allotments", async ({ page }) => {
+test("institute page: MCC address, terms with their sources, paginated allotments", async ({ page, isMobile }) => {
   await page.goto(`/decide/institutes/${KOKILA_NM}?${PROFILE}&tab=fees`);
   await page.getByRole("button", { name: "About address" }).click(); // the address is behind its (i)
   await expect(page.getByRole("dialog", { name: "address" })).toContainText("Navi Mumbai");
@@ -452,10 +452,11 @@ test("institute page: MCC address, terms with their sources, paginated allotment
 
   await page.goto(`/decide/institutes/${SETH_GS}?${PROFILE}&tab=allotments`);
   const results = page.locator("#results");
-  await expect(results).toContainText("1–50 of 1,001");
+  const per = isMobile ? 25 : 50; // 25 a page on a phone (server/view.ts pageSizeFor)
+  await expect(results).toContainText(`1–${per} of 1,001`);
   await page.getByRole("link", { name: "Next" }).click();
   await expect(page).toHaveURL(/page=2/);
-  await expect(results).toContainText("51–100 of 1,001");
+  await expect(results).toContainText(`${per + 1}–${per * 2} of 1,001`);
   await expect(results).toBeFocused();
 });
 

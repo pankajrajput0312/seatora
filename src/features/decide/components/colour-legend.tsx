@@ -7,7 +7,7 @@ import { levelClass } from "./stat-cells";
 // The colour key (docs/APP_DESIGN_SYSTEM.md "Colour key") behind one (i): what each colour on a page means, each with
 // its words. Colour is never the only signal: every value and badge also says it in text. Spans only (it may sit in a <p>).
 
-const badge = "inline-flex items-center rounded-sm px-1.5 py-0.5 text-[11px] font-medium";
+const badge = "inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium";
 const Row = ({ head, children }: { head: string; children: React.ReactNode }) => (
   <span className="mt-2 block">
     <span className="block font-semibold">{head}</span>

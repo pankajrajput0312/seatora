@@ -145,8 +145,8 @@ export function SourceRef({ doc, first, className }: { doc: SourceDoc; first?: b
   // Outside a page, and before hydration (or without JS: the numbers are the browser's), the document itself.
   if (n == null) return <Fallback docs={[doc]} sup />;
   return (
-    <sup className={className ?? "ml-0.5 text-[0.75em] font-normal text-muted-foreground"}>
-      <a href={`#source-${n}`} onClick={(e) => openSource(e, n)} aria-label={`Source ${n}: ${docName(doc)}`} title={docName(doc)} className={refClass}>{n}</a>
+    <sup className={className ?? "ml-0.5 text-[max(0.75em,0.75rem)] font-normal text-muted-foreground"}>
+      <a href={`#source-${n}`} onClick={(e) => openSource(e, n)} aria-label={`Source ${n}: ${docName(doc)}`} title={docName(doc)} className={`hit ${refClass}`}>{n}</a>
     </sup>
   );
 }
@@ -164,7 +164,7 @@ export function SourceRefs({ docs, first, label = "Sources", className }: { docs
   // Before hydration (or without JS): the documents as short links, so the HTML has them.
   if (!byN.size) return <p className={className ?? "text-xs text-muted-foreground"}>{label}: <Fallback docs={docs} sup /></p>;
   const link = (n: number) => (
-    <a href={`#source-${n}`} onClick={(e) => openSource(e, n)} aria-label={`Source ${n}: ${docName(byN.get(n)!)}`} title={docName(byN.get(n)!)} className={`${refClass} numeric inline-flex min-h-11 min-w-6 items-center justify-center`}>{n}</a>
+    <a href={`#source-${n}`} onClick={(e) => openSource(e, n)} aria-label={`Source ${n}: ${docName(byN.get(n)!)}`} title={docName(byN.get(n)!)} className={`hit ${refClass} numeric inline-flex min-h-11 min-w-6 items-center justify-center`}>{n}</a>
   );
   return (
     <p className={className ?? "text-xs text-muted-foreground"}>

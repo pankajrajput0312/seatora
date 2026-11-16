@@ -395,8 +395,16 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
 
 /* ---------- Phones (below md): one compact type and spacing scale, like a native app ----------
    Tailwind's utilities read these tokens, so every text-* size, padding, gap and height steps down together; md up is
-   untouched. Body 14px, small 12px, h1 20-22px, stat numbers 20-24px; spacing at 80% (p-4 = 12.8px, h-11 = 35px), with
-   the main actions (Button md, inputs) kept at 40px and form fields at 16px so iOS never zooms. */
+   untouched. Body 14px, small 12px, h1 20-22px, stat numbers 20-24px; spacing at 80% (p-4 = 12.8px), with the main
+   actions (Button md, inputs) at 38px and form fields at 16px so iOS never zooms. The touch-target step 11 (size-11,
+   h-11, min-h-11, min-w-11) is not spacing: it stays 44px at every width (--spacing-11 below). */
+@theme { --spacing-11: 2.75rem; }
+/* A 44px touch target around a small control (a superscript, an icon link, a chip) without changing its size or the
+   lines around it: an invisible box centred on it. Not on an element that already uses ::before. */
+@utility hit {
+  position: relative;
+  &::before { content: ""; position: absolute; inset: min(0px, calc((100% - 2.8rem) / 2)); } /* a hair over 44px: never 43.9 */
+}
 @media (width < 48rem) {
   :root {
     --spacing: 0.2rem;
@@ -425,6 +433,9 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
     --font-size-2xl: 1.25rem;
     --text-body-leading: 1.45;
   }
+  /* min-h-6 / min-w-6 are the dense rows' link minimum (WCAG's 24px target), not spacing: they stay 24px too. */
+  .app .min-h-6 { min-height: 1.5rem; }
+  .app .min-w-6 { min-width: 1.5rem; }
   /* Form fields stay 16px: iOS zooms into anything smaller. */
   :is(input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea) { font-size: 1rem; }
   /* Headings: page titles 22px, sections 16-17px, card titles 15px, whatever size class the page gave them. */
@@ -435,6 +446,10 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
   .app .astryx-mobile-nav .astryx-button { min-width: 2.5rem; min-height: 2.5rem; }
   .app .astryx-top-nav-heading { min-height: 2.5rem; }
   .app header:has(.astryx-top-nav-heading) > * { padding-block: 0.25rem; }
+}
+/* Phones: the brand is its logo (the plan and rank chips need the row); the name stays the link's accessible name. */
+@media (width < 30rem) {
+  .app .astryx-top-nav-heading > span + span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 /* A list page's filters and results tools on one row: the Filters form, then the count, Cards | Table, CSV, Display; the
    rest (active-filter chips, notes) on the lines under it. The row positions the Filters panel, so it spans the row. */
@@ -452,7 +467,8 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
 @media (width < 48rem) {
   .filter-row > .toolbar { display: contents; }
   .filter-row > .toolbar > :first-child { order: 1; flex-basis: 100%; }
-  .filter-row > .toolbar > :last-child:not(:first-child) { display: contents; }
+  /* The tools' wrapper dissolves so its items sit beside Filters; a lone Cards | Table toggle (role=group) stays whole. */
+  .filter-row > .toolbar > :last-child:not(:first-child, [role="group"]) { display: contents; }
 }
 
 /* The phone menu: the account footer (decide-shell.tsx AccountFooter) stays at the drawer's bottom while the list scrolls

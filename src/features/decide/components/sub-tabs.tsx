@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { ScrollToCurrent } from "./focus-item";
 
 /** Link-based sub-navigation (not ARIA tabs): each view has its own URL. */
 export function SubTabs({ label, items, current }: { label: string; items: { key: string; label: string; href: string; accent?: boolean }[]; current: string }) {
@@ -11,6 +12,7 @@ export function SubTabs({ label, items, current }: { label: string; items: { key
           {t.accent && <span className="ml-1.5 rounded-full bg-[#6d28d9] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">NAMES</span>}
         </Link>
       ))}
+      <ScrollToCurrent />
     </nav>
   );
 }

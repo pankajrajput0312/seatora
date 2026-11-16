@@ -22,3 +22,15 @@ export function FocusOnChange({ id, value }: { id: string; value: string | numbe
   }, [id, value]);
   return null;
 }
+
+/** In a sideways-scrolling row (SubTabs), brings its current item (aria-current) into view, centred, on mount. */
+export function ScrollToCurrent() {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const row = ref.current?.parentElement;
+    const cur = row?.querySelector<HTMLElement>("[aria-current]");
+    if (!row || !cur) return;
+    row.scrollLeft += cur.getBoundingClientRect().left - row.getBoundingClientRect().left - (row.clientWidth - cur.offsetWidth) / 2;
+  }, []);
+  return <span ref={ref} hidden />;
+}

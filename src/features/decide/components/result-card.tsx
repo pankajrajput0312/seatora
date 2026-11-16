@@ -85,7 +85,7 @@ export function ResultCard({ chips, actions, stat, title, href, external, subtit
                 rel="noopener noreferrer"
                 aria-label={`MCC profile: ${title} (opens in a new tab)`}
                 title="MCC profile"
-                className="relative inline-flex size-5 shrink-0 items-center justify-center text-muted-foreground before:absolute before:-inset-3 before:content-[''] hover:text-sky"
+                className="hit inline-flex size-5 shrink-0 items-center justify-center text-muted-foreground hover:text-sky"
               >
                 {icon}
               </a>
@@ -107,7 +107,8 @@ export function ResultCard({ chips, actions, stat, title, href, external, subtit
         )}
       </div>
       {head && (
-        <div className="order-first flex min-h-11 items-center justify-between gap-2 border-b border-border pl-4 pr-1">
+        // The row's height is its action buttons' (44px); chips alone keep the compact phone height.
+        <div className={cn("order-first flex min-h-11 items-center justify-between gap-2 border-b border-border pl-4 pr-1", !actions && "max-md:min-h-[2.2rem]")}>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 py-1.5 text-xs font-medium text-muted-foreground">
             <Joined items={chips ?? []} mark={<span aria-hidden className="h-3 w-px bg-border" />} />
           </div>

@@ -14,10 +14,10 @@ import { openAccess, safeNext } from "@/lib/site-access";
 
 export const metadata: Metadata = { title: "Create account", robots: { index: false } };
 
-type Props = { searchParams: Promise<{ next?: string | string[]; ref?: string | string[] }> };
+type Props = { searchParams: Promise<{ next?: string | string[]; ref?: string | string[]; invite?: string | string[] }> };
 
 export default async function SignupPage({ searchParams }: Props) {
-  const { next, ref } = await searchParams;
+  const { next, ref, invite } = await searchParams;
   const to = typeof next === "string" ? next : undefined;
   if (await hasSiteAccess()) redirect(safeNext(to));
   // A referral (/r/CODE's cookie, else ?ref=): her inviter's first name, and sign-up records who invited her.
@@ -34,6 +34,8 @@ export default async function SignupPage({ searchParams }: Props) {
       <AuthShell eyebrow="Free account" title="Create your account.">
         <TrackView name="signup_view" />
         {inviter && <InviteBanner inviter={inviter.name} className="mb-4" />}
+        {/* /r/CODE with a code nobody has (route.ts), or a hand-typed ?ref= that isn't one. */}
+        {!inviter && (invite === "bad" || refCode) && <p className="mb-4 text-sm text-muted-foreground">That invite link isn&apos;t valid. You can still create a free account.</p>}
         <p className="mb-6 text-sm text-muted-foreground max-sm:order-last max-sm:mt-6 max-sm:mb-0">
           {freeUntil ? (
             <>Everything is free till {shortDate(freeUntil)} (Season Pass ₹0, then {price}): anyone can create an account and open the planner.</>

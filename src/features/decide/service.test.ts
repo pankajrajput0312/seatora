@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { reachOrder } from "./lib/reach";
+import { PAST_YEARS, reachOrder } from "./lib/reach";
 import type { Profile } from "./profile";
 import { getCatalog, setTestCatalog } from "./server/catalog";
 import { remarkOf } from "./server/queries";
@@ -73,6 +73,14 @@ describe("service on the test fixture", () => {
     for (const s of d.summary) if (s.deepest) expect(s.deepest).toMatchObject({ closing: expect.any(Number), round: expect.any(String), category: expect.any(String), quota: expect.any(String) });
     expect(d.strip.length).toBeLessThanOrEqual(8);
     expect(d.trend.map((t) => t.course.slug)).toEqual(d.strip.map((s) => s.course.slug));
+    // The trend reads only that year's cutoffs on her categories: the same medians as the full rows' grid cells.
+    const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return !s.length ? null : s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2); };
+    for (const t of d.trend)
+      for (const p of t.points) {
+        const xs = o.rows.filter((r) => r.course.slug === t.course.slug).flatMap((r) => r.grid[PAST_YEARS[1]]?.[p.round]?.closing ?? []);
+        expect({ n: p.n, median: p.median }, `${t.course.slug} ${p.round}`).toEqual({ n: xs.length, median: median(xs) });
+      }
+    expect(d.trend.some((t) => t.points.some((p) => p.n > 0))).toBe(true);
   });
 
   it("narrows by profile before reading cutoffs", async () => {

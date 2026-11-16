@@ -7,6 +7,12 @@ import { siteConfig } from "@/config/site";
 import { Button } from "@/components/ui/button";
 import { AuthLink } from "./auth-link";
 
+const links = [
+  { label: "Residents", href: "/#preview" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "FAQ", href: "/#faq" },
+];
+
 // Native <dialog>: showModal() gives the focus trap, Escape and top layer, so phones don't download a dialog library.
 export function MobileNav() {
   const ref = useRef<HTMLDialogElement>(null);
@@ -35,7 +41,10 @@ export function MobileNav() {
             </button>
           </div>
           <nav aria-label="Mobile" className="mt-4 grid">
-            <AuthLink onClick={close} className="border-b border-border py-3.5 text-base" />
+            {links.map((l) => (
+              <Link key={l.href} href={l.href} onClick={close} className="flex min-h-11 items-center border-b border-border text-base">{l.label}</Link>
+            ))}
+            <AuthLink onClick={close} className="flex min-h-11 items-center border-b border-border text-base" />
           </nav>
           <Button asChild size="lg" className="mt-5 w-full">
             <Link href="/signup" onClick={close}>Get Seatora — Free</Link>

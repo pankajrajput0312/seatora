@@ -15,7 +15,7 @@ import { TermFilterControls } from "@/features/decide/components/term-filter-con
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
-import { chosenView } from "@/features/decide/server/view";
+import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankValue } from "@/features/decide/lib/params";
 import { readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
@@ -28,7 +28,7 @@ export const metadata: Metadata = { title: "Rank scan" };
 const VIEW = "rank-scan";
 // ponytail: 50 a page (rounds in order, ranks within a round): each card carries its five term cells and their (i)s,
 // and both views are in the page. ±500 is about 550 rows in a busy year.
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
 const windows = ["100", "250", "500"] as const;
 const schema = z.object({
   scan: rankValue.optional(),
@@ -40,7 +40,7 @@ const schema = z.object({
 
 export default async function RankScanPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
-  const view = await chosenView(params, VIEW);
+  const [view, pageSize] = await Promise.all([chosenView(params, VIEW), pageSizeFor(PAGE_SIZE)]);
   const profile = profileFromParams(params);
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
@@ -58,8 +58,8 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const { kept, unknown } = splitByTerms(scanned, tp.filters, (a) => a.fees, (a) => a.hospital?.type?.value);
   type Row = (typeof kept)[number];
   const you = rank ? youMarks(kept, rank) : new Set<Row>();
-  const page = Math.min(Math.max(1, Math.ceil(kept.length / PAGE_SIZE)), f.page ?? 1);
-  const rows = kept.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const page = Math.min(Math.max(1, Math.ceil(kept.length / pageSize)), f.page ?? 1);
+  const rows = kept.slice((page - 1) * pageSize, page * pageSize);
   const groups = rounds.map((rd) => ({ round: rd, rows: rows.filter((a) => a.round === rd) })).filter((g) => g.rows.length);
   const courseOf = new Map(meta.courses.map((c) => [`${c.degree}|${c.specialty}`, c]));
   const provisional = (rd: string) => meta.sources.some((s) => s.year === year?.year && s.round === rd && s.provisional);
@@ -110,7 +110,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
             {/* The results' sources here, before the panes: the MCC result is numbered first (the term (i)s come after). */}
             <div className="flex flex-wrap items-center gap-x-2">
               <p id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
-                <span><span className="numeric font-semibold text-foreground">{rangeLabel({ rows, page, pageSize: PAGE_SIZE, total: kept.length })}</span> allotments: history, not a prediction</span>
+                <span><span className="numeric font-semibold text-foreground">{rangeLabel({ rows, page, pageSize, total: kept.length })}</span> allotments: history, not a prediction</span>
                 <InfoTip label="these allotments">
                   Ranks <span className="numeric">{formatRank(Math.max(1, rank - window))}–{formatRank(rank + window)}</span> in {year.label}, every course and seat
                   category{round ? `, ${roundLabel[round]} only` : ""}. A “Your rank falls here” line marks where ranks pass yours. What happened then, not what will happen now.
@@ -163,12 +163,13 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                     </div>
                   }
                   table={
-                    <div role="region" aria-label={label} tabIndex={0} className={tbl.wrap}>
+                    // Wide: the box scrolls inside the window, the header row and the Rank column stay in view (tbl.scroll).
+                    <div role="region" aria-label={label} tabIndex={0} className={`${tbl.wrap} ${tbl.scroll}`}>
                       <table className={tbl.table}>
                         <caption className="sr-only">{year.year} {roundLabel[g.round]}: allotments to ranks near {formatRank(rank)}</caption>
-                        <thead>
+                        <thead className={tbl.head}>
                           <tr className={tbl.headRow}>
-                            <th scope="col" className={`${tbl.th} text-right`}>Rank</th>
+                            <th scope="col" className={`${tbl.th} sticky left-0 z-[3] bg-card text-right`}>Rank</th>
                             <th scope="col" className={tbl.th}>Seat category</th>
                             <th scope="col" className={tbl.th}>Institute and course</th>
                             {statKeys.map((k) => <th key={k} scope="col" className={`${termCol.th(k)} whitespace-nowrap`}><StatHead k={k} /></th>)}
@@ -178,7 +179,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                           {g.rows.flatMap((a, i) => [
                             ...(you.has(a) ? [<tr key="you" className="bg-sky/10"><td colSpan={3 + statKeys.length} className="px-4 py-1.5 text-xs font-semibold text-sky">{youText}</td></tr>] : []),
                             <tr key={i} className={tbl.row}>
-                              <td className={tbl.num}>{formatRank(a.rank)}</td>
+                              <td className={`${tbl.num} sticky left-0 z-[1] bg-card`}>{formatRank(a.rank)}</td>
                               <td className={tbl.td}>{a.category}</td>
                               <td className={`${tbl.td} min-w-52`}>
                                 <Link href={L.institute(a.collegeSlug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{a.collegeName}</Link>
@@ -199,7 +200,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
               </section>
             );
           })}
-          <Pager page={page} pageSize={PAGE_SIZE} total={kept.length} href={(n) => L.with("/decide/rank-scan", { page: n })} focusId="results" label="Rank scan" />
+          <Pager page={page} pageSize={pageSize} total={kept.length} href={(n) => L.with("/decide/rank-scan", { page: n })} focusId="results" label="Rank scan" />
         </>
       )}
     </AppPage>

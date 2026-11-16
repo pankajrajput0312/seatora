@@ -30,7 +30,7 @@ export function PlanPrompt({ title, children }: { title: string; children: React
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[60] grid items-end bg-black/50 sm:place-items-center sm:p-4" onClick={(e) => e.target === e.currentTarget && close()}>
-      <div role="dialog" aria-modal="true" aria-labelledby="plan-prompt-h" data-placement="popup" className="max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl bg-card p-5 shadow-xl sm:max-w-3xl sm:rounded-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="plan-prompt-h" data-placement="popup" className="max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl bg-card p-5 pb-0 shadow-xl sm:max-w-3xl sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3">
           <h2 id="plan-prompt-h" className="text-lg font-semibold">{title}</h2>
           <button ref={closeRef} type="button" onClick={close} aria-label="Close" className="-mt-1 -mr-1 grid size-10 shrink-0 place-items-center rounded-md hover:bg-muted">
@@ -38,9 +38,12 @@ export function PlanPrompt({ title, children }: { title: string; children: React
           </button>
         </div>
         {children}
-        <button type="button" onClick={close} className="mt-3 min-h-11 w-full rounded-md border border-border text-sm font-semibold">
-          Not now
-        </button>
+        {/* Pinned to the sheet's bottom: Not now is in reach without scrolling past the plans. */}
+        <div className="sticky bottom-0 -mx-5 mt-3 bg-card px-5 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          <button type="button" onClick={close} className="min-h-11 w-full rounded-md border border-border text-sm font-semibold">
+            Not now
+          </button>
+        </div>
       </div>
     </div>
   );

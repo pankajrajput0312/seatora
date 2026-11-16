@@ -98,7 +98,7 @@ export function DisplayMenu({ cols, hidden, setHidden, always = "The institute c
         e.currentTarget.querySelector("summary")?.focus();
       }}
     >
-      <summary className="flex h-11 cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-card px-3 text-sm whitespace-nowrap hover:border-foreground/70 [&::-webkit-details-marker]:hidden">
+      <summary className="flex h-11 max-md:h-[2.375rem] cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-card px-3 text-sm whitespace-nowrap hover:border-foreground/70 [&::-webkit-details-marker]:hidden">
         <span className="text-muted-foreground">Display</span>
         <span className="font-semibold">{cols.length - hidden.size} of {cols.length} columns</span>
         <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
