@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { formatInrShort } from "../lib/format";
 import type { DecideLinks } from "../lib/links";
-import { LATEST_YEAR, PAST_YEARS, reachLabel, seatsBelowText, type Deepest } from "../lib/reach";
+import { LATEST_YEAR, PAST_YEARS, reachLabel, seatsBelowNotes, type Deepest } from "../lib/reach";
 import type { ChoiceItem } from "../lib/choices";
 import type { OptionRow } from "../service";
 import { roundLabel, rounds, seatKindLabel, type Round, type SeatList, type Term } from "../types";
@@ -15,7 +15,7 @@ import { smallLink } from "./ui";
 export const courseName = (r: Pick<OptionRow, "course">) => `${r.course.degree} ${r.course.name}`;
 
 /** What the Options list (a client component) reads of a row: everything but the published terms and their flat texts, about half a row's bytes (the line shows `fees`). */
-const notListed = ["terms", "feeText", "stipendText", "bondText", "penaltyText", "allotmentsByYear"] as const;
+const notListed = ["terms", "feeText", "stipendText", "bondText", "penaltyText", "allotmentsByYear", "reachAt"] as const;
 export type ListRow = Omit<OptionRow, (typeof notListed)[number]>;
 export const listRow = (r: OptionRow) => Object.fromEntries(Object.entries(r).filter(([k]) => !(notListed as readonly string[]).includes(k))) as ListRow;
 
@@ -66,7 +66,7 @@ export function SeatsCell({ r, list, L, n = r.seats, end = true }: { r: ListRow;
 
 /** Under an option's label: the lists whose seats here are all on seat categories with another label (OptionRow.seatsBelow). */
 export function SeatsBelowNote({ r, includeLatest = true }: { r: Pick<OptionRow, "seatsBelow">; includeLatest?: boolean }) {
-  return r.seatsBelow?.map((n) => <span key={n.kind} className="mt-1 block max-w-xs text-xs text-sun">{seatsBelowText(n, LATEST_YEAR, PAST_YEARS, includeLatest)}</span>);
+  return seatsBelowNotes(r.seatsBelow ?? [], LATEST_YEAR, PAST_YEARS, includeLatest).map((t) => <span key={t} className="mt-1 block max-w-xs text-xs text-sun">{t}</span>);
 }
 
 /** A closing rank with its round and seat category, marked Provisional when its MCC result is. */

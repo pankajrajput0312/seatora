@@ -1,4 +1,4 @@
-import { LATEST_YEAR, PAST_YEARS, reachLabel, seatsBelowText, type Deepest } from "@/features/decide/lib/reach";
+import { LATEST_YEAR, PAST_YEARS, reachLabel, seatsBelowNotes, type Deepest } from "@/features/decide/lib/reach";
 import type { OptionRow, RoundSummary } from "@/features/decide/service";
 import { roundLabel, seatKindLabel, type SeatKind, type SeatList, type Term } from "@/features/decide/types";
 
@@ -35,7 +35,7 @@ export function optionsCsv(rows: OptionRow[], o: { lists: SeatList[]; includeLat
     i + 1, r.college.name, r.college.state, `${r.course.degree} ${r.course.name}`, r.quota,
     `${reachLabel(r.reach, LATEST_YEAR, PAST_YEARS, o.includeLatest)}${r.reachProvisional ? " (provisional)" : ""}`,
     ...o.lists.map((l) => r.seatsBy?.[l.kind]),
-    ...(o.lists.length ? [r.seatsBelow?.map((n) => seatsBelowText(n, LATEST_YEAR, PAST_YEARS, o.includeLatest)).join(" ")] : []),
+    ...(o.lists.length ? [seatsBelowNotes(r.seatsBelow ?? [], LATEST_YEAR, PAST_YEARS, o.includeLatest).join(" ")] : []),
     ...closing(r.latest), ...closing(r.byYear[last]), ...closing(r.byYear[older]),
     ...term(r.terms.fee), ...term(r.terms.bond),
   ]);

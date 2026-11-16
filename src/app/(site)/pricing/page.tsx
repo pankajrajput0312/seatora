@@ -37,8 +37,8 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Pricing</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Seatora NEET PG 2026 Season Pass</h1>
         {q.inviter && <InviteBanner inviter={q.inviter} className="mt-4" />}
-        <p className="mt-3 text-2xl font-semibold">
-          <FreePrice /> <span className="text-base font-normal text-muted-foreground">{business.period}</span>
+        <p className="mt-3 text-lg font-semibold">
+          <FreePrice />
         </p>
         <p className="mt-3 text-muted-foreground">
           Online NEET PG counselling planner for MCC All India counselling: Round 2 seats, past closing ranks, fees, stipends and bonds, and
@@ -58,16 +58,18 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
             <h2>What you pay</h2>
             {paying ? (
               <p className="mt-2">
-                The Season Pass costs <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> {formatPaise(q.listAmount)} {business.period}, paid once by card or UPI through Razorpay
-                ({formatPaise(discountedPrice(q.listAmount))} with a friend&apos;s referral link), and runs till {longDate(SEASON_PASS_UNTIL)}.{" "}
-                {free && `Till ${shortDate(free)} you can also upgrade free, with no payment; that free upgrade ends on ${shortDate(free)}. `}There is no
-                subscription and nothing renews automatically. Prices are in Indian Rupees (INR).
+                {free ? `Till ${shortDate(free)} the Season Pass is free: upgrade with no payment and no card. After that it costs ` : <>The Season Pass costs <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> </>}
+                {formatPaise(q.listAmount)} {business.period}, paid once by card or UPI through Razorpay ({formatPaise(discountedPrice(q.listAmount))} with a friend&apos;s
+                referral link), and runs till {longDate(SEASON_PASS_UNTIL)}. There is no subscription and nothing renews automatically. Prices are in Indian Rupees (INR).
               </p>
             ) : (
               <p className="mt-2">
-                {free ? `Till ${shortDate(free)} you can upgrade to the Season Pass free` : "Paid passes open soon"} (regular price{" "}
-                <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> {formatPaise(PLANS.season_pass.amount)}). Nothing is charged right now, there is no subscription and nothing renews automatically.
-                Any price is in Indian Rupees (INR).
+                {free ? (
+                  `Till ${shortDate(free)} you can upgrade to the Season Pass free, with no card. After that it costs ${formatPaise(PLANS.season_pass.amount)} once.`
+                ) : (
+                  <>Paid passes open soon (regular price <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> {formatPaise(PLANS.season_pass.amount)}).</>
+                )}{" "}
+                Nothing is charged right now, there is no subscription and nothing renews automatically. Any price is in Indian Rupees (INR).
               </p>
             )}
             <p className="mt-2">{business.season}</p>

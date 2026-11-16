@@ -33,8 +33,8 @@ const newTab = <span className="sr-only"> (opens in a new tab)</span>;
  * `chips`: the header row, left to right ("2026 · R1", "All India Quota", "Open"); empty ones are skipped.
  * `actions`: icon buttons at the header's right (wishlist, compare; 44px each).
  * `stat`: the big number on the left, e.g. `{ label: "Rank", value: formatRank(1) }` (proportional figures).
- * `title` + `href`: the institute (an in-app link). `external`: its MCC profile, an icon link beside the heading (outside
- * it, so the heading is named by the institute alone; one name on every card: "MCC profile: <title>"), or the title
+ * `title` + `href`: the institute (an in-app link). `external`: its MCC profile, a small "MCC ↗" link beside the heading
+ * (outside it, so the heading is named by the institute alone; one name on every card: "Open on MCC: <title>"), or the title
  * itself when there is no `href`; both open in a new tab and say so.
  * `subtitle`: the course. `meta`: "Delhi • <TypeBadge/> • 1,538 beds"; empty ones are skipped.
  * `footer`: TermStatCells (no padding here: the cells bring their own rules). `level`: the title's heading level.
@@ -48,7 +48,7 @@ export function ResultCard({ chips, actions, stat, title, href, external, subtit
   stat?: { label: string; value: Node };
   title: string;
   href?: string;
-  /** `label` is not read: every card names the link "MCC profile: <title>" (kept optional so callers still compile). */
+  /** `label` is not read: every card names the link "Open on MCC: <title>" (kept optional so callers still compile). */
   external?: { href: string; label?: string };
   subtitle?: Node;
   meta?: Node[];
@@ -78,23 +78,25 @@ export function ResultCard({ chips, actions, stat, title, href, external, subtit
                 title
               )}
             </H>
+            {/* Worded "MCC", so the ↗ never reads as "open this college" (the title link does that). */}
             {href && external && (
               <a
                 href={external.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`MCC profile: ${title} (opens in a new tab)`}
-                title="MCC profile"
-                className="hit inline-flex size-5 shrink-0 items-center justify-center text-muted-foreground hover:text-sky"
+                aria-label={`Open on MCC: ${title} (opens in a new tab)`}
+                title="Open on MCC"
+                className="hit inline-flex h-5 shrink-0 items-center gap-0.5 text-xs font-semibold text-muted-foreground hover:text-sky"
               >
-                {icon}
+                MCC<ExternalLink className="size-3.5" strokeWidth={2} aria-hidden />
               </a>
             )}
           </div>
           {present(subtitle) && <div className="mt-0.5 text-sm">{subtitle}</div>}
           {meta?.some(present) && (
-            // An (i)'s hit area reaches down and sideways, not up: a wrapped line's (i) never covers the one above it.
-            <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground [&_button]:before:top-0">
+            // An (i)'s hit area reaches down and sideways, not up (a wrapped line's (i) never covers the one above it), and
+            // stays 44px tall: 20px icon + 24px below.
+            <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground [&_button]:before:top-0 [&_button]:before:bottom-[-1.5rem]">
               <Joined items={meta} mark={<span aria-hidden>•</span>} />
             </div>
           )}

@@ -10,13 +10,16 @@ import { referrerByCode } from "@/features/referrals/service";
 import { allow, isLimited, reset } from "@/lib/rate-limit";
 import { inviteMatches, isAllowed, isMember, openAccess, parseAllowlist, safeNext } from "@/lib/site-access";
 import { dummyHash, hashPassword, verifyPassword } from "./lib/password";
+import { redeemResetToken, resetAllowed } from "./lib/reset";
 import { createSession, currentSessionId, deleteSession, getCurrentUser } from "./lib/session";
 import {
   changePasswordSchema,
   openSignUpSchema,
+  resetPasswordSchema,
   signInSchema,
   signUpSchema,
   type ChangePasswordInput,
+  type ResetPasswordInput,
   type SignInInput,
   type SignUpInput,
 } from "./validations";
@@ -186,6 +189,28 @@ export async function changePassword(input: ChangePasswordInput): Promise<Change
     console.error("changePassword failed", err);
     return { ok: false, error: "We couldn't change your password. Please try again." };
   }
+}
+
+/**
+ * /reset?token=: sets a new password (sign-up's rules) with a one-time link from the admin page (lib/reset.ts), signs
+ * every other device out and this one in, then on to the planner. Rate-limited per IP.
+ */
+export async function resetPassword(token: string, input: ResetPasswordInput): Promise<AuthResult> {
+  if (!(await resetAllowed())) return { ok: false, error: "Too many attempts. Please wait 15 minutes." };
+  const parsed = resetPasswordSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  const expired = "This reset link has expired or was already used. Ask us for a new one.";
+  if (typeof token !== "string" || !/^[\w-]{20,100}$/.test(token)) return { ok: false, error: expired };
+  try {
+    const user = await redeemResetToken(token, await hashPassword(parsed.data.password));
+    if (!user) return { ok: false, error: expired };
+    if (!isMember(user.email)) return { ok: false, error: "Password changed, but this account doesn't have access." };
+    await createSession(user);
+  } catch (err) {
+    console.error("resetPassword failed", err);
+    return { ok: false, error: "We couldn't change your password. Please try again." };
+  }
+  redirect("/decide");
 }
 
 export async function signOut() {

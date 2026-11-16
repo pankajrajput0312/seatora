@@ -2,7 +2,7 @@ import Link from "next/link";
 import { siteConfig } from "@/config/site";
 import { Button } from "@/components/ui/button";
 import { Container } from "./container";
-import { AuthLink } from "./auth-link";
+import { AuthLink, PlannerCta } from "./auth-link";
 import { LogoMark } from "./logo";
 import { MobileNav } from "./mobile-nav";
 
@@ -20,7 +20,7 @@ export function SiteHeader() {
               <AuthLink />
             </Button>
             <Button asChild size="sm">
-              <Link href="/signup">Get Seatora — Free</Link>
+              <PlannerCta />
             </Button>
           </div>
           <MobileNav />

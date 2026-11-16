@@ -17,8 +17,10 @@ describe("PlanCardsView", () => {
     expect(text(card(html, "PREMIUM"))).not.toContain("Your plan");
     const pass = text(card(html, "PREMIUM"));
     expect(pass).toContain("Free till 20 Nov");
-    expect(pass).toContain("Was ₹499, now ₹0 till 20 Nov₹499₹0till 20 Nov");
-    expect(pass).toContain("Free for everyone till 20 Nov. After that ₹199 (₹159 with an invite), valid till 31 Mar 2027.");
+    // One price now and one after, never a struck "was" price beside ₹0.
+    expect(pass).toContain("₹0now");
+    expect(pass).not.toContain("₹499");
+    expect(pass).toContain("Free till 20 Nov. Then ₹199 once — no auto-renew, no card now. Valid till 31 Mar 2027.");
     expect(pass).toContain("CTA");
   });
 
@@ -27,7 +29,7 @@ describe("PlanCardsView", () => {
     expect(text(card(html, "FREE"))).toContain("10 institute pages a day10 residents searches a day2 options in Compare1 saved choice listNo CSV exportsNo plan reports");
     expect(text(card(html, "PREMIUM"))).toContain("Unlimited institute pages200 residents searches a day4 options in Compare10 saved choice listsUnlimited CSV exportsUnlimited plan reports");
     expect(text(html)).not.toMatch(/Your plan|Free till|Current plan/);
-    expect(text(card(html, "PREMIUM"))).toContain("Was ₹499, now ₹199₹499₹199paid once");
+    expect(text(card(html, "PREMIUM"))).toContain("Was ₹499, now ₹199₹499₹199once, no auto-renew");
     expect(text(card(html, "PREMIUM"))).toContain("₹159 with an invite, valid till 31 Mar 2027.");
     expect(card(html, "FREE")).toContain('<a href="/signup">Create free account</a>');
     expect(limitLine("ask", 0)).toBe("No Ask Seatora questions a day");

@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { siteConfig } from "@/config/site";
+import { newResetToken } from "@/features/auth/lib/reset";
 import { staffUser } from "@/features/auth/lib/session";
 import { couponCreateSchema, couponEditSchema } from "@/features/payments/coupons";
 import { ROLES } from "@/features/plans/plans";
@@ -129,4 +131,20 @@ export async function updateCoupon(form: FormData) {
     db.adminAudit.create({ data: { actorId: me.id, targetId: id, action: "coupon_update", before: json(before), after: json(data) } }),
   ]);
   backToCoupons("coupon_saved");
+}
+
+/**
+ * Accounts: a one-time password reset link for her (lib/reset.ts; an hour, her older links void), with an AdminAudit row
+ * (never the token). Returned once, to show with a Copy button; only an owner makes one for an owner or admin.
+ */
+export async function createResetLink(userId: string): Promise<{ ok: true; link: string; expiresAt: string } | { ok: false; error: string }> {
+  const me = await staffUser();
+  if (!me) return { ok: false, error: "Only an owner or admin can do this." };
+  const id = z.string().min(1).max(40).safeParse(userId);
+  const target = id.success ? await db.user.findUnique({ where: { id: id.data }, select: { role: true } }) : null;
+  if (!target) return { ok: false, error: "No such account." };
+  if (me.role !== "OWNER" && ["OWNER", "ADMIN"].includes(target.role)) return { ok: false, error: "Only an owner can reset an owner's or admin's password." };
+  const { token, expiresAt, writes } = newResetToken(id.data!);
+  await db.$transaction([...writes, db.adminAudit.create({ data: { actorId: me.id, targetId: id.data!, action: "password_reset_link", before: {}, after: { expiresAt: expiresAt.toISOString() } } })]);
+  return { ok: true, link: `${siteConfig.url}/reset?${new URLSearchParams({ token })}`, expiresAt: expiresAt.toISOString() };
 }

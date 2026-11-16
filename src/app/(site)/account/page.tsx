@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Container } from "@/components/layout/container";
-import { Button } from "@/components/ui/button";
-import { signOut } from "@/features/auth/actions";
+import { LogOutButton } from "@/features/auth/components/log-out-button";
 import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
 import { getCurrentUser } from "@/features/auth/lib/session";
 import { PlanCards } from "@/features/plans/components/plan-cards";
@@ -26,9 +25,7 @@ export default async function AccountPage() {
           <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{user.email}</p>
           <h1 className="glow mt-3 font-pixel text-4xl leading-none md:text-5xl">Hi, {user.name}.</h1>
         </div>
-        <form action={signOut}>
-          <Button type="submit" variant="secondary">Sign out</Button>
-        </form>
+        <LogOutButton className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-secondary px-4 text-sm font-medium text-foreground hover:bg-raised aria-disabled:opacity-60" />
       </div>
 
       <section id="plan" data-placement="account" aria-labelledby="plan-h" className="max-w-3xl scroll-mt-24 border-b border-border py-12">

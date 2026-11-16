@@ -1,12 +1,20 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { PlannerCta } from "@/components/layout/auth-link";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { CrewScene } from "./crew-scene";
 import { FreePrice } from "./free-price";
 
-// Phones only: what's inside and the price, so they sit above the fold next to the buttons.
-const inside = ["Residents' names", "Options for your rank", "Fees, stipend, bond", "Seats"];
+// Phones only: what's inside and the price, so they sit above the fold next to the buttons. Each opens its planner page
+// (sign-up first when signed out; /signup sends a signed-in visitor straight on to `next`).
+const inside = [
+  { label: "Residents' names", next: "/decide/residents" },
+  { label: "Options for your rank", next: "/decide/options" },
+  { label: "Fees, stipend, bond", next: "/decide/fees" },
+  { label: "Seats", next: "/decide/seats" },
+];
+const viaSignup = (next: string) => `/signup?${new URLSearchParams({ next })}`;
 
 export function Hero() {
   return (
@@ -22,7 +30,9 @@ export function Hero() {
           </p>
           <ul className="mt-4 flex flex-wrap gap-2 text-sm md:hidden" aria-label="What you get">
             {inside.map((item) => (
-              <li key={item} className="rounded-md border border-border bg-card px-2.5 py-1">{item}</li>
+              <li key={item.label}>
+                <Link href={viaSignup(item.next)} className="hit inline-flex rounded-md border border-border bg-card px-2.5 py-1 hover:underline">{item.label}</Link>
+              </li>
             ))}
           </ul>
           <p className="mt-4 text-sm text-muted-foreground md:hidden">
@@ -30,10 +40,10 @@ export function Hero() {
           </p>
           <div className="mt-5 flex flex-wrap gap-3 sm:mt-8">
             <Button asChild size="lg" className="w-full sm:w-auto">
-              <Link href="/signup">See residents <ArrowRight className="size-4" /></Link>
+              <Link href={viaSignup("/decide/residents")}>See residents <ArrowRight className="size-4" /></Link>
             </Button>
             <Button asChild size="lg" variant="ghost" className="w-full sm:w-auto">
-              <Link href="/signup">Get Seatora — Free</Link>
+              <PlannerCta />
             </Button>
           </div>
         </div>

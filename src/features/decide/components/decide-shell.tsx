@@ -12,7 +12,7 @@ import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { LogoMark } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { signOut } from "@/features/auth/actions";
+import { LogOutButton } from "@/features/auth/components/log-out-button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { MAX_COMPARE } from "../lib/choices";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
@@ -99,8 +99,17 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
     }
   }, [hydrated, profile, sp, pathname, router]);
 
+  // "Saved your rank": a few seconds after each save, above the phone's bottom bar.
+  const [toast, setToast] = useState(false);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(false), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   const save = (p: Profile) => {
     setStored(p);
+    setToast(true);
     // First run: on to Options, which opens on the current round's seats in her courses (service.ts optionsView).
     if (!shown) {
       landing.current = "/decide/options";
@@ -249,6 +258,9 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
 
       <div aria-hidden className={cn("fixed inset-x-0 top-0 z-50 h-0.5 bg-mark", loading ? "animate-pulse" : "hidden")} />
       <p role="status" className="sr-only">{loading ? "Loading the page…" : ""}</p>
+      <p role="status" className={cn("pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto w-fit rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background shadow-overlay md:bottom-6", !toast && "sr-only")}>
+        {toast ? "Saved your rank" : ""}
+      </p>
 
       <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {[...bottom, compare.length ? { href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows } : { href: "/decide/seats", label: "Seats", icon: LayoutGrid }].map(({ href, label, icon: Icon }) => (
@@ -313,12 +325,11 @@ function AccountFooter({ account, href, current }: { account: ShellAccount | nul
             <span className="block truncate text-xs text-muted-foreground">{account.plan}</span>
           </span>
         </Link>
-        <form action={signOut} className="shrink-0">
-          <button type="submit" title="Log out" className="flex min-h-12 min-w-12 max-md:min-h-11 max-md:min-w-11 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
-            <LogOut className="size-4" aria-hidden />
-            <span className="text-[11px] font-semibold">Log out</span>
-          </button>
-        </form>
+        <LogOutButton
+          className="flex min-h-12 min-w-12 max-md:min-h-11 max-md:min-w-11 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground aria-disabled:opacity-60"
+          label="text-[11px] font-semibold"
+          icon={<LogOut className="size-4" aria-hidden />}
+        />
       </div>
     </div>
   );

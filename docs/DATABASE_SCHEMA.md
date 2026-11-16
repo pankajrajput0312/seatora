@@ -1,6 +1,6 @@
 # Database Schema (conceptual)
 
-Implemented so far in `prisma/schema.prisma`: **DataSource, College, Specialty, CollegeSpecialty, Cutoff, Allotment, CollegeTerm, ClinicalFacts, FeesStructured, Announcement, Resident, HiddenResident, ResidentsRead, RetiredCollegeKey, WaitlistEntry** (landing-page early access), **User, Session** (email/password auth), **FunnelEvent, ErrorGroup** (docs/FUNNEL.md). The other entities are documented here and added when real source data for them has been examined. Do not model data you have not seen.
+Implemented so far in `prisma/schema.prisma`: **DataSource, College, Specialty, CollegeSpecialty, Cutoff, Allotment, CollegeTerm, ClinicalFacts, FeesStructured, Announcement, Resident, HiddenResident, ResidentsRead, RetiredCollegeKey, WaitlistEntry** (landing-page early access), **User, Session, PasswordReset** (email/password auth; PasswordReset: a one-time reset link's token hash, `userId`, `expiresAt`, see docs/ARCHITECTURE.md), **FunnelEvent, ErrorGroup** (docs/FUNNEL.md). The other entities are documented here and added when real source data for them has been examined. Do not model data you have not seen.
 
 ## Provenance
 Every factual record references a `DataSource` and carries `lastVerifiedAt` and `verificationStatus`. Rules are in [DATA_INTEGRITY.md](DATA_INTEGRITY.md).

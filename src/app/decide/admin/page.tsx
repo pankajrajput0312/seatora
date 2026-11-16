@@ -17,6 +17,7 @@ import { formatPaise } from "@/features/referrals/lib";
 import { referralAdmin } from "@/features/referrals/service";
 import { cn } from "@/lib/cn";
 import { createCoupon, resolveError, setUserAccess, settleReferrals, updateCoupon } from "./actions";
+import { ResetLink } from "./reset-link";
 
 // Owners and admins only (anyone else: not found). The upgrade funnel, accounts, their plans and today's use, the
 // site's totals, possible duplicate accounts and server/browser errors (docs/FUNNEL.md).
@@ -272,6 +273,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                       <input name="notes" defaultValue={u.notes ?? ""} maxLength={500} placeholder="Notes" aria-label={`Notes on ${u.email}`} className="h-9 w-40 rounded-md border border-input bg-background px-2 text-sm" />
                       <button type="submit" className="inline-flex min-h-9 items-center rounded-md border border-input px-3 text-sm font-semibold">Save</button>
                     </form>
+                    <ResetLink userId={u.id} email={u.email} />
                   </td>
                 </tr>
               ))}

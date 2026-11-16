@@ -194,7 +194,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               {beds ? (
                 <Link href={L.institute(slug, "clinical")} className="inline-flex min-h-11 items-center text-sky hover:underline"><span className="numeric font-semibold">{beds.text}</span>&nbsp;beds<span className="sr-only">: see Hospital facts</span></Link>
               ) : (
-                <span className="text-muted-foreground">Beds not found</span>
+                <span className="text-muted-foreground">Beds: not published</span>
               )}
               {bedsFlags.length > 0 && <span className="text-xs text-sun">{bedsFlags.join(", ")}</span>}
               <InfoTip label="beds">
@@ -226,13 +226,13 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               </span>
             )}
             {info?.mccProfileUrl && (
-              <a href={info.mccProfileUrl} target="_blank" rel="noopener noreferrer" title="Official MCC profile" className="inline-flex size-11 items-center justify-center text-sky hover:text-foreground">
-                <ExternalLink className="size-5" strokeWidth={2} aria-hidden /><span className="sr-only">Official MCC profile (opens in a new tab)</span>
+              <a href={info.mccProfileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 text-sky hover:text-foreground">
+                MCC profile<ExternalLink className="size-4" strokeWidth={2} aria-hidden /><span className="sr-only"> (opens in a new tab)</span>
               </a>
             )}
             {website && (
-              <a href={website} target="_blank" rel="noopener noreferrer" title={`Website: ${info!.website}`} className="-ml-3 inline-flex size-11 items-center justify-center text-sky hover:text-foreground">
-                <Globe className="size-5" strokeWidth={2} aria-hidden /><span className="sr-only">Website: {info!.website}, as declared on its MCC profile (opens in a new tab)</span>
+              <a href={website} target="_blank" rel="noopener noreferrer" title={info!.website ?? undefined} className="inline-flex min-h-11 items-center gap-1 text-sky hover:text-foreground">
+                <Globe className="size-4" strokeWidth={2} aria-hidden />Website<span className="sr-only">: {info!.website}, as declared on its MCC profile (opens in a new tab)</span>
               </a>
             )}
           </p>

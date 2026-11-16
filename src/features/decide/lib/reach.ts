@@ -1,4 +1,5 @@
-import { roundLabel, seatKindLabel, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind } from "../types";
+import { formatRank } from "@/features/cutoffs/lib/format";
+import { roundLabel, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind } from "../types";
 
 /** The years the labels compare (client-safe; service.ts re-exports them). They match the imported MCC results. */
 export const LATEST_YEAR = 2026;
@@ -74,6 +75,24 @@ export function resultsSpan(years: { year: number; rounds: readonly Round[] }[])
   return first.year === last.year ? end : `${first.year} to ${end}`;
 }
 
+type Window = { latestYear: number; pastYears: [number, number]; includeLatest: boolean };
+/** Only the years and rounds the labels talk about: the two past years, plus the latest year's R1. */
+const inWindow = <T extends ReachInput>(cutoffs: T[], { latestYear, pastYears, includeLatest }: Window) =>
+  cutoffs.filter((c) => pastYears.includes(c.year) || (includeLatest && c.year === latestYear && c.round === "R1"));
+
+/** The closing a label rests on, so a second label can say it with its year and round ("2025 R3 closed at 38,120"). */
+export type ReachAt = { year: number; round?: Round; closing: number };
+/**
+ * The deepest closing a label counts (classifyReach's window): R1 to R3, or every round for "stray-only" or when only
+ * stray rounds are there. Null: no closing in the window ("no-data").
+ */
+export function reachEvidence(cutoffs: ReachInput[], reach: Reach, window: Window): ReachAt | null {
+  const used = inWindow(cutoffs, window);
+  const main = used.filter((c) => !isStrayRound(c.round));
+  const pool = reach === "stray-only" || !main.length ? used : main;
+  return pool.reduce<ReachAt | null>((a, c) => (!a || c.closing > a.closing ? { year: c.year, round: c.round, closing: c.closing } : a), null);
+}
+
 /**
  * History-only label for how a rank compares with past closing ranks. "Reached" means the rank was within the
  * closing rank of that round, R1 to R3 only (isStrayRound). Never a chance or prediction.
@@ -83,8 +102,7 @@ export function classifyReach(
   cutoffs: ReachInput[],
   { latestYear, pastYears, includeLatest }: { latestYear: number; pastYears: [number, number]; includeLatest: boolean },
 ): Reach {
-  // Only the years and rounds the labels talk about: the two past years, plus the latest year's R1.
-  const used = cutoffs.filter((c) => pastYears.includes(c.year) || (includeLatest && c.year === latestYear && c.round === "R1"));
+  const used = inWindow(cutoffs, { latestYear, pastYears, includeLatest });
   if (used.length === 0) return "no-data";
   const main = used.filter((c) => !isStrayRound(c.round));
   const reachedIn = (y: number) => main.some((c) => c.year === y && c.closing >= rank);
@@ -119,26 +137,58 @@ export function reachLabel(reach: Reach, latestYear: number, pastYears: [number,
   }[reach];
 }
 
-/** A list whose seats at an option, in her seat categories, are all on categories (`on`, each with its own label) whose label is not the option's. */
-export type SeatsBelow = { kind: SeatKind; on: { category: string; reach: Reach }[] };
+/**
+ * A list whose seats at an option, in her seat categories, are all on categories (`on`, each with its own label and the
+ * closing it rests on, `at`) whose label is not the option's.
+ */
+export type SeatsBelow = { kind: SeatKind; on: { category: string; reach: Reach; at?: ReachAt | null }[] };
 
 /**
  * Options label an option on all her seat categories together; a list's seats there can all be on a category whose own
  * label differs (e.g. "Reached in 2026 R1" from OBC seats, while the clear vacancy list prints only Open seats there,
  * where it closed before her rank). `reachBy`: the label on each of her categories alone; `seatCats`: per list kind,
- * her categories with seats in it.
+ * her categories with seats in it; `at`: per category, the closing its label rests on (reachEvidence).
  */
-export const seatsBelow = (reach: Reach, reachBy: Partial<Record<string, Reach>>, seatCats: Partial<Record<SeatKind, string[]>>): SeatsBelow[] =>
+export const seatsBelow = (reach: Reach, reachBy: Partial<Record<string, Reach>>, seatCats: Partial<Record<SeatKind, string[]>>, at?: Partial<Record<string, ReachAt | null>>): SeatsBelow[] =>
   Object.entries(seatCats).flatMap(([kind, cats]) =>
-    cats?.length && cats.every((c) => (reachBy[c] ?? "no-data") !== reach) ? [{ kind: kind as SeatKind, on: cats.map((c) => ({ category: c, reach: reachBy[c] ?? "no-data" })) }] : [],
+    cats?.length && cats.every((c) => (reachBy[c] ?? "no-data") !== reach)
+      ? [{ kind: kind as SeatKind, on: cats.map((c) => ({ category: c, reach: reachBy[c] ?? "no-data", ...(at && { at: at[c] ?? null }) })) }]
+      : [],
   );
 
-/** "In the clear vacancy list, your seat categories here have only Open seats; on Open seats alone: Closed before your rank." */
-export function seatsBelowText(n: SeatsBelow, latestYear: number, pastYears: [number, number], includeLatest = true) {
-  const one = n.on.length === 1;
-  const cats = n.on.map((x) => x.category).join(" and ");
-  const labels = n.on.map((x) => `${one ? "" : `${x.category}, `}${reachLabel(x.reach, latestYear, pastYears, includeLatest, x.category)}`).join("; ");
-  return `In the ${seatKindLabel[n.kind].toLowerCase()} list, your seat categories here have only ${cats} seats; on ${one ? `${cats} seats` : "each"} alone: ${labels}.`;
+const kindWords: Record<SeatKind, string> = { clear: "clear vacancy", virtual: "virtual vacancy", new: "newly added" };
+const atVerdict: Partial<Record<Reach, string>> = {
+  "reached-latest": "reached your rank",
+  "reached-both": "reached your rank",
+  "reached-one": "reached your rank",
+  "stray-only": "reached your rank only in a stray round",
+  "within-10": "before your rank, within 10%",
+  "closed-before": "before your rank",
+};
+
+/**
+ * The notes under an option's one label, a list kind each (kinds with the same seats merged), every fact with its year
+ * and round, so they never read against the label: "In the clear and virtual vacancy lists, the seats here you can take
+ * are Open seats only. On Open seats: deepest closing 38,120 in 2025 R3, before your rank."
+ */
+export function seatsBelowNotes(ns: SeatsBelow[], latestYear: number, pastYears: [number, number], includeLatest = true): string[] {
+  const groups = new Map<string, SeatsBelow[]>();
+  for (const n of ns) {
+    const k = JSON.stringify(n.on);
+    groups.set(k, [...(groups.get(k) ?? []), n]);
+  }
+  return [...groups.values()].map((g) => {
+    const kinds = g.map((n) => kindWords[n.kind]);
+    const lists = `${kinds.length > 1 ? `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)} lists` : `${kinds[0]} list`}`;
+    const on = g[0].on;
+    const facts = on.map(({ category, reach, at }) => {
+      const verdict = atVerdict[reach];
+      if (at && verdict) return `On ${category} seats: deepest closing ${formatRank(at.closing)} in ${at.year}${at.round ? ` ${roundLabel[at.round]}` : ""}, ${verdict}.`;
+      if (verdict) return `On ${category} seats alone: ${reachLabel(reach, latestYear, pastYears, includeLatest, category)}.`;
+      return `On ${category} seats: no allotment in ${reachWindow(latestYear, pastYears, includeLatest, true)}.`;
+    });
+    return `In the ${lists}, the seats here you can take are ${on.map((x) => x.category).join(" and ")} seats only. ${facts.join(" ")}`;
+  });
 }
 
 export const reachTone: Record<Reach, "info" | "neutral" | "warning"> = {

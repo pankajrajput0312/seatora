@@ -57,11 +57,12 @@ test("set profile, label options, and reorder choices with the keyboard only", a
   await expect(page).toHaveURL(/\/decide\/options\?.*rank=42284/);
   await expect(page.getByText("Reached in 2026 R1").filter({ visible: true }).first()).toBeVisible();
 
-  const stars = page.locator('button[aria-pressed="false"][aria-label^="In Round 2"]').filter({ visible: true });
+  const stars = page.locator('button[aria-pressed="false"][aria-label^="In Round "]').filter({ visible: true });
   for (let i = 0; i < 3; i++) await stars.first().click(); // a clicked star becomes pressed, so .first() moves to the next row
 
   await page.goto(`/decide/choices?${PROFILE}&layout=cards`); // the list (desktop opens on the table)
-  const list = page.getByRole("list", { name: /Round 2 · 2026 choice list, 3 items/ });
+  // The first list is named after the round MCC's schedule has her fill next.
+  const list = page.getByRole("list", { name: /Round \d · 2026 choice list, 3 items/ });
   const names = async () => list.locator(":scope > li").evaluateAll((lis) => lis.map((li) => li.querySelector("a")?.textContent));
   await expect(list).toBeVisible();
   const before = await names();
@@ -273,7 +274,7 @@ test("choices: labels follow the current data, Undo goes back to its own list, a
   await expect(list).toBeVisible();
   await expect(page.getByRole("button", { name: /^Round 3 · 2026/ })).toContainText("(0)");
 
-  const typedUpTo = page.getByLabel("Typed into the MCC portal up to #");
+  const typedUpTo = page.getByLabel(/Mark how far you've typed into MCC/);
   await typedUpTo.fill("2");
   await expect(list.getByText("Typed into MCC")).toHaveCount(2);
   await page.getByRole("button", { name: "Move Kokilaben Dhirubhai Ambani Hospital, DNB Family Medicine up" }).click();

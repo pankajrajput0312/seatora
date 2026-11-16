@@ -37,10 +37,10 @@ describe("ResultCard", () => {
     expect(html.match(/aria-hidden="true" class="h-3 w-px bg-border"><\/span><span class="sr-only">, <\/span>/g)).toHaveLength(2);
   });
 
-  it("external: an icon link beside an in-app title (outside the heading, one name), or the title itself; both say they open a new tab", () => {
+  it("external: a worded \"MCC ↗\" link beside an in-app title (outside the heading, one name), or the title itself; both say they open a new tab", () => {
     const both = card({ external: { href: "https://mcc.nic.in/x", label: "Official MCC profile" } });
     expect(both).toContain('href="/decide/institute/mamc"');
-    expect(both).toMatch(/<a href="https:\/\/mcc.nic.in\/x" target="_blank" rel="noopener noreferrer" aria-label="MCC profile: Maulana Azad Medical College \(opens in a new tab\)"/);
+    expect(both).toMatch(/<a href="https:\/\/mcc.nic.in\/x" target="_blank" rel="noopener noreferrer" aria-label="Open on MCC: Maulana Azad Medical College \(opens in a new tab\)" title="Open on MCC"[^>]*>MCC<svg/);
     expect(both.match(/<h3[^>]*>(.*?)<\/h3>/)?.[1]).not.toContain("mcc.nic.in"); // the heading is named by the institute alone
     const only = card({ href: undefined, external: { href: "https://mcc.nic.in/x", label: "MCC profile" } });
     expect(only).toMatch(/<a href="https:\/\/mcc.nic.in\/x" target="_blank" rel="noopener noreferrer"[^>]*>Maulana Azad Medical College<span[^>]*><svg[^>]*aria-hidden="true"/);

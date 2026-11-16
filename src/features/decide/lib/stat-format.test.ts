@@ -49,7 +49,7 @@ describe("₹ formatting", () => {
 describe("fee and stipend cells", () => {
   it("year 1's declared fee and stipend; later years and the whole course behind the (i), each with its source", () => {
     const c = cells("MD/MS", fees("MD", [rec("MD/MS", { fee_per_year: [fee(41000), fee(41000), null], stipend_per_month: [1, 2, 3].map(() => ({ inr: 136008, kind: "declared" as const, src: 1 })) })]));
-    expect(shown(c.fee)).toEqual(["₹41,000", "₹41,000/yr", null, null]);
+    expect(shown(c.fee)).toEqual(["₹41,000/yr", "₹41,000/yr", null, null]);
     expect(c.fee.tip.slice(0, 3)).toEqual([{ text: "Year 1: ₹41,000 a year", src: 1 }, { text: "Year 2: ₹41,000 a year", src: 1 }, { text: "Year 3: not stated" }]);
     // Its band (green) in words, last.
     expect([c.fee.level, c.fee.tip[3].text]).toEqual(["good", expect.stringMatching(/^Low fee for MD\/MS \(MD\/MS and Diploma: low under ₹1 L/)]);
@@ -64,7 +64,7 @@ describe("fee and stipend cells", () => {
       fee_whole_course: { amount: 375000, currency: "INR", maximum: true },
       stipend_per_month: [43000, 45000, 47000].map((v) => ({ inr: v, kind: "nbems_minimum" as const, minimum: true as const, src: 2 })),
     })]));
-    expect(shown(c.fee)).toEqual(["≤ ₹1.25 L", "Up to ₹1.25 L", null, null]);
+    expect(shown(c.fee)).toEqual(["≤ ₹1.25 L/yr", "Up to ₹1.25 L/yr", null, null]);
     expect(c.fee.tip[0]).toEqual({ text: "NBEMS limit; hospital declared none." });
     expect(c.fee.tip[1]).toMatchObject({ text: expect.stringMatching(/^Up to ₹1,25,000 a year: the most NBEMS lets a DNB hospital charge .*not the college's own fee\.$/), src: 1 });
     // Every line says it is a ceiling, the whole course too.
@@ -80,7 +80,7 @@ describe("fee and stipend cells", () => {
       fee_per_year: [{ ...fee(145000), above_nbems_ceiling: true }, { ...fee(125000), declared_amount: 147500, gst_src: 2, note: "declared ₹1,47,500 = ₹1,25,000 + 18% GST; NBEMS withdrew the GST on 17-11-2023, so ₹1,25,000 is shown" }, null],
       stipend_per_month: [{ inr: 35000, kind: "declared", src: 1, below_nbems_minimum: true }, null, null],
     })]));
-    expect([...shown(c.fee), c.fee.markerWarn]).toEqual(["₹1.45 L", "₹1.45 L/yr", null, null, undefined]);
+    expect([...shown(c.fee), c.fee.markerWarn]).toEqual(["₹1.45 L/yr", "₹1.45 L/yr", null, null, undefined]);
     expect(c.fee.tip).toContainEqual({ text: "Above the NBEMS maximum: the hospital declared more than NBEMS lets a DNB hospital charge.", warn: true });
     expect(c.fee.tip).toContainEqual({ text: "Declared ₹1,47,500 = ₹1,25,000 + 18% GST; NBEMS withdrew the GST on 17-11-2023, so ₹1,25,000 is shown", src: 2 });
     expect([...shown(c.stipend), c.stipend.markerWarn]).toEqual(["₹35,000", "₹35,000", "below NBEMS min", null, true]);
@@ -90,7 +90,7 @@ describe("fee and stipend cells", () => {
     expect(nb.stipend.tip).toContainEqual({ text: "Below the NBEMS minimum: the college declared less than NBEMS's minimum stipend of ₹43,000 a month.", warn: true, src: 2 });
     // A figure Seatora took the GST off: marked, the declared figure on its year line.
     const gst = cells("DNB", fees("DNB", [rec("DNB", { fee_per_year: [{ ...fee(125000), declared_amount: 147500, gst_src: 2, note: "declared ₹1,47,500 = ₹1,25,000 + 18% GST" }, null, null] })]));
-    expect([...shown(gst.fee), gst.fee.markerWarn]).toEqual(["₹1.25 L", "₹1.25 L/yr", null, null, undefined]);
+    expect([...shown(gst.fee), gst.fee.markerWarn]).toEqual(["₹1.25 L/yr", "₹1.25 L/yr", null, null, undefined]);
     expect(gst.fee.tip).toContainEqual({ text: "GST removed: the college declared ₹1,47,500.", warn: true });
     expect(gst.fee.tip).toContainEqual({ text: "Year 1: ₹1,25,000 a year (declared ₹1,47,500; see below)", src: 1 });
     const da = cells("MD/MS", fees("MD", [rec("MD/MS", { stipend_per_month: [{ inr: 55200, kind: "declared", src: 1, plus_da: true }, null, null] })]));
@@ -134,7 +134,7 @@ describe("fee and stipend cells", () => {
     };
     const v = rec("DNB", { seat_groups: ["DNB Quota"], fee_display: "verbatim", fee_text: text, fee_text_src: { url: MCC.url, date: "2026-11-14" }, fee_parsed: parsed });
     const c = cells("DNB", fees("DNB", [v]));
-    expect(shown(c.fee)).toEqual(["₹1.25 L", "₹1.25 L/yr", null, null]);
+    expect(shown(c.fee)).toEqual(["₹1.25 L/yr", "₹1.25 L/yr", null, null]);
     expect(c.fee.tip).toContainEqual({ text: "At admission / Year 1 / Year 2 / Year 3: 125000", src: 1, quote: true });
     expect(tip(c.fee)).toContain("At admission: ₹50,000 (as the profile states it).");
     expect(tip(c.fee)).toContain("Annual fee: ₹1,05,000 a year (as the profile states it).");
@@ -170,7 +170,7 @@ describe("fee and stipend cells", () => {
     expect(shown(goa.fee)).toEqual(["₹70,324 at admission", "₹70,324 at admission", null, null]);
     expect(goa.fee.tip[0].text).toBe("Year 1: ₹70,324 paid at admission");
     const range = cells("MD/MS", fees("MD", [rec("MD/MS", { fee_per_year: [{ ...fee(100000), amount_max: 6800000 }, null, null] })]));
-    expect(shown(range.fee).slice(0, 2)).toEqual(["₹1–68 L", "₹1–68 L/yr"]);
+    expect(shown(range.fee).slice(0, 2)).toEqual(["₹1–68 L/yr", "₹1–68 L/yr"]);
   });
 
   it("missing is '—' (none published), never 0", () => {

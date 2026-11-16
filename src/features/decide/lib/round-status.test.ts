@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoundStepInfo } from "../types";
-import { currentSteps, fmtIST, fmtNote, statusNow, stepsNow } from "./round-status";
+import { currentSteps, fillWindow, fmtIST, fmtNote, nextChoiceFilling, statusNow, stepsNow } from "./round-status";
 
 // 2026 R2 as round_status.json gives it (as of 14 Nov 2026 17:27 IST).
 const choice = { status: "open", scheduled: { from: "2026-11-10T13:00:00+05:30", to: "2026-11-15T23:55:00+05:30", on: null, tentative: false } } as const;
@@ -51,4 +51,14 @@ it("banner: open steps now, then the earliest upcoming date", () => {
   expect(pick("2026-11-16T09:00:00+05:30")).toEqual({ live: [], next: "R2 provisional_result" });
   expect(pick("2026-11-17T09:00:00+05:30")).toEqual({ live: [], next: "R3 choice_filling" });
   expect(pick("2026-11-28T09:00:00+05:30")).toEqual({ live: ["R3 choice_filling"], next: null });
+
+  // Choices names her list after the choice filling she fills next.
+  const fill = (now: string) => {
+    const s = nextChoiceFilling(stepsNow(rs, at(now)));
+    return s && `${s.round}: ${fillWindow(s)}`;
+  };
+  expect(fill("2026-11-14T17:27:28+05:30")).toBe("R2: open until 15 Nov 23:55 IST");
+  expect(fill("2026-11-16T09:00:00+05:30")).toBe("R3: 27 Nov – 2 Dec 10:00 IST (tentative)");
+  expect(fill("2026-11-28T09:00:00+05:30")).toBe("R3: open until 2 Dec 10:00 IST");
+  expect(fill("2026-12-03T09:00:00+05:30")).toBeNull();
 });

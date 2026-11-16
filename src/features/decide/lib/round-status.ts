@@ -58,3 +58,18 @@ export function currentSteps(steps: StepNow[]) {
   const next = steps.filter((s) => nextDate(s)).sort((a, b) => +instant(nextDate(a)!) - +instant(nextDate(b)!))[0] ?? null;
   return { live, next };
 }
+
+/** The choice filling she fills next: one open or suspended now, else the first upcoming one (rounds in order); null when none. */
+export const nextChoiceFilling = (steps: StepNow[]) =>
+  steps.find((s) => s.step === "choice_filling" && (s.now === "open" || s.now === "suspended" || s.now === "upcoming")) ?? null;
+
+/** Its dates in a few words: "open until 2 Dec 10:00 IST", "27 Nov – 2 Dec 10:00 IST (tentative)", "on 27 Nov", "suspended now". */
+export function fillWindow(s: StepNow) {
+  const { from, to, on, tentative } = s.scheduled ?? {};
+  const t = tentative ? " (tentative)" : "";
+  if (s.now === "suspended") return "suspended now";
+  if (s.now === "open") return to ? `open until ${fmtIST(to)}` : "open now";
+  if (from && to) return `${fmtIST(from)} – ${fmtIST(to)}${t}`;
+  const d = from ?? on;
+  return d ? `${from ? "from" : "on"} ${fmtIST(d)}${t}` : "dates not announced";
+}

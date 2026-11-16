@@ -69,7 +69,10 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
   const current = () => courses && { ...draft, pairs: undefined, ...courses };
 
   const rank = () => Number(rankText.replace(/\D/g, ""));
-  const rankError = "Enter your All India Rank (a number up to 3,00,000).";
+  const rankError = "Enter your All India Rank: a number from 1 to about 2,50,000.";
+  // Said as she types (a rank typed into a filled field used to run on: 4228442284), not only on Save.
+  const rankOff = rankText.trim() !== "" && !profileSchema.shape.rank.safeParse(rank()).success;
+  const rankMsg = error ?? (rankOff ? rankError : null);
   const save = () => {
     const c = current();
     if (!c) return setNoCourse(true);
@@ -122,8 +125,21 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
       <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <label className="grid gap-1.5 text-sm font-medium">
           All India Rank
-          <Input ref={rankInput} inputMode="numeric" value={rankText} onChange={(e) => setRankText(e.target.value)} placeholder="e.g. 42,284" aria-invalid={!!error} aria-describedby={error ? "profile-error" : undefined} className={`numeric ${control}`} />
+          <Input
+            ref={rankInput}
+            inputMode="numeric"
+            value={rankText}
+            onChange={(e) => { setRankText(e.target.value); setError(null); }}
+            // Select it all on focus, so typing replaces her old rank instead of adding digits to it.
+            onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.setSelectionRange(0, t.value.length)); }}
+            placeholder="e.g. 42,284"
+            aria-invalid={!!rankMsg}
+            aria-describedby={rankMsg ? "profile-error" : undefined}
+            className={`numeric ${control}`}
+          />
         </label>
+        {/* Right under the field on a phone (the grid stacks); under the whole row from sm. */}
+        {rankMsg && <p id="profile-error" role="alert" className="text-sm text-ember sm:order-last sm:col-span-3">{rankMsg}</p>}
         <label className="grid gap-1.5 text-sm font-medium">
           Category
           <select value={draft.category} onChange={(e) => set("category", e.target.value as Profile["category"])} className={control}>
@@ -134,7 +150,6 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
           <input type="checkbox" className="size-4 accent-sky" checked={draft.pwd} onChange={(e) => set("pwd", e.target.checked)} /> PwD
         </label>
       </div>
-      {error && <p id="profile-error" role="alert" className="text-sm text-ember">{error}</p>}
     </>
   );
   const courseStep = (
@@ -242,10 +257,8 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
         className="fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-xl border border-border bg-popover p-6 pb-0 shadow-overlay outline-none md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Dialog.Title className="text-xl font-semibold">{setup ? "Set up Decide" : "Your rank and preferences"}</Dialog.Title>
-            <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-              Saved to your account. Your rank, category, PwD status and filters show in page addresses, so shared links and browser history carry them.
-            </Dialog.Description>
+            <Dialog.Title className="text-xl font-semibold">{setup ? "Your rank and courses" : "Your rank and preferences"}</Dialog.Title>
+            <Dialog.Description className="mt-1 text-sm text-muted-foreground">Saved to your account, on every device you sign in on.</Dialog.Description>
           </div>
           <Dialog.Close asChild>
             <Button variant="ghost" size="icon" className="shrink-0" aria-label="Close"><X className="size-5" /></Button>
@@ -278,16 +291,24 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
             </>
           )}
 
-          {importError && <p role="alert" className="text-sm text-ember">{importError}</p>}
+          {/* Rarely needed, so folded away: a profile as a file, to move it or keep a copy. */}
+          {(!setup || step === 0) && (
+            <details className="text-sm">
+              <summary className="cursor-pointer py-3 text-muted-foreground">Advanced</summary>
+              <div className="flex flex-wrap gap-2">
+                {!setup && <Button type="button" variant="ghost" onClick={exportJson}>Export JSON</Button>}
+                <label className="inline-flex h-11 cursor-pointer items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-ring">
+                  Import JSON
+                  <input type="file" accept="application/json" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importJson(f); }} />
+                </label>
+              </div>
+              {importError && <p role="alert" className="text-sm text-ember">{importError}</p>}
+            </details>
+          )}
           {/* Pinned to the sheet's bottom, so Save (or Next) is always in reach however long the step. */}
           <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-popover px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pt-5">
             <div className="flex gap-2">
               {setup && step > 0 && <Button type="button" variant="secondary" onClick={() => go(step - 1)}>Back</Button>}
-              {!setup && <Button type="button" variant="ghost" onClick={exportJson}>Export JSON</Button>}
-              {(!setup || step === 0) && <label className="inline-flex h-11 cursor-pointer items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-ring">
-                Import JSON
-                <input type="file" accept="application/json" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importJson(f); }} />
-              </label>}
             </div>
             <Button type="submit" size="lg">{!setup ? "Save" : step < steps.length - 1 ? "Next" : "Save and see your options"}</Button>
           </div>

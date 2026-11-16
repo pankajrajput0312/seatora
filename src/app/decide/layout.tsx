@@ -19,7 +19,8 @@ import { getMeta } from "@/features/decide/service";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { PlanPrompt } from "@/features/plans/components/plan-prompt";
 import { freeNow, passState, planLine, shortDate } from "@/features/plans/plans";
-import { PLAN_PROMPT_COOKIE } from "@/features/plans/prompt";
+import { PLAN_PROMPT_COOKIE, PLAN_PROMPT_EVERY_MS } from "@/features/plans/prompt";
+import { db } from "@/lib/db";
 
 // Inside app uses its own "case sheet" system (docs/APP_DESIGN_SYSTEM.md): light, hyperlegible numerals.
 const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
@@ -55,8 +56,12 @@ export default async function DecideLayout({ children }: { children: React.React
   const upgrade = !!me && ["claimable", "free"].includes(passState(me).state);
   const free = freeNow();
   const account = me && { name: me.name.trim() || me.email.split("@")[0], plan: planLine(me), upgrade, freeTill: free && shortDate(free) };
-  // The plan pop-up: once right after signing in (the cookie createSession sets), only without the Season Pass.
-  const prompt = upgrade && !!(await cookies()).get(PLAN_PROMPT_COOKIE);
+  // The plan pop-up: right after signing in (the cookie createSession sets), only without the Season Pass, and at most
+  // once in PLAN_PROMPT_EVERY_MS per account (her last plan_popup_shown, any device: a new phone's sign-in doesn't repeat it).
+  const prompt =
+    upgrade &&
+    !!(await cookies()).get(PLAN_PROMPT_COOKIE) &&
+    !(await db.funnelEvent.findFirst({ where: { userId: me!.id, name: "plan_popup_shown", at: { gte: new Date(Date.now() - PLAN_PROMPT_EVERY_MS) } }, select: { id: true } }).catch(() => null));
   return (
     <div className={`app ${app.variable} min-h-screen`}>
       <AstryxProvider>

@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { Button } from "@/components/ui/button";
-import { AuthLink } from "./auth-link";
+import { AUTH_EVENT } from "@/features/auth/components/log-out-button";
+import { AuthLink, MenuLogOut, PlannerCta } from "./auth-link";
 
 const links = [
   { label: "Residents", href: "/#preview" },
@@ -21,6 +22,12 @@ export function MobileNav() {
     document.documentElement.style.overflow = "hidden";
   };
   const close = () => ref.current?.close();
+  // Logged out from the menu: it closes on the signed-out page.
+  useEffect(() => {
+    const done = () => ref.current?.close();
+    window.addEventListener(AUTH_EVENT, done);
+    return () => window.removeEventListener(AUTH_EVENT, done);
+  }, []);
   return (
     <>
       <button type="button" onClick={open} className="grid size-11 place-items-center rounded-md text-muted-foreground hover:bg-muted md:hidden" aria-label="Open menu" aria-haspopup="dialog">
@@ -45,9 +52,10 @@ export function MobileNav() {
               <Link key={l.href} href={l.href} onClick={close} className="flex min-h-11 items-center border-b border-border text-base">{l.label}</Link>
             ))}
             <AuthLink onClick={close} className="flex min-h-11 items-center border-b border-border text-base" />
+            <MenuLogOut className="flex min-h-11 w-full items-center border-b border-border text-left text-base text-muted-foreground aria-disabled:opacity-60" />
           </nav>
           <Button asChild size="lg" className="mt-5 w-full">
-            <Link href="/signup" onClick={close}>Get Seatora — Free</Link>
+            <PlannerCta onClick={close} />
           </Button>
         </div>
       </dialog>

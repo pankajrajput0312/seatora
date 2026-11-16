@@ -470,6 +470,7 @@ model User {
   /// Owner's notes on the account (the admin page).
   notes        String?
   sessions     Session[]
+  passwordResets PasswordReset[]
   requests     FeatureRequest[]
   profile      UserProfile?
   choices      UserChoices?
@@ -555,6 +556,18 @@ model UsageDistinct {
 }
 
 /// What an owner or admin changed on an account (/decide/admin): who, whom, and the fields before and after.
+/// A one-time password reset link, made on the admin page (there is no email provider): the DB only sees the token's
+/// hash. An hour long; used, or a newer link made, it is deleted (src/features/auth/lib/reset.ts).
+model PasswordReset {
+  id        String   @id // sha256(token)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model AdminAudit {
   id        String   @id @default(cuid())
   actorId   String

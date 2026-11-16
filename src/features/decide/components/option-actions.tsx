@@ -48,9 +48,8 @@ export function CompareToggle({ id, label }: { id: string; label: string }) {
     <Button
       size="icon"
       variant="ghost"
-      aria-pressed={on}
       aria-disabled={full || undefined}
-      aria-label={full ? `Compare is full (${MAX_COMPARE}): ${label}` : `In compare: ${label}`}
+      aria-label={full ? `Compare is full (${MAX_COMPARE}): ${label}` : on ? `Remove from compare: ${label}` : `Add to compare: ${label}`}
       onClick={() => !full && setIds((x) => (x.includes(id) ? x.filter((i) => i !== id) : [...x, id]))}
       className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
     >
@@ -126,7 +125,8 @@ function OptionCard({ r, L, n, latestYear, pastYears, includeLatest, seatLists, 
         ]}
         actions={<><ChoiceStar item={toChoiceItem(r)} /><CompareToggle id={r.id} label={rowLabel(r)} /></>}
         stat={{
-          label: "Closing rank",
+          // The big number's year and round, so it never reads against the label under it (which counts other rounds).
+          label: c ? `${c.year} ${roundLabel[c.d.round]} closing` : "Closing rank",
           value: (
             <>
               <span className="numeric">{c ? formatRank(c.d.closing) : <Dash />}</span>

@@ -33,11 +33,10 @@ test("landing page renders key sections", async ({ page }) => {
   for (const id of new Set(hashes)) await expect(page.locator(`#${id}`), `#${id}`).toBeAttached();
 });
 
-test("the Season Pass shows as free: ₹0, ₹499 struck, a free sign-up, and the policy links", async ({ page }) => {
+test("the Season Pass shows as free in one line (then ₹199 once), a free sign-up, and the policy links", async ({ page }) => {
   await page.goto("/pricing");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Seatora NEET PG 2026 Season Pass");
-  await expect(page.locator("main s").first()).toHaveText("₹499");
-  await expect(page.getByText("Was ₹499, now free").first()).toBeAttached();
+  await expect(page.getByText(/^Free till \d+ \w+\. Then ₹199 once — no auto-renew, no card now\.$/).first()).toBeVisible();
   await expect(page.locator('main a[href="/signup"]', { hasText: "Create free account" })).toHaveCount(2);
   await expect(page.locator('main a[href^="mailto:"]')).toHaveCount(0);
   await expect(page.locator("header a", { hasText: "Get Seatora — Free" }).first()).toBeAttached();
@@ -87,9 +86,9 @@ test("the invited account signs up (or in), signs out, and signs back in", async
   await page.goto("/account");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Hi, .+\.$/);
   await expect(page.getByText(invited.email)).toBeVisible();
-  await expect(page.locator('header a[href="/account"]:not(dialog a)')).toHaveCount(1); // (the phone menu <dialog> has its own)
+  await expect(page.locator('header a[href="/decide"]:not(dialog a)', { hasText: /^My planner$/ })).toHaveCount(1); // (the phone menu <dialog> has its own)
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/account");
   await expect(page).toHaveURL(/\/login$/);
@@ -107,7 +106,7 @@ test("copied cookies stop working after sign-out", async ({ page, browser }) => 
   await signUpOrIn(page);
   const copied = await page.context().cookies();
   await page.goto("/account");
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/$/);
 
   const thief = await browser.newContext();

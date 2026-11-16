@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { duplicateList, markTypedUpTo, move, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
-import { LATEST_YEAR, PAST_YEARS, reachWindow, seatsBelowText, type Reach, type SeatsBelow } from "../lib/reach";
+import { defaultChoices, duplicateList, markTypedUpTo, move, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
+import { LATEST_YEAR, PAST_YEARS, reachWindow, seatsBelowNotes, type Reach, type SeatsBelow } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
 import { useChoices, useDecideLinks } from "../lib/use-decide-store";
 import { keepProfileParams } from "../profile";
@@ -46,8 +46,16 @@ type ReachFor = (ids: string[], profile: string) => Promise<{ lists: SeatList[];
 /** `view`: Cards or table on show (chosenView "choices"). Only that one is rendered: its controls carry the ids focus moves to. */
 /** `maxLists`: the plan's saved lists (features/plans); at it, "Duplicate" gives way to a Season Pass link. Unset: no cap (signed out). */
 /** `hasLists`: the server has the newest round's seat lists, so a card keeps room for its seats line while it loads. */
-export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists }: { reachFor?: ReachFor; view: View; maxLists?: number; hasLists?: boolean }) {
+/** `nextRound`: the choice filling she fills next (MCC's schedule): its list name ("Round 3 · 2026") and dates. */
+export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nextRound }: { reachFor?: ReachFor; view: View; maxLists?: number; hasLists?: boolean; nextRound?: { name: string; when: string } | null }) {
   const [state, setState, hydrated] = useChoices();
+  // The first list, still under its default name (lib/choices.ts), takes the name of the round she fills next; a list she
+  // named or duplicated keeps its own, and no two lists end up with one name.
+  const first = defaultChoices.lists[0];
+  const rename = !!nextRound && nextRound.name !== first.name && !state.lists.some((l) => l.name === nextRound.name) && state.lists.some((l) => l.id === first.id && l.name === first.name);
+  useEffect(() => {
+    if (hydrated && rename) setState((s) => ({ ...s, lists: s.lists.map((l) => (l.id === first.id && l.name === first.name ? { ...l, name: nextRound!.name } : l)) }));
+  }, [hydrated, rename, nextRound, first, setState]);
   const L = useDecideLinks();
   const sp = useSearchParams();
   const list = state.lists.find((l) => l.id === state.activeId) ?? state.lists[0];
@@ -55,7 +63,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists }: {
   const [picked, setPicked] = useState<{ index: number; origin: number } | null>(null);
   // Undo belongs to the list the item was removed from, whichever list is open when she presses it.
   const [removed, setRemoved] = useState<{ listId: string; listName: string; item: ChoiceItem; index: number } | null>(null);
-  const [copyMsg, setCopyMsg] = useState<string | null>(null);
+  const [copyMsg, setCopyMsg] = useState<{ text: string; lines?: string[] } | null>(null);
   const dragFrom = useRef<number | null>(null);
 
   const items = list.items;
@@ -164,13 +172,16 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists }: {
   };
 
   const copy = async () => {
+    const text = toMccText(list);
     try {
-      await navigator.clipboard.writeText(toMccText(list));
-      setCopyMsg(`Copied ${n} choices in MCC order.`);
+      await navigator.clipboard.writeText(text);
+      // What went to the clipboard, at a glance: the first three lines and how many more.
+      const lines = text.split("\n");
+      setCopyMsg({ text: `Copied ${n} ${n === 1 ? "choice" : "choices"} in MCC order:`, lines: [...lines.slice(0, 3), ...(lines.length > 3 ? [`and ${lines.length - 3} more`] : [])] });
     } catch {
-      setCopyMsg("Couldn't copy. Use CSV or Print instead.");
+      setCopyMsg({ text: "Couldn't copy. Use CSV or Print instead." });
     }
-    setTimeout(() => setCopyMsg(null), 4000);
+    setTimeout(() => setCopyMsg(null), 8000);
   };
 
   const dupKey = (i: ChoiceItem) => `${i.slug}|${i.course}`;
@@ -198,7 +209,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists }: {
       closed && `Closed before your rank in every round of ${reachWindow(LATEST_YEAR, PAST_YEARS)}${lr?.reach ? "" : " (when added)"}`,
       // Seats are matched to the option by institute and course; say what was found, not what MCC printed.
       lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
-      ...(lr?.below ?? []).map((b) => seatsBelowText(b, LATEST_YEAR, PAST_YEARS)),
+      ...seatsBelowNotes(lr?.below ?? [], LATEST_YEAR, PAST_YEARS),
       fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
       typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
     ].filter(Boolean) as string[];
@@ -400,6 +411,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists }: {
           <Link href="/pricing" className="inline-flex min-h-11 items-center text-sm text-sky underline">More lists with the Season Pass</Link>
         )}
       </div>
+      {nextRound && <p className="-mt-2 text-sm text-muted-foreground" data-print-hide>For {nextRound.when}.</p>}
 
       {/* As on every results page: Cards | Table, then the CSV. */}
       <div className="flex flex-wrap items-center gap-2" data-print-hide>
@@ -408,7 +420,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists }: {
         <Button variant="secondary" disabled={!n} onClick={copy}>Copy in MCC order</Button>
         <Button variant="secondary" disabled={!n} onClick={() => window.print()}>Print</Button>
         <label className="inline-flex min-h-11 items-center gap-2 text-sm">
-          Typed into the MCC portal up to #
+          Mark how far you&apos;ve typed into MCC: up to choice
           <span className="w-20">
             <input
               type="number" min={0} max={n} value={prefix}
@@ -418,7 +430,12 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists }: {
           </span>
         </label>
       </div>
-      {copyMsg && <p className="text-sm" data-print-hide>{copyMsg}</p>}
+      {copyMsg && (
+        <div className="text-sm" data-print-hide>
+          <p>{copyMsg.text}</p>
+          {copyMsg.lines && <ol className="mt-1 grid gap-0.5 border-l-2 border-border pl-3 text-xs text-muted-foreground">{copyMsg.lines.map((l) => <li key={l} className="break-words">{l}</li>)}</ol>}
+        </div>
+      )}
       {missingTyped > 0 && (
         <p className="text-sm text-sun" data-print-hide>
           {missingTyped === 1 ? "1 option you marked as typed into MCC is" : `${missingTyped} options you marked as typed into MCC are`} no longer in this list, but still in the
@@ -427,7 +444,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists }: {
       )}
 
       <p className="sr-only" aria-live="assertive">{announce}</p>
-      <p className="sr-only" aria-live="polite">{copyMsg ?? ""}</p>
+      <p className="sr-only" aria-live="polite">{copyMsg?.text.replace(/:$/, ".") ?? ""}</p>
       {removed && (
         <p className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm" data-print-hide>
           Removed {name(removed.item)} from {removed.listName}.

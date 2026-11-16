@@ -24,7 +24,7 @@ it("one seats column per list (never added) and the seat category note, quoted t
   expect(head).toContain('"2026 R2 clear vacancy seats","2026 R2 virtual vacancy seats","2026 R2 newly added seats","Seat category note"');
   expect(line).toBe(
     ['1', '"A ""Quoted"" College"', "—", '"DNB Family Medicine"', '"DNB Quota"', '"Closed before your rank"', "3", "—", "0",
-      '"In the clear vacancy list, your seat categories here have only OBC seats; on OBC seats alone: No allotment on OBC seats in 2024, 2025 or 2026 R1."',
+      '"In the clear vacancy list, the seats here you can take are OBC seats only. On OBC seats: no allotment in 2024, 2025 or 2026 R1."',
       "20132", '"R1 (provisional)"', '"Open"', "—", "—", "—", "—", "—", "—", `"'=1+1"`, '"MCC profile"', "—", "—"].join(","),
   );
   expect(blank).toBe("");

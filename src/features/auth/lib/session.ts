@@ -13,7 +13,8 @@ const COOKIE = "medpath_session";
 export const SIGNED_IN_FLAG = "medpath_signed_in";
 const MAX_AGE_S = ACCESS_MAX_AGE_S; // 30 days, like the access cookie
 
-const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+/** How a session or reset token is stored: its SHA-256, never the token. */
+export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 /**
  * Creates a session for the user and sets the cookie. The DB only ever sees the token's hash. A member (anyone in open

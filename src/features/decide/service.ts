@@ -4,7 +4,7 @@ import { cache } from "react";
 import { hospitalInfo, type HospitalInfo } from "./components/institute/institute-data";
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
 import { anyTermFilter, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
-import { buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Reach, type ReachInput, type SeatsBelow } from "./lib/reach";
+import { buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { pairKey, profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
@@ -81,6 +81,8 @@ export type OptionRow = {
   reachProvisional: boolean;
   /** With a profile: the label on each of her seat categories alone (`reach` is on all of them together). */
   reachBy?: Partial<Record<Category, Reach>>;
+  /** Beside `reachBy`: the closing each of those labels rests on (lib/reach.ts reachEvidence), null without one. */
+  reachAt?: Partial<Record<Category, ReachAt | null>>;
   latest: Deepest | null; // latest year's R1 (provisional while its source is)
   byYear: Record<number, Deepest | null>;
   /** year → round → deepest closing among eligible categories (with its seat category); n = allotments, all categories */
@@ -222,6 +224,8 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], profile: Profile | null,
     : profile ? labelOf(profile.rank, mine, includeProvisional, latestR1Provisional(cat)) : { reach: "no-data", provisional: false };
   const opt = { latestYear: LATEST_YEAR, pastYears: PAST_YEARS, includeLatest: includeProvisional };
   const reachBy = profile && !eligibleOverride && !o.fresh ? Object.fromEntries([...eligible!].map((c) => [c, classifyReach(profile.rank, mine.filter((x) => x.category === c), opt)])) : undefined;
+  // The closing each of those labels rests on, for the notes that say them beside the option's own (seatsBelowNotes).
+  const reachAt = reachBy && Object.fromEntries(Object.entries(reachBy).map(([c, r]) => [c, reachEvidence(mine.filter((x) => x.category === c), r!, opt)]));
   return {
     id: o.id,
     college: { key: college.key, slug: college.slug, name: college.name, state: college.state, type: college.type },
@@ -229,7 +233,7 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], profile: Profile | null,
     quota: o.quota,
     reach: label.reach,
     reachProvisional: label.provisional,
-    ...(reachBy && { reachBy }),
+    ...(reachBy && { reachBy, reachAt }),
     latest: deepestByYear(mine.filter((c) => c.year === LATEST_YEAR && c.round === "R1"), provisional).get(LATEST_YEAR) ?? null,
     byYear: Object.fromEntries(YEARS.map((y) => [y, deepest.get(y) ?? null])),
     grid: buildGrid(list, eligible, provisional),
@@ -401,7 +405,7 @@ function withSeats(rows: OptionRow[], lists: SeatList[], seats: Map<string, Opti
   return rows.map((r) => {
     const { by: seatsBy, mine } = seatsByKind(lists, seats.get(r.id), categories);
     const cats = Object.fromEntries(lists.map((l, i) => [l.kind, mine[i].filter((c) => c.seats > 0).map((c) => c.category)]));
-    return { ...r, seats: seatsBy.clear ?? null, seatsBy, seatsBelow: r.reachBy ? seatsBelow(r.reach, r.reachBy, cats) : [] };
+    return { ...r, seats: seatsBy.clear ?? null, seatsBy, seatsBelow: r.reachBy ? seatsBelow(r.reach, r.reachBy, cats, r.reachAt) : [] };
   });
 }
 

@@ -15,7 +15,7 @@ import { CouponForm } from "./coupon-form";
  * The Season Pass call to action everywhere (Pricing #buy, the planner's home, the paywall, the account page), from her
  * state on the server (plans.ts passState):
  * - a Season Pass beyond the free period, or staff: "Season Pass active till 31 Mar 2027";
- * - in the free period: one button, "Upgrade for ~~₹499~~ ₹0" (the free claim; or "Season Pass · free till 20 Nov" once
+ * - in the free period: one button, "Upgrade free till 20 Nov" (the free claim; or "Season Pass · free till 20 Nov" once
  *   done), and "Have a coupon?" (CouponForm: a 100% coupon gives the whole season). No paid option while it is free;
  * - after it: "Upgrade for ~~₹499~~ ₹199" ("Upgrade for ~~₹499~~ ₹159 with Rahul's invite" with a referrer: her own, or the /r/
  *   cookie's code; "… with coupon X" with a coupon), or "Payments open soon" and "Have a coupon?";
@@ -35,11 +35,7 @@ export async function SeasonPassButton({ className, noteClassName, coupon }: { c
   const code = (await cookies()).get(REF_COOKIE)?.value ?? null;
   const q = paymentsOn() ? await quote(user?.id ?? null, code) : null;
   const was = formatPaise(PLANS.season_pass.wasAmount); // struck beside every price
-  const claimLabel = free && (
-    <span>
-      Upgrade for <s className="opacity-70">{was}</s> ₹0
-    </span>
-  );
+  const claimLabel = free && <span>Upgrade free till {shortDate(free)}</span>;
 
   if (!user)
     return (

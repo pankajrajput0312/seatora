@@ -59,6 +59,7 @@ export function AuthForm({ mode, next, open = false, refCode }: { mode: Mode; ne
         autoComplete: isSignUp ? "new-password" : "current-password",
         placeholder: isSignUp ? "At least 8 characters" : undefined,
       })}
+      {!isSignUp && <Link href="/forgot" className="-mt-2 inline-flex min-h-11 items-center justify-self-end text-sm text-muted-foreground underline hover:text-sky">Forgot password?</Link>}
       {isSignUp && !open && field("invite", "Invite code", { autoComplete: "off", spellCheck: false })}
       {error && <p role="alert" className="rounded-md border border-ember/30 bg-ember/10 px-3 py-2 text-sm text-ember">{error}</p>}
       <Button type="submit" size="lg" disabled={pending} className="mt-2">

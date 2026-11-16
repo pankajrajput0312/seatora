@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Check, X } from "lucide-react";
 import { getCurrentUser } from "@/features/auth/lib/session";
+import { freeLine } from "@/components/marketing/free-price";
 import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import { SEASON_PASS_UNTIL } from "@/features/payments/grant";
 import { PLANS } from "@/features/payments/plans";
@@ -59,22 +60,20 @@ export function PlanCardsView({ current, free, cta, freeCta, className }: { curr
         <div className="flex flex-1 flex-col p-4">
           {free ? (
             <p className="flex items-baseline gap-2">
-              <span className="sr-only">Was {formatPaise(was)}, now ₹0 till {shortDate(free)}</span>
-              <s aria-hidden className="numeric text-lg text-muted-foreground">{formatPaise(was)}</s>
-              <span aria-hidden className="numeric text-4xl font-extrabold">₹0</span>
-              <span aria-hidden className="text-sm text-muted-foreground">till {shortDate(free)}</span>
+              <span className="numeric text-4xl font-extrabold">₹0</span>
+              <span className="text-sm text-muted-foreground">now</span>
             </p>
           ) : (
             <p className="flex items-baseline gap-2">
               <span className="sr-only">Was {formatPaise(was)}, now {formatPaise(list)}</span>
               <s aria-hidden className="numeric text-lg text-muted-foreground">{formatPaise(was)}</s>
               <span aria-hidden className="numeric text-4xl font-extrabold">{formatPaise(list)}</span>
-              <span className="text-sm text-muted-foreground">paid once</span>
+              <span className="text-sm text-muted-foreground">once, no auto-renew</span>
             </p>
           )}
           <p className="mt-1 text-sm text-muted-foreground">
             {free
-              ? `Free for everyone till ${shortDate(free)}. After that ${formatPaise(list)} (${formatPaise(discountedPrice(list))} with an invite), valid till ${longDate(SEASON_PASS_UNTIL)}.`
+              ? `${freeLine(free)} Valid till ${longDate(SEASON_PASS_UNTIL)}.`
               : `${formatPaise(discountedPrice(list))} with an invite, valid till ${longDate(SEASON_PASS_UNTIL)}.`}
           </p>
           <Lines plan="PREMIUM" />

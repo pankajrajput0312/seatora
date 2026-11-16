@@ -24,7 +24,7 @@ const faqs = [
     q: "How do I get access?",
     a: (
       <>
-        A free account opens the planner straight away. The Seatora NEET PG 2026 Season Pass, for the whole 2026 counselling season: <FreePrice />. See the Pricing page for what each plan gives.
+        A free account opens the planner straight away. The Seatora NEET PG 2026 Season Pass, for the whole 2026 counselling season. <FreePrice /> See the Pricing page for what each plan gives.
       </>
     ),
   },

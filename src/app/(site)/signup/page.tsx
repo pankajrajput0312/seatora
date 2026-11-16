@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { freeLine } from "@/components/marketing/free-price";
 import { AuthForm } from "@/features/auth/components/auth-form";
 import { AuthShell } from "@/features/auth/components/auth-shell";
 import { hasSiteAccess } from "@/features/auth/lib/session";
 import { TrackView } from "@/features/funnel/components/beacon";
 import { PLANS } from "@/features/payments/plans";
-import { freeNow, shortDate } from "@/features/plans/plans";
+import { freeNow } from "@/features/plans/plans";
 import { InviteBanner } from "@/features/referrals/components/invite-banner";
 import { formatPaise, REF_COOKIE } from "@/features/referrals/lib";
 import { referrerByCode } from "@/features/referrals/service";
@@ -26,7 +27,7 @@ export default async function SignupPage({ searchParams }: Props) {
   const freeUntil = freeNow();
   const price = (
     <>
-      <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> {formatPaise(PLANS.season_pass.amount)}
+      <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> {formatPaise(PLANS.season_pass.amount)} once, no auto-renew
     </>
   );
   if (openAccess()) {
@@ -38,7 +39,7 @@ export default async function SignupPage({ searchParams }: Props) {
         {!inviter && (invite === "bad" || refCode) && <p className="mb-4 text-sm text-muted-foreground">That invite link isn&apos;t valid. You can still create a free account.</p>}
         <p className="mb-6 text-sm text-muted-foreground max-sm:order-last max-sm:mt-6 max-sm:mb-0">
           {freeUntil ? (
-            <>Everything is free till {shortDate(freeUntil)} (Season Pass ₹0, then {price}): anyone can create an account and open the planner.</>
+            <>Season Pass: {freeLine(freeUntil)} Anyone can create an account and open the planner.</>
           ) : (
             <>A free account opens the planner with the Free plan&apos;s daily limits; the Season Pass ({price}) lifts them.</>
           )}{" "}

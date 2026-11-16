@@ -110,6 +110,9 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
     <Link href={L.lastRanks(a.courseSlug, { inst: a.college.slug })} className="inline-flex min-h-6 items-center hover:text-sky hover:underline">{a.courseName}</Link>
   );
 
+  // A card whose institute, course, quota and terms are the previous card's (one college's allotments, rank after rank)
+  // says so instead of repeating the same fee and bond cells.
+  const sameTerms = (i: number) => i > 0 && rows[i - 1].college.slug === rows[i].college.slug && rows[i - 1].courseSlug === rows[i].courseSlug && rows[i - 1].quota === rows[i].quota && JSON.stringify(rows[i - 1].fees) === JSON.stringify(rows[i].fees);
   const cards = (
     <ResultCards title="Allotments" hideTitle>
       {rows.map((a, i) => (
@@ -146,7 +149,11 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
                   <PrevSeatCell prev={a.prev} L={L} />
                 </div>
               )}
-              <TermStatCells t={a.fees} of={of(a)} className="border-t-0" />
+              {sameTerms(i) ? (
+                <p className="px-4 py-2 text-xs text-muted-foreground">Fee, stipend and bond: as on the card before.</p>
+              ) : (
+                <TermStatCells t={a.fees} of={of(a)} className="border-t-0" />
+              )}
             </>
           }
         />

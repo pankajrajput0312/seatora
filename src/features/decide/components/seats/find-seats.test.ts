@@ -140,7 +140,7 @@ describe.skipIf(!process.env.DATABASE_URL)("findSeats on the real import", { tim
     // the clear vacancy list prints Open (2) and SC seats only: Open closed before her rank, so Options says so.
     const g = opts.get("GMERSMEDICALCOLLEGEANDGENERALHOSPITALKHA#384355~NBEMS Diploma~ANAESTHESIOLOGY~DNB Quota")!;
     expect(g).toMatchObject({ reach: "reached-latest", reachBy: { Open: "closed-before", OBC: "reached-latest" }, seatsBy: { clear: 2, virtual: 3 } });
-    expect(g.seatsBelow).toEqual([{ kind: "clear", on: [{ category: "Open", reach: "closed-before" }] }]);
+    expect(g.seatsBelow).toMatchObject([{ kind: "clear", on: [{ category: "Open", reach: "closed-before", at: { year: expect.any(Number), closing: expect.any(Number) } }] }]);
     // A Seats row with no history on its own seat category says so for that category, not "your categories".
     const csv = await seatsCsv({ ...v, r: v.r! });
     expect(csv).toContain("No allotment on OBC seats in 2024, 2025 or 2026 R1");

@@ -214,13 +214,14 @@ function feeCell(t: ProgrammeTerms): StatCell {
     ...textLines(t, u),
   ];
   if (!f) return { ...dash(c, tip), tip: [{ text: "Year 1's fee is not stated." }, ...tip] };
-  // "₹1.71 L/yr", "₹15–25 L/yr", a sum paid at admission "₹5 L at admission" (cards too); the NBEMS ceiling "Up to ₹1.25 L" (cards
-  // "≤ ₹1.25 L"), never the college's own. No marker: what a figure leaves out is in the (i).
+  // A year's fee says so, cards too: "₹1.71 L/yr", "₹15–25 L/yr"; a sum paid at admission "₹5 L at admission"; the NBEMS
+  // ceiling "Up to ₹1.25 L/yr" (cards "≤ ₹1.25 L/yr"), never the college's own. No marker: what a figure leaves out is in the (i).
   const v = feeRange(f.min, f.inr);
+  const per = f.atAdmission ? " at admission" : "/yr";
   const cell: StatCell = {
     ...c,
-    short: (f.kind === "maximum" ? "≤ " : "") + v + (f.atAdmission ? " at admission" : ""),
-    full: f.kind === "maximum" ? `Up to ${v}` : f.atAdmission ? `${v} at admission` : `${v}/yr`,
+    short: (f.kind === "maximum" ? "≤ " : "") + v + per,
+    full: (f.kind === "maximum" ? "Up to " : "") + v + per,
     marker: null, tone: null, tip,
   };
   const [low, high] = FEE_BANDS[t.programme as keyof typeof FEE_BANDS] ?? [];

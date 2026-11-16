@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cutoff, Round } from "../types";
-import { buildGrid, classifyReach, deepestByYear, eligibleCategories, reachLabel, resultsSpan, seatsBelow, seatsBelowText } from "./reach";
+import { buildGrid, classifyReach, deepestByYear, eligibleCategories, reachEvidence, reachLabel, resultsSpan, seatsBelow, seatsBelowNotes } from "./reach";
 
 const c = (year: number, round: Round, closing: number, category: Cutoff["category"] = "Open"): Cutoff => ({
   college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY", year, round, quota: "All India", category,
@@ -77,13 +77,36 @@ describe("labels on one seat category", () => {
     const by = { Open: "closed-before", OBC: "reached-latest" } as const;
     const below = seatsBelow("reached-latest", by, { clear: ["Open"], virtual: ["OBC", "Open"], new: [] });
     expect(below).toEqual([{ kind: "clear", on: [{ category: "Open", reach: "closed-before" }] }]);
-    expect(seatsBelowText(below[0], 2026, [2024, 2025])).toBe(
-      "In the clear vacancy list, your seat categories here have only Open seats; on Open seats alone: Closed before your rank.",
-    );
+    // With the closing each label rests on, the note says it with its year and round, never as a second verdict.
+    const at = { Open: { year: 2025, round: "R3", closing: 38120 }, OBC: { year: 2026, round: "R1", closing: 44810 } } as const;
+    const both = seatsBelow("reached-latest", by, { clear: ["Open"], virtual: ["Open"] }, at);
+    expect(seatsBelowNotes(both, 2026, [2024, 2025])).toEqual([
+      "In the clear vacancy and virtual vacancy lists, the seats here you can take are Open seats only. On Open seats: deepest closing 38,120 in 2025 R3, before your rank.",
+    ]);
+    expect(seatsBelowNotes(seatsBelow("reached-one", { Open: "no-data", OBC: "reached-one" }, { new: ["Open"] }, { Open: null }), 2026, [2024, 2025])).toEqual([
+      "In the newly added list, the seats here you can take are Open seats only. On Open seats: no allotment in 2024, 2025 or 2026 R1.",
+    ]);
     // Seats on the category the label comes from, or no seats at all: nothing to say.
     expect(seatsBelow("reached-latest", by, { clear: ["OBC"], virtual: [] })).toEqual([]);
     // One seat category: its label is the option's.
     expect(seatsBelow("within-10", { Open: "within-10" }, { clear: ["Open"] })).toEqual([]);
+  });
+});
+
+describe("reachEvidence", () => {
+  const w = { latestYear: 2026, pastYears: [2024, 2025] as [number, number], includeLatest: true };
+  const cs = [
+    { year: 2025, round: "R3", closing: 38120 },
+    { year: 2025, round: "stray", closing: 60000 },
+    { year: 2024, round: "R2", closing: 30000 },
+    { year: 2023, round: "R1", closing: 90000 }, // outside the window
+    { year: 2026, round: "R2", closing: 70000 }, // the latest year counts R1 only
+  ] as const;
+  it("the deepest R1 to R3 closing the label counts; a stray round only for stray-only", () => {
+    expect(classifyReach(42284, [...cs], w)).toBe("stray-only");
+    expect(reachEvidence([...cs], "closed-before", w)).toEqual({ year: 2025, round: "R3", closing: 38120 });
+    expect(reachEvidence([...cs], "stray-only", w)).toEqual({ year: 2025, round: "stray", closing: 60000 });
+    expect(reachEvidence([], "no-data", w)).toBeNull();
   });
 });
 

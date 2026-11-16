@@ -26,7 +26,13 @@ export const changePasswordSchema = z
   })
   .refine((d) => d.password === d.confirm, { message: "The new passwords don't match", path: ["confirm"] });
 
+/** A new password from a reset link: sign-up's rules, typed twice. */
+export const resetPasswordSchema = z
+  .object({ password: newPassword, confirm: z.string() })
+  .refine((d) => d.password === d.confirm, { message: "The passwords don't match", path: ["confirm"] });
+
 export type SignInInput = z.input<typeof signInSchema>;
+export type ResetPasswordInput = z.input<typeof resetPasswordSchema>;
 /** `invite` only without open access. */
 export type SignUpInput = z.input<typeof openSignUpSchema> & { invite?: string };
 export type ChangePasswordInput = z.input<typeof changePasswordSchema>;
