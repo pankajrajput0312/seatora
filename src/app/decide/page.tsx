@@ -37,8 +37,8 @@ function At({ p }: { p: StripPoint | null }) {
 const title = <h1 id="main-h1" tabIndex={-1} className="sr-only">Home</h1>;
 
 /**
- * No rank yet: the three-step setup first, then today's MCC step, Residents and the tools. With a rank: the next step
- * to take, today's MCC step, the tools, then Residents, then her options as Options opens them (service.ts optionsView:
+ * Residents first for everyone (the owner's call). No rank yet: then the three-step setup, today's MCC step and the
+ * tools. With a rank: then the next step to take, today's MCC step, the tools, then her options as Options opens them (service.ts optionsView:
  * the round view while a round's seat lists are out and its result isn't, else every option with past allotments), so
  * every number here is the count of the Options page its link opens. History charts follow.
  */
@@ -49,9 +49,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     return (
       <AppPage className="grid grid-cols-1 gap-4">
         {title}
+        <ResidentsPromo L={decideLinks(params)} />
         <SetupCard />
         <RoundStatusBanner params={params} />
-        <ResidentsPromo L={decideLinks(params)} />
         <ToolGroups L={decideLinks(params)} />
       </AppPage>
     );
@@ -79,6 +79,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <AppPage className="grid grid-cols-1 gap-4">
       {title}
+      <ResidentsPromo L={L} />
       <section aria-labelledby="next-step-h" className="rounded-xl border border-border bg-card p-4 sm:p-5">
         <p className="section-label text-muted-foreground">Next recommended step</p>
         {total ? (
@@ -108,7 +109,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       </section>
       <RoundStatusBanner params={params} />
       <ToolGroups L={L} />
-      <ResidentsPromo L={L} />
 
       <section aria-labelledby="numbers-h" className="grid gap-2">
         <div className="flex items-center gap-1">
