@@ -11,7 +11,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { duplicateList, markTypedUpTo, move, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
 import { LATEST_YEAR, PAST_YEARS, reachWindow, seatsBelowNotes, type Reach, type SeatsBelow } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
-import { useChoicesFor, useDecideLinks } from "../lib/use-decide-store";
+import { useChoices, useDecideLinks } from "../lib/use-decide-store";
 import { keepProfileParams } from "../profile";
 import type { ProgrammeTerms } from "../server/terms";
 import type { RowHospital, SeatsBy } from "../service";
