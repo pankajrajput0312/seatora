@@ -41,6 +41,7 @@ import { Paywall } from "@/features/plans/components/paywall";
 import { checkAndCount, currentPlan } from "@/features/plans/usage";
 import { roundLabel, seatKindLabel } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
+import { ScrollTable } from "@/features/decide/components/scroll-table";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 const tabs = [
@@ -392,7 +393,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                 </ul>
               }
               table={
-                <div role="region" aria-label="Courses offered" tabIndex={0} className={`${tbl.wrap} ${tbl.scroll}`}>
+                <ScrollTable label="Courses offered">
                   <table className={tbl.table}>
                     <caption className="sr-only">Courses at {college.name}, with past closing ranks, fees, stipend and bond</caption>
                     <thead className={tbl.head}>
@@ -436,7 +437,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       ])}
                     </tbody>
                   </table>
-                </div>
+                </ScrollTable>
               }
             />
           )}
@@ -526,26 +527,31 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                 </ul>
               }
               table={
-                <div role="region" aria-label="Allotments at this institute" tabIndex={0} className={tbl.wrap}>
+                // The rank pinned (phones: with its round under it, so a row swiped sideways still says when; tighter cells, so
+                // the five columns fit 360px).
+                <ScrollTable label="Allotments at this institute">
                   <table className={tbl.table}>
                     <caption className="sr-only">Allotments at {college.name}</caption>
-                    <thead><tr className={tbl.headRow}>
-                      <th scope="col" className={`${tbl.th} text-right`}>Rank</th><th scope="col" className={tbl.th}>Round</th><th scope="col" className={tbl.th}>Course</th><th scope="col" className={tbl.th}>Quota</th><th scope="col" className={tbl.th}>Seat category</th><th scope="col" className={tbl.th}>Remark</th>
+                    <thead className={tbl.head}><tr className={tbl.headRow}>
+                      <th scope="col" className={`${tbl.th} ${stick} text-right max-md:px-2`}>Rank<span className="md:hidden"> and round</span></th><th scope="col" className={`${tbl.th} max-md:hidden`}>Round</th><th scope="col" className={`${tbl.th} max-md:px-2`}>Course</th><th scope="col" className={`${tbl.th} max-md:px-2`}>Quota</th><th scope="col" className={`${tbl.th} max-md:px-2`}>Seat category</th><th scope="col" className={`${tbl.th} max-md:px-2`}>Remark</th>
                     </tr></thead>
                     <tbody>
                       {allot.rows.map((a, i) => (
                         <tr key={i} className={tbl.row}>
-                          <td className={tbl.num}><Link href={L.rankScan(a.rank, a.year)} className="hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link></td>
-                          <td className={`${tbl.td} whitespace-nowrap`}><span className="numeric">{a.year}</span> {roundLabel[a.round]} <Provisional when={a.provisional} /></td>
-                          <td className={tbl.td}><Link href={L.lastRanks(a.courseSlug, { inst: slug })} className="hover:text-sky hover:underline">{a.courseName}</Link></td>
-                          <td className={tbl.td}>{a.quota}</td>
-                          <td className={tbl.td}>{a.category}</td>
-                          <td className={`${tbl.td} text-muted-foreground`}>{a.remark}</td>
+                          <td className={`${tbl.num} ${stick} max-md:px-2`}>
+                            <Link href={L.rankScan(a.rank, a.year)} className="hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link>
+                            <span className="block text-xs font-normal whitespace-nowrap md:hidden"><span className="numeric">{a.year}</span> {roundLabel[a.round]} <Provisional when={a.provisional} /></span>
+                          </td>
+                          <td className={`${tbl.td} whitespace-nowrap max-md:hidden`}><span className="numeric">{a.year}</span> {roundLabel[a.round]} <Provisional when={a.provisional} /></td>
+                          <td className={`${tbl.td} max-md:px-2`}><Link href={L.lastRanks(a.courseSlug, { inst: slug })} className="hover:text-sky hover:underline">{a.courseName}</Link></td>
+                          <td className={`${tbl.td} max-md:px-2`}>{a.quota}</td>
+                          <td className={`${tbl.td} max-md:px-2`}>{a.category}</td>
+                          <td className={`${tbl.td} text-muted-foreground max-md:px-2`}>{a.remark}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollTable>
               }
             />
           )}

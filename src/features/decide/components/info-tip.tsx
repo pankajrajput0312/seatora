@@ -6,9 +6,13 @@ import { cn } from "@/lib/cn";
 const GAP = 6;
 const EDGE = 8;
 
-/** Under the button (above it when there is no room below), centred on it and kept inside the window. */
+/**
+ * Under the button (above it when there is no room below), centred on it and kept inside the window. A table's header
+ * pinned by ScrollTable is a copy with its own (i) for this panel: while the copy is pinned, the panel goes under that one.
+ */
 function placeTip(btn: HTMLElement, p: HTMLElement) {
-  const b = btn.getBoundingClientRect();
+  const pinned = document.querySelector<HTMLElement>(`[data-stuck] [popovertarget="${btn.getAttribute("popovertarget")}"]`);
+  const b = (pinned ?? btn).getBoundingClientRect();
   const vw = document.documentElement.clientWidth;
   const vh = window.innerHeight;
   // Before it shows (beforetoggle) it has no box yet: its CSS width, and room below assumed.

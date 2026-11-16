@@ -22,6 +22,7 @@ import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankJourney } from "@/features/decide/service";
 import { roundLabel } from "@/features/decide/types";
+import { ScrollTable } from "@/features/decide/components/scroll-table";
 
 export const metadata: Metadata = { title: "Rank journey" };
 const VIEW = "rank-journey";
@@ -136,7 +137,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
             table={
               // Status, quota, seat and candidate category and the choice no. ride in small lines (Round, Institute,
               // Previous seat), so the five term cells stay in view from about 1,024px.
-              <div role="region" aria-label={`Rank ${formatRank(rank)}, ${year.year}`} tabIndex={0} className={tbl.wrap}>
+              <ScrollTable label={`Rank ${formatRank(rank)}, ${year.year}`}>
                 <table className={tbl.table}>
                   <caption className="sr-only">Rank {formatRank(rank)}: its seat in each {year.year} round</caption>
                   <thead><tr className={tbl.headRow}>
@@ -176,7 +177,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </ScrollTable>
             }
           />
         </>

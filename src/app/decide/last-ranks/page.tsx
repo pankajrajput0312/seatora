@@ -24,6 +24,7 @@ import { anyTermFilter, readTermFilters, splitByTerms, termChips, termValueLabel
 import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
 import { baseCategories, roundLabel, rounds, type Round } from "@/features/decide/types";
+import { ScrollTable } from "@/features/decide/components/scroll-table";
 
 export const metadata: Metadata = { title: "Last ranks" };
 // ponytail: 25 a page: each card carries its five term cells and their (i)s (both views are in the page).
@@ -53,7 +54,7 @@ function Cell({ c, stack }: { c: OptionRow["grid"][number][Round]; stack?: boole
 /** A card's year × round grid, newest year first, rounds R1 → special stray. */
 function YearGrid({ r, cols, rds, caption }: { r: OptionRow; cols: Col[]; rds: Round[]; caption: string }) {
   return (
-    <div className="overflow-x-auto px-2 pb-1">
+    <div className="overflow-x-auto overflow-y-hidden px-2 pb-1">
       <table className="w-full text-xs">
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -174,14 +175,14 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   );
 
   const table = (
-    <div role="region" aria-label={caption} tabIndex={0} className={`relative rounded-xl border border-border bg-card [scroll-padding-inline-start:16rem] ${tbl.scroll}`}>
+    <ScrollTable label={caption} scrollClassName="[scroll-padding-inline-start:16rem] max-md:[scroll-padding-inline-start:8.5rem]">
       <table className="w-full min-w-[56rem] text-sm">
         <caption className="sr-only">{caption}, page {page}, newest year first</caption>
         <colgroup />
         {cols.map((c) => <colgroup key={c.year} span={c.rounds.length} />)}
         <thead className={tbl.head}>
           <tr className="text-xs text-muted-foreground">
-            <th rowSpan={2} scope="col" className="sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-semibold">Institute</th>
+            <th rowSpan={2} scope="col" className={`sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-semibold ${tbl.pin}`}>Institute</th>
             {cols.map((c) => (
               <th key={c.year} scope="colgroup" colSpan={c.rounds.length} className="border-l border-border px-2 py-2 text-center text-xs font-semibold">
                 <span className="numeric">{c.year}</span> <Provisional when={c.provisional} />
@@ -211,8 +212,8 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
             const here = inst?.slug === r.college.slug;
             return (
               <tr key={r.id} className={`border-b border-border last:border-0 hover:bg-muted/50 ${here ? "bg-sky/10" : ""}`}>
-                <th scope="row" className={`sticky left-0 z-[1] max-w-64 px-3 py-2 text-left font-normal ${here ? "bg-mist" : "bg-card"}`}>
-                  <Link href={L.institute(r.college.slug)} className="font-medium hover:text-sky hover:underline">{r.college.name}</Link>
+                <th scope="row" className={`sticky left-0 z-[1] max-w-64 px-3 py-2 text-left font-normal ${here ? "bg-mist" : "bg-card"} ${tbl.pin}`}>
+                  <Link href={L.institute(r.college.slug)} title={r.college.name} className={`font-medium hover:text-sky hover:underline ${tbl.clamp}`}>{r.college.name}</Link>
                   <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                     <span>{r.college.state ?? <Dash />}, {r.quota}</span>
                     {r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />}
@@ -232,7 +233,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
           })}
         </tbody>
       </table>
-    </div>
+    </ScrollTable>
   );
 
   return (

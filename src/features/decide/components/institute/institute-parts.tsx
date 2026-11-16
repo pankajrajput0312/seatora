@@ -7,6 +7,7 @@ import { Dash, Provisional } from "../bits";
 import { InfoTip } from "../info-tip";
 import { RegisterSources } from "../page-sources";
 import { fmtDay } from "../seats/seat-lists";
+import { ScrollTable } from "../scroll-table";
 import { smallLink, tbl } from "../ui";
 import { reportedCount, SELF_REPORTED, sourceName, ValueSource } from "./hospital-bits";
 import type { AllotmentMix, ClinicalAt, ValueMeta } from "./institute-data";
@@ -63,16 +64,20 @@ export function CollegeSeatTable({ rows, caption }: { rows: SeatRow[]; caption: 
   );
 }
 
-/** Allotments per quota (row groups) × seat category: the newest result round, then each year. */
+/**
+ * Allotments per quota (row groups) × seat category: the newest result round, then each year. A grid to read across, so
+ * on a phone it scrolls sideways with the category column pinned (ScrollTable), never folds into cards.
+ */
 export function AllotmentMixTable({ mix, name }: { mix: AllotmentMix; name: string }) {
   const cell = "px-3 py-2 max-sm:px-2 md:px-4";
+  const pin = "sticky left-0 z-[1] bg-card";
   return (
-    <div role="region" aria-label="Allotments by quota and seat category" tabIndex={0} className={cn(tbl.wrap, "max-w-3xl")}>
+    <ScrollTable label="Allotments by quota and seat category" className="max-w-3xl rounded-xl border border-border bg-card">
       <table className={tbl.table}>
         <caption className="sr-only">Allotments at {name} by quota and seat category: {mix.columns[0].label}, then each year</caption>
         <thead>
           <tr className={tbl.headRow}>
-            <th scope="col" className={cn(tbl.th, cell)}>Quota and seat category</th>
+            <th scope="col" className={cn(tbl.th, cell, pin)}>Quota and seat category</th>
             {mix.columns.map((c) => (
               <th key={c.label} scope="col" className={cn(tbl.th, cell, "text-right")}>
                 <span className="numeric">{c.label}</span>
@@ -85,18 +90,19 @@ export function AllotmentMixTable({ mix, name }: { mix: AllotmentMix; name: stri
         {mix.groups.map((g) => (
           <tbody key={g.quota}>
             <tr className="border-b border-border bg-muted/40">
-              <th scope="rowgroup" colSpan={mix.columns.length + 1} className={cn(cell, "text-left text-xs font-semibold text-muted-foreground")}>{g.quota}</th>
+              {/* The row-wide cell can't pin, its words can: they stay at the left edge as the grid scrolls. */}
+              <th scope="rowgroup" colSpan={mix.columns.length + 1} className={cn(cell, "text-left text-xs font-semibold text-muted-foreground")}><span className="sticky left-2 inline-block">{g.quota}</span></th>
             </tr>
             {g.rows.map((r) => (
               <tr key={r.category} className={tbl.row}>
-                <th scope="row" className={cn(cell, "text-left font-normal")}>{r.category} seat</th>
+                <th scope="row" className={cn(cell, pin, "text-left font-normal")}>{r.category} seat</th>
                 {r.values.map((v, i) => <td key={mix.columns[i].label} className={cn(cell, "numeric text-right font-semibold")}>{v != null ? formatRank(v) : <Dash />}</td>)}
               </tr>
             ))}
           </tbody>
         ))}
       </table>
-    </div>
+    </ScrollTable>
   );
 }
 

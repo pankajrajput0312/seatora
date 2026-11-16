@@ -23,6 +23,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { getMeta, rankScan } from "@/features/decide/service";
 import { statKeys } from "@/features/decide/lib/stat-format";
 import { roundLabel, rounds } from "@/features/decide/types";
+import { ScrollTable } from "@/features/decide/components/scroll-table";
 
 export const metadata: Metadata = { title: "Rank scan" };
 const VIEW = "rank-scan";
@@ -163,14 +164,15 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                     </div>
                   }
                   table={
-                    // Wide: the box scrolls inside the window, the header row and the Rank column stay in view (tbl.scroll).
-                    <div role="region" aria-label={label} tabIndex={0} className={`${tbl.wrap} ${tbl.scroll}`}>
+                    // Wide: the page scrolls, the header row stays pinned under the top bar and the Rank column in view (ScrollTable).
+                    // Phones: the seat category and a short institute name ride in the pinned Rank cell.
+                    <ScrollTable label={label} scrollClassName="max-md:scroll-pl-[8.5rem]">
                       <table className={tbl.table}>
                         <caption className="sr-only">{year.year} {roundLabel[g.round]}: allotments to ranks near {formatRank(rank)}</caption>
                         <thead className={tbl.head}>
                           <tr className={tbl.headRow}>
-                            <th scope="col" className={`${tbl.th} sticky left-0 z-[3] bg-card text-right`}>Rank</th>
-                            <th scope="col" className={tbl.th}>Seat category</th>
+                            <th scope="col" className={`${tbl.th} sticky left-0 z-[3] bg-card text-right max-md:text-left ${tbl.pin}`}>Rank<span className="md:hidden">, seat, institute</span></th>
+                            <th scope="col" className={`${tbl.th} max-md:hidden`}>Seat category</th>
                             <th scope="col" className={tbl.th}>Institute and course</th>
                             {statKeys.map((k) => <th key={k} scope="col" className={`${termCol.th(k)} whitespace-nowrap`}><StatHead k={k} /></th>)}
                           </tr>
@@ -179,10 +181,14 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                           {g.rows.flatMap((a, i) => [
                             ...(you.has(a) ? [<tr key="you" className="bg-sky/10"><td colSpan={3 + statKeys.length} className="px-4 py-1.5 text-xs font-semibold text-sky">{youText}</td></tr>] : []),
                             <tr key={i} className={tbl.row}>
-                              <td className={`${tbl.num} sticky left-0 z-[1] bg-card`}>{formatRank(a.rank)}</td>
-                              <td className={tbl.td}>{a.category}</td>
+                              <td className={`${tbl.num} sticky left-0 z-[1] bg-card max-md:text-left ${tbl.pin}`}>
+                                {formatRank(a.rank)}
+                                <span className="block text-xs font-normal md:hidden">{a.category} seat</span>
+                                <span title={a.collegeName} className={`block text-xs font-normal text-muted-foreground md:hidden ${tbl.clamp}`}>{a.collegeName}</span>
+                              </td>
+                              <td className={`${tbl.td} max-md:hidden`}>{a.category}</td>
                               <td className={`${tbl.td} min-w-52`}>
-                                <Link href={L.institute(a.collegeSlug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{a.collegeName}</Link>
+                                <Link href={L.institute(a.collegeSlug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline max-md:hidden">{a.collegeName}</Link>
                                 <span className="block"><Link href={courseLink(a)} className={subLink}>{courseName(a)}</Link></span>
                                 <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                                   {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.collegeName} />}
@@ -194,7 +200,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                           ])}
                         </tbody>
                       </table>
-                    </div>
+                    </ScrollTable>
                   }
                 />
               </section>

@@ -14,22 +14,22 @@ import { ViewField } from "./view-toggle";
 // Shared building blocks so every Decide screen reads the same way (docs/APP_DESIGN_SYSTEM.md, "Inside-app primitives").
 
 export const tbl = {
-  // scroll-px: Tab scrolls a half-hidden link fully into the box, focus ring included.
-  wrap: "relative scroll-px-12 overflow-x-auto rounded-xl border border-border bg-card",
+  // A table that fits (or nearly): it may scroll sideways, never up and down (the page is the one vertical scroller).
+  // scroll-px: Tab scrolls a half-hidden link fully into the box, focus ring included. Wide tables use ScrollTable
+  // (scroll-table.tsx): its header row stays pinned under the top bar while the page scrolls past it.
+  wrap: "relative scroll-px-12 overflow-x-auto overflow-y-hidden rounded-xl border border-border bg-card",
   table: "w-full text-sm",
   headRow: "border-b border-border text-left",
   th: "px-3 py-2 text-xs font-semibold text-muted-foreground",
   row: "border-b border-border last:border-0 hover:bg-muted/50",
   td: "px-3 py-2 align-top",
   num: "px-3 py-2 text-right align-top text-[0.875rem] font-semibold tabular-nums md:text-[15px]",
-  /**
-   * Wide tables: the box scrolls both ways inside the window's height, so the header row (`head`, on the thead) and a
-   * sticky first column stay in view; scroll-pt keeps a focused cell clear of the header. On paper the box lets every
-   * row through (a window-high box would cut the rest off).
-   */
-  // Screen only: a media variant like this one comes after print:, so print:max-h-none would lose to it on paper.
-  scroll: "overflow-auto overscroll-x-contain scroll-pt-40 [@media_screen_and_(min-height:40rem)]:max-h-[calc(100dvh-9rem)] print:overflow-visible",
-  head: "sticky top-0 z-[2] bg-card shadow-[0_1px_0_var(--color-border)] print:static",
+  /** A ScrollTable's thead: the sheet behind it and its ruled line (a shadow: no row borders in a pinned header). */
+  head: "bg-card shadow-[0_1px_0_var(--color-border)]",
+  /** Phones: a pinned row-header column is narrow (about a third of the screen), so the rest of the row shows beside it. */
+  pin: "max-md:w-[8.5rem] max-md:min-w-[8.5rem] max-md:max-w-[8.5rem]",
+  /** Phones: a name in a pinned column on two lines at most (the full name in its title and for screen readers). */
+  clamp: "max-md:line-clamp-2",
 };
 
 /**

@@ -27,6 +27,7 @@ import { TypeBadge } from "./type-badge";
 import { Skeleton } from "./skeleton";
 import { control, EmptyState, smallLink, tbl } from "./ui";
 import { ViewToggle, type View } from "./view-toggle";
+import { ScrollTable } from "./scroll-table";
 
 /** `reach` null: no rank in the address (terms and hospital only; the stored label stays). */
 type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; fees: ProgrammeTerms; hospital: RowHospital }>;
@@ -326,7 +327,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
   // Every row control sits in the sticky Choice cell, so a move never scrolls the table sideways; the round's seat
   // lists share one column.
   const table = (
-    <div id="choices-list" role="region" aria-label={listName} tabIndex={0} className={cn(tbl.wrap, tbl.scroll)}>
+    <ScrollTable id="choices-list" label={listName}>
       <table className={tbl.table}>
         <caption className="sr-only">{listName}</caption>
         <thead className={tbl.head}>
@@ -386,7 +387,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
           })}
         </tbody>
       </table>
-    </div>
+    </ScrollTable>
   );
 
   return (

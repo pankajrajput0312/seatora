@@ -21,6 +21,7 @@ import { TermStatCells } from "./stat-cells";
 import { TypeBadge } from "./type-badge";
 import { smallLink, tbl } from "./ui";
 import { ViewPanes, ViewToggle, type View } from "./view-toggle";
+import { ScrollTable } from "./scroll-table";
 
 export function ChoiceStar({ item }: { item: ChoiceItem }) {
   const [state, setState] = useChoices();
@@ -83,9 +84,13 @@ function Related({ r, L }: { r: ListRow; L: DecideLinks }) {
 }
 
 const summary = "inline-flex min-h-11 cursor-pointer items-center text-sky";
-// The star and the row header stay in view while the table scrolls sideways (the star column is w-12, 3rem).
-const stick = "sticky left-0 z-[1] bg-card";
-const stickName = "sticky left-12 z-[1] min-w-52 max-w-72 border-r border-border bg-card";
+// The star and the row header stay in view while the table scrolls sideways (the star column is w-12, 3rem). Phones:
+// only a narrow row header is pinned (tbl.pin: the short name, the course), the star scrolls away under it.
+const stick = "sticky left-0 z-[1] bg-card max-md:static";
+const stickName = cn("sticky left-12 z-[1] min-w-52 max-w-72 border-r border-border bg-card max-md:left-0", tbl.pin);
+// Phones: the two closing ranks come right after the row header (from md, after the terms and seats, where they were).
+const phoneOnly = "px-3 py-3 text-right md:hidden";
+const notPhone = "px-3 py-3 text-right max-md:hidden";
 
 
 /** The table row header's type badge and beds (the cards put them in their meta line); nothing when the import has neither. */
@@ -197,7 +202,7 @@ function OptionsList({ rows, caption, start, L, view, latestYear, pastYears, inc
     });
   const years = { latestYear, pastYears, includeLatest, seatLists };
   const table = (
-    <div role="region" aria-label={caption} tabIndex={0} className={cn("relative rounded-xl border border-border bg-card", tbl.scroll, "scroll-pl-72")}>
+    <ScrollTable label={caption} scrollClassName="scroll-pl-72 max-md:scroll-pl-[8.5rem]">
       <table className="w-full text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className={tbl.head}>
@@ -205,11 +210,13 @@ function OptionsList({ rows, caption, start, L, view, latestYear, pastYears, inc
           <tr className="text-left text-xs font-semibold text-muted-foreground">
             <th scope="col" className={cn(stick, "w-12 px-2 py-3 print:hidden")}><span className="sr-only">Add to choices</span></th>
             <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course</th>
+            <th scope="col" className={phoneOnly}>{latestYear} R1 closing</th>
+            <th scope="col" className={phoneOnly}>{last} deepest</th>
             <th scope="col" className="px-3 py-3">Reach</th>
             {statKeys.map((k) => <th key={k} scope="col" data-col={k} className="px-2 py-3 text-right">{statLabel[k]}</th>)}
             {seatLists.map((l) => <th key={l.key} scope="col" className="px-1.5 py-3 text-right"><SeatsHead list={l} short /></th>)}
-            <th scope="col" className="px-3 py-3 text-right">{latestYear} R1 closing</th>
-            <th scope="col" className="px-3 py-3 text-right">{last} deepest</th>
+            <th scope="col" className={notPhone}>{latestYear} R1 closing</th>
+            <th scope="col" className={notPhone}>{last} deepest</th>
             <th scope="col" className="hidden px-3 py-3 text-right xl:table-cell">{older} deepest</th>
             {/* Controls, not data: not on paper. */}
             <th scope="col" className="px-3 py-3 print:hidden">Details</th>
@@ -222,15 +229,17 @@ function OptionsList({ rows, caption, start, L, view, latestYear, pastYears, inc
               <td className={cn(stick, "px-2 py-2 print:hidden")}><ChoiceStar item={toChoiceItem(r)} /></td>
               {/* Row header: only what names the option, so it reads short for every cell. */}
               <th scope="row" className={cn(stickName, "px-3 py-3 text-left font-normal")}>
-                <Link href={L.institute(r.college.slug)} className="font-semibold hover:text-sky hover:underline">{r.college.name}</Link>
-                <span className="block">{courseName(r)}<span className="text-muted-foreground">, {r.quota}, {r.college.state ?? "state not listed"}</span></span>
-                <HospitalLine h={r.hospital} of={r.college.name} />
+                <Link href={L.institute(r.college.slug)} title={r.college.name} className={cn("font-semibold hover:text-sky hover:underline", tbl.clamp)}>{r.college.name}</Link>
+                <span className={cn("block max-md:text-xs", tbl.clamp)}>{courseName(r)}<span className="text-muted-foreground">, {r.quota}<span className="max-md:hidden">, {r.college.state ?? "state not listed"}</span></span></span>
+                <span className="block max-md:hidden"><HospitalLine h={r.hospital} of={r.college.name} /></span>
               </th>
+              <td className={phoneOnly}><ClosingCell d={r.latest} /></td>
+              <td className={phoneOnly}><ClosingCell d={r.byYear[last]} /></td>
               <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /><SeatsBelowNote r={r} includeLatest={includeLatest} /></td>
               <TermStatCells t={r.fees} variant="table" of={rowLabel(r)} tdClassName="px-2!" />
               {seatLists.map((l) => <td key={l.key} className="px-1.5 py-1 text-right"><SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} /></td>)}
-              <td className="px-3 py-3 text-right"><ClosingCell d={r.latest} /></td>
-              <td className="px-3 py-3 text-right"><ClosingCell d={r.byYear[last]} /></td>
+              <td className={notPhone}><ClosingCell d={r.latest} /></td>
+              <td className={notPhone}><ClosingCell d={r.byYear[last]} /></td>
               <td className="hidden px-3 py-3 text-right xl:table-cell"><ClosingCell d={r.byYear[older]} /></td>
               <td className="px-3 py-1 text-xs print:hidden">
                 <span className="flex min-w-[10rem] flex-wrap items-center gap-x-4">
@@ -246,13 +255,13 @@ function OptionsList({ rows, caption, start, L, view, latestYear, pastYears, inc
             open.has(r.id) && (
               <tr key={`${r.id}-rounds`} className="bg-muted/30">
                 <td />
-                <td colSpan={7 + statKeys.length + seatLists.length} className="px-3 pb-4"><RoundGrid row={r} caption={gridCaption(r)} /></td>
+                <td colSpan={9 + statKeys.length + seatLists.length} className="px-3 pb-4"><RoundGrid row={r} caption={gridCaption(r)} /></td>
               </tr>
             ),
           ])}
         </tbody>
       </table>
-    </div>
+    </ScrollTable>
   );
   const cards = (
     <ResultCards title={caption} hideTitle>

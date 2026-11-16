@@ -21,6 +21,7 @@ import { statCells, statKeys, statLabel } from "@/features/decide/lib/stat-forma
 import { Paywall } from "@/features/plans/components/paywall";
 import { currentPlan } from "@/features/plans/usage";
 import { currentOptionIds, getMeta, getOptionsByIds, LATEST_YEAR, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
+import { ScrollTable } from "@/features/decide/components/scroll-table";
 
 export const metadata: Metadata = { title: "Compare" };
 
@@ -101,18 +102,19 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       ) : (
         <>
         {me && known.length > cap && <Paywall feature="compare" eff={me.eff} className="mt-6" />}
-        {/* Phones: a narrower label column and 10rem columns, so the next option peeks in at the edge, and this line. */}
-        {options.length > 1 && <p className="mt-6 text-sm text-muted-foreground md:hidden">Swipe the table sideways for all {options.length} options; the labels stay put.</p>}
-        <div role="region" aria-label="Comparison" tabIndex={0} className={`relative mt-3 md:mt-8 rounded-xl border border-border bg-card [scroll-padding-inline-start:11rem] ${tbl.scroll}`}>
+        {/* Phones: two options fit the width beside the labels; three or four get 10rem columns, so the next one peeks in
+            at the edge (ScrollTable's edge shadow and first-time "Swipe for more" say there are more). */}
+        <ScrollTable label="Comparison" className="mt-3 rounded-xl border border-border bg-card md:mt-8" scrollClassName="[scroll-padding-inline-start:11rem]">
           {/* Fixed columns, 12rem at least: four options fit beside the labels from 1280px (a wide grid scrolls in its cell). */}
-          <table className="w-full min-w-[calc(7rem+var(--n)*10rem)] table-fixed text-sm md:min-w-[calc(11rem+var(--n)*12rem)]" style={{ "--n": options.length } as React.CSSProperties}>
+          <table className={`w-full table-fixed text-sm md:min-w-[calc(11rem+var(--n)*12rem)] ${options.length > 2 ? "min-w-[calc(7rem+var(--n)*10rem)]" : ""}`} style={{ "--n": options.length } as React.CSSProperties}>
             <caption className="sr-only">Comparison of {options.length} {options.length === 1 ? "option" : "options"}</caption>
             <thead className={tbl.head}>
               <tr className="align-top">
-                <td className="sticky left-0 z-10 w-28 bg-card p-3 md:w-44" />
+                <td className="sticky left-0 z-10 w-28 bg-card p-3 max-md:p-2 md:w-44" />
                 {options.map((r, i) => (
-                  <th key={r.id} id={`col-${r.id}`} tabIndex={-1} scope="col" className="p-3 text-left font-medium">
-                    <div className="flex items-start justify-between gap-2">
+                  <th key={r.id} id={`col-${r.id}`} tabIndex={-1} scope="col" className="p-3 text-left font-medium max-md:p-2">
+                    {/* Phones: the remove button wraps under a long name rather than squeezing it. */}
+                    <div className="flex items-start justify-between gap-x-2 max-md:flex-wrap">
                       <span>
                         <Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link>
                         {/* The quota is the first row; screen readers hear it with each cell's column name. */}
@@ -127,13 +129,13 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             <tbody>
               {rows.map((s) => (
                 <tr key={s.label} className="border-b border-border align-top last:border-0">
-                  <th scope="row" className="sticky left-0 z-[1] bg-card p-3 text-left text-xs font-normal text-muted-foreground">{s.label}</th>
-                  {options.map((r) => <td key={r.id} className="numeric p-3">{s.cell(r)}</td>)}
+                  <th scope="row" className="sticky left-0 z-[1] bg-card p-3 text-left text-xs font-normal text-muted-foreground max-md:p-2">{s.label}</th>
+                  {options.map((r) => <td key={r.id} className="numeric p-3 max-md:p-2">{s.cell(r)}</td>)}
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollTable>
         </>
       )}
       <div className="mt-6 grid gap-2 text-xs text-muted-foreground">

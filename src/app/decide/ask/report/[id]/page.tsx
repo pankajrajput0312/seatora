@@ -52,7 +52,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       <section aria-labelledby="list-h" className="grid gap-2">
         <h2 id="list-h" className="text-lg font-semibold">Choice list, in order</h2>
         {c.choices.length ? (
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div className="overflow-x-auto overflow-y-hidden rounded-lg border border-border">
             <table className="w-full text-sm">
               <thead className="bg-muted">
                 <tr><th scope="col" className={th}>No.</th><th scope="col" className={th}>College</th><th scope="col" className={th}>Course</th><th scope="col" className={th}>Quota</th><th scope="col" className={th}>Latest closing</th><th scope="col" className={th}>Reach (history)</th><th scope="col" className={th}>Why</th></tr>
@@ -81,7 +81,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       {top.length > 0 && (
         <section aria-labelledby="money-h" className="grid gap-2 break-inside-avoid">
           <h2 id="money-h" className="text-lg font-semibold">Fee, stipend and bond: top {top.length}</h2>
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div className="overflow-x-auto overflow-y-hidden rounded-lg border border-border">
             <table className="w-full text-sm">
               <thead className="bg-muted">
                 <tr><th scope="col" className={th}>No.</th><th scope="col" className={th}>College · course</th><th scope="col" className={th}>Fee</th><th scope="col" className={th}>Stipend</th><th scope="col" className={th}>Bond period</th><th scope="col" className={th}>Bond penalty</th><th scope="col" className={th}>Leaving penalty</th></tr>

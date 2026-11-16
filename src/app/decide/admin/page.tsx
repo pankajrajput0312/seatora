@@ -144,7 +144,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </p>
         {refs.groups.length ? (
           <div className={tbl.wrap}>
-            <table className={tbl.table}>
+            <table className={`${tbl.table} stack-md`}>
               <caption className="sr-only">Pending payouts by referrer</caption>
               <thead>
                 <tr className={tbl.headRow}>
@@ -155,10 +155,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 {refs.groups.map((g) => (
                   <tr key={g.referrerId} className={tbl.row}>
                     <td className={tbl.td}>{g.email}</td>
-                    <td className={tbl.td}>{g.upi ?? "—"}</td>
-                    <td className={tbl.num}>{formatPaise(g.amount)}</td>
-                    <td className={tbl.num}>{g.earnings.length}</td>
-                    <td className={`${tbl.td} text-xs`}>
+                    <td data-label="UPI" className={tbl.td}>{g.upi ?? "—"}</td>
+                    <td data-label="Pending" className={tbl.num}>{formatPaise(g.amount)}</td>
+                    <td data-label="Payments" className={tbl.num}>{g.earnings.length}</td>
+                    <td data-label="Buyers" className={`${tbl.td} span-all text-xs`}>
                       {g.earnings.map((e) => <span key={e.id} className="block">{e.buyer} <span className="numeric text-muted-foreground">{formatPaise(e.amount)}, {day(e.createdAt)}</span></span>)}
                     </td>
                     <td className={tbl.td}>
@@ -193,7 +193,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </form>
         {coupons.length ? (
           <div className={tbl.wrap}>
-            <table className={tbl.table}>
+            <table className={`${tbl.table} stack-md`}>
               <caption className="sr-only">Coupons, newest first</caption>
               <thead>
                 <tr className={tbl.headRow}>
@@ -204,11 +204,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 {coupons.map((c) => (
                   <tr key={c.id} className={tbl.row}>
                     <td className={`${tbl.td} font-semibold`}>{c.code}</td>
-                    <td className={tbl.num}>{c.percentOff}%</td>
-                    <td className={tbl.num}>{n(c.uses)} / {c.maxUses == null ? "∞" : n(c.maxUses)}</td>
-                    <td className={tbl.td}>{c.active ? "Yes" : "No"}</td>
-                    <td className={`${tbl.td} text-xs`}>{c.note ?? "—"}</td>
-                    <td className={`${tbl.td} text-xs`}>
+                    <td data-label="% off" className={tbl.num}>{c.percentOff}%</td>
+                    <td data-label="Uses / max" className={tbl.num}>{n(c.uses)} / {c.maxUses == null ? "∞" : n(c.maxUses)}</td>
+                    <td data-label="Active" className={tbl.td}>{c.active ? "Yes" : "No"}</td>
+                    <td data-label="Note" className={`${tbl.td} text-xs`}>{c.note ?? "—"}</td>
+                    <td data-label="Redeemed by" className={`${tbl.td} span-all text-xs`}>
                       {c.redemptions.length ? c.redemptions.map((r) => <span key={r.id} className="block">{r.user.email} <span className="numeric text-muted-foreground">{day(r.createdAt)}</span></span>) : "—"}
                     </td>
                     <td className={tbl.td}>
@@ -244,7 +244,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           {f.q && <Link href={PATH} className={smallLink}>Clear</Link>}
         </form>
         <div className={tbl.wrap}>
-          <table className={tbl.table}>
+          <table className={`${tbl.table} stack-md`}>
             <caption className="sr-only">Accounts, newest first</caption>
             <thead>
               <tr className={tbl.headRow}>
@@ -258,10 +258,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     <span className="block font-medium">{u.email}</span>
                     <span className="block text-xs text-muted-foreground">{u.name}</span>
                   </td>
-                  <td className={tbl.td}>{planLabel(u)}</td>
-                  <td className={`${tbl.td} numeric`}>{day(u.createdAt)}</td>
-                  <td className={`${tbl.td} numeric`}>{day(u.lastActive)}</td>
-                  <td className={`${tbl.td} numeric text-xs`}>{COUNTED.map((c) => `${c} ${u.today[c] ?? 0}`).join(", ")}</td>
+                  <td data-label="Plan" className={tbl.td}>{planLabel(u)}</td>
+                  <td data-label="Created" className={`${tbl.td} numeric`}>{day(u.createdAt)}</td>
+                  <td data-label="Last active" className={`${tbl.td} numeric`}>{day(u.lastActive)}</td>
+                  <td data-label="Today" className={`${tbl.td} numeric text-xs`}>{COUNTED.map((c) => `${c} ${u.today[c] ?? 0}`).join(", ")}</td>
                   <td className={tbl.td}>
                     <form action={setUserAccess} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="userId" value={u.id} />
@@ -288,7 +288,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <p className="text-sm text-muted-foreground">Accounts made on the same device, or on the same network within 24 hours. Hostels share networks: look before acting. Nothing happens automatically.</p>
         {dupes.length ? (
           <div className={tbl.wrap}>
-            <table className={tbl.table}>
+            <table className={`${tbl.table} stack-md`}>
               <caption className="sr-only">Groups of accounts that may be one person, newest first</caption>
               <thead>
                 <tr className={tbl.headRow}>
@@ -299,11 +299,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 {dupes.flatMap((g, gi) =>
                   g.users.map((u, i) => (
                     <tr key={`${gi}-${u.id}`} className={cn(tbl.row, i === 0 && gi > 0 && "border-t-2 border-t-border")}>
-                      <td className={tbl.td}>{i === 0 ? `${g.via} (${g.users.length})` : ""}</td>
+                      <td data-label="Same" className={tbl.td}>{i === 0 ? `${g.via} (${g.users.length})` : ""}</td>
                       <td className={tbl.td}>{u.email}</td>
-                      <td className={`${tbl.td} numeric`}>{day(u.createdAt)}</td>
-                      <td className={tbl.td}>{planLabel(u)}</td>
-                      <td className={tbl.td}>{u.paid ? "Paid" : "—"}</td>
+                      <td data-label="Created" className={`${tbl.td} numeric`}>{day(u.createdAt)}</td>
+                      <td data-label="Plan" className={tbl.td}>{planLabel(u)}</td>
+                      <td data-label="Paid" className={tbl.td}>{u.paid ? "Paid" : "—"}</td>
                       <td className={tbl.td}>
                         <Link href={`${PATH}?${new URLSearchParams({ q: u.email })}#users-h`} className={`${smallLink} -my-3`}>Notes and role</Link>
                       </td>
@@ -326,7 +326,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </p>
         {errors.length ? (
           <div className={tbl.wrap}>
-            <table className={tbl.table}>
+            <table className={`${tbl.table} stack-md`}>
               <caption className="sr-only">Open error groups, most frequent first</caption>
               <thead>
                 <tr className={tbl.headRow}>
@@ -336,13 +336,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <tbody>
                 {errors.map((e) => (
                   <tr key={e.fingerprint} className={tbl.row}>
-                    <td className={tbl.num}>{n(e.count)}</td>
-                    <td className={`${tbl.td} numeric whitespace-nowrap`}>{when(e.lastAt)}</td>
+                    <td data-label="Count" className={tbl.num}>{n(e.count)}</td>
+                    <td data-label="Last seen" className={`${tbl.td} numeric whitespace-nowrap`}>{when(e.lastAt)}</td>
                     <td className={`${tbl.td} text-xs`}>
                       <span className="block font-mono">{e.route}</span>
                       <span className="block text-muted-foreground">{e.kind === "server" ? "Server" : "Browser"}{e.lastDigest ? ` · digest ${e.lastDigest}` : ""}</span>
                     </td>
-                    <td className={`${tbl.td} max-w-xl text-xs break-words`}>{e.message}</td>
+                    <td data-label="Message" className={`${tbl.td} span-all max-w-xl text-xs break-words`}>{e.message}</td>
                     <td className={tbl.td}>
                       <form action={resolveError}>
                         <input type="hidden" name="fingerprint" value={e.fingerprint} />

@@ -7,7 +7,8 @@ const DISPLAY_KEY = "medpath.allotments.hidden";
 const DEFAULT_HIDDEN = ["cand", "option"];
 
 /**
- * Allotments' column chooser (the Seats matrix's): hides `#allotments [data-col]` cells by CSS, saved on the device.
+ * Allotments' column chooser (the Seats matrix's): hides the table's `[data-col]` cells (ScrollTable scope "allotments",
+ * its pinned header copy too) by CSS, saved on the device.
  * The page renders it with the table only.
  */
 export function AllotmentsDisplay({ cols }: { cols: { key: string; label: string }[] }) {
@@ -16,7 +17,7 @@ export function AllotmentsDisplay({ cols }: { cols: { key: string; label: string
     <div>
       <DisplayMenu cols={cols} hidden={hidden} setHidden={save} always="Rank, round and institute always show." />
       {/* Only known column keys reach the selector. */}
-      <style>{[...hidden].map((k) => `#allotments [data-col="${k}"]{display:none}`).join("")}</style>
+      <style>{[...hidden].map((k) => `[data-scroll-table="allotments"] [data-col="${k}"]{display:none}`).join("")}</style>
     </div>
   );
 }

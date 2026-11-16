@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { roundLabel, type Round } from "../types";
 import { InfoTip } from "./info-tip";
+import { ScrollTable } from "./scroll-table";
 
 // Charts follow the dataviz skill: emphasis form (one accent + gray context), thin marks, hairline solid grid,
 // hover tooltips, legend for 2+ series, and a table view for every chart. Text never wears the data colour.
@@ -51,7 +52,8 @@ export function ChartCard({ title, subtitle, legend, table, children, className,
       </div>
       {legend && !asTable && <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">{legend}</div>}
       <div className="mt-4">
-        {asTable ? <div role="region" aria-label={`${title} (table)`} tabIndex={0} className="relative max-h-96 overflow-auto">{table}</div> : children}
+        {/* The table view scrolls with the page (never a box of its own), its header row pinned under the top bar. */}
+        {asTable ? <ScrollTable label={`${title} (table)`} className="">{table}</ScrollTable> : children}
       </div>
       {source && <div className="mt-4">{source}</div>}
     </figure>
@@ -93,7 +95,7 @@ export function RankStrip({ rank, rows }: { rank: number; rows: { course: string
   };
   const summary = rows.map((r) => `${r.course}: ${r.points.length} options, ${r.points.filter((p) => p.closing >= rank).length} closed at or after your rank`).join("; ");
   return (
-    <div role="region" aria-label="Where your rank sits (chart)" tabIndex={0} className="relative overflow-x-auto" onPointerLeave={() => setTip(null)}>
+    <div role="region" aria-label="Where your rank sits (chart)" tabIndex={0} className="relative overflow-x-auto overflow-y-hidden" onPointerLeave={() => setTip(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[720px]" role="img" aria-label={`2025 deepest closing rank of each option, with your rank ${formatRank(rank)} marked. ${summary}.`} onPointerMove={onMove}>
         {ticks(max).map((t) => (
           <g key={t}>

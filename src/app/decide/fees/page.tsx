@@ -24,6 +24,7 @@ import { termChips, termFilterLists, termValueLabel } from "@/features/decide/li
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getDecideData, getMeta, listFees, type FeeSort } from "@/features/decide/service";
 import { programmeNames, programmes } from "@/features/decide/server/terms";
+import { ScrollTable } from "@/features/decide/components/scroll-table";
 
 export const metadata: Metadata = { title: "Fees & bond" };
 const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
@@ -95,11 +96,11 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   );
 
   const table = (
-    <div role="region" aria-label="Fees, stipend and bond table" tabIndex={0} className={`${tbl.wrap} ${tbl.scroll}`}>
+    <ScrollTable label="Fees, stipend and bond table">
       <table className={tbl.table}>
         <caption className="sr-only">Fees a year and stipend a month for years 1 to 3, service bond and leaving penalty by institute and programme, page {res.page}. The whole-course fee is in each Fee (i).</caption>
         <thead className={tbl.head}><tr className={tbl.headRow}>
-          {sortTh("name", "Institute", "sticky left-0 z-10 bg-card text-left")}
+          {sortTh("name", "Institute", `sticky left-0 z-10 bg-card text-left ${tbl.pin}`)}
           {statKeys.flatMap((k) =>
             k === "fee" || k === "stipend"
               ? [
@@ -120,10 +121,11 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             return (
               <tr key={`${r.college.key}-${t.programme}`} className={tbl.row}>
                 {/* z-[1]: above the cells' (i) buttons (positioned) as they scroll under it. */}
-                <th scope="row" className={`${tbl.td} sticky left-0 z-[1] min-w-48 max-w-72 bg-card text-left font-medium`}>
-                  <Link href={years(r)} className="hover:text-sky hover:underline">{r.college.name}</Link>
-                  <span className="mt-0.5 block font-normal">{programmeTitle(t)}</span>
-                  <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs font-normal text-muted-foreground">
+                {/* Phones: narrow (tbl.pin), the name on two lines, the programme, no state line. */}
+                <th scope="row" className={`${tbl.td} sticky left-0 z-[1] min-w-48 max-w-72 bg-card text-left font-medium ${tbl.pin}`}>
+                  <Link href={years(r)} title={r.college.name} className={`hover:text-sky hover:underline ${tbl.clamp}`}>{r.college.name}</Link>
+                  <span className="mt-0.5 block font-normal max-md:text-xs">{programmeTitle(t)}</span>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs font-normal text-muted-foreground max-md:hidden">
                     {r.college.state ?? <NotDeclared what="state not available" />}
                     {type && <TypeBadge type={type} of={r.college.name} />}
                   </span>
@@ -134,7 +136,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           })}
         </tbody>
       </table>
-    </div>
+    </ScrollTable>
   );
 
   return (

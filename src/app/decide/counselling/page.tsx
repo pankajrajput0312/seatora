@@ -208,8 +208,9 @@ async function MeritLists() {
         </div>
         <p className="text-sm text-muted-foreground">History only: compare ranks, not scores.</p>
       </div>
+      {/* A few wide rows: on a phone each is a card (stack-md, globals.css), so nothing scrolls sideways. */}
       <div role="region" aria-label="NEET PG result PDFs" tabIndex={0} className={tbl.wrap}>
-        <table className={tbl.table}>
+        <table className={`${tbl.table} stack-md`}>
           <caption className="sr-only">NEET PG result PDFs by year, with what each covers</caption>
           <thead>
             <tr className={tbl.headRow}>
@@ -224,10 +225,10 @@ async function MeritLists() {
             {lists.map((l) => (
               <tr key={l.key} className={tbl.row}>
                 <th scope="row" className={`${tbl.td} text-left font-medium whitespace-nowrap`}>NEET PG {l.year}</th>
-                <td className={tbl.num}>{formatRank(l.maxMarks)}</td>
-                <td className={tbl.num}>{formatRank(l.candidates)}</td>
-                <td className={`${tbl.td} min-w-56`}>{l.coverage}{!l.hasCategories && <span className="block text-xs text-muted-foreground">The PDF prints no category.</span>}</td>
-                <td className={`${tbl.td} min-w-56`}>
+                <td data-label="Maximum marks" className={tbl.num}>{formatRank(l.maxMarks)}</td>
+                <td data-label="Candidates ranked" className={tbl.num}>{formatRank(l.candidates)}</td>
+                <td data-label="Who is ranked" className={`${tbl.td} span-all min-w-56`}>{l.coverage}{!l.hasCategories && <span className="block text-xs text-muted-foreground">The PDF prints no category.</span>}</td>
+                <td data-label="Official documents" className={`${tbl.td} span-all min-w-56`}>
                   <span className="flex flex-wrap items-center gap-x-3">
                     <Badge tone={sourceTypeLabels[l.type].tone}>{sourceTypeLabels[l.type].text}</Badge>
                     {l.url ? (

@@ -18,6 +18,7 @@ import { MAX_COMPARE } from "../lib/choices";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
 import { AccountSync } from "./account-sync";
+import { BackToTop } from "./back-to-top";
 import { NAV_EVENT, navigating } from "./nav-pending";
 import { ProfileDialog, type ProfileMeta } from "./profile-dialog";
 import { RenamedSaved } from "./renamed-saved";
@@ -262,6 +263,7 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
         {toast ? "Saved your rank" : ""}
       </p>
 
+      <BackToTop />
       <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {[...bottom, compare.length ? { href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows } : { href: "/decide/seats", label: "Seats", icon: LayoutGrid }].map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-[11px]", href === "/decide/residents" ? cn("font-semibold text-[#6d28d9]", isCurrent(href) ? "border-[#6d28d9]" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>

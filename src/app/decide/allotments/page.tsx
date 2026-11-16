@@ -23,6 +23,7 @@ import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { roundLabel, rounds } from "@/features/decide/types";
+import { ScrollTable } from "@/features/decide/components/scroll-table";
 
 export const metadata: Metadata = { title: "Allotments" };
 const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
@@ -162,13 +163,15 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   );
 
   const table = (
-    <div id="allotments" role="region" aria-label="Allotments" tabIndex={0} className={`${tbl.wrap} ${tbl.scroll} scroll-pl-28`}>
+    <ScrollTable label="Allotments" scope="allotments" scrollClassName="scroll-pl-28 max-md:scroll-pl-[8.5rem]">
       <table className={tbl.table}>
         <caption className="sr-only">Allotments, page {page}</caption>
         <thead className={tbl.head}><tr className="text-left">
-          <th scope="col" className={`${th} ${stick} text-right`}>Rank</th>
-          <th scope="col" className={th}>Round</th>
-          <th scope="col" className={th}>{inst ? "Course" : "Institute"}</th>
+          {/* Phones: the round and the institute (course, at one institute) ride in the pinned Rank cell, so a row swiped
+              sideways still says whose seat it is; their own columns go. */}
+          <th scope="col" className={`${th} ${stick} text-right max-md:text-left ${tbl.pin}`}>Rank<span className="md:hidden">, round, {inst ? "course" : "institute"}</span></th>
+          <th scope="col" className={`${th} max-md:hidden`}>Round</th>
+          <th scope="col" className={`${th} ${inst ? "max-md:hidden" : ""}`}>{inst ? "Course" : "Institute"}</th>
           {/* The five numbers right after the institute, before what the card's header row has (quota, category). */}
           {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={`${th} text-right whitespace-nowrap`}><StatHead k={k} /></th>)}
           <th scope="col" data-col="quota" className={th}>Quota</th>
@@ -181,22 +184,25 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <tbody>
           {rows.map((a, i) => (
             <tr key={i} className={tbl.row}>
-              <td className={`${td} ${stick} text-right`}>
-                {rankLink(a, "numeric inline-flex min-h-6 min-w-6 items-center justify-end text-[15px] font-semibold hover:text-sky hover:underline")}
+              <td className={`${td} ${stick} text-right max-md:text-left ${tbl.pin}`}>
+                {rankLink(a, "numeric inline-flex min-h-6 min-w-6 items-center justify-end text-[15px] font-semibold hover:text-sky hover:underline max-md:justify-start")}
+                <span className="block text-xs md:hidden"><span className="numeric">{a.year}</span> {roundLabel[a.round]} <Provisional when={a.provisional} /></span>
+                <span title={inst ? a.courseName : a.college.name} className={`block text-xs text-muted-foreground md:hidden ${tbl.clamp}`}>{inst ? a.courseName : a.college.name}</span>
                 {/* Two stacked targets, each at least 24 × 24 px (WCAG 2.5.8). */}
               </td>
-              <td className={short}>
+              <td className={`${short} max-md:hidden`}>
                 <span className="font-medium"><span className="numeric">{a.year}</span> {roundLabel[a.round]}</span>
                 <span className="block"><Provisional when={a.provisional} /></span>
               </td>
               {/* Two lines at most: the institute, then its course, state, type and beds on one small line. Filtered to one
                   institute (said once above the table): the course alone. */}
-              <td className={`${td} ${inst ? "min-w-48" : "min-w-72"}`}>
+              <td className={`${td} ${inst ? "min-w-48 max-md:hidden" : "min-w-72 max-md:min-w-56"}`}>
                 {inst ? (
                   <span className="font-medium">{courseLink(a)}</span>
                 ) : (
                   <>
-                    <Link href={L.institute(a.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{a.college.name}</Link>
+                    {/* Phones: the name is in the pinned Rank cell. */}
+                    <Link href={L.institute(a.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline max-md:hidden">{a.college.name}</Link>
                     {/* Type and beds stay together: wrapped one above the other, the lower (i)'s 44px target covered the upper. */}
                     <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                       <span className="text-foreground">{courseLink(a)}</span>
@@ -222,7 +228,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollTable>
   );
 
   return (

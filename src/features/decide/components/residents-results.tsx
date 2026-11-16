@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { siteConfig } from "@/config/site";
-import { cn } from "@/lib/cn";
 import type { DecideLinks } from "../lib/links";
 import { parseSearchParams } from "../lib/params";
 import { profileHasCourse, type Profile } from "../profile";
@@ -15,6 +14,7 @@ import { ResultCards } from "./result-card";
 import { HideableCard, SyncedHideableRow } from "./residents-hideable-card";
 import { TypeBadge } from "./type-badge";
 import { tbl } from "./ui";
+import { ScrollTable } from "./scroll-table";
 
 // The Residents tab across colleges (/decide/residents): its URL params, table, cards, (i) and sources.
 // Never shows a reservation category (seat or candidate) or a rank: ResidentRow carries neither.
@@ -52,7 +52,7 @@ const td = "px-3 py-1.5 align-top";
 /** One page of residents as a table; the College cell opens that institute's Residents tab. */
 export function ResidentsTable({ rows, L, hide, caption, types }: { rows: ResidentRow[]; L: DecideLinks; hide: Hide; caption: string; types?: ResidentTypes }) {
   return (
-    <div role="region" aria-label="Residents table" tabIndex={0} className={cn(tbl.wrap, tbl.scroll)}>
+    <ScrollTable label="Residents table">
       <table className={tbl.table}>
         <caption className="sr-only">{caption}</caption>
         <thead className={tbl.head}><tr className="text-left">
@@ -81,7 +81,7 @@ export function ResidentsTable({ rows, L, hide, caption, types }: { rows: Reside
           })}
         </tbody>
       </table>
-    </div>
+    </ScrollTable>
   );
 }
 

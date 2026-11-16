@@ -126,7 +126,7 @@ export function Markdown({ text, codeAction }: { text: string; codeAction?: (b: 
           }
           case "table":
             return (
-              <div key={k} tabIndex={0} role="region" aria-label="Table, scrolls sideways" className="max-w-full overflow-x-auto rounded-lg border border-border bg-card">
+              <div key={k} tabIndex={0} role="region" aria-label="Table, scrolls sideways" className="max-w-full overflow-x-auto overflow-y-hidden rounded-lg border border-border bg-card">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-muted text-xs text-muted-foreground">
                     <tr>{b.head.map((c, j) => <th key={j} scope="col" className="px-3 py-2 font-semibold whitespace-nowrap">{inline(c, `${k}-h${j}`)}</th>)}</tr>

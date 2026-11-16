@@ -14,6 +14,7 @@ import { TypeBadge } from "../type-badge";
 import { smallLink, tbl } from "../ui";
 import { PAST_ROUNDS, type SeatLine, type SeatSort } from "./find-seats";
 import { seatCourse as courseOf } from "./seat-cards";
+import { ScrollTable } from "../scroll-table";
 
 // Seats page parts (src/app/decide/seats): one MCC seat list at a time, never added to another list.
 
@@ -134,7 +135,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
   const sticky = "sticky left-0 z-[1] w-40 min-w-40 border-r border-border bg-card md:w-72 md:min-w-72";
   const several = lists.length > 1;
   return (
-    <div role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, tbl.scroll, "scroll-pl-48 md:scroll-pl-80")}>
+    <ScrollTable label={caption} scrollClassName="scroll-pl-48 md:scroll-pl-80">
       <table className={tbl.table}>
         <caption className="sr-only">{caption}</caption>
         <thead className={tbl.head}>
@@ -188,6 +189,6 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
           })}
         </tbody>
       </table>
-    </div>
+    </ScrollTable>
   );
 }

@@ -95,7 +95,7 @@ export function RoundGrid({ row, caption }: { row: Pick<OptionRow, "grid" | "rea
       </p>
     );
   return (
-    <div role="region" aria-label={caption} tabIndex={0} className="relative overflow-x-auto">
+    <div role="region" aria-label={caption} tabIndex={0} className="relative overflow-x-auto overflow-y-hidden">
       <table className="text-xs">
         <caption className="sr-only">{caption}</caption>
         <thead>

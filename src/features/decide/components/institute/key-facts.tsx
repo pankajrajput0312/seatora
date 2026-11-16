@@ -78,7 +78,7 @@ export function KeyFacts({ rows, total, mine, cats, list, name, slug, L }: { row
       </div>
 
       {/* md up: one table. Bond columns on a wash, so the bond reads first. */}
-      <div role="region" aria-label="Key facts by course" tabIndex={0} className="overflow-x-auto rounded-xl border border-border bg-card max-md:hidden">
+      <div role="region" aria-label="Key facts by course" tabIndex={0} className="overflow-x-auto overflow-y-hidden rounded-xl border border-border bg-card max-md:hidden">
         <table className="w-full text-sm [&_td[data-col^=bond]]:bg-wash/60 [&_td[data-col^=bond]]:text-base">
           <caption className="sr-only">Key facts by course at {name}</caption>
           <thead>

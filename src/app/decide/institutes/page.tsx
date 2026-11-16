@@ -23,6 +23,7 @@ import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, LATEST_YEAR, listInstitutes, PAST_YEARS } from "@/features/decide/service";
+import { ScrollTable } from "@/features/decide/components/scroll-table";
 
 export const metadata: Metadata = { title: "Institutes" };
 const PAGE_SIZE = 24; // splits evenly into 2, 3 and 4 columns; small enough for a phone to paint fast
@@ -130,12 +131,12 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   );
 
   const table = (
-    <div role="region" aria-label="Institutes" tabIndex={0} className={`${tbl.wrap} ${tbl.scroll}`}>
+    <ScrollTable label="Institutes">
       <table className={tbl.table}>
         <caption className="sr-only">Institutes, {rangeLabel(res)}</caption>
         <thead className={tbl.head}>
           <tr className={tbl.headRow}>
-            <th scope="col" className={`${tbl.th} sticky left-0 z-[3] border-r border-border bg-card`}>Institute</th>
+            <th scope="col" className={`${tbl.th} sticky left-0 z-[3] border-r border-border bg-card ${tbl.pin}`}>Institute</th>
             <th scope="col" className={tbl.th}>State</th>
             <th scope="col" className={tbl.th}>Type</th>
             <th scope="col" className={`${tbl.th} text-right`}>Beds</th>
@@ -149,8 +150,8 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
             const h = info.get(r.college.key);
             return (
               <tr key={r.college.key} className={tbl.row}>
-                <th scope="row" className={`${tbl.td} sticky left-0 z-[1] min-w-56 max-w-80 border-r border-border bg-card text-left font-medium`}>
-                  <Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link>
+                <th scope="row" className={`${tbl.td} sticky left-0 z-[1] min-w-56 max-w-80 border-r border-border bg-card text-left font-medium ${tbl.pin}`}>
+                  <Link href={L.institute(r.college.slug)} title={r.college.name} className={`hover:text-sky hover:underline ${tbl.clamp}`}>{r.college.name}</Link>
                 </th>
                 <td className={tbl.td}>{r.college.state ?? <Dash />}</td>
                 <td className={`${tbl.td} whitespace-nowrap`}>{h?.type ? <TypeBadge type={h.type} of={r.college.name} /> : <Dash />}</td>
@@ -163,7 +164,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
           })}
         </tbody>
       </table>
-    </div>
+    </ScrollTable>
   );
 
   return (

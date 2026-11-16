@@ -361,8 +361,9 @@ async function Trends({ profile, page, L }: { profile: Profile | null; page: num
       {res.total === 0 ? (
         <EmptyState title="No allotments for these courses." href={L.to("/decide/seats", { tab: "trends" })} action="Show trends" />
       ) : (
+        // A phone: a card per option (stack-md, globals.css), its years two to a line, nothing sideways.
         <div role="region" aria-label="Allotments made by year" tabIndex={0} className={tbl.wrap}>
-          <table className={tbl.table}>
+          <table className={`${tbl.table} stack-md`}>
             <caption className="sr-only">Allotments made by year per institute, course and quota, page {res.page}</caption>
             <thead>
               <tr className={tbl.headRow}>
@@ -381,14 +382,14 @@ async function Trends({ profile, page, L }: { profile: Profile | null; page: num
                       <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="flex min-h-6 w-fit items-center text-xs text-muted-foreground hover:text-sky hover:underline">{courseName(r)}, {r.quota}</Link>
                     </th>
                     {newest.map((y) => (
-                      <td key={y} className={tbl.num}>
-                        <span className="flex items-center justify-end gap-2">
+                      <td key={y} data-label={label(y)} className={tbl.num}>
+                        <span className="flex items-center justify-end gap-2 max-md:justify-start">
                           {r.byYear[y] != null && <span className="block h-2 rounded-r-[4px] bg-mark" style={{ width: `${(r.byYear[y]! / max) * 64}px` }} aria-hidden />}
                           {r.byYear[y] != null ? formatRank(r.byYear[y]) : <Dash />}
                         </span>
                       </td>
                     ))}
-                    <td className={tbl.num}>{change == null ? <Dash /> : change > 0 ? `+${formatRank(change)}` : formatRank(change)}</td>
+                    <td data-label={`${y1} vs ${y0}`} className={tbl.num}>{change == null ? <Dash /> : change > 0 ? `+${formatRank(change)}` : formatRank(change)}</td>
                   </tr>
                 );
               })}

@@ -25,6 +25,7 @@ import { smallLink, tbl } from "../ui";
 import { ViewPanes, type View } from "../view-toggle";
 import type { PastClosing, SeatLine, SeatSort } from "./find-seats";
 import { SeatCards, seatCourse as courseOf, seatRowKey as rowKey } from "./seat-cards";
+import { ScrollTable } from "../scroll-table";
 
 // The Seats page's matrix view (src/app/decide/seats): one row per institute, course, quota and seat category, its
 // seats in each round's lists (never added together), its course's terms (TermStatCells: the course's own programme
@@ -186,14 +187,14 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   return (
     // grid-cols-1, not a bare grid: an auto track would grow to the table's width and the table box would not scroll.
     <div data-seat-rows className="grid grid-cols-1 gap-2">
-      {/* Hiding is CSS on data-col, so a header group and its cells go together (keys are the known columns only). */}
-      <style>{[...hidden].map((k) => `#seat-matrix [data-col="${k}"]{display:none}`).join("")}</style>
+      {/* Hiding is CSS on data-col, so a header group and its cells go together, in the pinned header copy too (keys are the known columns only). */}
+      <style>{[...hidden].map((k) => `[data-scroll-table="seat-matrix"] [data-col="${k}"]{display:none}`).join("")}</style>
       <ViewPanes
         page="seats"
         view={view}
         cards={<SeatCards rows={rows} list={list} lists={lists} ranked={ranked} L={L} title={caption} onDetails={show} />}
         table={
-          <div id="seat-matrix" role="region" aria-label={caption} tabIndex={0} className={cn(tbl.wrap, tbl.scroll, "scroll-pl-44 md:scroll-pl-68")}>
+          <ScrollTable id="seat-matrix" scope="seat-matrix" label={caption} scrollClassName="scroll-pl-44 md:scroll-pl-68">
             <table className={tbl.table}>
               <caption className="sr-only">{caption}</caption>
               <thead className={tbl.head}>
@@ -293,7 +294,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollTable>
         }
       />
       <RowDetails row={row} groups={groups} years={years} results={results} ranked={ranked} onClose={() => setOpen(null)} refocus={refocus} />
@@ -360,7 +361,7 @@ function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }
               <section aria-labelledby="row-closing" className="grid gap-2">
                 <h3 id="row-closing" className="font-semibold">Closing ranks on {r.quota ?? "this quota"}, {r.category} seats</h3>
                 <p className="text-xs text-muted-foreground">The highest All India Rank MCC allotted in that round; allotments made in brackets (not seats). Each round links its MCC result PDF.</p>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overflow-y-hidden">
                   <table className="text-sm">
                     <caption className="sr-only">Closing rank and allotments by year and round: {r.college.name}, {courseOf(r)}</caption>
                     <tbody>

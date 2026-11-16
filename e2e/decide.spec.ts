@@ -396,6 +396,32 @@ test("Allotments' R2 columns, Display and CSV: 2023 rank 23 upgraded in R2 to Se
   await expect(table.getByRole("link", { name: /^Journey/ })).toHaveCount(0); // Rank journey is gone (its page is a 404)
 });
 
+test("wide tables: the page is the one vertical scroller, the header row pins under the top bar and scrolls sideways with the body", async ({ page }) => {
+  await page.goto(`/decide/options?${PROFILE}&layout=table`); // phones open on cards
+  const table = page.locator("[data-scroll-table]").first();
+  const body = table.getByRole("region");
+  const pinned = table.locator(":scope > [data-stuck]");
+  await expect(pinned).toHaveCount(0); // at rest the real header shows
+  // Mid-table: the copy shows, right under the app's top bar.
+  await table.evaluate((e) => scrollTo(0, e.getBoundingClientRect().top + scrollY + 400));
+  await expect(pinned).toBeVisible();
+  const bar = await page.locator(".astryx-app-shell-header").evaluate((e) => e.getBoundingClientRect().bottom);
+  expect(Math.abs((await pinned.boundingBox())!.y - bar)).toBeLessThanOrEqual(1);
+  // The wheel over the table scrolls the page; the table box never scrolls up and down.
+  const box = (await body.boundingBox())!;
+  const y0 = await page.evaluate(() => scrollY);
+  await page.mouse.move(box.x + box.width / 2, bar + 200);
+  await page.mouse.wheel(0, 500);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(y0);
+  expect(await body.evaluate((e) => [e.scrollTop, getComputedStyle(e).overflowY])).toEqual([0, "hidden"]);
+  // Sideways, the copy follows the body.
+  const max = await body.evaluate((e) => e.scrollWidth - e.clientWidth);
+  if (max > 0) {
+    await body.evaluate((e) => (e.scrollLeft = 120));
+    await expect.poll(() => pinned.evaluate((e) => e.firstElementChild!.scrollLeft)).toBe(await body.evaluate((e) => e.scrollLeft));
+  }
+});
+
 test("print: every table box lets all its rows onto paper", async ({ page }) => {
   test.setTimeout(90_000);
   for (const path of [
