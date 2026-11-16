@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     const noStore = { "Cache-Control": "private, no-store" };
     if (!(await canSeeResidents())) return Response.json({ ok: false, error: { code: "locked", message: "Sign in with an allowed account." } }, { status: 401, headers: noStore });
     const no = await residentsDenied("read");
-    if (no) return Response.json({ ok: false, error: { code: no, message: no === "plan_limit" ? "Today's residents reads on your plan are used up (more at 00:00 IST). See /pricing for the Season Pass." : "Too many requests. Try again later." } }, { status: 429, headers: noStore });
+    if (no) return Response.json({ ok: false, error: { code: no, message: no === "plan_limit" ? "Today's residents reads on your plan are used up (more at 00:00 IST). See /pricing for the Season Pass." : no === "device_limit" ? "This device has used today's free residents reads (more at 00:00 IST). See /pricing for the Season Pass." : "Too many requests. Try again later." } }, { status: 429, headers: noStore });
     const q = parseQuery(querySchema, new URL(req.url).searchParams);
     if (!q.success) return invalid(q.error);
     const slug = (await params).slug;

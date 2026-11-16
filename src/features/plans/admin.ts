@@ -60,8 +60,8 @@ export async function adminTotals() {
       SELECT ("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date AS day, count(*) AS n FROM "User"
       WHERE "createdAt" >= (now() AT TIME ZONE 'UTC') - make_interval(days => ${DAYS}::int) GROUP BY 1 ORDER BY 1 DESC`,
     db.$queryRaw<{ day: Date; feature: string; n: bigint; users: bigint }[]>`
-      SELECT "day", "feature", sum("count")::bigint AS n, count(*) AS users FROM "UsageDaily" WHERE "day" >= (now() AT TIME ZONE 'Asia/Kolkata')::date - ${DAYS}::int GROUP BY 1, 2
-      UNION ALL SELECT "day", "feature", count(*), count(DISTINCT "userId") FROM "UsageDistinct" WHERE "day" >= (now() AT TIME ZONE 'Asia/Kolkata')::date - ${DAYS}::int GROUP BY 1, 2
+      SELECT "day", "feature", sum("count")::bigint AS n, count(*) AS users FROM "UsageDaily" WHERE "day" >= (now() AT TIME ZONE 'Asia/Kolkata')::date - ${DAYS}::int AND "userId" NOT LIKE 'aid:%' GROUP BY 1, 2
+      UNION ALL SELECT "day", "feature", count(*), count(DISTINCT "userId") FROM "UsageDistinct" WHERE "day" >= (now() AT TIME ZONE 'Asia/Kolkata')::date - ${DAYS}::int AND "userId" NOT LIKE 'aid:%' GROUP BY 1, 2
       ORDER BY 1 DESC, 2`,
     db.$queryRaw<{ day: Date; runs: bigint; input: bigint; output: bigint; cacheRead: bigint; cacheWrite: bigint }[]>`
       SELECT ("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date AS day, count(*) AS runs, sum("inputTokens")::bigint AS input,

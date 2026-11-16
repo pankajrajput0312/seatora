@@ -17,7 +17,7 @@ const m = vi.hoisted(() => ({
 vi.mock("@/features/auth/lib/session", () => ({ hasSiteAccess: m.hasSiteAccess, getCurrentUser: m.getCurrentUser }));
 vi.mock("@/lib/rate-limit", () => ({ allow: m.allow }));
 vi.mock("@/features/plans/usage", () => ({ checkAndCount: m.plan }));
-vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-real-ip": "203.0.113.9" }) }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-real-ip": "203.0.113.9" }), cookies: async () => ({ get: () => undefined }) }));
 vi.mock("@/lib/db", () => ({ db: { $queryRaw: m.reads, resident: { count: m.count, findMany: m.findMany }, college: { findMany: m.colleges }, dataSource: { findMany: m.sources } } }));
 
 const row = {

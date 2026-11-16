@@ -8,17 +8,26 @@ import { PageHead } from "@/features/decide/components/bits";
 import { Pager, smallLink, tbl } from "@/features/decide/components/ui";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { toURLSearchParams } from "@/features/decide/profile";
+import { funnelReport, possibleDuplicates, RANGES, recentErrors, type Range } from "@/features/funnel/admin";
+import { STAGES } from "@/features/funnel/lib";
 import { ADMIN_PAGE_SIZE, adminTotals, listUsers } from "@/features/plans/admin";
-import { COUNTED, ROLES } from "@/features/plans/plans";
+import { COUNTED, ROLES, type Effective, type Role } from "@/features/plans/plans";
 import { formatPaise } from "@/features/referrals/lib";
 import { referralAdmin } from "@/features/referrals/service";
-import { setUserAccess, settleReferrals } from "./actions";
+import { cn } from "@/lib/cn";
+import { resolveError, setUserAccess, settleReferrals } from "./actions";
 
-// Owners and admins only (anyone else: not found). Accounts, their plans and today's use, and the site's totals.
+// Owners and admins only (anyone else: not found). The upgrade funnel, accounts, their plans and today's use, the
+// site's totals, possible duplicate accounts and server/browser errors (docs/FUNNEL.md).
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false, follow: false } };
 const PATH = "/decide/admin";
-const schema = z.object({ q: z.string().trim().max(100).optional(), page: pageValue.default(1), msg: z.string().max(20).optional() });
+const schema = z.object({
+  q: z.string().trim().max(100).optional(),
+  page: pageValue.default(1),
+  msg: z.string().max(20).optional(),
+  range: z.enum(Object.keys(RANGES) as [Range, ...Range[]]).default("7d"),
+});
 const MESSAGES: Record<string, string> = {
   saved: "Saved.",
   invalid: "Not saved: check the fields.",
@@ -28,23 +37,82 @@ const MESSAGES: Record<string, string> = {
   paid_out: "Referral earnings marked paid out.",
   voided: "Referral earnings voided.",
   nothing_pending: "Nothing changed: those earnings are no longer pending.",
+  resolved: "Error marked resolved; it reopens if it happens again.",
 };
 
 const day = (d: Date | null) => (d ? d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "—");
 const isoDay = (d: Date | null) => (d ? new Date(d.getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10) : "");
 const n = (x: number) => x.toLocaleString("en-IN");
+const pct = (x: number | null) => (x == null ? "—" : `${x}%`);
+const when = (d: Date) => d.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
+const planLabel = (u: { role: Role; plan: Effective }) =>
+  u.plan.staff ? u.role[0] + u.role.slice(1).toLowerCase() : u.plan.plan === "PREMIUM" ? (u.plan.freeUntil ? "Free for all" : "Season Pass") : "Free";
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const me = await staffUser();
   if (!me) notFound();
   const f = parseSearchParams(schema, toURLSearchParams(await searchParams));
-  const [users, totals, refs] = await Promise.all([listUsers(f.q || undefined, f.page), adminTotals(), referralAdmin()]);
+  const [users, totals, refs, fun, dupes, errors] = await Promise.all([
+    listUsers(f.q || undefined, f.page),
+    adminTotals(),
+    referralAdmin(),
+    funnelReport(f.range),
+    possibleDuplicates(),
+    recentErrors(),
+  ]);
+  const people = (c: { events: number; people: number }) => [n(c.events), n(c.people)];
   const href = (page: number) => `${PATH}?${new URLSearchParams({ ...(f.q && { q: f.q }), page: String(page) })}`;
 
   return (
     <AppPage className="grid grid-cols-1 gap-6">
-      <PageHead title="Admin" about="Accounts, plans, usage and referral payouts. Roles, Season Pass dates and payouts change here; every change is logged." />
+      <PageHead title="Admin" about="The upgrade funnel, accounts, plans, usage, referral payouts, possible duplicate accounts and errors. Roles, Season Pass dates and payouts change here; every change is logged." />
       {f.msg && MESSAGES[f.msg] && <p role="status" className="rounded-md border border-border bg-card px-3 py-2 text-sm">{MESSAGES[f.msg]}</p>}
+
+      <section aria-labelledby="funnel-h" className="grid gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="funnel-h" className="scroll-mt-24 text-lg font-semibold">Funnel</h2>
+          <nav aria-label="Funnel range" className="flex overflow-hidden rounded-md border border-input text-sm">
+            {(Object.keys(RANGES) as Range[]).map((r) => (
+              <Link key={r} href={`${PATH}?range=${r}#funnel-h`} aria-current={r === f.range ? "page" : undefined} className={cn("inline-flex min-h-9 items-center px-3", r === f.range ? "bg-foreground font-semibold text-background" : "hover:bg-muted")}>
+                {RANGES[r]}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Unique people per stage: the account when signed in, else the browser&apos;s device cookie. Bots are not counted. Each stage is
+          counted on its own, so a step can pass 100% when people start further in (a shared sign-up link skips the home page).
+        </p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SmallTable caption={`Upgrade funnel, ${RANGES[f.range].toLowerCase()}`} head={["Stage", "People", "Step", "Overall"]} rows={fun.stages.map((s) => [s.label, n(s.people), pct(s.step), pct(s.overall)])} />
+          <div className="grid content-start gap-4">
+            <SmallTable caption="Upgrade clicks by placement" head={["Placement", "Clicks", "People"]} rows={fun.placements.map((p) => [p.placement ?? "—", ...people(p)])} />
+            <SmallTable
+              caption="Checkout"
+              head={["Outcome", "Events", "People"]}
+              rows={[
+                ["Opened", ...people(fun.checkout.opened)],
+                ["Cancelled", ...people(fun.checkout.cancelled)],
+                ["Failed", ...people(fun.checkout.failed)],
+                ["Paid", ...people(fun.checkout.paid)],
+                ["Revenue (paid payments)", formatPaise(fun.checkout.revenue), ""],
+              ]}
+            />
+          </div>
+          <SmallTable
+            caption="Referrals"
+            head={["Step", "Events", "People"]}
+            rows={[
+              ["Link opens", ...people(fun.referrals.opens)],
+              ["Referred sign-ups", ...people(fun.referrals.signups)],
+              ["Referred and paid", ...people(fun.referrals.paid)],
+              ["Earnings (not void)", formatPaise(fun.referrals.earnings), ""],
+            ]}
+          />
+          <SmallTable caption="Paywall hits by feature" head={["Feature", "Hits", "People"]} rows={fun.paywall.map((p) => [p.feature ?? "—", ...people(p)])} />
+        </div>
+        <SmallTable caption="Last 14 days (IST): unique people per stage" head={["Day", ...STAGES.map((s) => s.short)]} rows={fun.days.map((d) => [day(new Date(`${d.day}T12:00:00+05:30`)), ...d.stages.map((s) => n(s.people))])} />
+      </section>
 
       <section aria-labelledby="totals-h" className="grid gap-4">
         <h2 id="totals-h" className="text-lg font-semibold">Totals</h2>
@@ -129,9 +197,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     <span className="block font-medium">{u.email}</span>
                     <span className="block text-xs text-muted-foreground">{u.name}</span>
                   </td>
-                  <td className={tbl.td}>
-                    {u.plan.staff ? u.role[0] + u.role.slice(1).toLowerCase() : u.plan.plan === "PREMIUM" ? (u.plan.freeUntil ? "Free for all" : "Season Pass") : "Free"}
-                  </td>
+                  <td className={tbl.td}>{planLabel(u)}</td>
                   <td className={`${tbl.td} numeric`}>{day(u.createdAt)}</td>
                   <td className={`${tbl.td} numeric`}>{day(u.lastActive)}</td>
                   <td className={`${tbl.td} numeric text-xs`}>{COUNTED.map((c) => `${c} ${u.today[c] ?? 0}`).join(", ")}</td>
@@ -154,6 +220,82 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
         <Pager page={f.page} pageSize={ADMIN_PAGE_SIZE} total={users.total} href={href} focusId="users-h" label="Accounts" />
       </section>
+
+      <section aria-labelledby="dupes-h" className="grid gap-3">
+        <h2 id="dupes-h" className="text-lg font-semibold">Possible duplicates</h2>
+        <p className="text-sm text-muted-foreground">Accounts made on the same device, or on the same network within 24 hours. Hostels share networks: look before acting. Nothing happens automatically.</p>
+        {dupes.length ? (
+          <div className={tbl.wrap}>
+            <table className={tbl.table}>
+              <caption className="sr-only">Groups of accounts that may be one person, newest first</caption>
+              <thead>
+                <tr className={tbl.headRow}>
+                  {["Same", "Email", "Created", "Plan", "Paid", ""].map((h, i) => <th key={i} scope="col" className={tbl.th}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {dupes.flatMap((g, gi) =>
+                  g.users.map((u, i) => (
+                    <tr key={`${gi}-${u.id}`} className={cn(tbl.row, i === 0 && gi > 0 && "border-t-2 border-t-border")}>
+                      <td className={tbl.td}>{i === 0 ? `${g.via} (${g.users.length})` : ""}</td>
+                      <td className={tbl.td}>{u.email}</td>
+                      <td className={`${tbl.td} numeric`}>{day(u.createdAt)}</td>
+                      <td className={tbl.td}>{planLabel(u)}</td>
+                      <td className={tbl.td}>{u.paid ? "Paid" : "—"}</td>
+                      <td className={tbl.td}>
+                        <Link href={`${PATH}?${new URLSearchParams({ q: u.email })}#users-h`} className={`${smallLink} -my-3`}>Notes and role</Link>
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">None.</p>
+        )}
+      </section>
+
+      <section aria-labelledby="errors-h" className="grid gap-3">
+        <h2 id="errors-h" className="scroll-mt-24 text-lg font-semibold">Errors</h2>
+        <p className="text-sm text-muted-foreground">
+          Open server and browser errors seen in the last 7 days, grouped (numbers and ids aside). Resolved hides one until it happens again.
+          {process.env.ALERT_WEBHOOK_URL ? " Alerts go to the webhook on a new error and at 10 and 100." : " ALERT_WEBHOOK_URL is not set: no alerts."}
+        </p>
+        {errors.length ? (
+          <div className={tbl.wrap}>
+            <table className={tbl.table}>
+              <caption className="sr-only">Open error groups, most frequent first</caption>
+              <thead>
+                <tr className={tbl.headRow}>
+                  {["Count", "Last seen", "Where", "Message", ""].map((h, i) => <th key={i} scope="col" className={tbl.th}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {errors.map((e) => (
+                  <tr key={e.fingerprint} className={tbl.row}>
+                    <td className={tbl.num}>{n(e.count)}</td>
+                    <td className={`${tbl.td} numeric whitespace-nowrap`}>{when(e.lastAt)}</td>
+                    <td className={`${tbl.td} text-xs`}>
+                      <span className="block font-mono">{e.route}</span>
+                      <span className="block text-muted-foreground">{e.kind === "server" ? "Server" : "Browser"}{e.lastDigest ? ` · digest ${e.lastDigest}` : ""}</span>
+                    </td>
+                    <td className={`${tbl.td} max-w-xl text-xs break-words`}>{e.message}</td>
+                    <td className={tbl.td}>
+                      <form action={resolveError}>
+                        <input type="hidden" name="fingerprint" value={e.fingerprint} />
+                        <button type="submit" className="inline-flex min-h-9 items-center rounded-md border border-input px-3 text-sm font-semibold">Resolved</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No open errors in the last 7 days.</p>
+        )}
+      </section>
     </AppPage>
   );
 }
@@ -164,7 +306,7 @@ function SmallTable({ caption, head, rows }: { caption: string; head: string[]; 
       <table className={tbl.table}>
         <caption className="px-3 py-2 text-left text-sm font-semibold">{caption}</caption>
         <thead>
-          <tr className={tbl.headRow}>{head.map((h) => <th key={h} scope="col" className={tbl.th}>{h}</th>)}</tr>
+          <tr className={tbl.headRow}>{head.map((h, j) => <th key={h} scope="col" className={cn(tbl.th, j > 0 && "text-right")}>{h}</th>)}</tr>
         </thead>
         <tbody>
           {rows.length ? rows.map((r, i) => <tr key={i} className={tbl.row}>{r.map((c, j) => <td key={j} className={j ? tbl.num : tbl.td}>{c}</td>)}</tr>) : (

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AuthForm } from "@/features/auth/components/auth-form";
 import { AuthShell } from "@/features/auth/components/auth-shell";
 import { hasSiteAccess } from "@/features/auth/lib/session";
+import { TrackView } from "@/features/funnel/components/beacon";
 import { PLANS } from "@/features/payments/plans";
 import { freeNow, shortDate } from "@/features/plans/plans";
 import { InviteBanner } from "@/features/referrals/components/invite-banner";
@@ -31,6 +32,7 @@ export default async function SignupPage({ searchParams }: Props) {
   if (openAccess()) {
     return (
       <AuthShell eyebrow="Free account" title="Create your account.">
+        <TrackView name="signup_view" />
         {inviter && <InviteBanner inviter={inviter.name} className="mb-4" />}
         <p className="mb-6 text-sm text-muted-foreground max-sm:order-last max-sm:mt-6 max-sm:mb-0">
           {freeUntil ? (
@@ -47,6 +49,7 @@ export default async function SignupPage({ searchParams }: Props) {
   }
   return (
     <AuthShell eyebrow="Season Pass" title="Create your account.">
+      <TrackView name="signup_view" />
       <p className="mb-6 text-sm text-muted-foreground max-sm:order-last max-sm:mt-6 max-sm:mb-0">
         Accounts are created when you buy the Seatora NEET PG 2026 Season Pass ({price}) from the{" "}
         <a href="/pricing" className="text-sky underline">Pricing</a> page; you receive an access code with your purchase. Already have an

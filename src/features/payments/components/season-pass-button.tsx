@@ -18,7 +18,8 @@ import { BuySeasonPass } from "./buy-season-pass";
  * - after it: "Upgrade for ~~₹499~~ ₹199" ("Upgrade for ~~₹499~~ ₹159 with Rahul's invite" with a referrer: her own, or the /r/
  *   cookie's code), or "Payments open soon";
  * - signed out: the same words, to /signup?next=/pricing#buy.
- * `className`: the primary button; `noteClassName`: text (and the secondary button's colour).
+ * `className`: the primary button; `noteClassName`: text (and the secondary button's colour). Each Upgrade carries
+ * data-upgrade: a click is an upgrade_click at the nearest data-placement (docs/FUNNEL.md).
  */
 export async function SeasonPassButton({ className, noteClassName }: { className?: string; noteClassName?: string }) {
   const user = await getCurrentUser();
@@ -39,7 +40,7 @@ export async function SeasonPassButton({ className, noteClassName }: { className
 
   if (!user)
     return (
-      <Link href={`/signup?${new URLSearchParams({ next: "/pricing#buy" })}`} className={cn("inline-flex items-center justify-center", className)}>
+      <Link href={`/signup?${new URLSearchParams({ next: "/pricing#buy" })}`} data-upgrade="" className={cn("inline-flex items-center justify-center", className)}>
         {claimLabel ||
           (q ? (
             <span>

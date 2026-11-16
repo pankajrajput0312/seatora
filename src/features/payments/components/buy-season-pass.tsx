@@ -3,6 +3,7 @@
 import { useId, useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
+import { beacon } from "@/features/funnel/components/beacon";
 import { applyReferralCode } from "@/features/referrals/actions";
 import { formatPaise } from "@/features/referrals/lib";
 import { cn } from "@/lib/cn";
@@ -10,6 +11,8 @@ import { PLANS } from "../plans";
 
 // Razorpay Standard Checkout for the Season Pass: the order route sets the amount, the modal takes the payment, verify
 // confirms it (the webhook covers a closed tab). checkout.js loads only where this button is shown to a signed-in buyer.
+// Funnel (docs/FUNNEL.md): the button is an Upgrade (data-upgrade); closing the modal is checkout_cancelled, a declined
+// payment payment_failed. The order route records checkout_opened, markPaid payment_paid.
 
 const NEXT = "/pricing#buy";
 type RazorpayResponse = { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string };
@@ -96,12 +99,15 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
         modal: {
           ondismiss: () => {
             setBusy(false);
-            if (!failed.current) setMessage("Payment cancelled");
+            if (failed.current) return;
+            setMessage("Payment cancelled");
+            beacon({ name: "checkout_cancelled" });
           },
         },
       });
       rzp.on("payment.failed", (r) => {
         failed.current = true;
+        beacon({ name: "payment_failed" });
         setMessage(`Payment failed: ${r.error?.description ?? "please try again"}`);
       });
       rzp.open();
@@ -130,7 +136,7 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
   return (
     <div>
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
-      <button type="button" onClick={buy} disabled={busy} className={cn("inline-flex items-center justify-center disabled:opacity-50", className)}>
+      <button type="button" data-upgrade="" onClick={buy} disabled={busy} className={cn("inline-flex items-center justify-center disabled:opacity-50", className)}>
         {busy ? "Opening payment…" : label}
       </button>
       {!offer.inviter && (

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { siteConfig } from "@/config/site";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { VercelAnalytics } from "@/components/analytics/vercel-analytics";
+import { UpgradeClicks } from "@/features/funnel/components/beacon";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {children}
         <InstallPrompt />
         <VercelAnalytics />
+        <UpgradeClicks />
       </body>
     </html>
   );

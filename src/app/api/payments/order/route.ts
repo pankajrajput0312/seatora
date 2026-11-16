@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/features/auth/lib/session";
 import { PLANS, paymentsOn } from "@/features/payments/plans";
 import { createOrder, RazorpayError } from "@/features/payments/razorpay";
+import { track } from "@/features/funnel/service";
 import { hasPaid } from "@/features/payments/service";
 import { quote } from "@/features/referrals/service";
 import { db } from "@/lib/db";
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
   try {
     const order = await createOrder(amount, currency, id, { plan, userId: user.id, ...(referrerId && { referrerId }) });
     await db.payment.create({ data: { id, userId: user.id, plan, amount, listAmount, discount, referrerId, currency, razorpayOrderId: order.id } });
+    await track("checkout_opened", { userId: user.id, meta: { amount, referred: !!referrerId } });
     return Response.json({ orderId: order.id, amount, listAmount, discount, inviter, currency, keyId: order.keyId, email: user.email }, { headers });
   } catch (e) {
     if (e instanceof RazorpayError && e.status === 401) {

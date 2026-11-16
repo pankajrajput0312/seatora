@@ -11,6 +11,7 @@ import { paymentsOn, PLANS } from "@/features/payments/plans";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { freeNow, longDate, shortDate } from "@/features/plans/plans";
 import { SEASON_PASS_UNTIL } from "@/features/payments/grant";
+import { TrackView } from "@/features/funnel/components/beacon";
 import { InviteBanner } from "@/features/referrals/components/invite-banner";
 import { discountedPrice, formatPaise, REF_COOKIE, REFERRAL_PERCENT } from "@/features/referrals/lib";
 import { quote } from "@/features/referrals/service";
@@ -29,6 +30,7 @@ export default async function PricingPage() {
   const askOpen = askConfig().enabled && process.env.ASK_FOR_MEMBERS === "1";
   return (
     <Container className="py-10 md:py-28">
+      <TrackView name="pricing_view" />
       <article className="max-w-prose">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Pricing</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Seatora NEET PG 2026 Season Pass</h1>
@@ -40,7 +42,7 @@ export default async function PricingPage() {
           Online NEET PG counselling planner for MCC All India counselling: Round 2 seats, past closing ranks, fees, stipends and bonds, and
           residents at each college, from official MCC, NBEMS and NMC documents. A free account opens the planner straight away.
         </p>
-        <section id="buy" aria-labelledby="plans-h" className="mt-8 scroll-mt-24 md:w-[44rem]">
+        <section id="buy" data-placement="pricing" aria-labelledby="plans-h" className="mt-8 scroll-mt-24 md:w-[44rem]">
           <h2 id="plans-h" className="text-lg font-medium">Free and Season Pass</h2>
           <PlanCards className="mt-3" />
           <p className="mt-3 text-sm text-muted-foreground">

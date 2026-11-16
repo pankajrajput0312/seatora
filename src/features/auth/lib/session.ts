@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { deviceAid, ipHash } from "@/features/funnel/service";
 import { PLAN_PROMPT_COOKIE, PLAN_PROMPT_MAX_AGE_S } from "@/features/plans/prompt";
 import { db } from "@/lib/db";
 import { ACCESS_COOKIE, ACCESS_MAX_AGE_S, accessCookie, accessCookieUser, isAllowed, isMember, parseAllowlist, siteGate } from "@/lib/site-access";
@@ -17,11 +18,12 @@ const hashToken = (token: string) => createHash("sha256").update(token).digest("
 /**
  * Creates a session for the user and sets the cookie. The DB only ever sees the token's hash. A member (anyone in open
  * mode, else an allowlisted user) also gets the seatora_access cookie that src/middleware.ts checks (only while the gate is on).
+ * The row keeps the device (seatora_aid) and the hashed IP (docs/FUNNEL.md).
  */
 export async function createSession({ id: userId, email }: { id: string; email: string }) {
   const token = randomBytes(32).toString("base64url");
   await db.session.create({
-    data: { id: hashToken(token), userId, expiresAt: new Date(Date.now() + MAX_AGE_S * 1000) },
+    data: { id: hashToken(token), userId, expiresAt: new Date(Date.now() + MAX_AGE_S * 1000), aid: await deviceAid(), ipHash: await ipHash() },
   });
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,

@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { clientIp, deviceAid, ipHash, track } from "@/features/funnel/service";
 import { REF_COOKIE } from "@/features/referrals/lib";
 import { referrerByCode } from "@/features/referrals/service";
 import { allow, isLimited, reset } from "@/lib/rate-limit";
@@ -31,11 +32,13 @@ const ACCOUNT_LIMIT = 20;
 const LOCK_MS = 15 * 60 * 1000;
 // Accounts created per IP per hour (on top of rateLimited): sign-up is open to anyone with SEATORA_OPEN_ACCESS=1.
 const SIGNUPS_PER_HOUR = 5;
-
-async function clientIp() {
-  const h = await headers();
-  return h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-}
+// Accounts one device (the seatora_aid cookie) may create in 30 days: SIGNUP_PER_DEVICE, default 3 (docs/FUNNEL.md).
+// Not by IP: hostels and colleges share one.
+const DEVICE_WINDOW_MS = 30 * 86_400_000;
+const signupsPerDevice = () => {
+  const n = Number(process.env.SIGNUP_PER_DEVICE);
+  return Number.isInteger(n) && n > 0 ? n : 3;
+};
 
 async function rateLimited(kind: string) {
   const h = await headers();
@@ -64,7 +67,8 @@ async function recordFailure(pairKey: string, userId?: string) {
 
 // SEATORA_OPEN_ACCESS=1: anyone may sign up, no invite code; an owner address (SEATORA_OWNER_EMAILS) can't be claimed,
 // since nothing verifies the email. Otherwise invite-only: an allowlisted account (SEATORA_ALLOWED_EMAILS) with
-// SEATORA_INVITE_CODE. Either way at most SIGNUPS_PER_HOUR tries reach the database per IP. `next` is ?next= from the page.
+// SEATORA_INVITE_CODE. Either way at most SIGNUPS_PER_HOUR tries reach the database per IP, and a device that made
+// SIGNUP_PER_DEVICE accounts in 30 days makes no more. `next` is ?next= from the page.
 // `ref`: the page's ?ref=; the seatora_ref cookie (/r/CODE) comes first. A real code's owner becomes her referredById.
 export async function signUp(input: SignUpInput, next?: string, ref?: string): Promise<AuthResult> {
   if (await rateLimited("signup")) return { ok: false, error: "Too many attempts. Please wait a minute." };
@@ -79,6 +83,11 @@ export async function signUp(input: SignUpInput, next?: string, ref?: string): P
     // One message for both, so it doesn't reveal which emails are allowlisted.
     return { ok: false, error: "That email and invite code don't match an invite. Buy the Season Pass on the Pricing page to get an access code." };
   }
+  const aid = await deviceAid();
+  const perDevice = signupsPerDevice();
+  if (aid && (await db.user.count({ where: { signupAid: aid, createdAt: { gte: new Date(Date.now() - DEVICE_WINDOW_MS) } } })) >= perDevice) {
+    return { ok: false, error: `This device already has ${perDevice} Seatora account${perDevice === 1 ? "" : "s"}. Sign in to one of them.` };
+  }
   if (!allow(`signup-hour:${await clientIp()}`, SIGNUPS_PER_HOUR, 60 * 60 * 1000)) {
     return { ok: false, error: "Too many accounts from this network. Please try again in an hour." };
   }
@@ -92,9 +101,12 @@ export async function signUp(input: SignUpInput, next?: string, ref?: string): P
         passwordHash: await hashPassword(parsed.data.password),
         createdVia: "signup",
         referredById: referrer?.id ?? null,
+        signupAid: aid,
+        signupIpHash: await ipHash(),
       },
     });
     await createSession(user);
+    await track("signup_done", { userId: user.id, aid, meta: { referred: !!referrer } });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return { ok: false, error: "An account with this email already exists. Try signing in." };
@@ -130,6 +142,7 @@ export async function signIn(input: SignInInput, next?: string): Promise<AuthRes
     // Only after the password checks out, so this reveals nothing to a guesser.
     if (!isMember(user.email)) return { ok: false, error: "This account doesn't have access." };
     await createSession(user);
+    await track("signin_done", { userId: user.id });
   } catch (err) {
     console.error("signIn failed", err);
     return { ok: false, error: "We couldn't sign you in. Please try again." };

@@ -1,6 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import { getCurrentUser, hasSiteAccess } from "@/features/auth/lib/session";
+import { deviceAid } from "@/features/funnel/service";
 import { checkAndCount } from "@/features/plans/usage";
 import { db } from "@/lib/db";
 import { allow } from "@/lib/rate-limit";
@@ -67,16 +68,18 @@ export const canSeeResidents = hasSiteAccess;
 /**
  * Why reading or hiding names is refused now, else null. Reads: "rate_limited" past 300 per hour per IP (in memory, per
  * instance, as @/lib/rate-limit) or signed out; "plan_limit" past the plan's residents reads a day (features/plans,
- * UsageDaily, so parallel instances share it and a copied cookie gets no fresh budget from a new IP). Hides: 20 per hour per IP.
+ * UsageDaily, so parallel instances share it and a copied cookie gets no fresh budget from a new IP); "device_limit" when
+ * a Free account's device has used today's Free reads across its accounts (docs/FUNNEL.md). Hides: 20 per hour per IP.
  */
-export async function residentsDenied(kind: "read" | "hide"): Promise<null | "rate_limited" | "plan_limit"> {
+export async function residentsDenied(kind: "read" | "hide"): Promise<null | "rate_limited" | "plan_limit" | "device_limit"> {
   const h = await headers();
   const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (kind === "hide") return allow(`residents-hide:${ip}`, 20, 60 * 60 * 1000) ? null : "rate_limited";
   if (!allow(`residents:${ip}`, 300, 60 * 60 * 1000)) return "rate_limited";
   const user = await getCurrentUser();
   if (!user) return "rate_limited";
-  return (await checkAndCount(user.id, "residents", undefined, { account: user })).allowed ? null : "plan_limit";
+  const r = await checkAndCount(user.id, "residents", undefined, { account: user, aid: await deviceAid() });
+  return r.allowed ? null : r.device ? "device_limit" : "plan_limit";
 }
 
 /**

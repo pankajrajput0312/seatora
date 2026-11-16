@@ -36,6 +36,7 @@ vi.mock("@/lib/db", () => {
       }
     },
     user: { findUnique: async ({ where }: { where: Record<string, unknown> }) => m.users.find((u) => match(u, where)) ?? null },
+    funnelEvent: { create: async () => ({}) },
     payment: {
       create: async ({ data }: { data: Omit<Row, "razorpayPaymentId" | "status" | "paidAt"> }) => m.rows.push({ razorpayPaymentId: null, status: "created", paidAt: null, ...data }),
       findUnique: async ({ where }: { where: Record<string, unknown> }) => m.rows.find((r) => match(r, where)) ?? null,

@@ -12,6 +12,7 @@ vi.mock("@/lib/db", () => ({
         return { count: hit.length };
       },
     },
+    funnelEvent: { create: async () => ({}) },
   },
 }));
 const { claimFreePass } = await import("./claim");

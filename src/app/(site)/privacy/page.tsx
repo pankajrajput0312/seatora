@@ -18,7 +18,7 @@ export default function PrivacyPage() {
       <article className="max-w-prose">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Legal</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Privacy Policy</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-15">15 November 2026</time></p>
+        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-16">16 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
           <section>
             <h2>Who we are</h2>
@@ -43,20 +43,35 @@ export default function PrivacyPage() {
               If you send us a request (from the Contact page or inside the planner), we store your message, its type, your email address,
               the page you sent it from and the time, and link it to your account if you are signed in.
             </p>
-            <p className="mt-2">To stop abuse, your IP address is held in memory for up to a day to limit repeated requests, and we don&apos;t store it. Our hosting provider may keep standard server logs.</p>
+            <p className="mt-2">
+              To stop abuse, your IP address is held in memory for up to a day to limit repeated requests. We store only a scrambled
+              form of it (a keyed one-way hash, which can&apos;t be turned back into the address) with your account and each sign-in.
+              Our hosting provider may keep standard server logs.
+            </p>
           </section>
           <section>
             <h2>Cookies</h2>
             <p className="mt-2">
-              Seatora uses three strictly necessary cookies and no others: a sign-in cookie that keeps you signed in, a small flag cookie
-              with no personal data that lets the page header show your account link, and an access cookie that lets your browser through
-              the site&apos;s access check. Each expires after 30 days, and signing out removes all three. We use no
-              analytics, tracking or advertising cookies.
+              Seatora uses a sign-in cookie that keeps you signed in, a small flag cookie with no personal data that lets the page header
+              show your account link, and an access cookie that lets your browser through the site&apos;s access check. Each expires after
+              30 days, and signing out removes all three. A device cookie holds a random number that identifies this browser, not you; it
+              lasts a year (see &ldquo;Usage events and error reports&rdquo;). We use no third-party analytics, tracking or advertising cookies.
             </p>
             <p className="mt-2">
               To see which pages are used and how fast they load, we use Vercel Web Analytics and Speed Insights. They set no
               cookies and keep no personal data: they count page visits by address (without the part after &ldquo;?&rdquo;, so never your
               rank or searches), with the country, browser and device type, and page load timings.
+            </p>
+          </section>
+          <section>
+            <h2>Usage events and error reports</h2>
+            <p className="mt-2">
+              To improve Seatora we record a few steps on our own servers, with no third-party trackers: for example that a page like
+              Pricing or Sign up was opened, that the plan window was shown or closed, that an Upgrade button was clicked, and whether a
+              checkout was opened, cancelled or paid. Each record holds the time, the device cookie and, when you are signed in, your
+              account. The device cookie and the scrambled IP address also stop one person from making many free accounts to get more free
+              use. When a page fails, we keep an error report of what went wrong and on which page, without your name, email, searches or
+              anything you typed. Usage events and error reports are deleted after 12 months.
             </p>
           </section>
           <section>
@@ -89,7 +104,7 @@ export default function PrivacyPage() {
           </section>
           <section>
             <h2>How long we keep it</h2>
-            <p className="mt-2">Account data is kept until you ask us to delete your account. Emails left with us for a NEET PG year are kept until the planner opens for that year or until you ask us to delete them, whichever comes first. Requests are kept until you ask us to delete them or your account.</p>
+            <p className="mt-2">Account data is kept until you ask us to delete your account. Emails left with us for a NEET PG year are kept until the planner opens for that year or until you ask us to delete them, whichever comes first. Requests are kept until you ask us to delete them or your account. Usage events and error reports are kept for 12 months.</p>
           </section>
           <section>
             <h2>Your rights</h2>

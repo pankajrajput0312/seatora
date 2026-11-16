@@ -178,7 +178,7 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
             endContent={
               <span className="flex items-center gap-1">
                 {account && (
-                  <Link href={L.to("/decide/plan")} title={account.plan} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap">
+                  <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap">
                     <span className="sr-only">Your plan: </span>
                     <span className="font-semibold">{account.upgrade ? "Free" : account.plan.split(" · ")[0]}</span>
                     {account.upgrade && <span className="-mr-1.5 rounded-full bg-[#5ccfe6] px-2 py-0.5 font-semibold text-[#0b0e12]">Upgrade</span>}
@@ -299,7 +299,7 @@ function AccountFooter({ account, href, current }: { account: ShellAccount | nul
   return (
     <div data-nav-footer className="grid gap-1.5 border-t border-border pt-2">
       {account.upgrade && (
-        <Link href={href} className={cyan}>
+        <Link href={href} data-upgrade="sidebar_footer" className={cyan}>
           <span className="flex items-center gap-1.5 text-sm font-bold"><CircleArrowUp className="size-4" aria-hidden />Upgrade</span>
           {account.freeTill && <span className="text-xs font-semibold">Free till {account.freeTill}</span>}
         </Link>

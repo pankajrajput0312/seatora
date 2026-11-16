@@ -488,8 +488,15 @@ model User {
   payoutUpi    String?
   refPayments  Payment[]         @relation("PaymentReferrer")
   earnings     ReferralEarning[]
+  /// The device (seatora_aid cookie) and HMAC of the IP she signed up from (docs/FUNNEL.md): the per-device sign-up cap
+  /// and the admin page's possible duplicates. Never the raw IP.
+  signupAid    String?
+  signupIpHash String?
+  funnelEvents FunnelEvent[]
 
   @@index([referredById])
+  @@index([signupAid])
+  @@index([signupIpHash])
 }
 
 /// The Decide profile (features/decide/profile.ts profileSchema) of a signed-in user, so it follows the account across
@@ -517,6 +524,9 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+  /// The device (seatora_aid) and HMAC of the IP it was opened from (docs/FUNNEL.md).
+  aid       String?
+  ipHash    String?
 
   @@index([userId])
 }
@@ -717,4 +727,36 @@ model ReferralEarning {
   note       String?
 
   @@index([referrerId])
+}
+
+/// First-party funnel events (docs/FUNNEL.md, features/funnel): the name (lib.ts EVENTS), the device and/or account,
+/// where an Upgrade was clicked, and small non-personal meta. Kept 12 months.
+model FunnelEvent {
+  id        BigInt   @id @default(autoincrement())
+  at        DateTime @default(now())
+  name      String
+  aid       String?
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  placement String?
+  meta      Json     @default("{}")
+
+  @@index([name, at])
+  @@index([userId])
+  @@index([aid])
+}
+
+/// Server and browser errors grouped by fingerprint (sha1 of kind, route and the message without numbers or ids). No
+/// request bodies, query strings, emails or names (docs/FUNNEL.md "Errors").
+model ErrorGroup {
+  fingerprint String    @id
+  kind        String
+  message     String
+  route       String
+  count       Int       @default(1)
+  firstAt     DateTime  @default(now())
+  lastAt      DateTime  @default(now())
+  lastDigest  String?
+  /// Set from the admin page; a new occurrence clears it (reopens).
+  resolvedAt  DateTime?
 }

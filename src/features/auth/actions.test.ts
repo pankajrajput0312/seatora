@@ -7,7 +7,7 @@ import { hasSiteAccess, isOwner } from "./lib/session";
 const ctx = vi.hoisted(() => ({
   ip: "203.0.113.1",
   jar: new Map<string, string>(),
-  users: [] as { id: string; email: string; name: string; passwordHash: string; failedLogins: number; lockedUntil: Date | null; referralCode?: string; referredById?: string | null }[],
+  users: [] as { id: string; email: string; name: string; passwordHash: string; failedLogins: number; lockedUntil: Date | null; referralCode?: string; referredById?: string | null; signupAid?: string | null; createdAt?: Date }[],
   sessions: new Map<string, { userId: string; expiresAt: Date }>(),
 }));
 vi.mock("next/headers", () => ({
@@ -34,7 +34,7 @@ vi.mock("@/lib/db", () => {
             const { Prisma } = await import("@prisma/client");
             throw new Prisma.PrismaClientKnownRequestError("unique", { code: "P2002", clientVersion: "test" });
           }
-          const u = { ...data, id: `u${ctx.users.length + 1}`, failedLogins: 0, lockedUntil: null };
+          const u = { ...data, id: `u${ctx.users.length + 1}`, failedLogins: 0, lockedUntil: null, createdAt: new Date() };
           ctx.users.push(u);
           return u;
         },
@@ -42,7 +42,10 @@ vi.mock("@/lib/db", () => {
           ctx.users.find((u) => u.email === where.email || u.id === where.id || (!!where.referralCode && u.referralCode === where.referralCode)) ?? null,
         update: async ({ where }: { where: { id: string } }) => user(where.id),
         updateMany: async () => ({ count: 0 }),
+        count: async ({ where }: { where: { signupAid: string; createdAt: { gte: Date } } }) =>
+          ctx.users.filter((u) => u.signupAid === where.signupAid && u.createdAt! >= where.createdAt.gte).length,
       },
+      funnelEvent: { create: async () => ({}) },
       session: {
         create: async ({ data }: { data: { id: string; userId: string; expiresAt: Date } }) => ctx.sessions.set(data.id, data),
         findUnique: async ({ where }: { where: { id: string } }) => {
@@ -102,6 +105,30 @@ describe("open access (SEATORA_OPEN_ACCESS=1)", () => {
     expect(ctx.users).toHaveLength(5);
     fresh();
     expect(await failsWith(signUp(person("n6@seatora.test")))).toBe("REDIRECT /decide"); // another IP
+  });
+
+  it("a device (seatora_aid) makes 3 accounts in 30 days, then is refused; another device on the same network is not", async () => {
+    const aid = "DDDDDDDDDDDDDDDDDDDDDD";
+    for (let i = 0; i < 3; i++) {
+      ctx.jar.clear();
+      ctx.jar.set("seatora_aid", aid);
+      expect(await failsWith(signUp(person(`d${i}@seatora.test`)))).toBe("REDIRECT /decide");
+    }
+    ctx.jar.clear();
+    ctx.jar.set("seatora_aid", aid);
+    expect(await signUp(person("d3@seatora.test"))).toEqual({ ok: false, error: "This device already has 3 Seatora accounts. Sign in to one of them." });
+    expect(ctx.users.map((u) => u.signupAid)).toEqual([aid, aid, aid]);
+    ctx.jar.set("seatora_aid", "EEEEEEEEEEEEEEEEEEEEEE"); // same IP, another browser
+    expect(await failsWith(signUp(person("d3@seatora.test")))).toBe("REDIRECT /decide");
+    // Older than 30 days no longer count; SIGNUP_PER_DEVICE changes the cap.
+    ctx.users.slice(0, 3).forEach((u) => (u.createdAt = new Date(Date.now() - 31 * 86_400_000)));
+    fresh();
+    ctx.jar.set("seatora_aid", aid);
+    vi.stubEnv("SIGNUP_PER_DEVICE", "1");
+    expect(await failsWith(signUp(person("d4@seatora.test")))).toBe("REDIRECT /decide");
+    ctx.jar.clear();
+    ctx.jar.set("seatora_aid", aid);
+    expect(await signUp(person("d5@seatora.test"))).toEqual({ ok: false, error: "This device already has 1 Seatora account. Sign in to one of them." });
   });
 
   it("a referral: the seatora_ref cookie (or ?ref=) sets referredById; an unknown code sets nothing", async () => {

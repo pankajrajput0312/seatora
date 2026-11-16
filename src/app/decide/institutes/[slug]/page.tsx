@@ -36,6 +36,7 @@ import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, options
 import { feesFor } from "@/features/decide/server/facts";
 import { programmes } from "@/features/decide/server/terms";
 import { canSeeResidents, groupResidents, listResidents, residentsDenied } from "@/features/decide/server/residents";
+import { deviceAid } from "@/features/funnel/service";
 import { Paywall } from "@/features/plans/components/paywall";
 import { checkAndCount, currentPlan } from "@/features/plans/usage";
 import { roundLabel, seatKindLabel } from "@/features/decide/types";
@@ -89,12 +90,12 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const { college, options, yours, allotmentsByYear, fees, unlistedBy } = inst;
   // The plan's distinct institutes a day (features/plans): opening one again today, or any tab of it, is free.
   const me = await currentPlan();
-  const view = me && (await checkAndCount(me.user.id, "institutes", college.key, { account: me.user }));
+  const view = me && (await checkAndCount(me.user.id, "institutes", college.key, { account: me.user, aid: await deviceAid() }));
   if (me && view && !view.allowed) {
     return (
       <AppPage className="grid grid-cols-1 gap-3">
         <PageHead title={college.name} />
-        <Paywall feature="institutes" eff={me.eff} used={view.used} />
+        <Paywall feature="institutes" eff={me.eff} used={view.used} device={view.device} />
       </AppPage>
     );
   }
@@ -597,7 +598,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       {residentsAccess === "locked" && (
         <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.institute(slug, "courses")} action="See the courses here" />
       )}
-      {residentsAccess === "plan_limit" && me && <Paywall feature="residents" eff={me.eff} />}
+      {(residentsAccess === "plan_limit" || residentsAccess === "device_limit") && me && <Paywall feature="residents" eff={me.eff} device={residentsAccess === "device_limit"} />}
       {residentsAccess === "rate_limited" && (
         <EmptyState title="Too many requests" description="Residents were opened too many times from this network or account. Try again in an hour, or tomorrow." href={L.institute(slug, "courses")} action="See the courses here" />
       )}

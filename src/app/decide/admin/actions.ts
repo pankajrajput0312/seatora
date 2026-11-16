@@ -6,7 +6,7 @@ import { staffUser } from "@/features/auth/lib/session";
 import { ROLES } from "@/features/plans/plans";
 import { db } from "@/lib/db";
 
-// /decide/admin's one mutation. Server Actions can be POSTed to any route, so it checks the caller itself.
+// /decide/admin's mutations. Server Actions can be POSTed to any route, so each checks the caller itself.
 
 const inputSchema = z.object({
   userId: z.string().min(1).max(40),
@@ -71,4 +71,19 @@ export async function settleReferrals(form: FormData) {
     db.adminAudit.create({ data: { actorId: me.id, targetId: referrerId, action: `referral_${to}`, before: { earnings: before }, after: JSON.parse(JSON.stringify(after)) } }),
   ]);
   back(to === "paid_out" ? "paid_out" : "voided");
+}
+
+/** Errors: marks a group resolved (a new occurrence reopens it), with an AdminAudit row. Owner or admin only. */
+export async function resolveError(form: FormData) {
+  const me = await staffUser();
+  if (!me) redirect("/decide");
+  const fingerprint = z.string().regex(/^[0-9a-f]{40}$/).safeParse(form.get("fingerprint"));
+  const back = (msg: string) => redirect(`/decide/admin?${new URLSearchParams({ msg })}#errors-h`);
+  if (!fingerprint.success) back("invalid");
+  const at = new Date();
+  await db.$transaction([
+    db.errorGroup.updateMany({ where: { fingerprint: fingerprint.data }, data: { resolvedAt: at } }),
+    db.adminAudit.create({ data: { actorId: me.id, targetId: fingerprint.data!, action: "error_resolved", before: {}, after: { resolvedAt: at.toISOString() } } }),
+  ]);
+  back("resolved");
 }

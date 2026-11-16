@@ -59,7 +59,7 @@ export function HomeHub({ L }: { L: DecideLinks }) {
               Search residents <ArrowRight className="size-4" aria-hidden />
             </Link>
           </div>
-          <div className="rounded-lg border border-dashed border-[#2b3a45] px-4 py-3 md:text-right">
+          <div data-placement="home_card" className="rounded-lg border border-dashed border-[#2b3a45] px-4 py-3 md:text-right">
             <p className="font-mono text-[10px] tracking-[0.25em] text-[#a3abb3]">SEASON PASS</p>
             <p className="mt-1 flex items-baseline gap-2 md:justify-end">
               <s className="text-sm text-[#6b7480]" aria-label={`Was ${formatPaise(PLANS.season_pass.wasAmount)}`}>{formatPaise(PLANS.season_pass.wasAmount)}</s>

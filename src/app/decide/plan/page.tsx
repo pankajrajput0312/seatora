@@ -37,7 +37,7 @@ export default async function PlanPage() {
           Create a free account to use the planner, or <Link href={`/login?${new URLSearchParams({ next: PATH })}`} className="text-sky underline">sign in</Link>.
         </p>
       )}
-      <section aria-labelledby="plans-h" className="grid gap-3">
+      <section data-placement="plan_page" aria-labelledby="plans-h" className="grid gap-3">
         <h2 id="plans-h" className="text-lg font-semibold">Plans</h2>
         <PlanCards />
       </section>

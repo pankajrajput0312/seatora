@@ -41,12 +41,12 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   );
 
   const denied = async (why: ResidentsDenied["code"]) => {
-    const me = why === "plan_limit" ? await currentPlan() : null;
+    const me = why === "plan_limit" || why === "device_limit" ? await currentPlan() : null;
     return (
     <AppPage className="grid grid-cols-1 gap-3">
       {head()}
       {me ? (
-        <Paywall feature="residents" eff={me.eff} />
+        <Paywall feature="residents" eff={me.eff} device={why === "device_limit"} />
       ) : why === "locked" ? (
         <EmptyState title="Sign in to see residents" description="Names are shown only to the signed-in, invited account." href={L.to("/decide/institutes")} action="See the institutes" />
       ) : (

@@ -9,7 +9,7 @@ import { canSeeResidents, residentsDenied, type ResidentSource } from "./residen
 
 /** Names may not be read: "locked" (no access, as canSeeResidents), "rate_limited" (per IP) or "plan_limit" (the plan's reads a day). */
 export class ResidentsDenied extends Error {
-  constructor(readonly code: "locked" | "rate_limited" | "plan_limit") {
+  constructor(readonly code: "locked" | "rate_limited" | "plan_limit" | "device_limit") {
     super(`residents: ${code}`);
     this.name = "ResidentsDenied";
   }

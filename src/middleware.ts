@@ -1,14 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { AID_COOKIE, AID_MAX_AGE_S, isAid, isBot } from "@/features/funnel/lib";
 import { ACCESS_COOKIE, accessCookieUser, siteGate } from "@/lib/site-access";
 
-// Access gate for /decide and /api/v1: a valid seatora_access cookie, which only a member's sign-in sets (any account with
-// SEATORA_OPEN_ACCESS=1, else an allowlisted one).
-// Server Actions can be POSTed to any route, so Decide actions re-check access themselves. See docs/ARCHITECTURE.md "Access gate".
+// Two jobs. 1. The seatora_aid device cookie (docs/FUNNEL.md) on page requests that lack it, bots aside; it is also put
+// on this request, so the page or route handler sees it the first time. 2. The access gate for /decide and /api/v1: a
+// valid seatora_access cookie, which only a member's sign-in sets (any account with SEATORA_OPEN_ACCESS=1, else an
+// allowlisted one). Server Actions can be POSTed to any route, so Decide actions re-check access themselves. See
+// docs/ARCHITECTURE.md "Access gate".
 
 let warned = false;
 
 export async function middleware(req: NextRequest) {
   const api = req.nextUrl.pathname.startsWith("/api/");
+  const aid = !api && !isAid(req.cookies.get(AID_COOKIE)?.value) && !isBot(req.headers.get("user-agent")) ? newAid() : null;
+  if (aid) req.cookies.set(AID_COOKIE, aid);
+  const res = await gate(req, api);
+  if (aid) res.cookies.set(AID_COOKIE, aid, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: AID_MAX_AGE_S });
+  return res;
+}
+
+async function gate(req: NextRequest, api: boolean) {
+  const path = req.nextUrl.pathname;
+  if (!path.startsWith("/decide") && !path.startsWith("/api/v1")) return next(req);
   const gate = siteGate();
   if (gate.state !== "on") {
     if (!warned) {
@@ -16,24 +29,29 @@ export async function middleware(req: NextRequest) {
       if (gate.state === "off") console.warn("SITE_ACCESS_SECRET and SEATORA_ALLOWED_EMAILS are not set: /decide and /api/v1 are OPEN (development only).");
       else console.error("SITE_ACCESS_SECRET (32+ characters) and SEATORA_ALLOWED_EMAILS (or SEATORA_OPEN_ACCESS=1) are required: denying /decide and /api/v1.");
     }
-    if (gate.state === "off") return pass(api, req.method);
+    if (gate.state === "off") return pass(req, api);
     return api ? denied(503, "access_unconfigured", "Access is not configured.") : redirect(req, "/login?error=unavailable");
   }
 
-  if (await accessCookieUser(req.cookies.get(ACCESS_COOKIE)?.value, gate.key)) return pass(api, req.method);
+  if (await accessCookieUser(req.cookies.get(ACCESS_COOKIE)?.value, gate.key)) return pass(req, api);
   if (api) return denied(401, "unauthorized", gate.open ? "Sign in to use the Decide API." : "Sign in with an allowed account.");
   return redirect(req, `/login?${new URLSearchParams({ next: req.nextUrl.pathname + req.nextUrl.search })}`);
 }
 
-// The API is read-only: any other method gets the JSON error envelope (405), not Next's empty one. Pages pass (Server Actions POST).
-function pass(api: boolean, method: string) {
-  if (api && !["GET", "HEAD", "OPTIONS"].includes(method)) return denied(405, "method_not_allowed", "The Decide API is read-only: use GET.", { Allow: "GET, HEAD" });
-  return privateNext();
+/** 16 random bytes, base64url (22 characters). */
+function newAid() {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-// Private responses are per user: no shared cache may keep them (this overrides the pages' and API's s-maxage).
-function privateNext() {
-  const res = NextResponse.next();
+/** On, with this request's (maybe new) cookies. */
+const next = (req: NextRequest) => NextResponse.next({ request: { headers: req.headers } });
+
+// The API is read-only: any other method gets the JSON error envelope (405), not Next's empty one. Pages pass (Server Actions POST).
+function pass(req: NextRequest, api: boolean) {
+  if (api && !["GET", "HEAD", "OPTIONS"].includes(req.method)) return denied(405, "method_not_allowed", "The Decide API is read-only: use GET.", { Allow: "GET, HEAD" });
+  // Private responses are per user: no shared cache may keep them (this overrides the pages' and API's s-maxage).
+  const res = next(req);
   res.headers.set("Cache-Control", "private, no-store");
   return res;
 }
@@ -51,6 +69,8 @@ function redirect(req: NextRequest, path: string) {
   return res;
 }
 
+// Pages and route handlers (not Next's assets, files with an extension, or /api other than /api/v1), and all of the
+// gated paths whatever their names.
 export const config = {
-  matcher: ["/decide/:path*", "/api/v1/:path*"],
+  matcher: ["/((?!_next/|api/|.*\\.[\\w]+$).*)", "/decide/:path*", "/api/v1/:path*"],
 };

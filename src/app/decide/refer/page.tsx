@@ -6,6 +6,7 @@ import { getCurrentUser, requireDecideAccess } from "@/features/auth/lib/session
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
 import { StatStrip } from "@/features/decide/components/ui";
+import { TrackView } from "@/features/funnel/components/beacon";
 import { PLANS, paymentsOn } from "@/features/payments/plans";
 import { freeNow, shortDate } from "@/features/plans/plans";
 import { ShareLink } from "@/features/referrals/components/share-link";
@@ -31,6 +32,7 @@ export default async function ReferPage() {
 
   return (
     <AppPage className="grid max-w-3xl grid-cols-1 gap-6">
+      <TrackView name="referral_page_view" />
       <PageHead title="Refer & earn" about={`Your friend gets ${REFERRAL_PERCENT}% off the Season Pass; you get ${REFERRAL_PERCENT}% of what they pay.`} />
       {(free || !paymentsOn()) && (
         <p className="rounded-md border border-border bg-card px-3 py-2 text-sm">

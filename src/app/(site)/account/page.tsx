@@ -31,7 +31,7 @@ export default async function AccountPage() {
         </form>
       </div>
 
-      <section id="plan" aria-labelledby="plan-h" className="max-w-3xl scroll-mt-24 border-b border-border py-12">
+      <section id="plan" data-placement="account" aria-labelledby="plan-h" className="max-w-3xl scroll-mt-24 border-b border-border py-12">
         <h2 id="plan-h" className="text-lg font-medium">Your plan</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {planLine(user)}. Today: {usedOf(used.institutes, eff.limits.institutes)} institute pages, {usedOf(used.residents, eff.limits.residents)} residents

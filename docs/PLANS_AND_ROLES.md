@@ -37,14 +37,16 @@ Premium if the role is `OWNER`, `ADMIN` or `PREMIUM`, or `premiumUntil` is in th
 Overrides: `PLAN_<FREE|PREMIUM>_<FEATURE>` (camelCase becomes `_`: `PLAN_FREE_CHOICE_LISTS`) = a whole number, or `unlimited` / `-1`. Anything else keeps the default.
 
 ## Counting (`usage.ts`)
-`checkAndCount(userId, feature, key?)` → `{ allowed, used, limit, resetAt }`, server-side only:
+`checkAndCount(userId, feature, key?, { aid })` → `{ allowed, used, limit, resetAt, device? }`, server-side only:
 - `UsageDaily` (userId, day, feature, count), primary key (userId, day, feature): one `INSERT … ON CONFLICT DO UPDATE SET count = count + 1 WHERE count < limit RETURNING count`. No row back = refused, and nothing is counted.
 - With `key`, `UsageDistinct` (userId, day, feature, key): the key already there today = allowed for free; else inserted only while today's distinct count is under the limit (count-then-insert: two parallel first views can pass the last slot by one).
 - `day` is the IST date. `ResidentsRead` (the old per-UTC-day residents counter) is no longer written; drop it in a later migration.
+- **Per device** (`aid`, the `seatora_aid` cookie; residents and institutes): on the Free plan only, the device is counted first as the subject `aid:<aid>` with the same limits, so free accounts on one browser share one allowance; refused there = `device: true` and the paywall says "This device has used today's free …" (docs/FUNNEL.md). Premium, the free upgrade, staff and the free period are never device-capped.
 
 ## Admin (`/decide/admin`)
 Owner and admin only (anyone else: not found; noindex). The nav's Help group shows "Admin" only to them.
 - Totals: accounts by role; sign-ups per IST day; uses per feature per day (and how many accounts); Ask runs, tokens and cost per day from `AskLog` at list prices (docs/ASK_SEATORA.md "Cost").
+- Funnel (range picker), Possible duplicates and Errors: docs/FUNNEL.md.
 - Accounts, newest first, 50 a page, search by email or name: plan, created, last active (latest sign-in or counted use), today's counts, and a form per row (role, Season Pass until, notes). The action (`setUserAccess`, Zod) checks the caller itself: only an owner grants or changes Owner and Admin; nobody changes their own role. Every save writes an `AdminAudit` row (actor, target, before, after).
 
 ### Grant the Season Pass

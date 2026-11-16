@@ -19,7 +19,7 @@ export function ClaimFreePass({ label, className, noteClassName }: { label: Reac
     });
   return (
     <div>
-      <button type="button" onClick={claim} disabled={pending} className={cn("inline-flex items-center justify-center disabled:opacity-50", className)}>
+      <button type="button" data-upgrade="" onClick={claim} disabled={pending} className={cn("inline-flex items-center justify-center disabled:opacity-50", className)}>
         {pending ? "Upgrading…" : label}
       </button>
       {error && <p role="status" className={cn("mt-1 text-xs", noteClassName)}>{error}</p>}

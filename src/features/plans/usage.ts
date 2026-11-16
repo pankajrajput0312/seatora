@@ -4,9 +4,11 @@ import { db } from "@/lib/db";
 import { COUNTED, effectivePlan, istDay, type Account, type Capped, type Counted, type Effective } from "./plans";
 
 // Usage counting, in Postgres so every server instance shares it. Server-side only: nothing the browser sends is trusted.
-// UsageDaily: one atomic upsert per use. UsageDistinct (institutes): one row per thing opened per day.
+// UsageDaily: one atomic upsert per use. UsageDistinct (institutes): one row per thing opened per day. Both are keyed by
+// a subject: a user id, or "aid:<device>" for the Free plan's per-device count.
 
-export type Check = { allowed: boolean; used: number; limit: number; resetAt: Date };
+/** `device`: refused because this device (seatora_aid) has used today's Free allowance across its accounts. */
+export type Check = { allowed: boolean; used: number; limit: number; resetAt: Date; device?: boolean };
 const SQL_MAX = 2_147_483_647; // Infinity in an INTEGER comparison
 
 const accountOf = (userId: string) => db.user.findUniqueOrThrow({ where: { id: userId }, select: { role: true, premiumUntil: true } });
@@ -15,10 +17,20 @@ const accountOf = (userId: string) => db.user.findUniqueOrThrow({ where: { id: u
  * Counts one use of `feature` today (IST) if it is within the account's plan; `key` makes it a distinct count (opening
  * the same institute again is free and always allowed). Over the limit nothing is counted. `account`: the user's role
  * and premiumUntil when the caller already has them (saves a read).
+ * `aid` (the seatora_aid cookie): on the Free plan the device is counted too, as the subject "aid:<aid>" with the same
+ * limits, so free accounts on one browser share one allowance. Premium (paid, claimed, the free period) and staff never are.
  */
-export async function checkAndCount(userId: string, feature: Counted, key?: string, opts: { account?: Account; now?: Date } = {}): Promise<Check> {
+export async function checkAndCount(userId: string, feature: Counted, key?: string, opts: { account?: Account; now?: Date; aid?: string | null } = {}): Promise<Check> {
   const now = opts.now ?? new Date();
-  const limit = effectivePlan(opts.account ?? (await accountOf(userId)), now).limits[feature];
+  const account = opts.account ?? (await accountOf(userId));
+  const eff = effectivePlan(account, now);
+  if (opts.aid && eff.plan === "FREE") {
+    // ponytail: the device goes first, so a use the device refuses counts for neither; one the account then refuses
+    // still spends a device slot (one account at its own cap, on a second device). One SQL statement if that matters.
+    const d = await checkAndCount(`aid:${opts.aid}`, feature, key, { account, now });
+    if (!d.allowed) return { ...d, device: true };
+  }
+  const limit = eff.limits[feature];
   const { day, resetAt } = istDay(now);
   const cap = Math.min(limit, SQL_MAX);
   if (key !== undefined) {

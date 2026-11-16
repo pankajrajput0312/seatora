@@ -482,7 +482,7 @@ const handlers: Handlers = {
     const c = await oneCollege(i.college);
     if (!(await canSeeResidents())) fail("Residents' names need a signed-in member session.");
     const no = await residentsDenied("read");
-    if (no) fail(no === "plan_limit" ? "Her plan's residents reads for today are used up (more at 00:00 IST; the Season Pass on /pricing gives more)." : "Residents read limit reached. Try later or open the page.");
+    if (no) fail(no === "plan_limit" || no === "device_limit" ? "Her plan's residents reads for today are used up (more at 00:00 IST; the Season Pass on /pricing gives more)." : "Residents read limit reached. Try later or open the page.");
     const pair = i.course ? (await coursesOf([i.course]))[0] : undefined;
     const slug = pair ? (await meta()).courses.find((x) => `${x.degree}~${x.specialty}` === pair)?.slug : undefined;
     const r = await listResidents(c.key, { course: slug, year: i.year }, { page: 1, pageSize: 60 });

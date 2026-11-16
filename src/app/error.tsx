@@ -4,8 +4,10 @@ import { AlertCircle } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { siteFonts } from "@/app/site-fonts";
+import { useReportError } from "@/features/funnel/components/beacon";
 
-export default function Error({ reset }: { error: Error; reset: () => void }) {
+export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useReportError(error); // grouped in /decide/admin Errors (docs/FUNNEL.md)
   return (
     <Container className={`${siteFonts} py-32`}>
       <AlertCircle className="size-6 text-ember" strokeWidth={1.75} />
