@@ -1,0 +1,42 @@
+"use client";
+
+import { X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { PLAN_PROMPT_COOKIE } from "../prompt";
+
+/**
+ * The plan pop-up right after signing in: what her plan gives and the upgrade, over the planner. "Not now", ×, Esc or a
+ * click outside closes it for this sign-in. A fixed layer rather than <dialog>: the top layer would sit above Razorpay's
+ * checkout when she pays from here.
+ */
+export function PlanPrompt({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const close = useCallback(() => {
+    document.cookie = `${PLAN_PROMPT_COOKIE}=; Max-Age=0; path=/`;
+    setOpen(false);
+  }, []);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [close]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[60] grid items-end bg-black/50 sm:place-items-center sm:p-4" onClick={(e) => e.target === e.currentTarget && close()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="plan-prompt-h" className="max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl bg-card p-5 shadow-xl sm:max-w-lg sm:rounded-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="plan-prompt-h" className="text-lg font-semibold">{title}</h2>
+          <button ref={closeRef} type="button" onClick={close} aria-label="Close" className="-mt-1 -mr-1 grid size-10 shrink-0 place-items-center rounded-md hover:bg-muted">
+            <X className="size-5" aria-hidden />
+          </button>
+        </div>
+        {children}
+        <button type="button" onClick={close} className="mt-3 min-h-11 w-full rounded-md border border-border text-sm font-semibold">
+          Not now
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { PLAN_PROMPT_COOKIE, PLAN_PROMPT_MAX_AGE_S } from "@/features/plans/prompt";
 import { db } from "@/lib/db";
 import { ACCESS_COOKIE, ACCESS_MAX_AGE_S, accessCookie, accessCookieUser, isAllowed, isMember, parseAllowlist, siteGate } from "@/lib/site-access";
 
@@ -29,6 +30,7 @@ export async function createSession({ id: userId, email }: { id: string; email: 
     path: "/",
     maxAge: MAX_AGE_S,
   });
+  (await cookies()).set(PLAN_PROMPT_COOKIE, "1", { secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: PLAN_PROMPT_MAX_AGE_S });
   (await cookies()).set(SIGNED_IN_FLAG, "1", {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

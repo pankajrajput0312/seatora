@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Atkinson_Hyperlegible_Next } from "next/font/google";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import { DatabaseZap } from "lucide-react";
 import "@astryxdesign/core/reset.css";
@@ -16,7 +16,13 @@ import type { ProfileMeta } from "@/features/decide/components/profile-dialog";
 import { EmptyState } from "@/features/decide/components/ui";
 import { deviceView } from "@/features/decide/components/view-toggle";
 import { getMeta } from "@/features/decide/service";
-import { passState } from "@/features/plans/plans";
+import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
+import { PlanPrompt } from "@/features/plans/components/plan-prompt";
+import { PlanTable } from "@/features/plans/components/plan-table";
+import { freeNow, passState, shortDate, type Feature } from "@/features/plans/plans";
+import { PLAN_PROMPT_COOKIE } from "@/features/plans/prompt";
+
+const PROMPT_FEATURES: Feature[] = ["institutes", "residents", "csv", "reports", "compare", "choiceLists"];
 
 // Inside app uses its own "case sheet" system (docs/APP_DESIGN_SYSTEM.md): light, hyperlegible numerals.
 const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
@@ -50,6 +56,9 @@ export default async function DecideLayout({ children }: { children: React.React
   // "Upgrade" in the nav: signed in without the Season Pass (the free upgrade in the free period, the paid one after).
   const me = meta ? await getCurrentUser().catch(() => null) : null;
   const upgrade = !!me && ["claimable", "free"].includes(passState(me).state);
+  // The plan pop-up: once right after signing in (the cookie createSession sets), only without the Season Pass.
+  const prompt = upgrade && !!(await cookies()).get(PLAN_PROMPT_COOKIE);
+  const free = freeNow();
   return (
     <div className={`app ${app.variable} min-h-screen`}>
       <AstryxProvider>
@@ -68,6 +77,19 @@ export default async function DecideLayout({ children }: { children: React.React
             </AppPage>
           )}
         </DecideShell>
+        {prompt && (
+          <PlanPrompt title={free ? "Upgrade to the Season Pass, free" : "Upgrade to the Season Pass"}>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {free
+                ? `You're on the Free plan. Everything is free till ${shortDate(free)}: upgrade now, no card needed.`
+                : "You're on the Free plan. The Season Pass lifts the daily limits for the whole counselling season."}
+            </p>
+            <PlanTable features={PROMPT_FEATURES} className="mt-4" />
+            <div className="mt-4">
+              <SeasonPassButton className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-foreground px-4 text-sm font-semibold text-background" noteClassName="text-muted-foreground" />
+            </div>
+          </PlanPrompt>
+        )}
       </AstryxProvider>
     </div>
   );
