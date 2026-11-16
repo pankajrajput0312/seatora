@@ -107,7 +107,7 @@ export async function ResidentsPromo({ L }: { L: DecideLinks }) {
         <div data-placement="home_card" className="rounded-lg border border-dashed border-[#2b3a45] px-4 py-3 md:max-w-72">
           <p className="section-label text-[#a3abb3]">Season Pass</p>
           {got ? (
-            <p className="mt-1 font-mono text-body font-bold text-[#5fd36f]">{got}</p>
+            <p className="mt-1 text-body font-bold text-[#5fd36f]">{got}</p>
           ) : free ? (
             // As the plan card: ₹0 now, never a struck "was" price beside it.
             <p className="mt-1 flex items-baseline gap-2">

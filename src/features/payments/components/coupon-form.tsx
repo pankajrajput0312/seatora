@@ -25,11 +25,13 @@ function useRedeem(done: (coupon: string) => string) {
       if (!body?.free) return setMessage(body?.error?.message ?? "Couldn't apply the coupon. Try again.");
       applied.current = done(body.coupon);
       navigating(true); // inside Decide: the shell keeps the refresh moving (decide-shell.tsx)
-      // The page again, without its ?coupon= (used now: its banner would say so).
+      // The whole page again (the layout's plan chip too), without its ?coupon= (used now: its banner would say so).
       const url = new URL(location.href);
-      if (!url.searchParams.has("coupon")) return router.refresh();
-      url.searchParams.delete("coupon");
-      router.replace(url.pathname + url.search + url.hash, { scroll: false });
+      if (url.searchParams.has("coupon")) {
+        url.searchParams.delete("coupon");
+        router.replace(url.pathname + url.search + url.hash, { scroll: false });
+      }
+      router.refresh(); // after the replace (the router queues them): the layout re-renders too
     });
   return { pending, message, redeem };
 }
