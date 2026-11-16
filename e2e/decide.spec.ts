@@ -169,28 +169,37 @@ test("Cards | Table writes `layout`, keeps the page's own `view`, renders only t
   await expect(page.locator("#options-count")).toContainText("of 641 options");
 });
 
-/** Opens the page's Filters panel (list pages keep their filters behind it). */
+/** Opens the page's Filters sheet (list pages keep their filters behind it). */
 const openFilters = async (page: import("@playwright/test").Page) => {
-  const filters = page.locator("details[data-filters]");
-  if ((await filters.getAttribute("open")) == null) await filters.locator("> summary").click();
+  if (!(await page.getByRole("dialog", { name: "Filters" }).isVisible())) await page.getByRole("button", { name: /^Filters/ }).click();
 };
+/** The sheet's submit: "Show N results" (or "Show results" once a field changed). */
+const showResults = (page: import("@playwright/test").Page) => page.getByRole("dialog", { name: "Filters" }).getByRole("button", { name: /^Show/ }).click();
 
-test("filters sit behind a Filters button: its count, Escape closes it with focus back on it, Apply keeps them", async ({ page }) => {
+test("filters sit behind a Filters button: its count, a sheet with sections, Escape closes it with focus back on it, Show results keeps them; a chip opens its filter", async ({ page }) => {
   await page.goto(`/decide/fees?${PROFILE}&maxleave=5`);
-  const summary = page.locator("details[data-filters] > summary");
+  const button = page.getByRole("button", { name: /^Filters/ });
+  const sheet = page.getByRole("dialog", { name: "Filters" });
   await expect(page.getByRole("searchbox")).toBeVisible(); // the search box stays out
-  await expect(page.getByRole("group", { name: "Filters", exact: true })).toBeHidden();
-  await expect(summary).toContainText(/Filters\s*\d+ applied/);
-  await summary.click();
-  await expect(page.getByRole("group", { name: "Filters", exact: true })).toBeVisible();
-  await page.getByRole("group", { name: "Filters", exact: true }).getByRole("combobox").first().focus();
+  await expect(sheet).toBeHidden();
+  await expect(button).toContainText(/Filters\s*\d+ applied/);
+  await button.click();
+  await expect(sheet).toBeVisible();
+  // Sections say what they are set to; the money filters are one "Fees & bond" section.
+  await expect(sheet.locator("summary", { hasText: "Fees & bond" })).toContainText("Leaving penalty up to ₹5 L");
+  await expect(sheet.getByRole("button", { name: /^Show [\d,]+ results?$/ })).toBeVisible();
+  await sheet.getByRole("combobox").first().focus();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("group", { name: "Filters", exact: true })).toBeHidden();
-  await expect(summary).toBeFocused();
-  await summary.click();
-  await page.getByRole("button", { name: "Apply" }).click(); // a plain GET form: the page loads again, the panel closed
-  await expect(page.getByRole("group", { name: "Filters", exact: true })).toBeHidden();
+  await expect(sheet).toBeHidden();
+  await expect(button).toBeFocused();
+  await button.click();
+  await showResults(page); // a plain GET form: the page loads again, the sheet closed
+  await expect(sheet).toBeHidden();
   await expect(page).toHaveURL(/maxleave=5/);
+  // The chip's words open its filter in the sheet, its section open; only its × removes it.
+  await page.getByRole("group", { name: "Active filters" }).getByRole("button", { name: /^Change filter: Leaving penalty/ }).click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole("combobox", { name: "Leaving penalty" })).toBeFocused();
 });
 
 test("options, the view of every option with past allotments: her 641 options in the open quotas (25 at a time), Show more focuses the first new row, two ticked states both apply", async ({ page }) => {
@@ -209,8 +218,8 @@ test("options, the view of every option with past allotments: her 641 options in
   await page.locator("summary", { hasText: "State" }).click();
   await page.getByRole("checkbox", { name: "Maharashtra" }).check();
   await page.getByRole("checkbox", { name: "Karnataka" }).check();
-  await page.locator("summary", { hasText: "State" }).click(); // close it: on a phone the open list covers Apply
-  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.locator("summary", { hasText: "State" })).toContainText("2 selected"); // live, before it applies
+  await showResults(page);
   await expect(page).toHaveURL(/st=Maharashtra/);
   await expect(page).toHaveURL(/st=Karnataka/);
   await expect(count).toContainText("of 138 options");
@@ -348,7 +357,7 @@ test("last ranks show the official closings: closing on one seat category, allot
   await expect(page.locator(`#inst-${SETH_GS}`)).toContainText("11,842 (20)");
   await openFilters(page);
   await page.getByLabel("Seat category").selectOption("Open");
-  await page.getByRole("button", { name: "Apply" }).click();
+  await showResults(page);
   await expect(page).toHaveURL(/lcat=Open/);
   await expect(page.locator(`#inst-${SETH_GS}`)).toContainText("8,502 (20)");
 });
@@ -362,7 +371,7 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
   // Comboboxes: the Display menu has checkboxes with the same names.
   await openFilters(page);
   await page.getByRole("combobox", { name: "Seat category" }).selectOption("OBC");
-  await page.getByRole("button", { name: "Apply" }).click();
+  await showResults(page);
   await expect(page).toHaveURL(/acat=OBC/);
   await expect(table).toContainText("17,213");
 
@@ -372,7 +381,7 @@ test("allotments: own filter keys, comma ranks, pages, and GMC Nagpur 2026 R1", 
   await expect(page.locator("#results")).not.toContainText("2,09,566");
   await openFilters(page);
   await page.getByRole("combobox", { name: "Quota" }).selectOption("All India");
-  await page.getByRole("button", { name: "Apply" }).click();
+  await showResults(page);
   await expect(page).toHaveURL(/aq=All\+India/);
   await expect(page).not.toHaveURL(/[?&]quota=/);
   await page.goto(`/decide/allotments?${PROFILE}&from=abc`);
@@ -514,6 +523,7 @@ test("removing a filter chip moves focus to the chip now in its place, and with 
   const chips = page.getByRole("group", { name: "Active filters" });
   await chips.getByRole("link", { name: /^Remove filter: Fee up to/ }).click();
   await expect(page).not.toHaveURL(/maxfee=/);
+  await expect(page.getByRole("status").filter({ hasText: /^Removed Fee up to/ })).toContainText("Undo");
   const stipend = chips.getByRole("link", { name: /^Remove filter: Stipend at least/ });
   await expect(stipend).toBeFocused();
   await stipend.press("Enter");

@@ -13,6 +13,7 @@ import { useChoices, useCompare, useDecideLinks } from "../lib/use-decide-store"
 import { statKeys, statLabel } from "../lib/stat-format";
 import { roundLabel, type SeatList } from "../types";
 import { Dash, HistoryNote, Provisional, ReachBadge } from "./bits";
+import { AboutData } from "./filter-form";
 import { FocusItem } from "./focus-item";
 import { Beds } from "./pages/beds";
 import { cardClosing, ClosingCell, courseName, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, seatKindShort, toChoiceItem, type ListRow } from "./options-view";
@@ -318,16 +319,16 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
 
   return (
     <>
-      {/* csv-link.tsx toolbarRow (that module is server-only): the tools under the count on a phone. */}
-      <div className="grid justify-items-start gap-2 md:flex md:items-center md:justify-between md:gap-x-4">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 md:flex-1">
+      {/* csv-link.tsx toolbarRow (that module is server-only). Phones: "About this data" (the count line and notes) and the tools on one row. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 md:gap-x-4">
+        <AboutData className="flex flex-wrap items-center gap-x-3 gap-y-1 md:flex-1">
           <p id="options-count" aria-live="polite" className="text-sm text-muted-foreground">
             Showing <span className="numeric font-semibold text-foreground">{formatRank(start + 1)}–{formatRank(shown)}</span> of <span className="numeric">{formatRank(total)}</span> options
             {firstPageHref && <> · <Link href={firstPageHref} className={`${smallLink} text-sky`}>Back to the first</Link></>}
            <ColourLegend className="ml-1 align-middle" /></p>
           <HistoryNote more={historyMore} />
           {notes}
-        </div>
+        </AboutData>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <ViewToggle page="options" view={view} />
           {tools}

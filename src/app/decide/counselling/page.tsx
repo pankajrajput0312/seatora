@@ -11,7 +11,7 @@ import { InfoTip } from "@/features/decide/components/info-tip";
 import { MCC_PG, MccLink } from "@/features/decide/components/pages/mcc-link";
 import { NoticeLink } from "@/features/decide/components/round-status";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
-import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
+import { ActiveFilters, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { LATEST_YEAR } from "@/features/decide/lib/reach";
@@ -132,18 +132,26 @@ async function Announcements({ f, params, L }: { f: Filters; params: URLSearchPa
   const years = [...new Set(all.map((n) => n.year))].sort((a, b) => b - a);
   const page = Math.min(f.page, Math.max(1, Math.ceil(matching.length / PAGE_SIZE)));
   const res = { rows: matching.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total: matching.length, page, pageSize: PAGE_SIZE };
+  const here = (changes: Record<string, string | null>) => L.with("/decide/counselling", { page: null, ...changes });
+  const chips = [
+    f.kind && { label: kindLabel[f.kind], param: "kind", href: here({ kind: null }) },
+    f.round && { label: roundName[f.round], param: "round", href: here({ round: null }) },
+    f.year && { label: `PG ${f.year}`, param: "year", href: here({ year: null }) },
+  ].filter((x) => !!x);
+  const clear = L.to("/decide/counselling", { tab: "announcements" });
 
   return (
     <>
-      <FilterBar action="/decide/counselling" params={params} cols="md:grid-cols-[1fr_1fr_1fr_auto]">
+      <FilterBar action="/decide/counselling" params={params} active={chips.length} clear={clear} total={res.total} noun="notices">
         <input type="hidden" name="tab" value="announcements" />
         <Field label="Kind"><Select name="kind" value={f.kind} all="All kinds" options={noticeKinds.map((k) => ({ value: k, label: kindLabel[k] }))} /></Field>
         <Field label="Round"><Select name="round" value={f.round} all="All rounds" options={noticeRounds.map((r) => ({ value: r, label: roundName[r] }))} /></Field>
-        <Field label="Counselling year"><Select name="year" value={f.year ? String(f.year) : undefined} all="All years" options={years.map((y) => ({ value: String(y), label: `PG ${y}` }))} /></Field>
+        <Field label="Year"><Select name="year" value={f.year ? String(f.year) : undefined} all="All years" options={years.map((y) => ({ value: String(y), label: `PG ${y}` }))} /></Field>
       </FilterBar>
+      <ActiveFilters items={chips} clear={clear} />
 
       <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-        <p id="results" tabIndex={-1} aria-live="polite">
+        <p id="results" tabIndex={-1} aria-live="polite" className="max-md:sr-only">
           <span className="numeric font-semibold text-foreground">{rangeLabel(res)}</span> MCC notices, newest first
         </p>
         {all[0] && (

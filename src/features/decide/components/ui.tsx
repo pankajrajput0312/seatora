@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { keepProfileParams } from "../profile";
-import { FilterForm, FiltersPanel, SearchSubmit } from "./filter-form";
+import { FilterForm, FiltersPanel, ToolbarCount, ToolbarSearch } from "./filter-form";
 import { FocusOnChange } from "./focus-item";
 import { InfoTip } from "./info-tip";
 import { ViewField } from "./view-toggle";
@@ -33,14 +33,22 @@ export const tbl = {
 };
 
 /**
- * GET filter form that keeps the profile params (every repeated value, comma-joined). The form and its Apply button
- * stay mounted across navigations so focus stays on Apply (Enter in a field moves it there); only the fields remount
- * to show the applied values.
- * Submitting drops `page`, so results start at page 1, and keeps the address's Cards | Table choice (ViewField).
- * `active` (a list page: the number of its active-filter chips): only `search` (the search box, if any) shows, the
- * fields (`children`, laid out by `cols`) open from a Filters button with that count (FiltersPanel; `clear` its Clear all).
+ * A list page's toolbar, its filter form's class: on phones pinned under the app's top bar while the results scroll
+ * (globals.css .filter-toolbar), one row of 44px controls: the search (ToolbarSearch), Filters (FiltersPanel) and the
+ * result count (ToolbarCount); md up the row it always was.
  */
-export function FilterBar({ action, params, children, cols = "md:grid-cols-4", search, active, clear }: {
+export const toolbar = "filter-toolbar flex min-w-0 items-start gap-2";
+
+/**
+ * GET filter form that keeps the profile params (every repeated value, comma-joined). The form and its buttons stay
+ * mounted across navigations; only the fields remount to show the applied values.
+ * Submitting drops `page`, so results start at page 1, and keeps the address's Cards | Table choice (ViewField).
+ * `active` (a list page: the number of its active-filter chips): the toolbar (pinned on phones): `search` (its label and
+ * input, if any), a Filters button with that count opening the fields (`children`: FilterSections and Fields) in a sheet
+ * (FiltersPanel; `clear` its Reset), and on phones `total` results (`noun`). Without `active`: the fields in a card
+ * laid out by `cols`, with Apply.
+ */
+export function FilterBar({ action, params, children, cols = "md:grid-cols-4", search, active, clear, total, noun = "results" }: {
   action: string;
   params: URLSearchParams;
   children: React.ReactNode;
@@ -48,21 +56,19 @@ export function FilterBar({ action, params, children, cols = "md:grid-cols-4", s
   search?: React.ReactNode;
   active?: number;
   clear?: string;
+  total?: number;
+  noun?: string;
 }) {
   if (active != null)
     return (
-      <FilterForm action={action} role="search" className="relative flex flex-wrap items-end gap-2">
+      <FilterForm action={action} role="search" className={toolbar}>
         {[...keepProfileParams(params)].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
         <ViewField />
-        {search && (
-          <>
-            <Fragment key={`q${params}`}>{search}</Fragment>
-            <SearchSubmit />
-          </>
-        )}
-        <FiltersPanel count={active} clear={clear}>
-          <div className={cn("grid gap-3 sm:grid-cols-2", cols, "md:items-end")}><Fragment key={params.toString()}>{children}</Fragment></div>
+        {search && <ToolbarSearch><Fragment key={`q${params}`}>{search}</Fragment></ToolbarSearch>}
+        <FiltersPanel count={active} clear={clear} total={total}>
+          <Fragment key={params.toString()}>{children}</Fragment>
         </FiltersPanel>
+        {total != null && <ToolbarCount total={total} noun={noun} />}
       </FilterForm>
     );
   return (
@@ -75,9 +81,10 @@ export function FilterBar({ action, params, children, cols = "md:grid-cols-4", s
   );
 }
 
+/** A labelled field. In the Filters sheet it is one row (globals.css .filter-sheet .field): the label, then the control. */
 export function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <label className={cn("grid gap-1.5 text-sm", className)}>
+    <label className={cn("field grid gap-1.5 text-sm", className)}>
       <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       {children}
     </label>

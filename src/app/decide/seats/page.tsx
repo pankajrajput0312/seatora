@@ -10,7 +10,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HistoryNote, PageHead } from "@/features/decide/components/bits";
 import { termDocs } from "@/features/decide/components/fees";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
-import { FilterForm, FiltersPanel, SearchSubmit } from "@/features/decide/components/filter-form";
+import { AboutData, FilterForm, FiltersPanel, ToolbarCount, ToolbarSearch } from "@/features/decide/components/filter-form";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { courseName } from "@/features/decide/components/options-view";
 import { MccLink } from "@/features/decide/components/pages/mcc-link";
@@ -22,7 +22,7 @@ import { ViewField, ViewPanes, ViewToggle } from "@/features/decide/components/v
 import { chosenView } from "@/features/decide/server/view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
-import { ActiveFilters, control, EmptyState, Pager, rangeLabel, smallLink, tbl } from "@/features/decide/components/ui";
+import { ActiveFilters, control, EmptyState, Field, Pager, rangeLabel, smallLink, tbl, toolbar } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { reachWindow } from "@/features/decide/lib/reach";
 import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
@@ -105,18 +105,18 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
     : `${compare ? `Seats in every ${round} list side by side` : `Seats in the ${title} list`} (MCC PDF${compare ? "s" : ""}), ${sortLabels[sort].toLowerCase()}, page ${r.page}`;
   const years: ClosingYear[] = meta.years.map((y, i) => ({ year: y.year, rounds: i === 0 ? y.rounds : [...rounds] }));
   // Chips for what narrows the rows beyond the courses (the Course pill shows those); inst / course / nohist have their own lines below.
-  const listed = (label: string, xs: string[]) => `${label}: ${xs.length > 2 ? `${xs.length} selected` : xs.join(", ")}`;
   const hasWords = { clear: "Has clear vacancy", virtual: "Has virtual vacancy", new: "Has newly added" } as const;
   const active = [
-    f.q && { label: `Search: “${f.q}”`, href: here({ q: null }) },
-    f.quota.length > 0 && { label: listed("Quota", f.quota), href: here({ quota: null }) },
-    f.st.length > 0 && { label: listed("State", f.st), href: here({ st: null }) },
-    matrix && f.has.length > 0 && { label: `${round}: ${f.has.map((k) => hasWords[k].toLowerCase()).join(" or ")}`, href: here({ has: null }) },
-    f.scat && { label: f.scat === "all" ? "All seat categories" : `${f.scat} seats`, href: here({ scat: null }) },
+    f.q && { label: `Search: “${f.q}”`, param: "q", href: here({ q: null }) },
+    // One chip per quota, state and list: the × takes that one out.
+    ...f.quota.map((q) => ({ label: q, param: "quota", href: L.without("/decide/seats", "quota", q) })),
+    ...f.st.map((s) => ({ label: s, param: "st", href: L.without("/decide/seats", "st", s) })),
+    ...(matrix ? f.has : []).map((k) => ({ label: `${round}: ${hasWords[k].toLowerCase()}`, param: "has", href: L.without("/decide/seats", "has", k) })),
+    f.scat && { label: f.scat === "all" ? "All seat categories" : `${f.scat} seats`, param: "scat", href: here({ scat: null }) },
     // Her profile's caps apply here as on Options (find-seats.ts seatsView); "any" lifts one on this page.
-    profile?.maxFeeLakh != null && f.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: here({ maxfee: "any" }) },
-    profile?.maxBondYears != null && f.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: here({ bondyrs: "any" }) },
-    ...termChips(f).map((c) => ({ label: c.label, href: here({ [c.key]: null }) })),
+    profile?.maxFeeLakh != null && f.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: here({ maxfee: "any" }) },
+    profile?.maxBondYears != null && f.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: here({ bondyrs: "any" }) },
+    ...termChips(f).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/seats", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
   const clearAll = here({ list: list.key, q: null, quota: null, st: null, has: null, scat: null, ...noTerms });
   const strong = (t: string) => <span className="font-semibold">{t}</span>;
@@ -175,11 +175,9 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
       </div>
       </div>
 
-      {/* As on Options: the search box shows, the rest open from Filters; the form, its buttons and the panel stay mounted, the fields remount to show what was applied. */}
-      {/* One row: the search, Filters and the results' tools (Cards | Table, CSV, Display); the count line under it. The row
-          is the Filters panel's box (the form is static), so the panel spans it. */}
-      <div className="relative flex flex-wrap items-center gap-2">
-      <FilterForm action="/decide/seats" role="search" aria-label="Filter seats" className="static flex min-w-0 flex-[1_1_18rem] flex-wrap items-end gap-2">
+      {/* As on Options: the toolbar (pinned on phones) has the search box, Filters (the rest, in a sheet) and the count;
+          the form, its buttons and the sheet stay mounted, the fields remount to show what was applied. */}
+      <FilterForm action="/decide/seats" role="search" aria-label="Filter seats" className={toolbar}>
         {(["rank", "cat", "pwd", "fee", "bond"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         <input type="hidden" name="list" value={list.key} />
         {!matrix && <input type="hidden" name="view" value={f.view} />}
@@ -187,15 +185,15 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         {f.nohist && <input type="hidden" name="nohist" value="1" />}
         <ViewField />
         {(["inst", "course", "squota"] as const).map((k) => f[k] && <input key={k} type="hidden" name={k} value={f[k]} />)}
-        <Fragment key={params.toString()}>
-          <label className="min-w-0 flex-1 basis-32 md:min-w-56">
-            <span className="sr-only">Search institute or state</span>
-            <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Institute or state" className={control} />
-          </label>
-        </Fragment>
-        <SearchSubmit />
-        <FiltersPanel count={active.length} clear={clearAll}>
-        <div className="flex flex-wrap items-end gap-2">
+        <ToolbarSearch>
+          <Fragment key={params.toString()}>
+            <label className="min-w-0">
+              <span className="sr-only">Search institute or state</span>
+              <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Institute or state" className={control} />
+            </label>
+          </Fragment>
+        </ToolbarSearch>
+        <FiltersPanel count={active.length} clear={clearAll} total={r.total}>
         <Fragment key={params.toString()}>
           {f.c.length ? (
             <FilterDropdown label="Course" name="c" options={pairChoices(meta.courses)} selected={f.c} />
@@ -211,9 +209,9 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             options={meta.quotas.map((q) => ({ value: q, label: openQuotas.includes(q) ? q : `${q} (restricted)` }))}
             selected={f.quota}
             none={profile ? "Open quotas" : undefined}
-            noneNote={profile ? openQuotasNote : undefined}
+            info={profile ? openQuotasNote : undefined}
           />
-          <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.st} />
+          <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.st} none="All states" />
           {matrix && (
             <FilterDropdown
               label={`Seats in ${round}`}
@@ -221,36 +219,26 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
               options={seatKinds.filter((k) => roundLists.some((l) => l.kind === k)).map((k) => ({ value: k, label: hasWords[k] }))}
               selected={f.has}
               none="Any"
-              noneNote={`None ticked means every row. Ticked: rows with seats in any ticked ${round} list.`}
+              info={`Ticked: rows with seats in any ticked ${round} list.`}
             />
           )}
           <TermFilterControls f={f} caps={profile} />
-          <label className="w-72 max-w-full">
-            <span className="sr-only">Seat category</span>
+          <Field label="Seat category">
             <select name="scat" defaultValue={f.scat ?? ""} className={control}>
-              <option value="">{mine ? `Your categories: ${mine.join(", ")}` : "All seat categories"}</option>
+              <option value="">{mine ? `Yours: ${mine.join(", ")}` : "All seat categories"}</option>
               {mine && <option value="all">All seat categories</option>}
               {seatCategories.map((c) => <option key={c} value={c}>{c} seats</option>)}
             </select>
-          </label>
-          <label className="w-72 max-w-full">
-            <span className="sr-only">Sort</span>
+          </Field>
+          <Field label="Sort">
             <select name="sort" defaultValue={sort} className={control}>
               {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && several ? `Most ${kindSeats(list)} first` : s === "reach" && matrix ? "Your chances: beyond your rank first" : sortLabels[s]}</option>)}
             </select>
-          </label>
+          </Field>
         </Fragment>
-        </div>
         </FiltersPanel>
+        <ToolbarCount total={r.total} noun="rows" />
       </FilterForm>
-        {r.total > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <ViewToggle page="seats" view={view} />
-            <CsvLink href={L.with("/api/v1/seats/export", { tab: null, page: null })} what={`${matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row`} total={r.total} />
-            {matrix && view === "table" && <SeatMatrixDisplay groups={seatGroups(r.lists)} ranked={!!profile} years={years} />}
-          </div>
-        )}
-      </div>
       <ActiveFilters items={active} clear={clearAll} />
 
       {one && (
@@ -268,7 +256,8 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         </p>
       )}
       <div className="grid gap-1">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-2 md:gap-x-4">
+        <AboutData className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
             {matrix ? (
               <>
@@ -291,6 +280,14 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             <SeatSource lists={several ? roundLists : [list]} L={L} />
             {r.total > 0 && <HistoryNote more={closingNote} />}
           </span>
+        </AboutData>
+        {r.total > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <ViewToggle page="seats" view={view} />
+            <CsvLink href={L.with("/api/v1/seats/export", { tab: null, page: null })} what={`${matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row`} total={r.total} />
+            {matrix && view === "table" && <SeatMatrixDisplay groups={seatGroups(r.lists)} ranked={!!profile} years={years} />}
+          </div>
+        )}
         </div>
         {r.unknownTerms > 0 && f.nd !== "keep" && (
           <p className="text-sm text-muted-foreground">

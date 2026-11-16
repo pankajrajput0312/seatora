@@ -1,97 +1,65 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { cn } from "@/lib/cn";
 import { matchesSpecialty } from "../lib/specialty-search";
+import { FilterSection } from "./filter-form";
 
 /**
- * Compact multi-select for GET filter forms: a pill that opens a checkbox panel. Ticked boxes submit repeated params
- * (sp=A&sp=B), which every Decide page reads. Only one panel is open at a time (native `<details name>`), and it closes
- * on Escape (focus back on the pill) and when focus leaves it, so it never covers the control that has focus.
- * `search`: a box above the list that shows only the options whose label has what she types (a long list; with JS).
- * `find`: a list too long to send (Residents' colleges): `options` are only the ticked ones, and the box asks `find` for
- * what she types (2+ letters); without JS the box itself is submitted as `findName` (the page searches by it).
+ * A multi-select of the Filters sheet: a section (FilterSection) whose header says what is ticked, opening large
+ * checkbox chips. Ticked boxes submit repeated params (sp=A&sp=B), which every Decide page reads. A long list (`search`, or more
+ * than 12) has a box above it that shows only the options whose label has what she types. `none`: what the header says
+ * when nothing is ticked (quotas: the open ones, not all); `info`: what that means, or how the values are arrived at,
+ * behind the header's (i).
  */
-const noop = () => () => {};
-export function FilterDropdown({ label, name, options, selected, none = "All", noneNote = "None ticked means all.", search, find, findName }: {
+export function FilterDropdown({ label, name, options, selected, none = "All", info, search }: {
   label: string;
   name: string;
   options: { value: string; label: string }[];
   selected: string[];
-  /** What the pill says, and the note explains, when nothing is ticked (quotas: the open ones, not all). */
   none?: string;
-  noneNote?: string;
+  info?: React.ReactNode;
   search?: boolean;
-  find?: (q: string) => Promise<{ value: string; label: string }[] | null>;
-  findName?: string;
 }) {
-  const count = selected.length;
   const [typed, setTyped] = useState("");
-  const hydrated = useSyncExternalStore(noop, () => true, () => false);
-  const [found, setFound] = useState<{ value: string; label: string }[]>([]);
-  useEffect(() => {
-    if (!find || typed.trim().length < 2) return setFound([]);
-    let live = true;
-    const t = setTimeout(() => find(typed.trim()).then((r) => live && setFound(r ?? [])), 250);
-    return () => {
-      live = false;
-      clearTimeout(t);
-    };
-  }, [find, typed]);
-  // With `find`: the ticked ones (kept while she searches on), then what the search found (each once).
-  const [kept, setKept] = useState(options);
-  const shown = find ? [...kept, ...found.filter((o) => !kept.some((x) => x.value === o.value))] : options;
-  const keep = (o: { value: string; label: string }) => find && !kept.some((x) => x.value === o.value) && setKept((k) => [...k, o]);
+  const [ticked, setTicked] = useState(selected.length);
+  const long = search || options.length > 12;
+  const count = selected.length;
+  const summary = count ? (count === 1 ? options.find((o) => o.value === selected[0])?.label ?? selected[0] : `${count} selected`) : none;
   return (
-    <details
-      name="decide-filter"
-      className="group relative"
-      onKeyDown={(e) => {
-        if (e.key !== "Escape" || !e.currentTarget.open) return;
-        e.stopPropagation(); // only this panel, not a Filters panel around it
-        e.currentTarget.open = false;
-        e.currentTarget.querySelector("summary")?.focus();
-      }}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) e.currentTarget.open = false;
-      }}
-      onToggle={(e) => {
-        // Open leftwards when the panel would pass the right edge of the window (the last pill in a row).
-        const panel = e.currentTarget.querySelector("fieldset")!;
-        delete panel.dataset.flip;
-        if (e.currentTarget.open && panel.getBoundingClientRect().right > document.documentElement.clientWidth) panel.dataset.flip = "";
-      }}
-    >
-      <summary className="flex h-11 max-md:h-[2.375rem] cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-card px-3 text-sm whitespace-nowrap hover:border-foreground/70 [&::-webkit-details-marker]:hidden">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-semibold">{count ? (count === 1 ? options.find((o) => o.value === selected[0])?.label ?? selected[0] : `${count} selected`) : none}</span>
-        <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
-      </summary>
-      {/* tabIndex -1: a click on the panel's text keeps focus inside, so the panel stays open. */}
-      <fieldset tabIndex={-1} className="absolute left-0 z-10 mt-1 max-h-80 min-w-56 max-w-[calc(100vw-2rem)] overflow-auto data-flip:right-0 data-flip:left-auto rounded-lg border border-border bg-card p-2 shadow-overlay outline-none">
+    <FilterSection title={label} none={none} info={info} summary={summary}>
+      <fieldset onChange={(e) => setTicked(e.currentTarget.querySelectorAll("input[type=checkbox]:checked").length)}>
         <legend className="sr-only">{label}</legend>
-        {(search || find) && (
-          <input
-            type="search"
-            name={find && !hydrated ? findName : undefined}
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
-            aria-label={`Find in ${label}`}
-            placeholder="Type to find"
-            className="mb-1 h-11 w-full rounded-md border border-input bg-card px-3 text-sm"
-          />
+        {long && (
+          // Pinned above the chips while they scroll in the sheet, so it stays above the phone's keyboard; the live count beside it.
+          <div className="sticky top-0 z-[1] flex items-center gap-3 bg-card pb-2">
+            <input
+              type="search"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
+              aria-label={`Find in ${label}`}
+              placeholder={`Find a ${label.toLowerCase()}`}
+              className="h-11 min-w-0 flex-1 rounded-md border border-input bg-card px-3 text-sm"
+            />
+            <span aria-hidden className={cn("shrink-0 text-sm", ticked ? "font-semibold text-sky" : "text-muted-foreground")}>{ticked} selected</span>
+          </div>
         )}
-        {find && typed.trim().length >= 2 && !found.length && <p role="status" className="px-2 py-1 text-xs text-muted-foreground">Nothing found yet.</p>}
-        {search && !find && typed.trim() && !options.some((o) => matchesSpecialty(typed, o.label)) && <p role="status" className="px-2 py-1 text-xs text-muted-foreground">No {label.toLowerCase().replace(/ \(.*\)$/, "")} matches “{typed.trim()}”.</p>}
-        {shown.map((o) => (
-          <label key={o.value} hidden={(!find && !matchesSpecialty(typed, o.label)) || undefined} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-muted">
-            <input type="checkbox" name={name} value={o.value} defaultChecked={selected.includes(o.value)} onChange={(e) => e.target.checked && keep(o)} className="size-4 accent-sky" />
-            {o.label}
-          </label>
-        ))}
-        <p className="px-2 pt-1 text-xs text-muted-foreground">{noneNote}</p>
+        {long && typed.trim() && !options.some((o) => matchesSpecialty(typed, o.label)) && <p role="status" className="py-2 text-sm text-muted-foreground">No {label.toLowerCase()} matches “{typed.trim()}”.</p>}
+        {/* Large chips that wrap, as in the profile editor: more of a long list in view than one row each. */}
+        <div className="flex flex-wrap gap-2">
+          {options.map((o) => (
+            <label
+              key={o.value}
+              hidden={(long && !matchesSpecialty(typed, o.label)) || undefined}
+              className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-input bg-card px-3 text-sm hover:border-foreground/70 has-checked:border-sky has-checked:bg-sky/10 has-checked:font-semibold has-checked:text-sky"
+            >
+              <input type="checkbox" name={name} value={o.value} defaultChecked={selected.includes(o.value)} className="size-4 shrink-0 accent-sky" />
+              {o.label}
+            </label>
+          ))}
+        </div>
       </fieldset>
-    </details>
+    </FilterSection>
   );
 }

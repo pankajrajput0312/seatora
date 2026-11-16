@@ -4,6 +4,7 @@ import Link from "next/link";
 import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
 import { toolbarRow } from "@/features/decide/components/csv-link";
+import { AboutData } from "@/features/decide/components/filter-form";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HistoryNote, PageHead, ReachBadge } from "@/features/decide/components/bits";
@@ -61,15 +62,15 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
     const c = meta.courses.find((x) => x.slug === slug);
     return c ? `${c.degree} ${c.name}` : slug;
   };
-  const listed = (what: string, names: string[]) => (names.length > 2 ? `${what}: ${names.length} selected` : names.join(", "));
   const chips = [
     // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
-    ...(profile?.maxFeeLakh != null && tp.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: L.with(PATH, { maxfee: "any", page: null }) }] : []),
-    ...(profile?.maxBondYears != null && tp.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: L.with(PATH, { bondyrs: "any", page: null }) }] : []),
-    ...(f.q ? [{ label: `“${f.q}”`, href: L.with(PATH, { q: null, page: null }) }] : []),
-    ...(f.state?.length ? [{ label: listed("States", f.state), href: L.with(PATH, { state: null, page: null }) }] : []),
-    ...(f.course?.length ? [{ label: listed("Courses", f.course.map(courseLabel)), href: L.with(PATH, { course: null, page: null }) }] : []),
-    ...termChips(tp).map((c) => ({ label: c.label, href: L.with(PATH, { [c.key]: null, page: null }) })),
+    ...(profile?.maxFeeLakh != null && tp.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: L.with(PATH, { maxfee: "any", page: null }) }] : []),
+    ...(profile?.maxBondYears != null && tp.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: L.with(PATH, { bondyrs: "any", page: null }) }] : []),
+    ...(f.q ? [{ label: `“${f.q}”`, param: "q", href: L.with(PATH, { q: null, page: null }) }] : []),
+    // One chip per state and course: the × takes that one out.
+    ...(f.state ?? []).map((s) => ({ label: s, param: "state", href: L.without(PATH, "state", s) })),
+    ...(f.course ?? []).map((c) => ({ label: courseLabel(c), param: "course", href: L.without(PATH, "course", c) })),
+    ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without(PATH, c.key, c.value) : L.with(PATH, { [c.key]: null, page: null }) })),
   ];
   const clear = L.with(PATH, { q: null, state: null, course: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
   const bestOf = (r: (typeof res.rows)[number]) =>
@@ -179,24 +180,26 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
       <FilterBar
         action={PATH}
         params={params}
-        cols="md:grid-cols-3 xl:grid-cols-4"
         active={chips.length}
         clear={clear}
+        total={res.total}
+        noun="institutes"
         search={
-          <label className="min-w-0 flex-1 basis-32 md:min-w-56">
+          <label className="min-w-0">
             <span className="sr-only">Search institutes by name or state</span>
             <input type="search" name="q" defaultValue={f.q} placeholder="Name or state" className={control} />
           </label>
         }
       >
-        <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.state ?? []} none="All states" noneNote="None ticked means every state. Tick one or more." />
-        <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={f.course ?? []} none="Any course" noneNote="None ticked means any course. Tick one or more." />
+        <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.state ?? []} none="All states" />
+        <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={f.course ?? []} none="Any course" />
         <Field label="Sort"><Select name="sort" value={f.sort} options={[...sorts]} /></Field>
         <TermFilterControls f={tp} caps={profile} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
 
       <div className={toolbarRow}>
+        <AboutData>
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
           <span className="numeric font-semibold text-foreground">{rangeLabel(res)}</span> institutes
           {unknown > 0 && (
@@ -206,6 +209,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
             </>
           )}
          <ColourLegend className="ml-1 align-middle" /></p>
+        </AboutData>
         {res.total > 0 && <ViewToggle page="institutes" view={view} />}
       </div>
       </div>

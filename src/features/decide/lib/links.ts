@@ -32,9 +32,22 @@ export function decideLinks(params: URLSearchParams | string = "") {
     }
     return href(path, p, hash);
   };
+  /** Every current param with one value of `key` taken out (an active-filter chip's ×), the page number dropped. */
+  const without = (path: string, key: string, value: string) => {
+    const profile = (profileParamKeys as readonly string[]).includes(key);
+    const p = new URLSearchParams(keep);
+    for (const [k, v] of src) if (!(profileParamKeys as readonly string[]).includes(k)) p.append(k, v);
+    const rest = p.getAll(key).flatMap((v) => (profile ? v.split(",") : [v])).filter((v) => v !== value);
+    p.delete(key);
+    p.delete("page");
+    if (profile && rest.length) p.set(key, rest.join(","));
+    else for (const v of rest) p.append(key, v);
+    return href(path, p);
+  };
   return {
     to,
     with: withChanges,
+    without,
     /** Same page and filters, another page number (page 1 drops the param). */
     page: (path: string, n: number) => withChanges(path, { page: n > 1 ? n : null }),
     institute: (slug: string, tab?: "overview" | "courses" | "allotments" | "fees" | "clinical", extra: Extra = {}) => to(`/decide/institutes/${slug}`, { tab, ...extra }),

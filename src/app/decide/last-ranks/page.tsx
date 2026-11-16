@@ -4,6 +4,7 @@ import Link from "next/link";
 import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
 import { toolbarRow } from "@/features/decide/components/csv-link";
+import { AboutData } from "@/features/decide/components/filter-form";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HistoryNote, PageHead, Provisional } from "@/features/decide/components/bits";
@@ -161,9 +162,9 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const mcc = (r: OptionRow) => info.get(r.college.key)?.mccProfileUrl;
   const chips = [
     // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
-    ...(profile?.maxFeeLakh != null && tp.params.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: L.with("/decide/last-ranks", { maxfee: "any", page: null }) }] : []),
-    ...(profile?.maxBondYears != null && tp.params.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: L.with("/decide/last-ranks", { bondyrs: "any", page: null }) }] : []),
-    ...termChips(tp.params).map((c) => ({ label: c.label, href: L.with("/decide/last-ranks", { [c.key]: null, page: null }) })),
+    ...(profile?.maxFeeLakh != null && tp.params.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: L.with("/decide/last-ranks", { maxfee: "any", page: null }) }] : []),
+    ...(profile?.maxBondYears != null && tp.params.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: L.with("/decide/last-ranks", { bondyrs: "any", page: null }) }] : []),
+    ...termChips(tp.params).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/last-ranks", c.key, c.value) : L.with("/decide/last-ranks", { [c.key]: null, page: null }) })),
   ];
   const clear = L.with("/decide/last-ranks", { ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
   const about = (
@@ -242,7 +243,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
       <div className="filter-row">
-      <FilterBar action="/decide/last-ranks" params={params} cols="md:grid-cols-4 [&>label]:min-w-0" active={chips.length} clear={clear}>
+      <FilterBar action="/decide/last-ranks" params={params} active={chips.length} clear={clear} total={lr.total} noun="options">
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         <Field label="Course"><Select name="course" value={course.slug} options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
         <Field label="Seat category"><Select name="lcat" value={category} options={categories.map((c) => ({ value: c, label: c }))} /></Field>
@@ -271,7 +272,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
 
       <div className={toolbarRow}>
         {/* The results' sources here, before the panes: MCC results are numbered first (the cards' term (i)s come after). */}
-        <div className="grid gap-0.5">
+        <AboutData className="grid gap-0.5">
           <p id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
             <span><span className="numeric font-semibold text-foreground">{rangeLabel({ ...lr, rows, page, pageSize: PAGE_SIZE })}</span> options</span>
             <InfoTip label="these options">
@@ -285,7 +286,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
             )}
            <ColourLegend className="ml-1 align-middle" /></p>
           <DataSource used={years.map((year) => ({ year }))} />
-        </div>
+        </AboutData>
         {lr.total > 0 && <ViewToggle page={VIEW} view={view} />}
       </div>
       </div>

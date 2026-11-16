@@ -20,14 +20,14 @@ describe("TermFilterControls", () => {
     expect(checked(html, "ctype", "esic")).toBe(false);
     expect(checked(html, "nd", "keep")).toBe(true);
     expect(html).toContain(">No bond<");
-    expect(html).toContain('aria-label="About not published"');
+    expect(html).toContain('aria-label="About Fees &amp; bond"'); // "Include not published" explained behind the section's (i)
   });
 
   it("nothing applied: any, include-not-declared unticked", () => {
     const html = render("");
     expect(selected(html, "maxfee")).toBe("");
     expect(checked(html, "nd", "keep")).toBe(false);
-    expect(html).toContain('<span class="sr-only">Stipend per month, at least</span>');
+    expect(html).toMatch(/>Stipend<\/span><select name="minstip"/); // a short visible label, its row in the sheet
   });
 
   it("her profile's caps are the default, and Any clears them; a value off the list is kept", () => {

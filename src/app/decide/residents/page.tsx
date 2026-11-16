@@ -80,18 +80,19 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
   };
   const collegeName = (slug: string) => pickedColleges.find((c) => c.slug === slug)?.name ?? slug;
   const typedCourses = !allCourses && params.has("course") ? query.course ?? [] : [];
-  const listed = (what: string, names: string[]) => (names.length > 2 ? `${what}: ${names.length} selected` : names.join(", "));
+  const R = "/decide/residents";
+  // One chip per value (college, name, course, state, year): the × takes that one out.
   const chips = [
-    query.q && { label: `Search: “${query.q}”`, href: here({ q: null }) },
-    picked.length > 0 && { label: listed("Colleges", picked.map(collegeName)), href: here({ college: null }) },
-    (query.name?.length ?? 0) > 0 && { label: listed("Names", query.name!), href: here({ name: null }) },
+    query.q && { label: `Search: “${query.q}”`, param: "q", href: here({ q: null }) },
+    ...picked.map((c) => ({ label: collegeName(c), href: L.without(R, "college", c) })),
+    ...(query.name ?? []).map((n) => ({ label: n, href: L.without(R, "name", n) })),
     query.cq && { label: `College: “${query.cq}”`, href: here({ cq: null }) },
     // Her courses are the default: a chip for them too, "All courses" lifts it.
-    allCourses ? { label: "All courses", href: here({ course: null }) } : typedCourses.length ? { label: listed("Courses", typedCourses.map(courseName)), href: here({ course: null }) } : yours && { label: `Your courses (${yours.length})`, href: here({ course: "all" }) },
-    (query.state?.length ?? 0) > 0 && { label: listed("States", query.state!), href: here({ state: null }) },
-    (query.year?.length ?? 0) > 0 && { label: listed("Years", query.year!.map(String)), href: here({ year: null }) },
+    ...(allCourses ? [{ label: "All courses", param: "course", href: here({ course: null }) }] : typedCourses.length ? typedCourses.map((c) => ({ label: courseName(c), param: "course", href: L.without(R, "course", c) })) : yours ? [{ label: `Your courses (${yours.length})`, param: "course", href: here({ course: "all" }) }] : []),
+    ...(query.state ?? []).map((s) => ({ label: s, param: "state", href: L.without(R, "state", s) })),
+    ...(query.year ?? []).map((y) => ({ label: String(y), param: "year", href: L.without(R, "year", String(y)) })),
     query.quota && { label: residentQuota(query.quota), href: here({ rq: null }) },
-    query.sort !== "year" && { label: `Sorted by ${sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`, href: here({ sort: null }) },
+    query.sort !== "year" && { label: `Sorted by ${sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`, param: "sort", href: here({ sort: null }) },
   ].filter((x) => !!x);
   const clear = L.to("/decide/residents", { course: "all" });
   const courseChoices = [
@@ -107,22 +108,24 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
       <FilterBar
         action="/decide/residents"
         params={params}
-        cols="md:grid-cols-3"
         active={chips.length}
         clear={clear}
+        total={total}
+        noun="residents"
         search={
           <ResidentsSearch q={query.q} colleges={pickedColleges.map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name }))} names={query.name ?? []} findColleges={findResidentColleges} findNames={findResidentNames} listColleges={listResidentColleges} />
         }
       >
-        <FilterDropdown label="Course (branch)" name="course" search options={courseChoices} selected={allCourses ? ["all"] : typedCourses} none={yours ? `Your courses (${yours.length})` : "All courses"} noneNote={yours ? "None ticked means your courses. Tick All courses for every one." : "None ticked means every course."} />
-        <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={query.state ?? []} none="All states" noneNote="None ticked means every state. Tick one or more." />
-        <FilterDropdown label="Year" name="year" options={years.map((y) => ({ value: String(y), label: String(y) }))} selected={(query.year ?? []).map(String)} none="All years" noneNote="None ticked means every year. Tick one or more." />
+        <FilterDropdown label="Course" name="course" search options={courseChoices} selected={allCourses ? ["all"] : typedCourses} none={yours ? `Your courses (${yours.length})` : "All courses"} info={yours ? "None ticked means your courses. Tick All courses for every one." : undefined} />
+        <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={query.state ?? []} none="All states" />
+        <FilterDropdown label="Year" name="year" options={years.map((y) => ({ value: String(y), label: String(y) }))} selected={(query.year ?? []).map(String)} none="All years" />
         <Field label="Sort by"><Select name="sort" value={query.sort} options={sorts} /></Field>
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
 
       <div className={toolbarRow}>
-        <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
+        {/* Phones: the toolbar says the count; this line is for md up (and the focus after a page or a removed chip). */}
+        <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground max-md:sr-only">
           <span className="numeric font-semibold text-foreground">{formatRank(total)}</span> residents
         </p>
         {total > 0 && <ViewToggle page="residents" view={view} />}

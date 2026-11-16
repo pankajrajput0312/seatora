@@ -31,3 +31,11 @@ it("with() keeps page filters and applies changes; page() drops page=1", () => {
   expect(L.page("/decide/options", 1)).toBe("/decide/options?rank=1&sp=A%2CB&q=x");
   expect(L.page("/decide/options", 2)).toBe("/decide/options?rank=1&sp=A%2CB&q=x&page=2");
 });
+
+it("without() takes one value out of a filter, the others and the rest kept", () => {
+  const L = decideLinks("rank=1&st=Bihar,Kerala&ctype=govt&ctype=esic&page=2");
+  const q = (href: string) => Object.fromEntries([...new URL(href, "http://x").searchParams.keys()].map((k) => [k, new URL(href, "http://x").searchParams.getAll(k)]));
+  expect(q(L.without("/decide/options", "st", "Bihar"))).toEqual({ rank: ["1"], st: ["Kerala"], ctype: ["govt", "esic"] });
+  expect(q(L.without("/decide/options", "ctype", "esic"))).toEqual({ rank: ["1"], st: ["Bihar,Kerala"], ctype: ["govt"] });
+  expect(decideLinks("rank=1&st=Bihar").without("/decide/options", "st", "Bihar")).toBe("/decide/options?rank=1");
+});

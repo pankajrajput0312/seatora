@@ -14,7 +14,8 @@ import { ResultCard, ResultCards } from "@/features/decide/components/result-car
 import { TermStatCells } from "@/features/decide/components/stat-cells";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
-import { ActiveFilters, control, EmptyState, FilterBar, Pager, rangeLabel, Select, tbl } from "@/features/decide/components/ui";
+import { AboutData } from "@/features/decide/components/filter-form";
+import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
@@ -35,7 +36,6 @@ const sortLabel: Record<FeeSort, string> = { fee1: "fee, year 1", stip1: "stipen
 /** Stipend sorts highest first by default, the rest lowest first. */
 const natural = (k: FeeSort) => (k === "stip1" ? "desc" : "asc");
 const arrow = (on: boolean, dir: string) => (on ? <span aria-hidden="true">{dir === "asc" ? " ↑" : " ↓"}</span> : null);
-const bare = "grid min-w-0 text-sm";
 
 export default async function FeesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
@@ -55,10 +55,10 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const without = (k: string) => L.with("/decide/fees", { [k]: null, page: null });
   const chips = [
     // Her profile's caps apply here (absent maxfee / bondyrs): a chip each, removed by "any".
-    ...(d.maxFeeLakh != null && f.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(d.maxFeeLakh)}`, href: L.with("/decide/fees", { maxfee: "any", page: null }) }] : []),
-    ...(d.maxBondYears != null && f.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(d.maxBondYears)}`, href: L.with("/decide/fees", { bondyrs: "any", page: null }) }] : []),
-    ...termChips(f).map((c) => ({ label: c.label, href: without(c.key) })),
-    ...(f.q ? [{ label: `“${f.q}”`, href: without("q") }] : []),
+    ...(d.maxFeeLakh != null && f.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(d.maxFeeLakh)}`, param: "maxfee", href: L.with("/decide/fees", { maxfee: "any", page: null }) }] : []),
+    ...(d.maxBondYears != null && f.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(d.maxBondYears)}`, param: "bondyrs", href: L.with("/decide/fees", { bondyrs: "any", page: null }) }] : []),
+    ...termChips(f).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/fees", c.key, c.value) : without(c.key) })),
+    ...(f.q ? [{ label: `“${f.q}”`, param: "q", href: without("q") }] : []),
     ...(f.bdecl ? [{ label: f.bdecl === "declared" ? "Bond declared" : "No bond on record", href: without("bdecl") }] : []),
   ];
 
@@ -165,46 +165,43 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         — means none published.
       </PageHead>
 
-      {/* min-w-0: TermFilterControls' selects are sized for a flex bar; in this grid each takes its cell. */}
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
       <div className="filter-row">
       <FilterBar
         action="/decide/fees"
         params={params}
-        cols="md:grid-cols-3 xl:grid-cols-4 [&>label]:min-w-0"
         active={chips.length}
         clear={L.to("/decide/fees")}
+        total={res.total}
+        noun="programmes"
         search={
-          <label className="grid min-w-0 flex-1 basis-32 text-sm md:min-w-56">
+          <label className="grid min-w-0 text-sm">
             <span className="sr-only">Institute or state</span>
             <input name="q" type="search" defaultValue={f.q ?? ""} placeholder="Institute or state" className={control} />
           </label>
         }
       >
-        <label className={bare}>
-          <span className="sr-only">Programme</span>
+        <Field label="Programme">
           <Select name="program" value={f.program} all={d.programmes ? `Your profile: ${d.programmes.join(", ")}` : "All programmes"}
             options={[...(d.programmes ? [{ value: "all", label: "All programmes" }] : []), ...programmeNames.map((p) => ({ value: programmes[p].slug, label: p }))]} />
-        </label>
-        <label className={bare}>
-          <span className="sr-only">State</span>
+        </Field>
+        <Field label="State">
           <Select name="state" value={f.state} all={d.states ? `Your profile: ${d.states.join(", ")}` : "All states"}
             options={[...(d.states ? [{ value: "all", label: "All states" }] : []), ...meta.states.map((s) => ({ value: s, label: s }))]} />
-        </label>
+        </Field>
         <TermFilterControls f={f} caps={d} />
-        <label className={bare}>
-          <span className="sr-only">Sort by</span>
-          <Select name="sort" value={f.sort} options={(Object.keys(sortLabel) as FeeSort[]).map((k) => ({ value: k, label: `Sort: ${sortLabel[k]}` }))} />
-        </label>
-        <label className={bare}>
-          <span className="sr-only">Order</span>
-          <Select name="dir" value={f.dir} all={`Order: ${byName ? "A to Z" : natural(f.sort) === "desc" ? "highest first" : "lowest first"}`}
+        <Field label="Sort by">
+          <Select name="sort" value={f.sort} options={(Object.keys(sortLabel) as FeeSort[]).map((k) => ({ value: k, label: sortLabel[k][0].toUpperCase() + sortLabel[k].slice(1) }))} />
+        </Field>
+        <Field label="Order">
+          <Select name="dir" value={f.dir} all={byName ? "A to Z" : natural(f.sort) === "desc" ? "Highest first" : "Lowest first"}
             options={[{ value: "asc", label: byName ? "A to Z" : "Lowest first" }, { value: "desc", label: byName ? "Z to A" : "Highest first" }]} />
-        </label>
+        </Field>
       </FilterBar>
       <ActiveFilters items={chips} clear={L.to("/decide/fees")} />
 
       <div className={toolbarRow}>
+        <AboutData>
         <h2 id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm font-normal text-muted-foreground">
           <span><span className="numeric font-semibold text-foreground">{rangeLabel(res)}</span> programmes</span>
           {res.undeclared > 0 && <InfoTip label="these programmes"><span className="numeric">{formatRank(res.undeclared)}</span> of them have no published figures (every figure is —).</InfoTip>}
@@ -215,6 +212,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             </span>
           )}
          <ColourLegend className="ml-1 align-middle" /></h2>
+        </AboutData>
         {res.total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle page="fees" view={view} />

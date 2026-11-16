@@ -8,6 +8,7 @@ import { AllotmentsDisplay } from "@/features/decide/components/allotments/allot
 import { allotmentCategories, allotmentsView, statusLabel, type AllotmentRow } from "@/features/decide/components/allotments/allotments-view";
 import { AppPage } from "@/features/decide/components/app-page";
 import { CsvLink, toolbarRow } from "@/features/decide/components/csv-link";
+import { AboutData } from "@/features/decide/components/filter-form";
 import { Dash, PageHead, Provisional } from "@/features/decide/components/bits";
 import { DataSource } from "@/features/decide/components/data-source";
 import { termDocs } from "@/features/decide/components/fees";
@@ -84,16 +85,16 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const course = meta.courses.find((c) => c.slug === filters.course);
   const ranks = filters.from != null && filters.to != null ? `Ranks ${formatRank(filters.from)}–${formatRank(filters.to)}` : filters.from != null ? `From rank ${formatRank(filters.from)}` : filters.to != null ? `Up to rank ${formatRank(filters.to)}` : null;
   const active = [
-    set("year") && { label: filters.year ? `Year: ${meta.years.find((y) => y.year === filters.year)?.label ?? filters.year}` : "All years", href: here({ year: null }) },
-    set("round") && filters.round && { label: `Round: ${roundLabel[filters.round]}`, href: here({ round: null }) },
-    course && { label: `${course.degree} ${course.name}`, href: here({ course: null }) },
-    filters.quota && { label: `Quota: ${filters.quota}`, href: here({ aq: null }) },
-    filters.category && { label: `${filters.category} seats`, href: here({ acat: null }) },
+    set("year") && { label: filters.year ? `Year: ${meta.years.find((y) => y.year === filters.year)?.label ?? filters.year}` : "All years", param: "year", href: here({ year: null }) },
+    set("round") && filters.round && { label: `Round: ${roundLabel[filters.round]}`, param: "round", href: here({ round: null }) },
+    course && { label: `${course.degree} ${course.name}`, param: "course", href: here({ course: null }) },
+    filters.quota && { label: `Quota: ${filters.quota}`, param: "aq", href: here({ aq: null }) },
+    filters.category && { label: `${filters.category} seats`, param: "acat", href: here({ acat: null }) },
     filters.state && { label: `State: ${filters.state}`, href: here({ state: null }) },
-    ranks && { label: ranks, href: here({ from: null, to: null }) },
-    caps?.maxFeeLakh != null && f.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(caps.maxFeeLakh)}`, href: here({ maxfee: "any" }) },
-    caps?.maxBondYears != null && f.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(caps.maxBondYears)}`, href: here({ bondyrs: "any" }) },
-    ...termChips(f).map((c) => ({ label: c.label, href: here({ [c.key]: null }) })),
+    ranks && { label: ranks, param: "from", href: here({ from: null, to: null }) },
+    caps?.maxFeeLakh != null && f.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(caps.maxFeeLakh)}`, param: "maxfee", href: here({ maxfee: "any" }) },
+    caps?.maxBondYears != null && f.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(caps.maxBondYears)}`, param: "bondyrs", href: here({ bondyrs: "any" }) },
+    ...termChips(f).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/allotments", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
   const of = (a: AllotmentRow) => `${a.college.name}, ${a.courseName}`;
   // State • type badge • beds: the card's meta line (the table's line under the course has the same).
@@ -251,11 +252,11 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
       <div className="filter-row">
-      <FilterBar action="/decide/allotments" params={params} cols="grid-cols-2 md:grid-cols-4 xl:grid-cols-6 [&>label]:min-w-0" active={active.length} clear={L.to("/decide/allotments", { inst: inst?.slug })}>
+      <FilterBar action="/decide/allotments" params={params} active={active.length} clear={L.to("/decide/allotments", { inst: inst?.slug })} total={total} noun="allotments">
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
         <Field label="Round"><Select name="round" value={filters.round} all="All rounds" options={rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
-        <Field label="Course" className="col-span-2 md:col-span-1"><Select name="course" value={f.course} all="All courses" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
+        <Field label="Course"><Select name="course" value={f.course} all="All courses" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
         <Field label="Quota"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
         <Field label="Seat category"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>
         <Field label="Rank from"><input {...rankInput("from")} /></Field>
@@ -266,11 +267,13 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       {rankError && <p id="rank-error" role="alert" className="text-sm text-ember">{rankError}</p>}
 
       <div className={toolbarRow}>
+        <AboutData>
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
           <span className="numeric font-semibold text-foreground">{rangeLabel({ rows, total, page, pageSize })}</span> allotments
           {/* The default view (no filter: the latest round) is what Year and Round show; say it for screen readers. */}
           {latest && <span className="sr-only">, the latest round, {latest.year} {roundLabel[latest.rounds.at(-1)!]}</span>}
          <ColourLegend className="ml-1 align-middle" /></p>
+        </AboutData>
         {total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle page="allotments" view={view} />

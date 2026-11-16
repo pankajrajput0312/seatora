@@ -34,8 +34,8 @@ const groupOf = (l: SeatList) => `${l.year} ${roundLabel[l.round]}`;
 /** Link chips, one per list PDF, grouped by year and round (seatLists() order); earlier rounds fold away unless picked. */
 export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; current: string; href: (key: string) => string }) {
   const [latest, ...earlier] = [...new Set(lists.map(groupOf))];
-  const group = (g: string) => (
-    <div key={g} className="chip-row flex flex-wrap items-center gap-2">
+  const group = (g: string, first?: boolean) => (
+    <div key={g} className={cn("chip-row flex flex-wrap items-center gap-2", first && "max-md:min-w-0 max-md:flex-1 max-md:mr-0! max-md:pr-0!")}>
       <span className="numeric text-sm font-semibold sm:w-20 sm:shrink-0" aria-hidden>{g}</span>
       {lists.filter((l) => groupOf(l) === g).map((l, _, xs) => (
         <Link
@@ -54,12 +54,13 @@ export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; cu
     </div>
   );
   return (
-    <nav aria-label="Seat lists" className="flex flex-wrap items-center gap-2">
-      {latest && group(latest)}
+    // Phones: the latest round's lists scroll sideways with "Earlier" at the row's end (one row, not two).
+    <nav aria-label="Seat lists" className="flex flex-wrap items-center gap-2 max-md:w-full max-md:min-w-0 max-md:flex-nowrap max-md:has-[details[open]]:flex-wrap">
+      {latest && group(latest, true)}
       {earlier.length > 0 && (
-        <details open={lists.some((l) => l.key === current && groupOf(l) !== latest)} className="open:basis-full">
-          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm text-sky underline">Earlier rounds: {earlier.join(", ")}</summary>
-          <div className="mt-2 grid gap-2">{earlier.map(group)}</div>
+        <details open={lists.some((l) => l.key === current && groupOf(l) !== latest)} className="open:basis-full max-md:shrink-0">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm text-sky underline">Earlier<span className="max-md:sr-only"> rounds: {earlier.join(", ")}</span></summary>
+          <div className="mt-2 grid gap-2">{earlier.map((g) => group(g))}</div>
         </details>
       )}
     </nav>

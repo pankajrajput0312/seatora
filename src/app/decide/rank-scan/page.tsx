@@ -4,6 +4,7 @@ import Link from "next/link";
 import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
 import { toolbarRow } from "@/features/decide/components/csv-link";
+import { AboutData } from "@/features/decide/components/filter-form";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { PageHead, Provisional } from "@/features/decide/components/bits";
@@ -66,9 +67,9 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const provisional = (rd: string) => meta.sources.some((s) => s.year === year?.year && s.round === rd && s.provisional);
   const chips = [
     // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
-    ...(profile?.maxFeeLakh != null && tp.params.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: L.with("/decide/rank-scan", { maxfee: "any", page: null }) }] : []),
-    ...(profile?.maxBondYears != null && tp.params.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: L.with("/decide/rank-scan", { bondyrs: "any", page: null }) }] : []),
-    ...termChips(tp.params).map((c) => ({ label: c.label, href: L.with("/decide/rank-scan", { [c.key]: null, page: null }) })),
+    ...(profile?.maxFeeLakh != null && tp.params.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: L.with("/decide/rank-scan", { maxfee: "any", page: null }) }] : []),
+    ...(profile?.maxBondYears != null && tp.params.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: L.with("/decide/rank-scan", { bondyrs: "any", page: null }) }] : []),
+    ...termChips(tp.params).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/rank-scan", c.key, c.value) : L.with("/decide/rank-scan", { [c.key]: null, page: null }) })),
   ];
   const clear = L.with("/decide/rank-scan", { ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
   const course = (a: Row) => courseOf.get(`${a.degree}|${a.specialty}`);
@@ -85,13 +86,15 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
       <FilterBar
         action="/decide/rank-scan"
         params={params}
-        cols="md:grid-cols-4 [&>label]:min-w-0"
         active={chips.length}
         clear={clear}
+        total={rank && year && !invalid ? kept.length : undefined}
+        noun="allotments"
         search={
-          <Field label="Rank" className="w-48">
-            <input name="scan" inputMode="numeric" defaultValue={typed ?? rank ?? ""} placeholder="e.g. 42,284" aria-invalid={invalid || undefined} aria-describedby={invalid ? "scan-error" : undefined} className={`${control} numeric`} />
-          </Field>
+          <label className="flex min-w-0 items-center gap-2 text-sm">
+            <span className="shrink-0 text-xs font-semibold text-muted-foreground">Rank</span>
+            <input name="scan" inputMode="numeric" enterKeyHint="search" defaultValue={typed ?? rank ?? ""} placeholder="e.g. 42,284" aria-invalid={invalid || undefined} aria-describedby={invalid ? "scan-error" : undefined} className={`${control} numeric min-w-0`} />
+          </label>
         }
       >
         <Field label="Year"><Select name="year" value={year ? String(year.year) : undefined} options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
@@ -109,7 +112,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         <>
           <div className={toolbarRow}>
             {/* The results' sources here, before the panes: the MCC result is numbered first (the term (i)s come after). */}
-            <div className="flex flex-wrap items-center gap-x-2">
+            <AboutData className="flex flex-wrap items-center gap-x-2">
               <p id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
                 <span><span className="numeric font-semibold text-foreground">{rangeLabel({ rows, page, pageSize, total: kept.length })}</span> allotments: history, not a prediction</span>
                 <InfoTip label="these allotments">
@@ -123,7 +126,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                 )}
                <ColourLegend className="ml-1 align-middle" /></p>
               <DataSource used={[{ year: year.year }]} />
-            </div>
+            </AboutData>
             {groups.length > 0 && <ViewToggle page={VIEW} view={view} />}
           </div>
           {groups.length === 0 && <EmptyState title="No allotments in this range" description="No seat was allotted to these ranks that year, or none passed the filters. Try a wider range, another year or fewer filters." />}

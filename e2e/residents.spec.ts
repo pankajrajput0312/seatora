@@ -25,15 +25,14 @@ test("residents: her courses, newest year first, no rank; filters by college and
     const table = page.getByRole("table");
     const cards = page.getByRole("region", { name: "Residents", exact: true }).getByRole("listitem");
     const pager = page.getByRole("navigation", { name: "Residents, pages" });
-    const filters = page.locator("details[data-filters]");
-    const open = async () => (await filters.getAttribute("open")) == null && (await filters.locator("> summary").click());
+    const filtersButton = page.getByRole("button", { name: /^Filters/ });
 
     // Default: her 5 courses, every rank (none shown), newest year first; the table on a desktop, cards on a phone.
     await page.goto(`/decide/residents?${PROFILE}`);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Residents");
     await expect(results).toHaveText(`${n(def)} residents`);
     await expect(page.getByRole("group", { name: "Active filters" })).toContainText("Your courses (5)");
-    await expect(page.locator("details[data-filters] > summary")).toContainText(/1 applied/);
+    await expect(filtersButton).toContainText(/1 applied/);
     const years = (await db.resident.groupBy({ by: ["year"], where: { hidden: false }, orderBy: { year: "desc" } })).map((g) => String(g.year));
     await expect(page.locator('select[name="year"] option')).toHaveText(["All years", ...years]);
     const shown = isMobile ? cards : table.locator("tbody tr");
@@ -63,14 +62,11 @@ test("residents: her courses, newest year first, no rank; filters by college and
     await expect(page.locator('select[name="rq"] option', { hasText: /Muslim Minority|Jain Minority/ })).toHaveCount(0);
     await expect(page.locator('select[name="sort"] option')).toHaveText(["Year, newest first", "College", "Name"]);
 
-    // A college by name (type to find it, tick it): only its residents in her courses.
+    // A college by name (type it in the search box, tick it, Search): only its residents in her courses.
     const college = await db.college.findFirstOrThrow({ where: { residents: { some: { hidden: false, ...hers } } }, orderBy: { name: "asc" }, select: { slug: true, name: true } });
-    await open();
-    await page.locator("summary", { hasText: "College (hospital)" }).click();
-    await page.getByRole("searchbox", { name: "Find in College (hospital)" }).fill(college.name.split(" ").slice(0, 2).join(" ").toLowerCase());
-    await page.locator(`input[name="college"][value="${college.slug}"]`).check();
-    await page.locator("summary", { hasText: "College (hospital)" }).click();
-    await page.getByRole("button", { name: "Apply" }).click();
+    await page.getByRole("combobox", { name: "Search a name or hospital" }).fill(college.name.split(" ").slice(0, 2).join(" ").toLowerCase());
+    await page.getByRole("group", { name: "Matches" }).getByRole("checkbox", { name: college.name }).first().check();
+    await page.getByRole("button", { name: "Search", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`college=${college.slug}`));
     await expect(results).toHaveText(`${n(await count({ ...hers, college: { slug: college.slug } }))} residents`);
 

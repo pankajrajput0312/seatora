@@ -23,7 +23,8 @@ import { TermStatCells } from "@/features/decide/components/stat-cells";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
-import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl } from "@/features/decide/components/ui";
+import { FilterForm, FiltersPanel } from "@/features/decide/components/filter-form";
+import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl, toolbar } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { fmtDay } from "@/features/decide/lib/format";
@@ -187,8 +188,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             {college.state && <> / <Link href={L.institutes({ state: college.state })} className={smallLink}>{college.state}</Link></>}
           </p>
           <PageHead title={college.name} />
-          {/* Type, place and beds on one line; the address, MCC profile and website one tap away. */}
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          {/* Type, place and beds on one line (on phones one row that scrolls sideways); the address, MCC profile and website one tap away. */}
+          <p className="chip-row mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             {info?.type && <TypeBadge type={info.type} />}
             {(college.state || college.pincode) && <span>{college.state}{college.pincode && <span className="numeric text-muted-foreground"> {college.pincode}</span>}</span>}
             <span className="inline-flex items-center gap-1">
@@ -492,14 +493,14 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       {tab === "allotments" && allot && (
         <section aria-labelledby="allot-h" className="grid grid-cols-1 gap-4">
           <h2 id="allot-h" className="sr-only">Allotments</h2>
-          <FilterBar action={`/decide/institutes/${slug}`} params={sp} cols="md:grid-cols-[1fr_1fr_auto]">
+          <FilterBar action={`/decide/institutes/${slug}`} params={sp} active={(allotYear ? 1 : 0) + (allotCourse ? 1 : 0)} clear={L.institute(slug, "allotments")} total={allot.total} noun="allotments">
             <input type="hidden" name="tab" value="allotments" />
             <Field label="Year"><Select name="year" value={allotYear ? String(allotYear) : undefined} all="All years" options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
             <Field label="Course"><Select name="course" value={allotCourse} all="All courses" options={courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
           </FilterBar>
           <div className={toolbarRow}>
             <p id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
-              <span><span className="numeric font-semibold text-foreground">{rangeLabel(allot)}</span> allotments</span>
+              <span className="max-md:sr-only"><span className="numeric font-semibold text-foreground">{rangeLabel(allot)}</span> allotments</span>
               <InfoTip label="allotments here">Newest first. Ranks only, never names. Select a rank to scan the allotments around it that year.</InfoTip>
               <Link href={L.allotments({ inst: slug, course: allotCourse, year: allotYear })} className={`${smallLink} text-sky`}>Open in Allotments</Link>
             </p>
@@ -612,15 +613,15 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         <section aria-labelledby="res-h" className="grid grid-cols-1 gap-4">
           <h2 id="res-h" className="sr-only">Residents</h2>
           {residents.total > 0 && (
-            <form method="get" action={`/decide/institutes/${slug}`} className="flex flex-wrap items-center gap-2">
+            <FilterForm action={`/decide/institutes/${slug}`} className={toolbar}>
               {[...sp.entries()].filter(([k]) => !["rcourse", "ryear", "tab"].includes(k)).map(([k, v], i) => <input key={`${k}-${i}`} type="hidden" name={k} value={v} />)}
               <input type="hidden" name="tab" value="residents" />
-              <FilterDropdown label="Course" name="rcourse" search options={residentCourseOptions} selected={rCourses} none="All courses" noneNote="None ticked means every course. Tick one or more." />
-              <FilterDropdown label="Year" name="ryear" options={residentYearOptions} selected={rYears.map(String)} none="All years" noneNote="None ticked means every year. Tick one or more." />
-              <button type="submit" className="inline-flex min-h-9 items-center rounded-md bg-foreground px-3 text-sm font-semibold text-background">Apply</button>
-              {(rCourses.length > 0 || rYears.length > 0) && <Link href={L.to(`/decide/institutes/${slug}`, { tab: "residents" })} className={smallLink}>Clear</Link>}
-              <span className="text-sm text-muted-foreground"><span className="numeric">{formatRank(residentRows.length)}</span> residents</span>
-            </form>
+              <FiltersPanel count={(rCourses.length > 0 ? 1 : 0) + (rYears.length > 0 ? 1 : 0)} clear={L.to(`/decide/institutes/${slug}`, { tab: "residents" })} total={residentRows.length}>
+                <FilterDropdown label="Course" name="rcourse" search options={residentCourseOptions} selected={rCourses} none="All courses" />
+                <FilterDropdown label="Year" name="ryear" options={residentYearOptions} selected={rYears.map(String)} none="All years" />
+              </FiltersPanel>
+              <span className="ml-auto self-center text-sm text-muted-foreground"><span className="numeric font-semibold text-foreground">{formatRank(residentRows.length)}</span> residents</span>
+            </FilterForm>
           )}
           {residents.total === 0 ? (
             <EmptyState title="No residents listed here" description="MCC's admitted-candidates lists have no names at this institute, or they were hidden." href={L.institute(slug, "courses")} action="See the courses here" />

@@ -57,14 +57,15 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames, l
   const toggleCollege = (o: Opt) => setPickedColleges((p) => (p.some((x) => x.value === o.value) ? p.filter((x) => x.value !== o.value) : [...p, o]));
   const toggleName = (n: string) => setPickedNames((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p, n]));
   const browsing = typed.trim().length < 2;
+  const pending = pickedColleges.map((c) => c.value).join("\n") !== colleges.map((c) => c.value).join("\n") || pickedNames.join("\n") !== names.join("\n");
   const shownColleges = browsing ? all ?? [] : found.colleges;
   const any = shownColleges.length + (browsing ? 0 : found.names.length) > 0 || (browsing && all !== null);
   const tick = "flex min-h-11 w-full cursor-pointer items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-muted";
 
   return (
     <>
-      {/* Phones: the box takes the whole row (Search and Filters wrap under it), so the list is the row's width. */}
-      <div ref={box} className="relative min-w-0 flex-1 basis-full md:basis-32 md:min-w-56" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
+      {/* In the toolbar beside Filters; on phones the list is the screen's width (from the box's left edge), not the box's. */}
+      <div ref={box} className="relative min-w-0" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
         <label>
           <span className="sr-only">Search a name or hospital</span>
           <input
@@ -73,7 +74,7 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames, l
             value={typed}
             maxLength={60}
             autoComplete="off"
-            placeholder="Search a name or hospital"
+            placeholder="Name or hospital"
             className={control}
             role="combobox"
             aria-expanded={open && any}
@@ -93,7 +94,7 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames, l
         {pickedColleges.map((c) => <input key={c.value} type="hidden" name="college" value={c.value} />)}
         {pickedNames.map((n) => <input key={n} type="hidden" name="name" value={n} />)}
         {open && any && (
-          <div id={`${id}-list`} role="group" aria-label="Matches" className="absolute inset-x-0 top-full z-40 mt-1 max-h-[40dvh] overflow-y-auto overscroll-contain rounded-md border border-border bg-popover p-1 shadow-lg">
+          <div id={`${id}-list`} role="group" aria-label="Matches" className="absolute top-full left-0 z-40 mt-1 max-h-[40dvh] w-[calc(100vw_-_var(--spacing)*8)] md:right-0 md:w-auto overflow-y-auto overscroll-contain rounded-md border border-border bg-popover p-1 shadow-lg">
             {browsing && all !== null && all.length === 0 && <p className="px-2 py-2 text-sm text-muted-foreground">Loading hospitals…</p>}
             {!browsing && shownColleges.length > 0 && <p className="px-2 pt-1 pb-0.5 text-xs font-semibold text-muted-foreground">Hospitals</p>}
             {shownColleges.map((o, i) => (
@@ -116,9 +117,9 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames, l
           </div>
         )}
       </div>
-      {/* The picks: a row of their own under the search row (order-last in the form's flex row), never over Search. */}
-      {(pickedColleges.length > 0 || pickedNames.length > 0) && (
-        <div className="order-last flex min-w-0 basis-full flex-wrap gap-1.5">
+      {/* The picks not searched yet, under the box (the applied ones are the page's chips). */}
+      {pending && (
+        <div className="mt-1.5 flex min-w-0 flex-wrap gap-1.5">
           {[...pickedColleges.map((c) => ({ key: `c:${c.value}`, label: c.label, drop: () => toggleCollege(c) })), ...pickedNames.map((n) => ({ key: `n:${n}`, label: n, drop: () => toggleName(n) }))].map((c) => (
             <button key={c.key} type="button" onClick={c.drop} className="hit inline-flex min-h-8 max-w-full items-center gap-1 rounded-full border border-border bg-muted px-2.5 text-xs" aria-label={`Remove ${c.label}`}>
               <span className="truncate">{c.label}</span>

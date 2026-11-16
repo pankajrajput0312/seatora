@@ -180,10 +180,13 @@ export const termValueLabel = {
   maxleave: (v: number) => `Leaving penalty up to ${lakhText(v)}`,
 };
 
-/** One chip per applied filter param (ActiveFilters: the page builds each href without `key`). A cap that is her profile's has no chip. */
-export function termChips(f: TermParams): { key: keyof TermParams; label: string }[] {
-  const out: { key: keyof TermParams; label: string }[] = [];
-  if (f.ctype?.length) out.push({ key: "ctype", label: f.ctype.map((t) => collegeTypeLabel[t]).join(", ") });
+/**
+ * One chip per applied filter value (ActiveFilters: the page builds each href without `key`, or without that one
+ * `value` of a list: one chip per college type). A cap that is her profile's has no chip.
+ */
+export function termChips(f: TermParams): { key: keyof TermParams; label: string; value?: string }[] {
+  const out: { key: keyof TermParams; label: string; value?: string }[] = [];
+  for (const t of f.ctype ?? []) out.push({ key: "ctype", label: collegeTypeLabel[t], value: t });
   for (const k of ["maxfee", "minstip", "bondyrs", "maxbond", "maxleave"] as const) {
     const v = f[k];
     if (typeof v === "number") out.push({ key: k, label: termValueLabel[k](v) });

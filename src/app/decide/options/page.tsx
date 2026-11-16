@@ -9,7 +9,7 @@ import { CsvLink } from "@/features/decide/components/csv-link";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { termDocs } from "@/features/decide/components/fees";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
-import { FilterForm, FiltersPanel, SearchSubmit } from "@/features/decide/components/filter-form";
+import { FilterForm, FiltersPanel, ToolbarCount, ToolbarSearch } from "@/features/decide/components/filter-form";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { OptionsResults } from "@/features/decide/components/option-actions";
 import { ViewField } from "@/features/decide/components/view-toggle";
@@ -17,7 +17,7 @@ import { chosenView } from "@/features/decide/server/view";
 import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
-import { ActiveFilters, control, EmptyState, smallLink } from "@/features/decide/components/ui";
+import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -88,17 +88,18 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const closedDefault = roundView ? "1" : "0";
   const termKeys = ["ctype", "maxfee", "minstip", "bondyrs", "maxbond", "maxleave", "nd"] as const;
   const active = [
-    f.q && { label: `Search: “${f.q}”`, href: here({ q: null }) },
+    f.q && { label: `Search: “${f.q}”`, param: "q", href: here({ q: null }) },
     f.reach && { label: reachLabel(f.reach, LATEST_YEAR, PAST_YEARS, !f.prov), href: here({ reach: null, closed: null }) },
-    f.seats && lists.length > 0 && (r.seats ?? null) !== (roundView ? "any" : null) && { label: r.seats ? seatsWords(r.seats) : `With or without ${round} seats`, href: here({ seats: null }) },
+    f.seats && lists.length > 0 && (r.seats ?? null) !== (roundView ? "any" : null) && { label: r.seats ? seatsWords(r.seats) : `With or without ${round} seats`, param: "seats", href: here({ seats: null }) },
     f.closed && f.closed !== closedDefault && !f.reach && { label: f.closed === "1" ? "Closed before your rank: shown" : "Closed before your rank: hidden", href: here({ closed: null }) },
-    f.prov && { label: `Without ${LATEST_YEAR} R1 (provisional)`, href: here({ prov: null }) },
-    profile.quotas.length > 0 && { label: `Quota: ${profile.quotas.length > 2 ? `${profile.quotas.length} selected` : profile.quotas.join(", ")}`, href: here({ quota: null }) },
-    profile.states.length > 0 && { label: `State: ${profile.states.length > 2 ? `${profile.states.length} selected` : profile.states.join(", ")}`, href: here({ st: null }) },
+    f.prov && { label: `Without ${LATEST_YEAR} R1 (provisional)`, param: "prov", href: here({ prov: null }) },
+    // One chip per quota and state: the × takes that one out.
+    ...profile.quotas.map((q) => ({ label: q, param: "quota", href: L.without("/decide/options", "quota", q) })),
+    ...profile.states.map((s) => ({ label: s, param: "st", href: L.without("/decide/options", "st", s) })),
     // Her profile's caps, while the page's own fee / bond filter does not replace them.
-    profile.maxFeeLakh != null && tp.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, href: here({ fee: null }) },
-    profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, href: here({ bond: null }) },
-    ...termChips(tp).map((c) => ({ label: c.label, href: here({ [c.key]: null }) })),
+    profile.maxFeeLakh != null && tp.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: here({ fee: null }) },
+    profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: here({ bond: null }) },
+    ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/options", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
   const clearAll = here({ q: null, reach: null, seats: null, closed: null, prov: null, quota: null, st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
   const chip = (active: boolean) =>
@@ -120,6 +121,18 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     </>
   );
 
+  // The round view's other views: inline from md, in the summary's (i) on phones.
+  const viewLinks = sum && (
+    <>
+      {r.seats ? (
+        <Link href={here({ seats: "all" })} className={`${smallLink} text-sky`}>Also without {roundLabel[lists[0].round]} seats</Link>
+      ) : (
+        <Link href={here({ seats: null })} className={`${smallLink} text-sky`}>Only with {roundLabel[lists[0].round]} seats</Link>
+      )}
+      <Link href={otherView} className={`${smallLink} text-sky`}>Every option with past allotments (closed hidden)</Link>
+    </>
+  );
+
   return (
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
@@ -136,12 +149,14 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         Labelled by your rank against past closing ranks.
       </PageHead>
 
+      {/* Phones: one line (the counts that matter, the rest and the view links behind its (i)); md up as it was. */}
       {sum && (
         <section aria-label={`${round} seats in your courses`} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <p className="inline-flex flex-wrap items-center gap-x-1">
-            <span>{n(sum.options)} with {round} seats:</span>
-            <span>{n(sum.clear)} clear,</span>
-            <span>{n(sum.virtualOnly)} virtual only{sum.newOnly > 0 && <>, {n(sum.newOnly)} only newly added</>},</span>
+            <span>{n(sum.options)} with {round} seats<span className="max-md:hidden">:</span></span>
+            <span className="max-md:hidden">{n(sum.clear)} clear,</span>
+            <span className="max-md:hidden">{n(sum.virtualOnly)} virtual only{sum.newOnly > 0 && <>, {n(sum.newOnly)} only newly added</>},</span>
+            <span className="md:hidden">·</span>
             {sum.fresh > 0 ? <Link href={here({ reach: "new", seats: null, q: null })} aria-label={`${formatRank(sum.fresh)} new: no past allotment`} className={`${smallLink} text-sky`}>{n(sum.fresh)} new<span className="sr-only">: no past allotment</span></Link> : <span>none new</span>}
             <InfoTip label={`${round} seats`}>
               {formatRank(sum.options)} {sum.options === 1 ? "option has" : "options have"} {roundWords} seats in your courses: {formatRank(sum.clear)} in the clear vacancy list,{" "}
@@ -149,16 +164,10 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
               {formatRank(sum.withNew)} with newly added seats; {sum.fresh > 0 ? `${formatRank(sum.fresh)} new: no past allotment` : "none new (every one has a past allotment)"}. {listsTip}{" "}
               Sorted by label (reached, then within 10%, then new and no allotment in your categories, closed before your rank last), then {round} clear vacancy seats, then the deepest{" "}
               {PAST_YEARS[1]} closing.
+              <span className="mt-2 flex flex-col items-start md:hidden">{viewLinks}</span>
             </InfoTip>
           </p>
-          <p className="flex flex-wrap gap-x-4">
-            {r.seats ? (
-              <Link href={here({ seats: "all" })} className={`${smallLink} text-sky`}>Also without {roundLabel[lists[0].round]} seats</Link>
-            ) : (
-              <Link href={here({ seats: null })} className={`${smallLink} text-sky`}>Only with {roundLabel[lists[0].round]} seats</Link>
-            )}
-            <Link href={otherView} className={`${smallLink} text-sky`}>Every option with past allotments (closed hidden)</Link>
-          </p>
+          <p className="flex flex-wrap gap-x-4 max-md:hidden">{viewLinks}</p>
         </section>
       )}
       {!roundView && lists.length > 0 && (
@@ -170,60 +179,56 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         </p>
       )}
 
-      {/* The profile filters are URL params, so this visit can differ from the saved profile. The search box shows; the rest open from Filters (FiltersPanel). The form, its buttons and the panel stay mounted (focus stays on them); only the fields remount to show what was applied. */}
-      <FilterForm
-        action="/decide/options"
-       
-        role="search"
-        aria-label="Filter options"
-        className="relative flex flex-wrap items-end gap-2"
-      >
+      {/* The profile filters are URL params, so this visit can differ from the saved profile. The toolbar (pinned on phones): the search box, Filters (the rest, in a sheet) and the count. The form, its buttons and the sheet stay mounted; only the fields remount to show what was applied. */}
+      <FilterForm action="/decide/options" role="search" aria-label="Filter options" className={toolbar}>
         {(["rank", "cat", "pwd", "fee", "bond"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         {f.reach && <input type="hidden" name="reach" value={f.reach} />}
         {f.closed && <input type="hidden" name="closed" value={f.closed} />}
         {f.view && <input type="hidden" name="view" value={f.view} />}
         <ViewField />
-        <Fragment key={params.toString()}>
-          <label className="min-w-0 flex-1 basis-32 md:min-w-56">
-            <span className="sr-only">Search institute, state or course</span>
-            <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Search" className={control} />
-          </label>
-        </Fragment>
-        <SearchSubmit />
-        <FiltersPanel count={active.length} clear={clearAll}>
-        <div className="flex flex-wrap items-end gap-2">
-        <Fragment key={params.toString()}>
-          {/* Exact courses in her profile (pairs) replace course x degree, so they get one exact-course filter. */}
-          {profile.pairs?.length ? (
-            <FilterDropdown label="Course" name="c" options={pairChoices(meta.courses)} selected={profile.pairs} />
-          ) : (
-            <>
-              <FilterDropdown label="Course" name="sp" search options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} selected={profile.specialties} />
-              <FilterDropdown label="Degree" name="deg" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={profile.degrees} />
-            </>
-          )}
-          <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" noneNote={openQuotasNote} />
-          <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} />
-          <TermFilterControls f={tp} caps={profile} />
-          {lists.length > 0 && (
-            <label className="w-64 max-w-full">
-              <span className="sr-only">Seats in the {round} seat lists</span>
-              <select name="seats" defaultValue={r.seats ?? "all"} className={control}>
-                <option value="all">With or without {round} seats</option>
-                <option value="any">{seatsWords("any")}</option>
-                {lists.map((l) => <option key={l.kind} value={l.kind}>{seatsWords(l.kind)}</option>)}
-              </select>
+        <ToolbarSearch>
+          <Fragment key={params.toString()}>
+            <label className="min-w-0">
+              <span className="sr-only">Search institute, state or course</span>
+              <input type="search" name="q" defaultValue={f.q ?? ""} maxLength={100} placeholder="Search" className={control} />
             </label>
-          )}
-          {latestProvisional && (
-            <label className="inline-flex min-h-11 items-center gap-2 px-1 text-sm">
-              <input type="checkbox" name="prov" value="0" defaultChecked={!!f.prov} className="size-5 accent-sky" />
-              Leave out {LATEST_YEAR} R1 (provisional) from the labels
-            </label>
-          )}
-        </Fragment>
-        </div>
+          </Fragment>
+        </ToolbarSearch>
+        <FiltersPanel count={active.length} clear={clearAll} total={r.total}>
+          <Fragment key={params.toString()}>
+            {/* Exact courses in her profile (pairs) replace course x degree, so they get one exact-course filter. */}
+            {profile.pairs?.length ? (
+              <FilterDropdown label="Course" name="c" options={pairChoices(meta.courses)} selected={profile.pairs} />
+            ) : (
+              <>
+                <FilterDropdown label="Course" name="sp" search options={meta.specialties.map((s) => ({ value: s.code, label: s.name }))} selected={profile.specialties} />
+                <FilterDropdown label="Degree" name="deg" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={profile.degrees} />
+              </>
+            )}
+            <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" info={openQuotasNote} />
+            <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} none="All states" />
+            {lists.length > 0 && (
+              <Field label="Seats">
+                <select name="seats" defaultValue={r.seats ?? "all"} className={control}>
+                  <option value="all">With or without {round} seats</option>
+                  <option value="any">{seatsWords("any")}</option>
+                  {lists.map((l) => <option key={l.kind} value={l.kind}>{seatsWords(l.kind)}</option>)}
+                </select>
+              </Field>
+            )}
+            <TermFilterControls f={tp} caps={profile} />
+            {latestProvisional && (
+              <span className="flex min-h-12 items-center gap-1 border-b border-border text-sm">
+                <label className="flex min-h-11 cursor-pointer items-center gap-3">
+                  <input type="checkbox" name="prov" value="0" defaultChecked={!!f.prov} className="size-5 accent-sky" />
+                  Without {LATEST_YEAR} R1 (provisional)
+                </label>
+                <InfoTip label={`${LATEST_YEAR} R1 (provisional)`}>Leaves MCC&apos;s provisional {LATEST_YEAR} R1 result out of the labels.</InfoTip>
+              </span>
+            )}
+          </Fragment>
         </FiltersPanel>
+        <ToolbarCount total={r.total} noun="options" />
       </FilterForm>
       <ActiveFilters items={active} clear={clearAll} />
 
