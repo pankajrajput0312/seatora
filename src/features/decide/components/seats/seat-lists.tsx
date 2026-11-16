@@ -39,7 +39,11 @@ export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; cu
     // Phones: the latest round's row scrolls sideways and fades at an edge with more (fade-x), so a chip under the
     // edge reads as "more this way", not as cut off by "Earlier".
     <div key={g} className={cn("chip-row flex flex-wrap items-center gap-2", first && "fade-x max-md:min-w-0 max-md:flex-1 max-md:mr-0! max-md:pr-0!")}>
-      <span className="numeric text-sm font-semibold sm:w-20 sm:shrink-0" aria-hidden>{g}</span>
+      {/* The chips' figures are each whole list (All India), not her filtered rows (the count beside the search box). */}
+      <span className="text-sm leading-tight sm:w-24 sm:shrink-0" aria-hidden>
+        <span className="numeric block font-semibold">{g}</span>
+        <span className="block text-xs text-muted-foreground">All India total</span>
+      </span>
       {lists.filter((l) => groupOf(l) === g).map((l, _, xs) => (
         <Link
           key={l.key}
@@ -50,7 +54,7 @@ export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; cu
             l.key === current ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input",
           )}
         >
-          <span className="sr-only">{g} </span>{seatKindLabel[l.kind]} <span className="numeric font-semibold">{formatRank(l.seats)}</span><span className="sr-only"> seats</span>
+          <span className="sr-only">{g} </span>{seatKindLabel[l.kind]} <span className="numeric font-semibold">{formatRank(l.seats)}</span><span className="sr-only"> seats in the whole list, All India</span>
           {xs.some((x) => x !== l && x.kind === l.kind) && listDay(l) && <span className="numeric text-xs"><span className="sr-only">, </span>{fmtDay(listDay(l)!)} PDF</span>}
         </Link>
       ))}

@@ -21,6 +21,9 @@ export type Deepest = { closing: number; round: Round; category: Category; provi
  */
 export const deepestOf = <T extends { closing: number }>(xs: T[]): T | null => xs.reduce<T | null>((a, c) => (!a || c.closing > a.closing ? c : a), null);
 
+/** Why a later round can close lower than R1 (BJ Ahmedabad 2025: R1 203, R2 85): said wherever rounds sit side by side. */
+export const LATER_ROUNDS_NOTE = "Later rounds count only new allotments and upgrades, so a later round can close lower than R1.";
+
 /** "Deepest 2025: 60,351 (Stray)": a deepest closing with its year and round. */
 export const deepestText = (d: { year: number; round?: Round; closing: number }) => `Deepest ${d.year}: ${formatRank(d.closing)}${d.round ? ` (${roundLabel[d.round]})` : ""}`;
 

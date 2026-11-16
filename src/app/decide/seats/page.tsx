@@ -238,7 +238,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
           </Field>
         </Fragment>
         </FiltersPanel>
-        <ToolbarCount total={r.total} noun="rows" />
+        <ToolbarCount total={r.total} noun="rows, your filters" />
       </FilterForm>
       <ActiveFilters items={active} clear={clearAll} />
 
@@ -262,7 +262,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
           <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
             {matrix ? (
               <>
-                <span className="numeric text-base font-semibold text-foreground">{formatRank(r.total)}</span> rows in {round}{allRounds && " and every other round"}
+                <span className="numeric text-base font-semibold text-foreground">{formatRank(r.total)}</span> rows in {round}{allRounds && " and every other round"}, your filters
                 {roundLists.map((l) => <Fragment key={l.key}> · <span className="numeric">{kindCount(l, r.seats[l.key] ?? 0, roundLists)}</span></Fragment>)}
               </>
             ) : compare ? (

@@ -24,6 +24,7 @@ import { statKeys } from "@/features/decide/lib/stat-format";
 import { anyTermFilter, readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, profileQuotas, toURLSearchParams } from "@/features/decide/profile";
 import { courseFilter } from "@/features/decide/lib/course-filter";
+import { LATER_ROUNDS_NOTE } from "@/features/decide/lib/reach";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { courseName } from "@/features/decide/components/options-view";
 import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
@@ -253,7 +254,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
 
   return (
     <AppPage className="grid grid-cols-1 gap-3">
-      <PageHead title="Last ranks" about={about}>Newest year first.</PageHead>
+      <PageHead title="Last ranks" about={about}>Newest year first. {LATER_ROUNDS_NOTE}</PageHead>
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
       <div className="filter-row">

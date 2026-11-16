@@ -16,7 +16,7 @@ import { EmptyState, smallLink, tbl } from "@/features/decide/components/ui";
 import { MAX_COMPARE } from "@/features/decide/lib/choices";
 import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams } from "@/features/decide/lib/params";
-import { deepestOf, eligibleCategories } from "@/features/decide/lib/reach";
+import { deepestOf, eligibleCategories, LATER_ROUNDS_NOTE } from "@/features/decide/lib/reach";
 import { inrFull } from "@/features/decide/lib/stat-format";
 import { lowestRisk } from "@/features/decide/lib/term-filters";
 import { roundLabel, rounds, seatKindLabel, type SeatList } from "@/features/decide/types";
@@ -219,7 +219,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                 {profile
                   ? `Closing ranks are on ${eligibleCategories(profile.category, profile.pwd).join(" or ")} seats, the seat categories you can take; each says which.`
                   : "No rank set, so closing ranks are the deepest on any seat category; each says which."}{" "}
-                Allotments count every category and round, not the seat matrix.
+                Allotments count every category and round, not the seat matrix. {LATER_ROUNDS_NOTE}
               </>
             )
           }

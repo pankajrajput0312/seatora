@@ -14,7 +14,9 @@ import { SourceRef } from "../page-sources";
 export function Beds({ b, inst, of = inst, unit }: { b: ReportedBeds; inst: string; of?: string; unit?: boolean }) {
   const c = reportedCount(b);
   const m = c.meta;
-  const flags = c.flags.flatMap((x) => flagShort[x] ?? []);
+  // "old figure (2022)": the year its period names (the last one, "January 2021 To December 2023" → 2023); none when not stated.
+  const year = m?.period && !/^not stated/i.test(m.period) ? m.period.match(/\b(?:19|20)\d{2}\b/g)?.at(-1) : undefined;
+  const flags = c.flags.flatMap((x) => (flagShort[x] ? [x === "old" && year ? `${flagShort[x]} (${year})` : flagShort[x]!] : []));
   return (
     <span className="inline-flex items-center gap-0.5">
       <span>

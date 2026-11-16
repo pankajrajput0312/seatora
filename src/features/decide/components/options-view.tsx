@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { formatInrShort } from "../lib/format";
 import type { DecideLinks } from "../lib/links";
-import { LATEST_YEAR, PAST_YEARS, reachLabel, seatsBelowNotes, type Deepest } from "../lib/reach";
+import { LATER_ROUNDS_NOTE, LATEST_YEAR, PAST_YEARS, reachLabel, seatsBelowNotes, type Deepest } from "../lib/reach";
 import type { ChoiceItem } from "../lib/choices";
 import type { OptionRow } from "../service";
 import { roundLabel, rounds, seatKindLabel, type Round, type SeatList, type Term } from "../types";
@@ -129,7 +129,7 @@ export function RoundGrid({ row, caption }: { row: Pick<OptionRow, "grid" | "rea
           ))}
         </tbody>
       </table>
-      <p className="mt-1 text-xs text-muted-foreground">Closing rank on that seat category; allotments made that round, all categories, in brackets.</p>
+      <p className="mt-1 text-xs text-muted-foreground">Closing rank on that seat category; allotments made that round, all categories, in brackets. {LATER_ROUNDS_NOTE}</p>
     </div>
   );
 }

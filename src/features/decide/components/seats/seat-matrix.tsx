@@ -11,7 +11,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { fmtDay, listDay } from "../../lib/format";
 import { useLocal } from "../../lib/local-store";
-import { LATEST_YEAR, PAST_YEARS, reachWindow } from "../../lib/reach";
+import { LATER_ROUNDS_NOTE, LATEST_YEAR, PAST_YEARS, reachWindow } from "../../lib/reach";
 import { useDecideLinks } from "../../lib/use-decide-store";
 import { statKeys, statLabel } from "../../lib/stat-format";
 import { openQuotas, roundLabel, seatKindLabel, type Round, type SeatList, type Source } from "../../types";
@@ -360,7 +360,7 @@ function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }
 
               <section aria-labelledby="row-closing" className="grid gap-2">
                 <h3 id="row-closing" className="font-semibold">Closing ranks on {r.quota ?? "this quota"}, {r.category} seats</h3>
-                <p className="text-xs text-muted-foreground">The highest All India Rank MCC allotted in that round; allotments made in brackets (not seats). Each round links its MCC result PDF.</p>
+                <p className="text-xs text-muted-foreground">The highest All India Rank MCC allotted in that round; allotments made in brackets (not seats). Each round links its MCC result PDF. {LATER_ROUNDS_NOTE}</p>
                 <div className="overflow-x-auto overflow-y-hidden">
                   <table className="text-sm">
                     <caption className="sr-only">Closing rank and allotments by year and round: {r.college.name}, {courseOf(r)}</caption>
