@@ -12,20 +12,11 @@ beforeEach(() => {
   svc.getDecideData.mockReset();
 });
 
-/** Optional properties in a JSON schema, nested objects (array items) included. */
-function countOptional(node: unknown): number {
-  if (!node || typeof node !== "object") return 0;
-  const o = node as { properties?: Record<string, unknown>; required?: string[]; items?: unknown };
-  const own = o.properties ? Object.keys(o.properties).filter((k) => !o.required?.includes(k)).length : 0;
-  return own + Object.values(o.properties ?? {}).reduce<number>((n, v) => n + countOptional(v), 0) + countOptional(o.items);
-}
-
 describe("tool definitions", () => {
-  it("are strict object schemas without keywords structured outputs reject", () => {
+  it("are object schemas with closed properties, not grammar-strict (Zod checks inputs)", () => {
     expect(toolDefs.map((t) => t.name)).toEqual(Object.keys(toolSchemas));
-    // The API's limit: 24 optional parameters across strict tools.
-    expect(toolDefs.filter((t) => t.strict).reduce((n, t) => n + countOptional(t.input_schema), 0)).toBeLessThanOrEqual(24);
     for (const t of toolDefs) {
+      expect(t.strict).toBeUndefined();
       expect(t.input_schema.type).toBe("object");
       expect((t.input_schema as { additionalProperties?: boolean }).additionalProperties).toBe(false);
       expect(JSON.stringify(t.input_schema)).not.toMatch(/"(minimum|maximum|minLength|maxLength|minItems|maxItems|pattern|\$schema)"/);

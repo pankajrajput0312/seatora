@@ -18,7 +18,7 @@ describe("the shipped skills", () => {
   const skills = loadSkills();
   it("all parse, with unique names, and include the required ones", () => {
     expect(skills.map((s) => s.name).sort()).toEqual(
-      ["choice-list-builder", "choice-list-strategy", "counselling-basics", "dnb-vs-md", "fees-stipend-bond", "reading-closing-ranks", "residents", "seatora-navigation"],
+      ["choice-filling-best-practices", "choice-list-builder", "choice-list-strategy", "counselling-basics", "dnb-vs-md", "fees-stipend-bond", "reading-closing-ranks", "residents", "seatora-navigation"],
     );
   });
   it("the index lists names and descriptions only, never bodies", () => {

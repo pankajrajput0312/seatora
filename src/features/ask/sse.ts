@@ -1,9 +1,19 @@
 // The chat stream's events (POST /api/ask/chat): one `data: <json>\n\n` frame each, ending with done or error.
 
 export type ChatEvent =
+  | { type: "meta"; conversationId: string; requestId: string }
   | { type: "text"; text: string }
+  | { type: "thinking"; text: string }
+  | { type: "status"; text: string }
+  /** The text so far is withdrawn: a corrected answer follows. */
+  | { type: "replace" }
+  /** The saved turn follows in full (a replay): drop what is shown and use it. */
+  | { type: "reset" }
+  /** Keep-alive every ~10 s. */
+  | { type: "ping" }
   | { type: "tool"; name: string; label: string }
-  | { type: "done"; outcome: string }
+  /** outcome checkpoint: post a continue for segment `next` now; running: another run has it, read the saved turn. */
+  | { type: "done"; outcome: string; next?: number }
   | { type: "error"; outcome: string; message: string };
 
 export const sseFrame = (e: ChatEvent) => `data: ${JSON.stringify(e)}\n\n`;

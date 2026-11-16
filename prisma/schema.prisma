@@ -441,20 +441,22 @@ model WaitlistEntry {
 }
 
 model User {
-  id           String           @id @default(cuid())
-  email        String           @unique
+  id           String            @id @default(cuid())
+  email        String            @unique
   name         String
   passwordHash String
   /// Consecutive failed sign-ins; the account is locked until lockedUntil after too many.
-  failedLogins Int              @default(0)
+  failedLogins Int               @default(0)
   lockedUntil  DateTime?
-  createdAt    DateTime         @default(now())
+  createdAt    DateTime          @default(now())
   sessions     Session[]
   requests     FeatureRequest[]
   profile      UserProfile?
   choices      UserChoices?
   askLogs      AskLog[]
   askReports   AskReport[]
+  askChats     AskConversation[]
+  askPrefs     AskPreference[]
 }
 
 /// The Decide profile (features/decide/profile.ts profileSchema) of a signed-in user, so it follows the account across
@@ -523,8 +525,16 @@ model AskLog {
   tools            String[]
   rounds           Int      @default(0)
   latencyMs        Int      @default(0)
-  /// started, ok, refusal, max_tokens, timeout, aborted, rate_limited, error
+  /// started, ok, refusal, max_tokens, partial (time ran out: best answer so far), aborted, rate_limited, error, replayed
   outcome          String   @default("started")
+  conversationId   String?
+  /// The answer check (features/ask/check.ts): numbers and links found in this turn's sources, and those not found.
+  checkPassed      Int      @default(0)
+  checkFailed      Int      @default(0)
+  /// The model was asked once to correct the answer because the check failed.
+  corrected        Boolean  @default(false)
+  /// Elapsed ms per phase: { modelMs, toolMs, checkMs, firstTextMs }.
+  timing           Json?
 
   @@index([userId, createdAt])
 }
@@ -540,4 +550,56 @@ model AskReport {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+/// An Ask Seatora chat (owner only): her questions and the answers, so a reload or a dropped connection shows the
+/// finished answer and she can reopen past chats. Deleted after 30 days without activity (features/ask/memory.ts).
+model AskConversation {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  messages  AskMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+/// One turn's question (role user) or answer (role assistant). `requestId` (the browser's id for the turn) makes a
+/// retried request idempotent. Answer status: streaming (being written, saved every few seconds), done, partial, error, stopped.
+model AskMessage {
+  id             String          @id @default(cuid())
+  conversationId String
+  conversation   AskConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  requestId      String
+  role           String
+  content        String          @default("")
+  /// Deep analysis: the model's summarised reasoning ("How I reasoned").
+  thinking       String?
+  /// streaming, checkpoint (between two runs: the browser starts the next), done, partial, error, stopped
+  status         String          @default("done")
+  /// The answer's runs so far (0 = the first); a continue names the run it starts, so a repeat is a no-op.
+  segment        Int             @default(0)
+  /// Where the run stood after its last finished round (agent.ts Checkpoint): the next run resumes it.
+  checkpoint     Json?
+  /// What it is doing now ("Checking closing ranks…"), for a browser reading the saved turn.
+  phase          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([conversationId, requestId, role])
+  @@index([conversationId, createdAt])
+}
+
+/// What she asked Ask Seatora to remember (course priority, budget, bond tolerance, states…): one row per key, shown and
+/// editable in "What Seatora remembers".
+model AskPreference {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, key])
 }

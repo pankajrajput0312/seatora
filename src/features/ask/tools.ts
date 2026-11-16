@@ -14,18 +14,30 @@ import { profileQuotas, type Profile } from "@/features/decide/profile";
 import { meritLists, scoreToRank } from "@/features/decide/server/merit";
 import { listNotices, roundStatus } from "@/features/decide/server/notices";
 import { canSeeResidents, listResidents, residentsBudget } from "@/features/decide/server/residents";
-import { choiceOptions, getDecideData, getInstitute, getMeta, lastRanks, listOptions, type OptionRow } from "@/features/decide/service";
-import { baseCategories, optionId, roundLabel, rounds, type SeatList } from "@/features/decide/types";
+import { optionSeats, pickLists, seatLists } from "@/features/decide/server/seats";
+import { eligibleCategories } from "@/features/decide/lib/reach";
+import { choiceOptions, getDecideData, getInstitute, getMeta, lastRanks, listOptions, seatsByKind, type OptionRow } from "@/features/decide/service";
+import { baseCategories, optionId, roundLabel, rounds, seatKinds, type SeatList } from "@/features/decide/types";
 import { db } from "@/lib/db";
 import { loadSkills } from "./skills";
 import { findColleges, resolveCourses } from "./lookup";
 import { saveReport } from "./reports";
+import { BAND_RULES, bandOf, seatChange, trendOf, type Band } from "./chances";
+import { getPreferences, setPreference } from "./memory";
+import { PREF_KEYS } from "./prefs";
 
 // The assistant's tools: thin, validated wrappers over Decide's service (the same reads the pages make). Each returns
 // compact JSON (rows capped, page links and source names included). Inputs come from the model: every one is parsed
 // with its Zod schema here, whatever the API promised.
 
-export type ToolContext = { userId: string; profile: Profile | null };
+export type ToolContext = {
+  userId: string;
+  profile: Profile | null;
+  /** Short refs ("c12") the chance and draft tools give options this turn → option ids, so lists cost few tokens. */
+  refs?: Map<string, string>;
+  /** Shows a block (markdown) to her directly, as part of the answer (present_choice_list). */
+  show?: (markdown: string) => void;
+};
 export type ToolResult = { ok: true; data: unknown } | { ok: false; error: string };
 
 const MAX_ROWS = 25;
@@ -40,6 +52,7 @@ const fail = (m: string): never => {
 const category = z.enum(baseCategories);
 /** One option: its id from a tool result, or as the table names it (college with state/PIN, "DNB Anaesthesiology", MCC quota). */
 const choiceRef = z.strictObject({
+  ref: z.string().max(12).optional().describe("The option's ref from assess_chances / draft_choice_list in this turn, e.g. c12"),
   id: z.string().max(300).optional(),
   college: z.string().max(200).optional(),
   course: z.string().max(120).optional(),
@@ -47,7 +60,7 @@ const choiceRef = z.strictObject({
 });
 const strs = z.array(z.string().max(120)).max(20);
 
-/** Input schemas (strict: unknown keys are an error). Numeric limits are checked here; the API schema drops them (structured outputs don't take them). */
+/** Input schemas (unknown keys are an error). Numeric limits are checked here; the API schemas leave them out. */
 export const toolSchemas = {
   load_skill: z.strictObject({ name: z.string().max(60).describe("Skill name from the list in the system prompt") }),
   get_profile: z.strictObject({}),
@@ -97,6 +110,25 @@ export const toolSchemas = {
     state: z.string().max(60).optional(),
     type: z.enum(typeValues).optional().describe("govt, private, trust, deemed, central, esic, municipal, armed_forces, psu, railway"),
   }),
+  assess_chances: z.strictObject({
+    courses: strs.optional().describe("Courses ('MD Anaesthesiology', 'DNB Family Medicine', or a specialty for every degree). Default: her profile's."),
+    rank: z.number().int().min(1).max(300000).optional(),
+    category: category.optional(),
+    quotas: strs.optional().describe("MCC quota labels; default her profile's (else All India, DNB Quota, Deemed/Paid Seats)"),
+    states: strs.optional(),
+    maxFeeLakh: z.number().positive().max(1000).optional(),
+    maxBondYears: z.number().int().min(0).max(20).optional(),
+    govtOnly: z.boolean().optional().describe("Only government-type colleges (state, central, ESIC, municipal, armed forces, railway, PSU)"),
+  }),
+  present_choice_list: z.strictObject({
+    title: z.string().min(3).max(120),
+    items: z.array(choiceRef.extend({ why: z.string().max(600).describe("A few words: the evidence for this line") })).min(1).max(60).describe("Her list in order: each { ref, why } with a ref from this turn's results (else college + course + quota)"),
+  }),
+  remember_preference: z.strictObject({
+    key: z.enum(PREF_KEYS),
+    value: z.string().max(300).describe("Her words, short (e.g. 'DNB Anaesthesiology, then MD Anaesthesiology'). Empty string forgets it."),
+  }),
+  get_preferences: z.strictObject({}),
   draft_choice_list: z.strictObject({
     courses: strs.min(1).describe("Courses in her priority order (first = most wanted)"),
     quotas: strs.optional(),
@@ -126,6 +158,10 @@ export const toolSchemas = {
 export type ToolName = keyof typeof toolSchemas;
 
 const descriptions: Record<ToolName, string> = {
+  assess_chances: "The main tool for 'what can I get', 'where are my possibilities', 'which colleges should I fill': every option with seats in the current round's lists for her courses, banded likely / possible / long shot / unlikely by a written rule, with closing trend, seat change vs last year's same round, fee and bond, plus a summary per course and quota. One fast call.",
+  present_choice_list: "Show her an ordered choice list as a table (college, course, quota, last closing, fee, bond, why) plus a 'Copy in MCC order' block, built from Seatora's data. Use it for any list longer than a few lines instead of typing the rows; then add only your reasoning and next steps.",
+  remember_preference: "Save something she states about her choices (course priority, budget, bond tolerance, states, home state, college types, other) to her account, so later chats know it. Only what she said; tell her you saved it.",
+  get_preferences: "What she has asked Seatora to remember (course priority, budget, bond tolerance, states…).",
   load_skill: "Load a skill's instructions and domain knowledge by name. Load the relevant skill before answering in its area.",
   get_profile: "Her Seatora profile from this page: AIR, category, PwD, courses, quotas, states, fee and bond caps.",
   search_options: "Options (college + course + quota) for a rank, with Seatora's reach label, closing ranks by year and round, seats in the current round's lists, fee/stipend/bond. Like the Options page.",
@@ -142,7 +178,7 @@ const descriptions: Record<ToolName, string> = {
   create_report: "Save a printable plan report (summary, ordered choices with facts, residents counts, risks, sources). Returns its link.",
 };
 
-/** Keywords structured outputs don't take; Zod still checks them on our side. */
+/** Keywords left out of the API schemas (kept lean); Zod checks them on our side. */
 const DROP = new Set(["$schema", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "minItems", "maxItems", "pattern", "default"]);
 function forApi(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(forApi);
@@ -153,22 +189,21 @@ function forApi(node: unknown): unknown {
   return out;
 }
 
-/**
- * Strict schemas (grammar-constrained input) allow at most 24 optional parameters across all tools: the two filter-heavy
- * tools are not strict (Zod still checks them here, and a bad input goes back to the model as a tool error).
- */
-const LOOSE = new Set<ToolName>(["search_options", "draft_choice_list"]);
-
 /** The tool definitions sent to the API, in a fixed order (a stable prompt-cache prefix). */
 export const toolDefs: Anthropic.Tool[] = (Object.keys(toolSchemas) as ToolName[]).map((name) => ({
   name,
   description: descriptions[name],
   input_schema: forApi(z.toJSONSchema(toolSchemas[name], { io: "input" })) as Anthropic.Tool.InputSchema,
-  strict: !LOOSE.has(name),
+  // Not strict: grammar-constrained schemas for this many tools compile slowly (over a minute) or not at all (Haiku: grammar
+  // over 300 MB). Every input is checked with its Zod schema here instead, and a bad one goes back as a tool error.
 }));
 
 /** What the chat shows while a tool runs. */
 export const toolLabel: Record<ToolName, string> = {
+  assess_chances: "Assessing your chances across this round's seats…",
+  present_choice_list: "Laying out your list…",
+  remember_preference: "Saving your preference…",
+  get_preferences: "Reading your saved preferences…",
   load_skill: "Reading a guide…",
   get_profile: "Reading your profile…",
   search_options: "Searching options for your rank…",
@@ -282,17 +317,20 @@ function profileWith(base: Profile | null, o: { rank?: number; category?: Profil
 }
 
 /** Option ids for refs (an id as given, else college + course + quota looked up); `missing` = refs that name no option. */
-async function refIds(refs: z.infer<typeof choiceRef>[]) {
+async function refIds(refs: z.infer<typeof choiceRef>[], known?: Map<string, string>) {
   const m = await meta();
   const { colleges } = await getDecideData();
   const ids: (string | null)[] = [];
   const missing: string[] = [];
   for (const r of refs) {
-    if (r.id) {
-      ids.push(r.id);
+    // A ref passed as the id ("c12") counts as the ref.
+    const ref = r.ref ?? (r.id && /^c\d+$/i.test(r.id.trim()) ? r.id : undefined);
+    const byRef = ref ? known?.get(ref.trim().toLowerCase()) : undefined;
+    if (byRef || r.id) {
+      ids.push(byRef ?? r.id!);
       continue;
     }
-    const label = [r.college, r.course, r.quota].join(" / ");
+    const label = r.ref && !r.college ? `ref ${r.ref}` : [r.college, r.course, r.quota].join(" / ");
     const pin = /\b(\d{6})\b/.exec(r.college ?? "")?.[1];
     // "Name, State PIN" as the table writes it: drop the PIN and a trailing state; else try the part before the first comma.
     let name = (r.college ?? "").replace(/\b\d{6}\b/, "").trim().replace(/,\s*$/, "");
@@ -313,6 +351,17 @@ async function refIds(refs: z.infer<typeof choiceRef>[]) {
   }
   return { ids, missing };
 }
+
+/** This turn's short ref for an option id ("c1", "c2"…; the same id keeps its ref). Without a map: the id itself. */
+function refFor(known: Map<string, string> | undefined, id: string) {
+  if (!known) return id;
+  for (const [k, v] of known) if (v === id) return k;
+  const k = `c${known.size + 1}`;
+  known.set(k, id);
+  return k;
+}
+
+const cell = (s: string | null | undefined) => (s ?? "—").replace(/\|/g, "/").replace(/\s+/g, " ").trim() || "—";
 
 const lakh = (v: number | undefined) => (v == null ? undefined : Math.round(v * 100000));
 
@@ -511,7 +560,150 @@ const handlers: Handlers = {
     };
   },
 
-  async draft_choice_list(i, { profile }) {
+  async assess_chances(i, { profile, refs: known }) {
+    const m = await meta();
+    const pairs = i.courses?.length ? await coursesOf(i.courses) : undefined;
+    const p = profileWith(profile, { rank: i.rank, category: i.category, pairs, quotas: quotasOf(i.quotas, m.quotas), states: statesOf(i.states, m.states) });
+    if (!p.pairs?.length && !p.specialties.length) fail("Which courses? Ask her (or use her course priority from get_preferences); assess_chances needs at least one course.");
+    const tf: TermFilters = {
+      types: i.govtOnly ? ["govt", "central", "esic", "municipal", "armed_forces", "railway", "psu"] : undefined,
+      maxFee: lakh(i.maxFeeLakh ?? p.maxFeeLakh ?? undefined) ?? null,
+      maxBondYears: i.maxBondYears ?? p.maxBondYears ?? null,
+    };
+    const all = await seatLists();
+    const [cur] = pickLists(all, {});
+    const round = !!cur;
+    const r = await listOptions(p, { view: round ? "round" : "all", hasSeats: round ? "any" : undefined, showClosed: true, terms: tf }, { page: 1, pageSize: 3000 });
+    // Last year's lists of the same round, one per kind (as the current ones), for the seat change.
+    const prev = cur ? seatKinds.flatMap((kind) => pickLists(all, { kind, year: cur.year - 1, round: cur.round }).slice(0, 1)) : [];
+    const cats = eligibleCategories(p.category, p.pwd);
+    const prevSeats = prev.length ? await optionSeats(prev, { ...(p.pairs?.length ? { pairs: p.pairs } : { specialties: p.specialties }), quotas: profileQuotas(p), categories: cats }) : null;
+    const prevLabel = cur ? `${cur.year - 1} ${roundLabel[cur.round]}` : "";
+    const years = [PAST_YEARS[0], PAST_YEARS[1], LATEST_YEAR];
+    const rows = r.rows.map((x) => {
+      const now = x.seatsBy ?? {};
+      const last = prevSeats ? seatsByKind(prev, prevSeats.get(x.id), cats).by : null;
+      const change = seatChange(now, last, prevLabel);
+      const b = bandOf(p.rank, x.grid, { years, latestYear: LATEST_YEAR, seatsUp: (change?.delta ?? 0) > 0 });
+      const deepest = Math.max(0, ...years.flatMap((y) => Object.values(x.grid[y] ?? {}).map((c) => c?.closing ?? 0)));
+      return { x, band: b.band, why: b.why, trend: trendOf(x.grid), change, now, last, deepest };
+    });
+    const order: Band[] = ["likely", "possible", "longShot", "unlikely", "noHistory"];
+    const counts = Object.fromEntries(order.map((b) => [b, rows.filter((y) => y.band === b).length]));
+    const line = (y: (typeof rows)[number]) => {
+      const t = terms(y.x);
+      return {
+        ref: refFor(known, y.x.id),
+        college: y.x.college.name,
+        state: y.x.college.state,
+        type: y.x.hospital?.type ? collegeTypeLabel[y.x.hospital.type.value] : null,
+        course: courseName(y.x),
+        quota: y.x.quota,
+        why: y.why,
+        trend: y.trend ? `${y.trend.arrow} ${y.trend.text}` : null,
+        closings: yearRounds(y.x).slice(0, 2),
+        seatsNow: y.now,
+        seatChange: y.change?.text ?? null,
+        fee: t.fee,
+        stipend: t.stipend,
+        bond: t.bond,
+        bondPenalty: t.bondInr,
+        leaving: t.leaving,
+        link: instLink(y.x.college.slug, "courses"),
+      };
+    };
+    // Likely: the hardest-to-get first (lowest deepest closing still reached); the rest: closest to her rank first.
+    const pick = (b: Band, n: number) =>
+      rows
+        .filter((y) => y.band === b)
+        .sort((a, z) => (b === "likely" ? a.deepest - z.deepest : z.deepest - a.deepest))
+        .slice(0, n)
+        .map(line);
+    // Per course and quota: how the group did at her rank, and its clear seats now vs last year.
+    const groups = new Map<string, (typeof rows)[number][]>();
+    for (const y of rows) {
+      const k = `${courseName(y.x)} · ${y.x.quota}`;
+      (groups.get(k) ?? groups.set(k, []).get(k)!).push(y);
+    }
+    const reachedIn = (y: (typeof rows)[number], rs: string[]) => years.some((yr) => rs.some((rd) => (y.x.grid[yr]?.[rd as keyof (typeof y.x.grid)[number]]?.closing ?? 0) >= p.rank));
+    const summary = [...groups].map(([k, ys]) => {
+      const r12 = ys.filter((y) => reachedIn(y, ["R1", "R2"])).length;
+      const r3 = ys.filter((y) => !reachedIn(y, ["R1", "R2"]) && reachedIn(y, ["R3"])).length;
+      const stray = ys.filter((y) => !reachedIn(y, ["R1", "R2", "R3"]) && reachedIn(y, ["stray", "special_stray"])).length;
+      const nowC = ys.reduce((n, y) => n + (y.now.clear ?? 0), 0);
+      const lastC = ys.reduce((n, y) => n + (y.last?.clear ?? 0), 0);
+      const pct = prev.length && lastC ? Math.round(((nowC - lastC) / lastC) * 100) : null;
+      const bands = order.filter((b) => ys.some((y) => y.band === b)).map((b) => `${ys.filter((y) => y.band === b).length} ${b}`).join(", ");
+      return `${k}: ${ys.length} options with seats; ${bands}. ${r12 ? `${r12} reached ${formatRank(p.rank)} in R1/R2` : `none reached ${formatRank(p.rank)} in R1/R2`}${r3 ? `; ${r3} only in R3` : ""}${stray ? `; ${stray} only in stray` : ""} (${years.join(", ")}). Clear seats ${nowC} now${prev.length ? ` vs ${lastC} in ${prevLabel}${pct != null ? ` (${pct >= 0 ? "+" : ""}${pct}%)` : ""}` : ""}.`;
+    });
+    return {
+      for: { rank: p.rank, category: p.category, seatCategories: cats, quotas: profileQuotas(p), govtOnly: !!i.govtOnly, maxFeeLakh: i.maxFeeLakh ?? p.maxFeeLakh ?? null, maxBondYears: tf.maxBondYears },
+      round: cur ? `${cur.year} ${roundLabel[cur.round]} seat lists (${listNames(r.seatLists).join("; ")})` : "no current seat lists: every option with past allotments",
+      comparedWith: prev.length ? `${prevLabel} seat lists (${listNames(prev).join("; ")})` : null,
+      options: rows.length,
+      leftOutNotPublished: r.unknownTerms,
+      counts,
+      summary,
+      rules: BAND_RULES,
+      likely: pick("likely", 12),
+      possible: pick("possible", 12),
+      longShot: pick("longShot", 10),
+      unlikely: counts.unlikely ? pick("unlikely", 3) : [],
+      noHistory: pick("noHistory", 6),
+      note: "History, not a prediction. Seat kinds overlap: never add clear, virtual and new. Fee/bond as the documents state them.",
+      links: { options: "/decide/options", seats: "/decide/seats", choices: "/decide/choices" },
+    };
+  },
+
+  async present_choice_list(i, { profile, refs: known, show }) {
+    const refs = await refIds(i.items, known);
+    const { rows } = await choiceOptions([...new Set(refs.ids.filter((x): x is string => !!x))], profile);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const lines = i.items.flatMap((it, n) => {
+      const r = byId.get(refs.ids[n] ?? "");
+      return r ? [{ r, why: it.why }] : [];
+    });
+    if (!lines.length) fail("None of these name an option in the data. Use refs from assess_chances or draft_choice_list in this turn.");
+    const seen = new Set<string>();
+    const uniq = lines.filter((l) => !seen.has(l.r.id) && seen.add(l.r.id));
+    const md = [
+      `**${cell(i.title)}**`,
+      "",
+      "| No. | College | Course | Quota | Last closing | Fee/yr | Bond | Why |",
+      "|---|---|---|---|---|---|---|---|",
+      ...uniq.map(({ r, why }, n) => {
+        const t = terms(r);
+        const bond = t.bond === "No bond" || t.bondInr === "—" || t.bondInr === "Not published" ? t.bond : `${t.bond}, ${t.bondInr}`;
+        why = why.length > 160 ? `${why.slice(0, 157)}…` : why;
+        return `| ${n + 1} | [${cell(r.college.name)}](${instLink(r.college.slug, "courses")})${r.college.state ? `, ${cell(r.college.state)}` : ""} | ${cell(courseName(r))} | ${cell(r.quota)} | ${cell(lastClosing(r))} | ${cell(t.fee)} | ${cell(bond)} | ${cell(why)} |`;
+      }),
+      "",
+      "```Copy in MCC order",
+      ...uniq.map(({ r }, n) => `${n + 1}. ${[r.college.name, [r.college.state, pinOf(r)].filter(Boolean).join(" ")].filter(Boolean).join(", ")} — ${courseName(r)} — ${r.quota}`),
+      "```",
+      "",
+      "[Open your Choices](/decide/choices)",
+    ].join("\n");
+    if (show) show(md);
+    return {
+      shown: uniq.length,
+      notFound: [...refs.missing, ...i.items.filter((_, n) => refs.ids[n] && !byId.has(refs.ids[n]!)).map((it) => it.ref ?? it.id ?? "?")],
+      note: show
+        ? "She now sees this table and the copy block. Do not repeat the lines. Add only: why this order (brief), the best-practice checklist, next steps with dates, and offer to save it to her Choices and make a report."
+        : md,
+    };
+  },
+
+  async remember_preference({ key, value }, { userId }) {
+    await setPreference(userId, key, value);
+    return { saved: value.trim() ? { [key]: value.trim() } : null, forgot: value.trim() ? null : key, all: await getPreferences(userId) };
+  },
+
+  async get_preferences(_, { userId }) {
+    return { preferences: await getPreferences(userId), note: "Shown and editable in 'What Seatora remembers' on the Ask page." };
+  },
+
+  async draft_choice_list(i, { profile, refs: known }) {
     const m = await meta();
     const order = await Promise.all(i.courses.map((w) => coursesOf([w])));
     const pairs = [...new Set(order.flat())];
@@ -543,7 +735,7 @@ const handlers: Handlers = {
         .filter((y) => y.b === b)
         .sort((a, z) => prio(a.x) - prio(z.x) || (b === "safe" ? deepest(a.x) - deepest(z.x) : deepest(z.x) - deepest(a.x)))
         .slice(0, caps[b])
-        .map((y) => ({ ...optionFacts(y.x, p), closings: yearRounds(y.x).slice(0, 2), coursePriority: prio(y.x) + 1, link: undefined }));
+        .map((y) => ({ ...optionFacts(y.x, p), ref: refFor(known, y.x.id), id: undefined, closings: yearRounds(y.x).slice(0, 2), coursePriority: prio(y.x) + 1, link: undefined }));
     return {
       for: { rank: p.rank, category: p.category, courses: i.courses, quotas: profileQuotas(p) },
       view: r.view,
@@ -560,9 +752,9 @@ const handlers: Handlers = {
     };
   },
 
-  async save_choice_list(i, { userId, profile }) {
+  async save_choice_list(i, { userId, profile, refs: known }) {
     if (!i.confirmed) fail("Not saved: ask her to confirm in chat first (replace or append), then call again with confirmed: true.");
-    const refs = await refIds(i.items);
+    const refs = await refIds(i.items, known);
     const wanted = [...new Set(refs.ids.filter((x): x is string => !!x))];
     const { rows } = await choiceOptions(wanted, profile);
     const byId = new Map(rows.map((r) => [r.id, r]));
@@ -590,9 +782,9 @@ const handlers: Handlers = {
     };
   },
 
-  async create_report(i, { userId, profile }) {
+  async create_report(i, { userId, profile, refs: known }) {
     const p = profileWith(profile, {});
-    const refs = await refIds(i.choices);
+    const refs = await refIds(i.choices, known);
     const { rows } = await choiceOptions([...new Set(refs.ids.filter((x): x is string => !!x))], p);
     const byId = new Map(rows.map((r) => [r.id, r]));
     const choices = i.choices.flatMap((c, n) => {

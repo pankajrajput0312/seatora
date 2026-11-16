@@ -48,18 +48,20 @@ describe.skipIf(!dbUrl)("tools on the real import", async () => {
     const { getReport } = await import("./reports");
     const { parseChoices } = await import("@/features/decide/lib/choices");
     const user = await db.user.create({ data: { email: `ask-tools-${Date.now()}@seatora.test`, name: "Tools test", passwordHash: "x" } });
-    const me = { ...ctx, userId: user.id };
+    const me = { ...ctx, userId: user.id, refs: new Map<string, string>() };
     try {
-      const d = (await runTool("draft_choice_list", { courses: ["DNB Anaesthesiology"], limit: 10 }, me, 15_000)) as { ok: true; data: { realistic: { id: string; college: string; state: string; pin: string; course: string; quota: string }[] } };
-      const [a, b] = d.data.realistic;
-      const saved = await runTool("save_choice_list", { items: [{ id: a.id }, { college: `${b.college}, ${b.state} ${b.pin}`, course: b.course, quota: b.quota }, { college: "No Such College", course: "MD Anaesthesiology", quota: "All India" }], mode: "replace", confirmed: true }, me, 15_000);
+      const d = (await runTool("draft_choice_list", { courses: ["DNB Anaesthesiology"], limit: 10 }, me, 15_000)) as { ok: true; data: { realistic: { ref: string; college: string; state: string; pin: string; course: string; quota: string }[] } };
+      const [ra, rb, rc] = d.data.realistic;
+      const a = { id: me.refs.get(ra.ref)! };
+      const b = { ...rb, id: me.refs.get(rb.ref)! };
+      const saved = await runTool("save_choice_list", { items: [{ ref: ra.ref }, { college: `${b.college}, ${b.state} ${b.pin}`, course: b.course, quota: b.quota }, { college: "No Such College", course: "MD Anaesthesiology", quota: "All India" }], mode: "replace", confirmed: true }, me, 15_000);
       expect(saved).toMatchObject({ ok: true, data: { saved: 2, notFound: ["No Such College / MD Anaesthesiology / All India"], link: "/decide/choices" } });
       let state = parseChoices((await db.userChoices.findUnique({ where: { userId: user.id } }))!.json);
       expect(state.activeId).toBe("ask-ask-seatora-plan");
       expect(state.lists.find((l) => l.id === state.activeId)!.items.map((x) => x.id)).toEqual([a.id, b.id]);
-      await runTool("save_choice_list", { items: [{ id: b.id }, { id: d.data.realistic[2].id }], mode: "append", confirmed: true }, me, 15_000);
+      await runTool("save_choice_list", { items: [{ id: b.id }, { ref: rc.ref }], mode: "append", confirmed: true }, me, 15_000);
       state = parseChoices((await db.userChoices.findUnique({ where: { userId: user.id } }))!.json);
-      expect(state.lists.find((l) => l.id === state.activeId)!.items.map((x) => x.id)).toEqual([a.id, b.id, d.data.realistic[2].id]);
+      expect(state.lists.find((l) => l.id === state.activeId)!.items.map((x) => x.id)).toEqual([a.id, b.id, me.refs.get(rc.ref)]);
 
       const r = (await runTool("create_report", { title: "Round 2 plan", summary: "Where you stand.", choices: [{ id: a.id, reason: "Reached in 2025" }], risks: ["Round 3 cannot be resigned."] }, me, 15_000)) as { ok: true; data: { reportId: string; link: string } };
       expect(r.data.link).toBe(`/decide/ask/report/${r.data.reportId}`);
@@ -70,5 +72,26 @@ describe.skipIf(!dbUrl)("tools on the real import", async () => {
     } finally {
       await db.user.delete({ where: { id: user.id } });
     }
+  });
+
+  it("assess_chances bands every option with seats this round in one fast call; present_choice_list shows a 30-line list", async () => {
+    const refs = new Map<string, string>();
+    const t0 = Date.now();
+    const a = (await runTool("assess_chances", { courses: ["Anaesthesiology"], rank: 25000, category: "Open" }, { ...ctx, refs }, 15_000)) as { ok: true; data: Record<string, unknown> };
+    expect(a.ok).toBe(true);
+    expect(Date.now() - t0).toBeLessThan(3000);
+    const d = a.data as { counts: Record<string, number>; summary: string[]; likely: { ref: string; why: string; seatChange: string | null; trend: string | null }[]; possible: { ref: string }[]; comparedWith: string };
+    expect(Object.keys(d.counts)).toEqual(["likely", "possible", "longShot", "unlikely", "noHistory"]);
+    expect(d.summary.join("\n")).toMatch(/MD Anaesthesiology · All India: \d+ options with seats/);
+    expect(d.comparedWith).toMatch(/^2025 R2 seat lists/);
+    expect(d.likely[0]).toMatchObject({ ref: "c1", why: expect.stringMatching(/^Reached/), seatChange: expect.stringMatching(/clear vs 2025 R2/) });
+    expect(JSON.stringify(a.data).length).toBeLessThan(60_000);
+
+    const shown: string[] = [];
+    const all = [...refs.keys()].slice(0, 30);
+    const p = (await runTool("present_choice_list", { title: "Round 2 plan", items: all.map((ref) => ({ ref, why: "test" })) }, { ...ctx, refs, show: (md) => shown.push(md) }, 15_000)) as { ok: true; data: { shown: number } };
+    expect(p.data.shown).toBe(all.length);
+    expect(shown[0].match(/^\| \d+ \|/gm)).toHaveLength(all.length);
+    expect(shown[0]).toContain("```Copy in MCC order");
   });
 });

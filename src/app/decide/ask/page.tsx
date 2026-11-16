@@ -22,11 +22,11 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
   const first = profile?.pairs?.[0]?.split("~") ?? (profile?.specialties[0] ? [profile.degrees[0] ?? "MD", profile.specialties[0]] : null);
   const course = first ? `${first[0]} ${meta.courses.find((c) => c.specialty === first[1])?.name ?? first[1]}` : "MD Anaesthesiology";
   const starters = [
-    profile ? `Where can I get ${course} with AIR ${formatRank(profile.rank)}?` : "What can I get with my rank?",
-    "Build my choice list for this round",
+    profile ? `What can I get with AIR ${formatRank(profile.rank)}, and what should I fill?` : "What can I get with my rank?",
+    `Where can I get ${course}?`,
+    "Build my full choice list for this round",
     "Is Chettinad worth ₹33 L/yr for MD Anaesthesiology?",
     "Compare Kokilaben and Seth GS for Anaesthesia",
-    "Who are the residents at Kokilaben?",
     "What is open in MCC counselling now?",
   ];
   return (

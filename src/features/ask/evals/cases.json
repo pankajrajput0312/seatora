@@ -313,5 +313,178 @@
     "/decide/ask/report/"
    ]
   }
+ },
+ {
+  "id": "broad-25000-open",
+  "question": "But can you please help me figuring out what's possibilities, what are the colleges which I need to fill my choice filling where it's possibility",
+  "profile": "rank=25000&cat=Open&sp=ANAESTHESIOLOGY",
+  "expect": {
+   "tools": [
+    [
+     "assess_chances"
+    ]
+   ],
+   "anyOf": [
+    [
+     "likely"
+    ],
+    [
+     "possible"
+    ],
+    [
+     "long shot",
+     "long-shot"
+    ],
+    [
+     "↑",
+     "↓",
+     "→",
+     "deeper",
+     "tighter",
+     "steady"
+    ],
+    [
+     "vs 2025 R2",
+     "than last year",
+     "last year",
+     "2025 R2"
+    ],
+    [
+     "checklist",
+     "best practice",
+     "best-practice"
+    ]
+   ],
+   "forbidden": [
+    "you will (definitely |surely )?get",
+    "guaranteed (a )?(seat|admission)",
+    "\\d+ ?% chance",
+    "chance of \\d+",
+    "took too long"
+   ],
+   "maxMs": 45000
+  }
+ },
+ {
+  "id": "what-can-i-get-42284",
+  "question": "What can I get?",
+  "expect": {
+   "tools": [
+    [
+     "assess_chances"
+    ]
+   ],
+   "anyOf": [
+    [
+     "likely",
+     "possible"
+    ],
+    [
+     "↑",
+     "↓",
+     "→",
+     "deeper",
+     "tighter",
+     "steady",
+     "trend"
+    ]
+   ],
+   "forbidden": [
+    "you will (definitely |surely )?get",
+    "guaranteed (a )?(seat|admission)",
+    "\\d+ ?% chance",
+    "chance of \\d+",
+    "took too long"
+   ],
+   "maxMs": 45000
+  }
+ },
+ {
+  "id": "choice-list-30",
+  "question": "Make my full choice list for this round, 30 lines: DNB Anaesthesiology first, then MD Anaesthesiology, then DNB Family Medicine. Any fee and bond is fine.",
+  "expect": {
+   "tools": [
+    [
+     "present_choice_list"
+    ]
+   ],
+   "contains": [
+    "Copy in MCC order",
+    "/decide/choices"
+   ],
+   "minRows": 30,
+   "forbidden": [
+    "you will (definitely |surely )?get",
+    "guaranteed (a )?(seat|admission)",
+    "\\d+ ?% chance",
+    "chance of \\d+",
+    "took too long"
+   ]
+  }
+ },
+ {
+  "id": "deep-dnb-or-deemed",
+  "deep": true,
+  "question": "Deep analysis please: at my rank, should I prefer DNB Anaesthesiology at a private hospital or MD Anaesthesiology at a deemed college? Weigh closing trends, seats, fees and bonds.",
+  "expect": {
+   "tools": [
+    [
+     "assess_chances",
+     "compare",
+     "search_options",
+     "college_profile",
+     "draft_choice_list"
+    ]
+   ],
+   "forbidden": [
+    "you will (definitely |surely )?get",
+    "guaranteed (a )?(seat|admission)",
+    "\\d+ ?% chance",
+    "chance of \\d+",
+    "took too long"
+   ]
+  }
+ },
+ {
+  "id": "check-wrong-claim",
+  "question": "So Kokilaben Dhirubhai Ambani Hospital (Navi Mumbai) DNB Anaesthesia closed at 52,000 in 2025 R3, right? Confirm from the data.",
+  "history": [
+   {
+    "role": "user",
+    "content": "Tell me about Kokilaben Navi Mumbai DNB Anaesthesia."
+   },
+   {
+    "role": "assistant",
+    "content": "Kokilaben Dhirubhai Ambani Hospital (Navi Mumbai) offers DNB Anaesthesiology under the DNB Quota."
+   }
+  ],
+  "expect": {
+   "tools": [
+    [
+     "last_ranks",
+     "college_profile",
+     "compare"
+    ]
+   ],
+   "contains": [
+    "29,892"
+   ],
+   "forbidden": [
+    "\\byes\\b[^.]*52,000",
+    "closed at 52,000 in 2025 R3"
+   ]
+  }
+ },
+ {
+  "id": "remember-budget",
+  "question": "Please remember: my budget is ₹10 L a year at most, and I won't take a bond longer than 1 year.",
+  "expect": {
+   "tools": [
+    [
+     "remember_preference"
+    ]
+   ],
+   "numbers": false
+  }
  }
 ]

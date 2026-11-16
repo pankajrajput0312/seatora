@@ -1,3 +1,5 @@
+import { bigNumbers } from "../check";
+
 // The Ask eval grader (deterministic): every big number in the answer must appear in what the model was given (tool
 // results, the question, her profile), required tools must have run, required links and words must be there, forbidden
 // content must not.
@@ -5,6 +7,8 @@
 export type EvalCase = {
   id: string;
   question: string;
+  /** Deep analysis mode. */
+  deep?: boolean;
   /** Earlier turns (text only, as the browser sends them). */
   history?: { role: "user" | "assistant"; content: string }[];
   /** Profile query string; default her profile. */
@@ -20,17 +24,18 @@ export type EvalCase = {
     forbidden?: string[];
     /** Check every number ≥ 1,000 (not a year) against the given text; default true. */
     numbers?: boolean;
+    /** End to end, ms. */
+    maxMs?: number;
+    /** At least this many numbered table rows ("| 12 |") in the answer. */
+    minRows?: number;
+    /** Each group: at least one of its substrings (case-insensitive) is in the answer. */
+    anyOf?: string[][];
+    /** At least this many runs (checkpoint → resume); meaningful with a small ASK_SLICE_MS. */
+    minSegments?: number;
   };
 };
 
 export type Graded = { pass: boolean; failures: string[] };
-
-/** Numbers ≥ 1000 written with or without Indian/Western commas ("45,409", "1,37,868", "42284"), years 1990-2100 aside. */
-export function bigNumbers(text: string): number[] {
-  return [...text.matchAll(/(?<![\d.,])\d{1,3}(?:,\d{2,3})+(?![\d,]*\d)|(?<![\d.,])\d{4,}(?![\d.])/g)]
-    .map((m) => Number(m[0].replace(/,/g, "")))
-    .filter((n) => n >= 1000 && !(n >= 1990 && n <= 2100));
-}
 
 export function grade(c: EvalCase, answer: string, run: { tools: string[]; given: string }): Graded {
   const failures: string[] = [];
@@ -42,6 +47,9 @@ export function grade(c: EvalCase, answer: string, run: { tools: string[]; given
   const lower = answer.toLowerCase();
   for (const s of e.contains ?? []) if (!lower.includes(s.toLowerCase())) failures.push(`missing "${s}"`);
   for (const f of e.forbidden ?? []) if (new RegExp(f, "i").test(answer)) failures.push(`forbidden /${f}/`);
+  for (const g of e.anyOf ?? []) if (!g.some((x) => lower.includes(x.toLowerCase()))) failures.push(`none of ${g.map((x) => `"${x}"`).join(", ")}`);
+  const rows = answer.match(/^\|\s*\d+\s*\|/gm)?.length ?? 0;
+  if (e.minRows && rows < e.minRows) failures.push(`only ${rows} numbered rows (want ${e.minRows})`);
   if (e.numbers !== false) {
     const known = new Set(bigNumbers(run.given));
     const unknown = [...new Set(bigNumbers(answer))].filter((n) => !known.has(n));
@@ -49,3 +57,5 @@ export function grade(c: EvalCase, answer: string, run: { tools: string[]; given
   }
   return { pass: failures.length === 0, failures };
 }
+
+export { bigNumbers };
