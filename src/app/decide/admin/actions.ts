@@ -1,8 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { staffUser } from "@/features/auth/lib/session";
+import { couponCreateSchema, couponEditSchema } from "@/features/payments/coupons";
 import { ROLES } from "@/features/plans/plans";
 import { db } from "@/lib/db";
 
@@ -86,4 +88,45 @@ export async function resolveError(form: FormData) {
     db.adminAudit.create({ data: { actorId: me.id, targetId: fingerprint.data!, action: "error_resolved", before: {}, after: { resolvedAt: at.toISOString() } } }),
   ]);
   back("resolved");
+}
+
+const backToCoupons = (msg: string) => redirect(`/decide/admin?${new URLSearchParams({ msg })}#coupons-h`);
+const json = (x: unknown) => JSON.parse(JSON.stringify(x));
+
+/** Coupons: a new coupon (docs/PAYMENTS.md "Coupons"), with an AdminAudit row. Owner or admin only. */
+export async function createCoupon(form: FormData) {
+  const me = await staffUser();
+  if (!me) redirect("/decide");
+  const parsed = couponCreateSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) backToCoupons("invalid");
+  const { note, ...rest } = parsed.data!;
+  const data = { ...rest, note: note || null };
+  try {
+    await db.$transaction(async (tx) => {
+      const c = await tx.coupon.create({ data });
+      await tx.adminAudit.create({ data: { actorId: me.id, targetId: c.id, action: "coupon_create", before: {}, after: json(data) } });
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") backToCoupons("coupon_exists");
+    throw e;
+  }
+  backToCoupons("coupon_saved");
+}
+
+/** Coupons: edit maxUses, allowedEmail and validUntil, or (its own form) only activate / deactivate, with an AdminAudit row. */
+export async function updateCoupon(form: FormData) {
+  const me = await staffUser();
+  if (!me) redirect("/decide");
+  const parsed = couponEditSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) backToCoupons("invalid");
+  const { id, active, ...rest } = parsed.data!;
+  const select = { maxUses: true, allowedEmail: true, validUntil: true, active: true };
+  const before = await db.coupon.findUnique({ where: { id }, select });
+  if (!before) backToCoupons("invalid");
+  const data = active ? { active: active === "1" } : rest;
+  await db.$transaction([
+    db.coupon.update({ where: { id }, data }),
+    db.adminAudit.create({ data: { actorId: me.id, targetId: id, action: "coupon_update", before: json(before), after: json(data) } }),
+  ]);
+  backToCoupons("coupon_saved");
 }

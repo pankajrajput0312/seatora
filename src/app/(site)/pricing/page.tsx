@@ -7,6 +7,7 @@ import { business } from "@/config/business";
 import { FreePrice } from "@/components/marketing/free-price";
 import { askConfig } from "@/features/ask/config";
 import { getCurrentUser } from "@/features/auth/lib/session";
+import { couponCodeSchema } from "@/features/payments/coupons";
 import { paymentsOn, PLANS } from "@/features/payments/plans";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { freeNow, longDate, shortDate } from "@/features/plans/plans";
@@ -21,8 +22,9 @@ export const metadata: Metadata = {
   description: `The Seatora NEET PG 2026 Season Pass: ${formatPaise(PLANS.season_pass.amount)} (was ${formatPaise(PLANS.season_pass.wasAmount)}) ${business.period}, paid once, with no subscription or auto-renewal. Free and Season Pass limits compared.`,
 };
 
-/** Rendered per request: her price (a referral), her Season Pass, and whether the free period and payments are on. */
-export default async function PricingPage() {
+/** Rendered per request: her price (a referral, or ?coupon=CODE), her Season Pass, and whether the free period and payments are on. */
+export default async function PricingPage({ searchParams }: { searchParams: Promise<{ coupon?: string | string[] }> }) {
+  const coupon = couponCodeSchema.safeParse((await searchParams).coupon).data ?? null;
   const user = await getCurrentUser();
   const q = await quote(user?.id ?? null, (await cookies()).get(REF_COOKIE)?.value);
   const free = freeNow();
@@ -44,7 +46,7 @@ export default async function PricingPage() {
         </p>
         <section id="buy" data-placement="pricing" aria-labelledby="plans-h" className="mt-8 scroll-mt-24 md:w-[44rem]">
           <h2 id="plans-h" className="text-lg font-medium">Free and Season Pass</h2>
-          <PlanCards className="mt-3" />
+          <PlanCards className="mt-3" coupon={coupon} />
           <p className="mt-3 text-sm text-muted-foreground">
             Limits reset at 00:00 IST. {free && `Everything has Season Pass limits till ${shortDate(free)}. `}
             {!askOpen && "Ask Seatora is in beta and opens to members later."}

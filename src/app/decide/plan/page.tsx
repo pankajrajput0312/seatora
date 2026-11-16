@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCurrentUser, requireDecideAccess } from "@/features/auth/lib/session";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
+import { couponCodeSchema } from "@/features/payments/coupons";
 import { smallLink, StatCell } from "@/features/decide/components/ui";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { effectivePlan, planLine, shortDate, usedOf } from "@/features/plans/plans";
@@ -15,8 +16,9 @@ import { REFERRAL_PERCENT } from "@/features/referrals/lib";
 export const metadata: Metadata = { title: "Your plan", robots: { index: false, follow: false } };
 const PATH = "/decide/plan";
 
-export default async function PlanPage() {
-  await requireDecideAccess(PATH);
+export default async function PlanPage({ searchParams }: { searchParams: Promise<{ coupon?: string | string[] }> }) {
+  const coupon = couponCodeSchema.safeParse((await searchParams).coupon).data ?? null; // ?coupon=CODE: applied to the price, or filled in
+  await requireDecideAccess(coupon ? `${PATH}?coupon=${coupon}` : PATH);
   const user = await getCurrentUser();
   const eff = user && effectivePlan(user);
   const used = user && (await usageToday(user.id));
@@ -39,7 +41,7 @@ export default async function PlanPage() {
       )}
       <section data-placement="plan_page" aria-labelledby="plans-h" className="grid gap-3">
         <h2 id="plans-h" className="text-lg font-semibold">Plans</h2>
-        <PlanCards />
+        <PlanCards coupon={coupon} />
       </section>
       <Link href="/decide/refer" className={`${smallLink} text-sm text-sky`}>
         Refer a friend: {REFERRAL_PERCENT}% off for them, {REFERRAL_PERCENT}% for you

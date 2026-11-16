@@ -31,10 +31,10 @@ small and never personal.
 | `plan_popup_shown` / `plan_popup_dismissed` | `PlanPrompt` opens / Not now, ×, Esc, a click outside | browser | |
 | `upgrade_click` | any element with `data-upgrade` (one listener, `UpgradeClicks` in the root layout) | browser | placement |
 | `free_claimed` | `claimFreePass` when it changed `premiumUntil` | server | |
-| `checkout_opened` | `POST /api/payments/order`, once the order exists | server | `amount`, `referred` |
+| `checkout_opened` | `POST /api/payments/order`, once the order exists | server | `amount`, `referred`, `coupon` |
 | `checkout_cancelled` | Razorpay `ondismiss` (not after a failure) | browser | |
 | `payment_failed` | Razorpay `payment.failed`; the webhook's `payment.failed` (`markFailed`) | both | |
-| `payment_paid` | `markPaid`, only the call that marked it | server | `amount`, `referred` |
+| `payment_paid` | `markPaid`, only the call that marked it; or a 100% coupon's redemption (`redeemFreeCoupon`, `amount` 0, no checkout_opened) | server | `amount`, `referred`, `coupon` |
 | `paywall_shown` | `Paywall` renders | server | `feature`, `device` |
 | `referral_link_open` | `GET /r/CODE` (not bots) | server | `valid` |
 | `referral_page_view` | `/decide/refer` | browser | |

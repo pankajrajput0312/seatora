@@ -2,41 +2,87 @@ import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { reset } from "@/lib/rate-limit";
 
-// The three payment routes with the session, Razorpay's API (fetch) and the Payment, User and ReferralEarning tables
-// mocked (in memory, with updateMany's conditional semantics): auth, server-side amount, the referral discount,
-// signatures, ownership, idempotent grant and earning.
+// The three payment routes with the session, Razorpay's API (fetch) and the Payment, User, ReferralEarning, Coupon and
+// CouponRedemption tables mocked (in memory, with updateMany's conditional semantics, unique keys, and transactions that
+// run one at a time and roll back on an error, as Postgres would order them): auth, server-side amount, the referral
+// discount, coupons, signatures, ownership, idempotent grant and earning.
 
 type Row = {
-  id: string; userId: string; plan: string; amount: number; listAmount: number; discount: number; referrerId: string | null; currency: string;
-  razorpayOrderId: string; razorpayPaymentId: string | null; status: string; paidAt: Date | null;
+  id: string; userId: string; plan: string; amount: number; listAmount: number; discount: number; referrerId: string | null; couponId?: string | null;
+  currency: string; razorpayOrderId?: string | null; razorpayPaymentId: string | null; status: string; paidAt: Date | null;
 };
 type User = { id: string; email: string; name: string; referralCode: string | null; referredById: string | null };
 type Earning = { referrerId: string; paymentId: string; buyerId: string; amount: number; status: string; note?: string | null; inTx: boolean };
+type Coupon = { id: string; code: string; percentOff: number; active: boolean; maxUses: number | null; uses: number; allowedEmail: string | null; validUntil: Date | null };
+type Redemption = { couponId: string; userId: string; paymentId: string | null };
 const m = vi.hoisted(() => ({
   user: null as null | { id: string; email: string; name: string },
+  session: vi.fn(),
   rows: [] as Row[],
   users: [] as User[],
   earnings: [] as Earning[],
+  coupons: [] as Coupon[],
+  redemptions: [] as Redemption[],
+  events: [] as { name: string; meta: object }[],
   inTx: false,
   grant: vi.fn(),
 }));
 
-vi.mock("@/features/auth/lib/session", () => ({ getCurrentUser: async () => m.user }));
+vi.mock("@/features/auth/lib/session", () => ({ getCurrentUser: m.session }));
 vi.mock("@/features/payments/grant", () => ({ grantPlan: m.grant }));
-vi.mock("@/lib/db", () => {
+vi.mock("@/lib/db", async () => {
+  const { Prisma } = await import("@prisma/client");
+  const unique = () => new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "test" });
+  const MAX_USES = { field: "Coupon.maxUses" }; // tx.coupon.fields.maxUses: a column reference
   const match = (r: object, w: Record<string, unknown>) =>
     Object.entries(w).every(([k, v]) => (v && typeof v === "object" && "not" in v ? r[k as keyof typeof r] !== v.not : r[k as keyof typeof r] === v));
+  let queue: Promise<unknown> = Promise.resolve();
   const db = {
-    $transaction: async (fn: (tx: unknown) => unknown) => {
-      m.inTx = true;
-      try {
-        return await fn(db);
-      } finally {
-        m.inTx = false;
-      }
+    $transaction: (fn: (tx: unknown) => unknown) => {
+      const run = queue.then(async () => {
+        const saved = structuredClone({ rows: m.rows, coupons: m.coupons, redemptions: m.redemptions, earnings: m.earnings });
+        m.inTx = true;
+        try {
+          return await fn(db);
+        } catch (e) {
+          Object.assign(m, saved); // rolled back
+          throw e;
+        } finally {
+          m.inTx = false;
+        }
+      });
+      queue = run.catch(() => {});
+      return run;
+    },
+    coupon: {
+      fields: { maxUses: MAX_USES },
+      findUnique: async ({ where }: { where: { code: string } }) => m.coupons.find((c) => c.code === where.code) ?? null,
+      // where: { id, OR: [{ maxUses: null }, { uses: { lt: fields.maxUses } }] }
+      updateMany: async ({ where, data }: { where: { id: string; OR: Record<string, unknown>[] }; data: { uses: { increment: number } } }) => {
+        const c = m.coupons.find((x) => x.id === where.id);
+        const ok = !!c && where.OR.some((o) => ("maxUses" in o ? c.maxUses === o.maxUses : (o.uses as { lt: unknown }).lt === MAX_USES && c.maxUses != null && c.uses < c.maxUses));
+        if (ok) c.uses += data.uses.increment;
+        return { count: ok ? 1 : 0 };
+      },
+      update: async ({ where, data }: { where: { id: string }; data: { uses: { increment: number } } }) => {
+        const c = m.coupons.find((x) => x.id === where.id)!;
+        c.uses += data.uses.increment;
+        return c;
+      },
+    },
+    couponRedemption: {
+      findUnique: async ({ where }: { where: { couponId_userId: Omit<Redemption, "paymentId"> } }) =>
+        m.redemptions.find((r) => r.couponId === where.couponId_userId.couponId && r.userId === where.couponId_userId.userId) ?? null,
+      create: async ({ data }: { data: Redemption }) => {
+        if (m.redemptions.some((r) => r.couponId === data.couponId && r.userId === data.userId)) throw unique();
+        m.redemptions.push(data);
+      },
+      createMany: async ({ data }: { data: Redemption[]; skipDuplicates: true }) => {
+        for (const d of data) if (!m.redemptions.some((r) => r.couponId === d.couponId && r.userId === d.userId)) m.redemptions.push(d);
+      },
     },
     user: { findUnique: async ({ where }: { where: Record<string, unknown> }) => m.users.find((u) => match(u, where)) ?? null },
-    funnelEvent: { create: async () => ({}) },
+    funnelEvent: { create: async ({ data }: { data: { name: string; meta: object } }) => m.events.push(data) },
     payment: {
       create: async ({ data }: { data: Omit<Row, "razorpayPaymentId" | "status" | "paidAt"> }) => m.rows.push({ razorpayPaymentId: null, status: "created", paidAt: null, ...data }),
       findUnique: async ({ where }: { where: Record<string, unknown> }) => m.rows.find((r) => match(r, where)) ?? null,
@@ -94,9 +140,15 @@ const verifyBody = (orderId = "order_1", paymentId = "pay_1", secret = SECRET) =
 
 beforeEach(() => {
   reset(`pay-order:${alice.id}`); // 10 orders a minute
+  reset(`pay-order:${bob.id}`);
   m.user = alice;
+  m.session.mockReset();
+  m.session.mockImplementation(async () => m.user);
   m.rows = [];
   m.earnings = [];
+  m.coupons = [];
+  m.redemptions = [];
+  m.events = [];
   m.users = [{ ...alice, referralCode: "ALCE234", referredById: null }, { ...bob, referralCode: null, referredById: null }, { ...rahul }];
   m.grant.mockReset();
   vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_id");
@@ -117,16 +169,16 @@ describe("POST /api/payments/order", () => {
   it("orders the plan's amount, never one from the client", async () => {
     const fetch = ordered();
     vi.stubGlobal("fetch", fetch);
-    // Only referralCode is read: a client's { amount: 100 } changes nothing.
+    // Only code is read: a client's { amount: 100 } changes nothing.
     const res = await post(order.POST, { amount: 100, currency: "USD", plan: "x", discount: 19900 });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ orderId: "order_new", amount: 19900, listAmount: 19900, discount: 0, inviter: null, currency: "INR", keyId: "rzp_test_id", email: alice.email });
+    expect(await res.json()).toEqual({ orderId: "order_new", amount: 19900, listAmount: 19900, discount: 0, inviter: null, coupon: null, currency: "INR", keyId: "rzp_test_id", email: alice.email });
     const sent = JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
     expect(sent).toMatchObject({ amount: 19900, currency: "INR", receipt: m.rows[0].id });
     expect(m.rows[0]).toMatchObject({ userId: alice.id, plan: "season_pass", amount: 19900, listAmount: 19900, discount: 0, referrerId: null, razorpayOrderId: "order_new", status: "created" });
     // An empty body is fine; a malformed code field is a 400.
     expect((await order.POST(new Request("http://test/api/payments/order", { method: "POST" }))).status).toBe(200);
-    expect((await post(order.POST, { referralCode: 42 })).status).toBe(400);
+    expect((await post(order.POST, { code: 42 })).status).toBe(400);
   });
 
   it("answers 502 when Razorpay rejects the keys, 500 on other errors, 409 once paid", async () => {
@@ -146,7 +198,7 @@ describe("referral pricing (order route)", () => {
   it("a friend's code: 20% off, ₹199 → ₹159, the referrer on the row; the client's amount is still ignored", async () => {
     const fetch = ordered();
     vi.stubGlobal("fetch", fetch);
-    const res = await post(order.POST, { referralCode: " rhux234 ", amount: 1 });
+    const res = await post(order.POST, { code: " rhux234 ", amount: 1 });
     expect(await res.json()).toMatchObject({ amount: 15900, listAmount: 19900, discount: 4000, inviter: "Rahul" });
     expect(sentAmount(fetch)).toBe(15900);
     expect(m.rows[0]).toMatchObject({ amount: 15900, listAmount: 19900, discount: 4000, referrerId: rahul.id });
@@ -156,17 +208,17 @@ describe("referral pricing (order route)", () => {
     m.users[0].referredById = rahul.id;
     vi.stubGlobal("fetch", ordered());
     expect(await (await post(order.POST, {})).json()).toMatchObject({ amount: 15900, inviter: "Rahul" });
-    expect(await (await post(order.POST, { referralCode: "ALCE234" })).json()).toMatchObject({ amount: 15900, inviter: "Rahul" });
+    expect(await (await post(order.POST, { code: "ALCE234" })).json()).toMatchObject({ amount: 15900, inviter: "Rahul" });
     expect(m.rows.map((r) => r.referrerId)).toEqual([rahul.id, rahul.id]);
   });
 
   it("refuses her own code and an unknown one (400, no order)", async () => {
     const fetch = ordered();
     vi.stubGlobal("fetch", fetch);
-    const own = await post(order.POST, { referralCode: "ALCE234" });
+    const own = await post(order.POST, { code: "ALCE234" });
     expect([own.status, (await own.json()).error.code]).toEqual([400, "invalid_referral"]);
-    expect((await post(order.POST, { referralCode: "ZZZZ999" })).status).toBe(400);
-    expect((await post(order.POST, { referralCode: "bad!" })).status).toBe(400);
+    expect((await post(order.POST, { code: "ZZZZ999" })).status).toBe(400);
+    expect((await post(order.POST, { code: "bad!" })).status).toBe(400);
     expect(fetch).not.toHaveBeenCalled();
     expect(m.rows).toHaveLength(0);
   });
@@ -177,7 +229,106 @@ describe("referral pricing (order route)", () => {
     vi.stubGlobal("fetch", ordered());
     expect(await (await post(order.POST, {})).json()).toMatchObject({ amount: 19900, discount: 0, inviter: null });
     expect(m.rows[1]).toMatchObject({ amount: 19900, discount: 0, referrerId: null });
-    expect((await post(order.POST, { referralCode: "RHUX234" })).status).toBe(400);
+    expect((await post(order.POST, { code: "RHUX234" })).status).toBe(400);
+  });
+});
+
+describe("coupons (order route)", () => {
+  const coupon = (o: Partial<Coupon> = {}): Coupon => ({ id: "cp1", code: "TESTFREE", percentOff: 100, active: true, maxUses: null, uses: 0, allowedEmail: null, validUntil: null, ...o });
+  const json = async (r: Response) => [r.status, await r.json()];
+
+  it("100%: the pass at once with no Razorpay call, a paid ₹0 row and one use; the client's amount is ignored; a second use is refused", async () => {
+    m.coupons = [coupon()];
+    const fetch = ordered();
+    vi.stubGlobal("fetch", fetch);
+    expect(await json(await post(order.POST, { code: " testfree ", amount: 19900, discount: 0 }))).toEqual([200, { ok: true, free: true, coupon: "TESTFREE" }]);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(m.rows).toHaveLength(1);
+    expect(m.rows[0]).toMatchObject({ userId: alice.id, plan: "season_pass", amount: 0, listAmount: 19900, discount: 19900, couponId: "cp1", status: "paid" });
+    expect(m.rows[0].razorpayOrderId ?? null).toBeNull();
+    expect(m.rows[0].paidAt).toBeInstanceOf(Date);
+    expect(m.redemptions).toEqual([{ couponId: "cp1", userId: alice.id, paymentId: m.rows[0].id }]);
+    expect(m.coupons[0].uses).toBe(1);
+    expect(m.grant).toHaveBeenCalledExactlyOnceWith(alice.id, "season_pass", expect.anything());
+    await vi.waitFor(() => expect(m.events).toContainEqual(expect.objectContaining({ name: "payment_paid", meta: { amount: 0, referred: false, coupon: true } })));
+    expect(m.events.map((e) => e.name)).not.toContain("checkout_opened");
+    expect((await post(order.POST, { code: "TESTFREE" })).status).toBe(409);
+    expect([m.coupons[0].uses, m.rows.length, m.grant.mock.calls.length]).toEqual([1, 1, 1]);
+  });
+
+  it("maxUses 1: another buyer is told it's used up", async () => {
+    m.coupons = [coupon({ maxUses: 1 })];
+    expect((await post(order.POST, { code: "TESTFREE" })).status).toBe(200);
+    m.user = bob;
+    expect(await json(await post(order.POST, { code: "TESTFREE" }))).toEqual([400, { ok: false, error: { code: "invalid_coupon", message: "This coupon has been used up." } }]);
+    expect(m.coupons[0].uses).toBe(1);
+  });
+
+  it("at the same moment: one buyer's repeated requests, or two buyers for the last use, grant and count once", async () => {
+    m.coupons = [coupon()];
+    const same = await Promise.all(Array.from({ length: 5 }, () => post(order.POST, { code: "TESTFREE" })));
+    expect(same.map((r) => r.status).sort()).toEqual([200, 409, 409, 409, 409]);
+    expect([m.coupons[0].uses, m.rows.length, m.redemptions.length, m.grant.mock.calls.length]).toEqual([1, 1, 1, 1]);
+
+    m.coupons = [coupon({ id: "cp2", code: "LASTONE", maxUses: 2, uses: 1 })];
+    m.rows = [];
+    m.redemptions = [];
+    m.grant.mockReset();
+    m.session.mockResolvedValueOnce(alice).mockResolvedValueOnce(bob);
+    const two = await Promise.all([post(order.POST, { code: "LASTONE" }), post(order.POST, { code: "LASTONE" })]);
+    expect(two.map((r) => r.status).sort()).toEqual([200, 400]);
+    expect([m.coupons[0].uses, m.rows.length, m.redemptions.length, m.grant.mock.calls.length]).toEqual([2, 1, 1, 1]);
+  });
+
+  it("partial: a discounted Razorpay order (50% of ₹199 = ₹99), counted and recorded when paid; it replaces her invite, so no earning", async () => {
+    m.users[0].referredById = rahul.id;
+    m.coupons = [coupon({ code: "HALF", percentOff: 50 })];
+    const fetch = ordered();
+    vi.stubGlobal("fetch", fetch);
+    expect(await (await post(order.POST, { code: "half", amount: 100 })).json()).toMatchObject({ amount: 9900, listAmount: 19900, discount: 10000, inviter: null, coupon: "HALF" });
+    expect(sentAmount(fetch)).toBe(9900);
+    expect(m.rows[0]).toMatchObject({ amount: 9900, discount: 10000, couponId: "cp1", referrerId: null, status: "created", razorpayOrderId: "order_new" });
+    expect([m.coupons[0].uses, m.redemptions.length]).toEqual([0, 0]);
+    for (let i = 0; i < 2; i++) expect((await post(verify.POST, verifyBody("order_new"))).status).toBe(200);
+    expect(m.rows[0].status).toBe("paid");
+    expect(m.redemptions).toEqual([{ couponId: "cp1", userId: alice.id, paymentId: m.rows[0].id }]);
+    expect([m.coupons[0].uses, m.earnings.length, m.grant.mock.calls.length]).toEqual([1, 0, 1]);
+  });
+
+  it("refused with the reason and no order: inactive, expired, another account's, used up; an unknown code is tried as a referral code", async () => {
+    const fetch = ordered();
+    vi.stubGlobal("fetch", fetch);
+    const cases: [Partial<Coupon>, string][] = [
+      [{ active: false }, "This coupon isn't valid."],
+      [{ validUntil: new Date(Date.now() - 1000) }, "This coupon has expired."],
+      [{ allowedEmail: "someone@seatora.test" }, "This coupon is for another account."],
+      [{ maxUses: 3, uses: 3 }, "This coupon has been used up."],
+    ];
+    for (const [o, message] of cases) {
+      m.coupons = [coupon(o)];
+      expect(await json(await post(order.POST, { code: "TESTFREE" }))).toEqual([400, { ok: false, error: { code: "invalid_coupon", message } }]);
+    }
+    m.coupons = [coupon({ allowedEmail: alice.email })];
+    expect((await post(order.POST, { code: "TESTFREE" })).status).toBe(200);
+    expect(fetch).not.toHaveBeenCalled();
+
+    m.rows = [];
+    m.coupons = [];
+    expect(await (await post(order.POST, { code: "RHUX234" })).json()).toMatchObject({ amount: 15900, inviter: "Rahul", coupon: null });
+    expect(await json(await post(order.POST, { code: "NOSUCH1" }))).toEqual([400, { ok: false, error: { code: "invalid_referral", message: "This coupon or invite code isn't valid." } }]);
+  });
+
+  it("payments off: a 100% coupon still works, a partial one waits; in the free period a partial one works only after it", async () => {
+    m.coupons = [coupon(), coupon({ id: "cp2", code: "HALF", percentOff: 50 })];
+    vi.stubEnv("RAZORPAY_KEY_ID", "");
+    expect((await post(order.POST, { code: "HALF" })).status).toBe(503);
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_id");
+    vi.stubEnv("FREE_FOR_ALL_UNTIL", new Date(Date.now() + 86_400_000).toISOString());
+    const half = await json(await post(order.POST, { code: "HALF" }));
+    expect(half[0]).toBe(400);
+    expect(half[1].error.message).toMatch(/^This coupon works after \d{1,2} [A-Z][a-z]{2}\.$/);
+    expect(await json(await post(order.POST, { code: "TESTFREE" }))).toEqual([200, { ok: true, free: true, coupon: "TESTFREE" }]);
+    expect(m.grant).toHaveBeenCalledOnce(); // grantPlan: the whole season (SEASON_PASS_UNTIL), not just the free period
   });
 });
 

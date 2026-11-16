@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { navigating } from "@/features/decide/components/nav-pending";
 import { cn } from "@/lib/cn";
 import { claimFreeSeasonPass } from "../actions";
 
@@ -15,6 +16,7 @@ export function ClaimFreePass({ label, className, noteClassName }: { label: Reac
       setError(null);
       const r = await claimFreeSeasonPass().catch(() => ({ ok: false as const, error: "Couldn't upgrade. Try again." }));
       if (!r.ok) return setError(r.error);
+      navigating(true); // inside Decide: the shell keeps the refresh moving (decide-shell.tsx)
       router.refresh();
     });
   return (

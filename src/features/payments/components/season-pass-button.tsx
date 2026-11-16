@@ -7,21 +7,24 @@ import { formatPaise, REF_COOKIE } from "@/features/referrals/lib";
 import { quote } from "@/features/referrals/service";
 import { cn } from "@/lib/cn";
 import { paymentsOn, PLANS } from "../plans";
+import { priceFor } from "../service";
 import { BuySeasonPass } from "./buy-season-pass";
+import { CouponForm } from "./coupon-form";
 
 /**
  * The Season Pass call to action everywhere (Pricing #buy, the planner's home, the paywall, the account page), from her
  * state on the server (plans.ts passState):
  * - a Season Pass beyond the free period, or staff: "Season Pass active till 31 Mar 2027";
  * - in the free period: one button, "Upgrade for ~~₹499~~ ₹0" (the free claim; or "Season Pass · free till 20 Nov" once
- *   done). No paid option while it is free;
+ *   done), and "Have a coupon?" (CouponForm: a 100% coupon gives the whole season). No paid option while it is free;
  * - after it: "Upgrade for ~~₹499~~ ₹199" ("Upgrade for ~~₹499~~ ₹159 with Rahul's invite" with a referrer: her own, or the /r/
- *   cookie's code), or "Payments open soon";
+ *   cookie's code; "… with coupon X" with a coupon), or "Payments open soon" and "Have a coupon?";
  * - signed out: the same words, to /signup?next=/pricing#buy.
  * `className`: the primary button; `noteClassName`: text (and the secondary button's colour). Each Upgrade carries
- * data-upgrade: a click is an upgrade_click at the nearest data-placement (docs/FUNNEL.md).
+ * data-upgrade: a click is an upgrade_click at the nearest data-placement (docs/FUNNEL.md). `coupon`: the page's
+ * ?coupon=, applied to the price (or filled into "Have a coupon?") and kept through sign-up.
  */
-export async function SeasonPassButton({ className, noteClassName }: { className?: string; noteClassName?: string }) {
+export async function SeasonPassButton({ className, noteClassName, coupon }: { className?: string; noteClassName?: string; coupon?: string | null }) {
   const user = await getCurrentUser();
   const s = user && passState(user);
   const text = cn("text-sm", noteClassName);
@@ -40,7 +43,7 @@ export async function SeasonPassButton({ className, noteClassName }: { className
 
   if (!user)
     return (
-      <Link href={`/signup?${new URLSearchParams({ next: "/pricing#buy" })}`} data-upgrade="" className={cn("inline-flex items-center justify-center", className)}>
+      <Link href={`/signup?${new URLSearchParams({ next: `/pricing${coupon ? `?coupon=${coupon}` : ""}#buy` })}`} data-upgrade="" className={cn("inline-flex items-center justify-center", className)}>
         {claimLabel ||
           (q ? (
             <span>
@@ -54,13 +57,31 @@ export async function SeasonPassButton({ className, noteClassName }: { className
       </Link>
     );
 
-  const offer = q && { amount: q.amount, listAmount: q.listAmount, inviter: q.inviter, code: q.referrerId ? code : null };
-  if (!free || !s || s.state === "free")
-    return offer ? <BuySeasonPass offer={offer} verb="Upgrade" className={className} noteClassName={noteClassName} /> : <p className={cn(text, "font-semibold")}>Payments open soon</p>;
+  const couponForm = <CouponForm initialCode={coupon} noteClassName={noteClassName} />;
+  if (!free || !s || s.state === "free") {
+    if (!q)
+      return (
+        <div>
+          <p className={cn(text, "font-semibold")}>Payments open soon</p>
+          {couponForm}
+        </div>
+      );
+    const c = coupon ? await priceFor(user.id, coupon) : null; // ?coupon=: priced as if she had typed it
+    const ok = c && !c.error ? c : null;
+    const p = ok ?? q;
+    const offer = { amount: p.amount, listAmount: p.listAmount, inviter: p.inviter, coupon: ok?.coupon ?? null, code: ok ? (coupon ?? null) : q.referrerId ? code : null };
+    const initial = coupon ? { code: coupon, error: c?.error ?? null } : undefined;
+    return <BuySeasonPass offer={offer} initial={initial} verb="Upgrade" className={className} noteClassName={noteClassName} />;
+  }
 
-  return s.state === "claimed" ? (
-    <p className={cn(text, "font-semibold")} role="status">Season Pass · free till {shortDate(free)}</p>
-  ) : (
-    <ClaimFreePass label={claimLabel} className={className} noteClassName={noteClassName} />
+  return (
+    <div>
+      {s.state === "claimed" ? (
+        <p className={cn(text, "font-semibold")} role="status">Season Pass · free till {shortDate(free)}</p>
+      ) : (
+        <ClaimFreePass label={claimLabel} className={className} noteClassName={noteClassName} />
+      )}
+      {couponForm}
+    </div>
   );
 }

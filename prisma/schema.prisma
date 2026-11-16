@@ -493,6 +493,7 @@ model User {
   signupAid    String?
   signupIpHash String?
   funnelEvents FunnelEvent[]
+  couponRedemptions CouponRedemption[]
 
   @@index([referredById])
   @@index([signupAid])
@@ -698,8 +699,13 @@ model Payment {
   /// Whose invite gave the discount; earns them a ReferralEarning when paid.
   referrerId        String?
   referrer          User?            @relation("PaymentReferrer", fields: [referrerId], references: [id], onDelete: SetNull)
+  /// The coupon that gave the discount (no referral then). A 100% coupon's row is paid at once, with no Razorpay order.
+  couponId          String?
+  coupon            Coupon?          @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  redemption        CouponRedemption?
   currency          String
-  razorpayOrderId   String           @unique
+  /// Null only for a free (100% coupon) row (a CHECK).
+  razorpayOrderId   String?          @unique
   razorpayPaymentId String?          @unique
   status            String           @default("created")
   createdAt         DateTime         @default(now())
@@ -759,4 +765,39 @@ model ErrorGroup {
   lastDigest  String?
   /// Set from the admin page; a new occurrence clears it (reopens).
   resolvedAt  DateTime?
+}
+
+/// A Season Pass coupon (docs/PAYMENTS.md "Coupons"), made on /decide/admin. 100% off: free, with no Razorpay payment.
+model Coupon {
+  id           String             @id @default(cuid())
+  /// A–Z and 0–9, 3–20 characters (a CHECK).
+  code         String             @unique
+  /// 1–100 (a CHECK).
+  percentOff   Int
+  active       Boolean            @default(true)
+  /// Null: no limit.
+  maxUses      Int?
+  uses         Int                @default(0)
+  /// Only this account may use it (lowercase, a CHECK); null: anyone.
+  allowedEmail String?
+  validUntil   DateTime?
+  note         String?
+  createdAt    DateTime           @default(now())
+  redemptions  CouponRedemption[]
+  payments     Payment[]
+}
+
+/// One account's use of a coupon (once each), made when its payment is paid.
+model CouponRedemption {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentId String?  @unique
+  payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@unique([couponId, userId])
+  @@index([userId])
 }

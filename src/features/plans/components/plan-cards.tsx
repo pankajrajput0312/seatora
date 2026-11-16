@@ -25,8 +25,8 @@ export function limitLine(f: Feature, n: number) {
 
 const button = "inline-flex min-h-11 w-full items-center justify-center rounded-md px-4 text-sm font-semibold";
 
-/** The cards for the signed-in user (or signed out: "Create free account"); her plan's card says so. */
-export async function PlanCards({ className }: { className?: string }) {
+/** The cards for the signed-in user (or signed out: "Create free account"); her plan's card says so. `coupon`: the page's ?coupon=. */
+export async function PlanCards({ className, coupon }: { className?: string; coupon?: string | null }) {
   const user = await getCurrentUser();
   const state = user && passState(user).state;
   return (
@@ -34,7 +34,7 @@ export async function PlanCards({ className }: { className?: string }) {
       className={className}
       current={!state ? null : state === "free" || state === "claimable" ? "FREE" : "PREMIUM"}
       free={state === "pass" || state === "staff" ? null : freeNow()} // a paid pass: its price, not the free-period offer
-      cta={<SeasonPassButton className={cn(button, "bg-[#5fd36f] text-[#0b0e12] hover:bg-[#7fe08b]")} noteClassName="text-muted-foreground" />}
+      cta={<SeasonPassButton coupon={coupon} className={cn(button, "bg-[#5fd36f] text-[#0b0e12] hover:bg-[#7fe08b]")} noteClassName="text-muted-foreground" />}
       freeCta={!user && <Link href="/signup" className={cn(button, "border border-border text-foreground hover:bg-muted")}>Create free account</Link>}
     />
   );

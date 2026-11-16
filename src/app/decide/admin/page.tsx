@@ -10,12 +10,13 @@ import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { toURLSearchParams } from "@/features/decide/profile";
 import { funnelReport, possibleDuplicates, RANGES, recentErrors, type Range } from "@/features/funnel/admin";
 import { STAGES } from "@/features/funnel/lib";
+import { couponAdmin } from "@/features/payments/service";
 import { ADMIN_PAGE_SIZE, adminTotals, listUsers } from "@/features/plans/admin";
 import { COUNTED, ROLES, type Effective, type Role } from "@/features/plans/plans";
 import { formatPaise } from "@/features/referrals/lib";
 import { referralAdmin } from "@/features/referrals/service";
 import { cn } from "@/lib/cn";
-import { resolveError, setUserAccess, settleReferrals } from "./actions";
+import { createCoupon, resolveError, setUserAccess, settleReferrals, updateCoupon } from "./actions";
 
 // Owners and admins only (anyone else: not found). The upgrade funnel, accounts, their plans and today's use, the
 // site's totals, possible duplicate accounts and server/browser errors (docs/FUNNEL.md).
@@ -38,6 +39,8 @@ const MESSAGES: Record<string, string> = {
   voided: "Referral earnings voided.",
   nothing_pending: "Nothing changed: those earnings are no longer pending.",
   resolved: "Error marked resolved; it reopens if it happens again.",
+  coupon_saved: "Coupon saved.",
+  coupon_exists: "Not saved: a coupon with that code already exists.",
 };
 
 const day = (d: Date | null) => (d ? d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "—");
@@ -47,25 +50,27 @@ const pct = (x: number | null) => (x == null ? "—" : `${x}%`);
 const when = (d: Date) => d.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
 const planLabel = (u: { role: Role; plan: Effective }) =>
   u.plan.staff ? u.role[0] + u.role.slice(1).toLowerCase() : u.plan.plan === "PREMIUM" ? (u.plan.freeUntil ? "Free for all" : "Season Pass") : "Free";
+const field = "h-9 rounded-md border border-input bg-background px-2 text-sm";
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const me = await staffUser();
   if (!me) notFound();
   const f = parseSearchParams(schema, toURLSearchParams(await searchParams));
-  const [users, totals, refs, fun, dupes, errors] = await Promise.all([
+  const [users, totals, refs, fun, dupes, errors, coupons] = await Promise.all([
     listUsers(f.q || undefined, f.page),
     adminTotals(),
     referralAdmin(),
     funnelReport(f.range),
     possibleDuplicates(),
     recentErrors(),
+    couponAdmin(),
   ]);
   const people = (c: { events: number; people: number }) => [n(c.events), n(c.people)];
   const href = (page: number) => `${PATH}?${new URLSearchParams({ ...(f.q && { q: f.q }), page: String(page) })}`;
 
   return (
     <AppPage className="grid grid-cols-1 gap-6">
-      <PageHead title="Admin" about="The upgrade funnel, accounts, plans, usage, referral payouts, possible duplicate accounts and errors. Roles, Season Pass dates and payouts change here; every change is logged." />
+      <PageHead title="Admin" about="The upgrade funnel, accounts, plans, usage, referral payouts, coupons, possible duplicate accounts and errors. Roles, Season Pass dates, payouts and coupons change here; every change is logged." />
       {f.msg && MESSAGES[f.msg] && <p role="status" className="rounded-md border border-border bg-card px-3 py-2 text-sm">{MESSAGES[f.msg]}</p>}
 
       <section aria-labelledby="funnel-h" className="grid gap-4">
@@ -171,6 +176,61 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No pending payouts.</p>
+        )}
+      </section>
+
+      <section aria-labelledby="coupons-h" className="grid gap-3">
+        <h2 id="coupons-h" className="scroll-mt-24 text-lg font-semibold">Coupons</h2>
+        <form action={createCoupon} className="flex flex-wrap items-end gap-2 text-sm">
+          <label className="grid gap-1">Code<input name="code" required pattern="[A-Za-z0-9]{3,20}" maxLength={20} placeholder="DRTARAL" className={`${field} w-32 uppercase`} /></label>
+          <label className="grid gap-1">% off<input name="percentOff" type="number" required min={1} max={100} defaultValue={100} className={`${field} w-20`} /></label>
+          <label className="grid gap-1">Max uses<input name="maxUses" type="number" min={1} placeholder="No limit" className={`${field} w-28`} /></label>
+          <label className="grid gap-1">Only for email<input name="allowedEmail" type="email" maxLength={200} placeholder="Anyone" className={`${field} w-48`} /></label>
+          <label className="grid gap-1">Valid until<input name="validUntil" type="date" className={field} /></label>
+          <label className="grid gap-1">Note<input name="note" maxLength={500} className={`${field} w-48`} /></label>
+          <button type="submit" className="inline-flex min-h-9 items-center rounded-md bg-foreground px-3 text-sm font-semibold text-background">Create coupon</button>
+        </form>
+        {coupons.length ? (
+          <div className={tbl.wrap}>
+            <table className={tbl.table}>
+              <caption className="sr-only">Coupons, newest first</caption>
+              <thead>
+                <tr className={tbl.headRow}>
+                  {["Code", "% off", "Uses / max", "Active", "Note", "Redeemed by", "Max uses, only for email, valid until"].map((h) => <th key={h} scope="col" className={tbl.th}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {coupons.map((c) => (
+                  <tr key={c.id} className={tbl.row}>
+                    <td className={`${tbl.td} font-semibold`}>{c.code}</td>
+                    <td className={tbl.num}>{c.percentOff}%</td>
+                    <td className={tbl.num}>{n(c.uses)} / {c.maxUses == null ? "∞" : n(c.maxUses)}</td>
+                    <td className={tbl.td}>{c.active ? "Yes" : "No"}</td>
+                    <td className={`${tbl.td} text-xs`}>{c.note ?? "—"}</td>
+                    <td className={`${tbl.td} text-xs`}>
+                      {c.redemptions.length ? c.redemptions.map((r) => <span key={r.id} className="block">{r.user.email} <span className="numeric text-muted-foreground">{day(r.createdAt)}</span></span>) : "—"}
+                    </td>
+                    <td className={tbl.td}>
+                      <form action={updateCoupon} className="flex flex-wrap items-center gap-2">
+                        <input type="hidden" name="id" value={c.id} />
+                        <input name="maxUses" type="number" min={1} defaultValue={c.maxUses ?? ""} placeholder="No limit" aria-label={`Max uses of ${c.code}`} className={`${field} w-24`} />
+                        <input name="allowedEmail" type="email" maxLength={200} defaultValue={c.allowedEmail ?? ""} placeholder="Anyone" aria-label={`Only for email (${c.code})`} className={`${field} w-44`} />
+                        <input name="validUntil" type="date" defaultValue={isoDay(c.validUntil)} aria-label={`Valid until (${c.code})`} className={field} />
+                        <button type="submit" className="inline-flex min-h-9 items-center rounded-md border border-input px-3 text-sm font-semibold">Save</button>
+                      </form>
+                      <form action={updateCoupon} className="mt-2">
+                        <input type="hidden" name="id" value={c.id} />
+                        <input type="hidden" name="active" value={c.active ? "0" : "1"} />
+                        <button type="submit" className="inline-flex min-h-9 items-center rounded-md border border-input px-3 text-sm font-semibold">{c.active ? "Deactivate" : "Activate"}</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No coupons yet.</p>
         )}
       </section>
 

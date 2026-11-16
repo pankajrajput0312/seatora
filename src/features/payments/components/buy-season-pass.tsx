@@ -3,8 +3,9 @@
 import { useId, useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
+import { navigating } from "@/features/decide/components/nav-pending";
 import { beacon } from "@/features/funnel/components/beacon";
-import { applyReferralCode } from "@/features/referrals/actions";
+import { applyCode } from "@/features/referrals/actions";
 import { formatPaise } from "@/features/referrals/lib";
 import { cn } from "@/lib/cn";
 import { PLANS } from "../plans";
@@ -24,26 +25,32 @@ declare global {
 }
 
 export type Offer = {
-  /** Her price in paise (the server's quote: 20% off with a referrer). Display only: the order route decides. */
+  /** Her price in paise (the server's: less a coupon, or 20% off with a referrer). Display only: the order route decides. */
   amount: number;
-  /** The price without a referral, paise. */
+  /** The price without a discount, paise. */
   listAmount: number;
   /** The referrer's first name when the price is discounted. */
   inviter: string | null;
-  /** The referral code to send with the order (from the /r/ cookie or typed here). */
+  /** The coupon's code when a coupon set the price (it replaces the referral discount). */
+  coupon: string | null;
+  /** The coupon or referral code to send with the order (the /r/ cookie, ?coupon=, or typed here). */
   code: string | null;
 };
 
 /**
  * For a signed-in buyer; use through SeasonPassButton, which knows her state and price. The button reads
- * "<verb> for ~~₹499~~ ₹159 with Rahul's invite" (struck: PLANS' display-only wasAmount). "Have a referral code?" shows only to a buyer with no discount yet.
+ * "<verb> for ~~₹499~~ ₹159 with Rahul's invite" (struck: PLANS' display-only wasAmount), or "… ₹0 with coupon DRTARAL".
+ * "Have a coupon or invite code?" shows until a coupon is applied; `initial` opens it with ?coupon='s code and its error.
+ * A 100% coupon grants the pass with no Razorpay call.
  */
-export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassName }: { offer: Offer; verb: string; className?: string; noteClassName?: string }) {
+export function BuySeasonPass({ offer: initialOffer, verb, initial, className, noteClassName }: {
+  offer: Offer; verb: string; initial?: { code: string; error: string | null }; className?: string; noteClassName?: string;
+}) {
   const router = useRouter();
-  const [paid, setPaid] = useState(false);
+  const [paid, setPaid] = useState<string | null>(null);
   const [offer, setOffer] = useState(initialOffer);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(initial?.error ?? null);
   const failed = useRef(false);
   const codeId = useId(); // the plan cards and a page's own button can both be on screen
 
@@ -52,16 +59,16 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
     <span>
       {verb} for {offer.amount < PLANS.season_pass.wasAmount && <s className="mr-1 opacity-70">{formatPaise(PLANS.season_pass.wasAmount)}</s>}
       {formatPaise(offer.amount)}
-      {offer.inviter ? ` with ${offer.inviter}'s invite` : ""}
+      {offer.inviter ? ` with ${offer.inviter}'s invite` : offer.coupon ? ` with coupon ${offer.coupon}` : ""}
     </span>
   );
 
-  if (paid) return <p className={cn("text-sm font-semibold", noteClassName)} role="status">Season Pass active</p>;
+  if (paid) return <p className={cn("text-sm font-semibold", noteClassName)} role="status">{paid}</p>;
 
   async function apply(form: FormData) {
     setMessage(null);
-    const r = await applyReferralCode(String(form.get("code") ?? ""));
-    if (r.ok) setOffer((o) => ({ ...o, amount: r.amount, inviter: r.inviter, code: r.code }));
+    const r = await applyCode(String(form.get("code") ?? ""));
+    if (r.ok) setOffer((o) => ({ ...o, amount: r.amount, inviter: r.inviter, coupon: r.coupon, code: r.code }));
     else setMessage(r.error);
   }
 
@@ -71,16 +78,21 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
     failed.current = false;
     try {
       // Only the code goes up: the server prices the order.
-      const res = await fetch("/api/payments/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(offer.code ? { referralCode: offer.code } : {}) });
+      const res = await fetch("/api/payments/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(offer.code ? { code: offer.code } : {}) });
       const body = await res.json().catch(() => null);
       if (res.status === 401) return router.push(`/login?${new URLSearchParams({ next: NEXT })}`);
-      if (res.status === 409) return setPaid(true);
+      if (res.status === 409) return setPaid("Season Pass active");
+      if (body?.free) {
+        setPaid(`Season Pass active — coupon ${body.coupon} applied`);
+        navigating(true); // inside Decide: the shell keeps the refresh moving (decide-shell.tsx)
+        return router.refresh();
+      }
       if (!res.ok) {
-        if (body?.error?.code === "invalid_referral") setOffer((o) => ({ ...o, amount: o.listAmount, inviter: null, code: null }));
+        if (/^invalid_(referral|coupon)$/.test(body?.error?.code)) setOffer((o) => ({ ...o, amount: o.listAmount, inviter: null, coupon: null, code: null }));
         setBusy(false);
         return setMessage(body?.error?.message ?? "Couldn't start the payment. Try again.");
       }
-      setOffer((o) => ({ ...o, amount: body.amount, inviter: body.inviter }));
+      setOffer((o) => ({ ...o, amount: body.amount, inviter: body.inviter, coupon: body.coupon }));
       if (!window.Razorpay) {
         setBusy(false);
         return setMessage("The payment window didn't load. Check your connection and try again.");
@@ -92,7 +104,7 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
         order_id: body.orderId,
         name: "Seatora",
         image: `${window.location.origin}/icons/icon-192.png`,
-        description: body.discount ? `Season Pass · ${formatPaise(body.discount)} off with ${body.inviter}'s invite` : "Season Pass",
+        description: body.discount ? `Season Pass · ${formatPaise(body.discount)} off with ${body.coupon ? `coupon ${body.coupon}` : `${body.inviter}'s invite`}` : "Season Pass",
         prefill: { email: body.email },
         theme: { color: "#0b0e12" },
         handler: (r: RazorpayResponse) => void confirm(r),
@@ -124,7 +136,7 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
       const res = await fetch("/api/payments/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(r) });
       if (!res.ok) throw new Error();
       setMessage(null);
-      setPaid(true);
+      setPaid("Season Pass active");
       router.refresh();
     } catch {
       setMessage("Paid, but we couldn't confirm it yet. Refresh in a few minutes; if it's still not active, contact us with your payment id " + r.razorpay_payment_id + ".");
@@ -139,12 +151,19 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
       <button type="button" data-upgrade="" onClick={buy} disabled={busy} className={cn("inline-flex items-center justify-center disabled:opacity-50", className)}>
         {busy ? "Opening payment…" : label}
       </button>
-      {!offer.inviter && (
-        <details className={cn("mt-2 text-xs", noteClassName)}>
-          <summary className="cursor-pointer">Have a referral code?</summary>
-          <form action={apply} className="mt-1.5 flex gap-2">
-            <label htmlFor={codeId} className="sr-only">Referral code</label>
-            <input id={codeId} name="code" required maxLength={8} autoComplete="off" spellCheck={false} placeholder="CODE" className="h-9 w-28 rounded-md border border-input bg-transparent px-2 text-sm uppercase text-foreground" />
+      {!offer.coupon && (
+        <details open={!!initial} className={cn("mt-2 text-xs", noteClassName)}>
+          <summary className="cursor-pointer">Have a coupon or invite code?</summary>
+          {/* onSubmit, not action: a POST form dims the Decide shell until the address changes (nav-pending.tsx). */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void apply(new FormData(e.currentTarget));
+            }}
+            className="mt-1.5 flex gap-2"
+          >
+            <label htmlFor={codeId} className="sr-only">Coupon or invite code</label>
+            <input id={codeId} name="code" required maxLength={20} defaultValue={initial?.code} autoComplete="off" spellCheck={false} placeholder="CODE" className="h-9 w-32 rounded-md border border-input bg-transparent px-2 text-sm uppercase text-foreground" />
             <button type="submit" className="h-9 rounded-md border border-input px-3 text-sm font-semibold text-foreground">Apply</button>
           </form>
         </details>

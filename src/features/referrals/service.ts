@@ -42,7 +42,7 @@ export async function quote(buyerId: string | null, code?: string | null): Promi
   const full = (error: string | null = null): Quote => ({ listAmount, amount: listAmount, discount: 0, referrerId: null, inviter: null, error: code ? error : null });
   const own = buyerId ? (await db.user.findUnique({ where: { id: buyerId }, select: { referredById: true } }))?.referredById : null;
   const ref = own ? await db.user.findUnique({ where: { id: own }, select: { id: true, name: true } }) : code ? await referrerByCode(code) : null;
-  if (!ref) return full("That referral code isn't valid.");
+  if (!ref) return full("This coupon or invite code isn't valid.");
   if (ref.id === buyerId) return full("That's your own code: share it with friends instead.");
   if (buyerId && (await db.payment.findFirst({ where: { userId: buyerId, status: "paid" }, select: { id: true } }))) {
     return full("The referral discount is for a first purchase only.");

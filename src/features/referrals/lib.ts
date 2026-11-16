@@ -18,8 +18,8 @@ export const upiSchema = z
   .max(100)
   .regex(/^[a-zA-Z0-9._-]{2,64}@[a-zA-Z][a-zA-Z0-9]{1,63}$/, "Enter a UPI ID like name@bank");
 
-/** The friend's price: 20% off the list price, rounded down to whole rupees (19900 → 15900 paise). */
-export const discountedPrice = (listPaise: number) => Math.floor((listPaise * (100 - REFERRAL_PERCENT)) / 10_000) * 100;
+/** The friend's price: 20% off the list price, rounded down to whole rupees (19900 → 15900 paise). Coupons pass their own percent. */
+export const discountedPrice = (listPaise: number, percent = REFERRAL_PERCENT) => Math.floor((listPaise * (100 - percent)) / 10_000) * 100;
 
 /** The referrer's share: 20% of what was actually paid, rounded down to the paisa (15900 → 3180). */
 export const earningFor = (paidPaise: number) => Math.floor((paidPaise * REFERRAL_PERCENT) / 100);
