@@ -211,8 +211,6 @@ export function feeBasis(t: Pick<ProgrammeTerms, "years">): "yearly" | "admissio
   return later.length && later.every((g) => g && !g.atAdmission && g.inr === f.inr && g.min === f.min && g.kind === f.kind) ? "yearly" : "admission";
 }
 const PER = { yearly: "/yr", admission: " at admission (Year 1)" } as const;
-/** "₹3.75 L for the course" (a card's short form; the (i) and tables give it in full). */
-export const courseFeeText = (inr: number, short = true) => `${short ? inrL(inr) : inrFull(inr)} for the course`;
 /** Why a ₹ range is a range, when the data says so (a fee or amount priced by specialty): the cell's hint. */
 export const RANGE_HINT = "depends on specialty";
 
