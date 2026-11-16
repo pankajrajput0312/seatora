@@ -1,20 +1,20 @@
 # Payments (Razorpay Standard Checkout)
 
-A signed-in user buys the Season Pass (₹499, ₹399 with a referral: docs/REFERRALS.md) from the plan cards (Pricing `/pricing#buy`, the planner's `/decide/plan`, the sign-in pop-up, the paywall, the account page) or the planner's home card, all through `SeasonPassButton` (components/season-pass-button.tsx). Code: `src/features/payments`, routes in `src/app/api/payments`.
+A signed-in user buys the Season Pass (₹199, ₹159 with a referral: docs/REFERRALS.md; every price shows the display-only "was" price struck beside it, ~~₹499~~ ₹199, from `PLANS.season_pass.wasAmount`) from the plan cards (Pricing `/pricing#buy`, the planner's `/decide/plan`, the sign-in pop-up, the paywall, the account page) or the planner's home card, all through `SeasonPassButton` (components/season-pass-button.tsx). Code: `src/features/payments`, routes in `src/app/api/payments`.
 
 ## What the button shows (`SeasonPassButton`, by `passState` in features/plans/plans.ts)
 | She is | Shows |
 |---|---|
 | Season Pass beyond the free period (paid, PREMIUM, granted), or staff | "Season Pass active till 31 Mar 2027" |
-| In the free period (FREE_FOR_ALL_UNTIL ahead), not upgraded | "Upgrade to Season Pass, free till 20 Nov" (the free upgrade, docs/PLANS_AND_ROLES.md); under it, while payments are on, "Keep it for the whole season (till 31 Mar 2027): ₹499, or ₹399 with an invite" and a "Pay · ₹499" button |
-| In the free period, upgraded free | "Season Pass · free till 20 Nov", and the same "Keep it for the whole season" option |
-| Free plan after the free period | "Upgrade · ₹499" ("Upgrade · ₹399 with Rahul's invite"); "Payments open soon" while payments are off |
+| In the free period (FREE_FOR_ALL_UNTIL ahead), not upgraded | "Upgrade for ~~₹499~~ ₹0" (the free upgrade, docs/PLANS_AND_ROLES.md); no paid option while it is free |
+| In the free period, upgraded free | "Season Pass · free till 20 Nov" |
+| Free plan after the free period | "Upgrade for ~~₹499~~ ₹199" ("Upgrade for ~~₹499~~ ₹159 with Rahul's invite"); "Payments open soon" while payments are off |
 | Signed out | the same words, linking to `/signup?next=/pricing#buy` |
 
 Every buy button is hidden while `paymentsOn()` is false; no paid button ever sits beside "no payment needed".
 
 ## Flow
-1. `BuySeasonPass` (client) → `POST /api/payments/order` with an optional `{ referralCode }` (Zod; nothing else in the body is read). The server picks the plan and amount (`PLANS` in `plans.ts`, 49900 paise INR, less the referral discount from `quote` in features/referrals/service.ts), creates a Razorpay order whose receipt is our `Payment.id`, and stores a `Payment` row (`created`, with `listAmount`, `discount`, `referrerId`). It returns `{ orderId, amount, listAmount, discount, inviter, currency, keyId, email }`. Answers: 401 when signed out, 400 for a malformed body or a referral code that doesn't apply (`invalid_referral`, with the reason), 409 when already paid, 429 after 10 a minute, 502 "Payments are not set up" when Razorpay rejects the keys, 503 while payments are off, 500 otherwise.
+1. `BuySeasonPass` (client) → `POST /api/payments/order` with an optional `{ referralCode }` (Zod; nothing else in the body is read). The server picks the plan and amount (`PLANS` in `plans.ts`, 19900 paise INR, less the referral discount from `quote` in features/referrals/service.ts), creates a Razorpay order whose receipt is our `Payment.id`, and stores a `Payment` row (`created`, with `listAmount`, `discount`, `referrerId`). It returns `{ orderId, amount, listAmount, discount, inviter, currency, keyId, email }`. Answers: 401 when signed out, 400 for a malformed body or a referral code that doesn't apply (`invalid_referral`, with the reason), 409 when already paid, 429 after 10 a minute, 502 "Payments are not set up" when Razorpay rejects the keys, 503 while payments are off, 500 otherwise.
 2. The Razorpay modal (`checkout.js`, loaded by `next/script` only where the button is shown to a signed-in buyer) takes the payment.
 3. Its success handler → `POST /api/payments/verify` with `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature`. The server checks HMAC-SHA256(`order_id|payment_id`, key secret) with `timingSafeEqual` (400 on mismatch, nothing changes), and that the order is this user's (404 otherwise). Then `markPaid`.
 4. `POST /api/payments/webhook` covers a buyer who closes the tab after paying: `payment.captured` and `order.paid` → `markPaid`; `payment.failed` → `failed` (a paid order is never changed back); `refund.processed` and `payment.refunded` void the payment's pending referral earning.
@@ -37,7 +37,7 @@ Locally, keep them in `.env.razorpay` (gitignored) and load with `set -a; . ./.e
 - Automated runs (Playwright): Razorpay ignores the card form's submit from a `HeadlessChrome` user agent; use a normal Chrome user agent and type the card number (`pressSequentially`).
 - Razorpay's own list of test cards and UPI ids: https://razorpay.com/docs/payments/payments/test-card-details/
 
-Check the result: the button shows "Season Pass active till 31 Mar 2027", `SELECT status, amount, discount, "paidAt" FROM "Payment" ORDER BY "createdAt" DESC LIMIT 1` says `paid`, and the buyer's `premiumUntil` is 2027-03-31 18:29:59 UTC. With a referral: amount 39900, discount 10000, and a `ReferralEarning` of 7980 `pending`.
+Check the result: the button shows "Season Pass active till 31 Mar 2027", `SELECT status, amount, discount, "paidAt" FROM "Payment" ORDER BY "createdAt" DESC LIMIT 1` says `paid`, and the buyer's `premiumUntil` is 2027-03-31 18:29:59 UTC. With a referral: amount 15900, discount 4000, and a `ReferralEarning` of 3180 `pending`.
 
 ## Webhook setup (Razorpay dashboard)
 1. Dashboard → Account & Settings → Webhooks → Add New Webhook (do it once in Test mode and once in Live mode; they are separate).

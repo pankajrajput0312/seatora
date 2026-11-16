@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { ArrowRight, Building2, CalendarDays, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
-import { business } from "@/config/business";
-import { formatINR } from "@/features/cutoffs/lib/format";
 import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
+import { PLANS } from "@/features/payments/plans";
 import { freeNow, shortDate } from "@/features/plans/plans";
-import { REFERRAL_PERCENT } from "@/features/referrals/lib";
+import { formatPaise, REFERRAL_PERCENT } from "@/features/referrals/lib";
 import type { DecideLinks } from "../lib/links";
 
 // The planner's home, in Seatora's own look (the logo's ink, cyan and green; a faint pixel grid): the Residents card first,
-// then every tool as a row with what it answers. The Season Pass card: ₹0 while FREE_FOR_ALL_UNTIL is ahead, then ₹499.
+// then every tool as a row with what it answers. The Season Pass card: ~~₹499~~ ₹0 while FREE_FOR_ALL_UNTIL is ahead, then ~~₹499~~ ₹199.
 
 const groups = [
   {
@@ -63,8 +62,8 @@ export function HomeHub({ L }: { L: DecideLinks }) {
           <div className="rounded-lg border border-dashed border-[#2b3a45] px-4 py-3 md:text-right">
             <p className="font-mono text-[10px] tracking-[0.25em] text-[#a3abb3]">SEASON PASS</p>
             <p className="mt-1 flex items-baseline gap-2 md:justify-end">
-              {free && <s className="text-sm text-[#6b7480]" aria-label={`Was ${formatINR(business.regularPrice)}`}>{formatINR(business.regularPrice)}</s>}
-              <span className="text-3xl font-extrabold text-[#5fd36f]">{formatINR(free ? 0 : business.regularPrice)}</span>
+              <s className="text-sm text-[#6b7480]" aria-label={`Was ${formatPaise(PLANS.season_pass.wasAmount)}`}>{formatPaise(PLANS.season_pass.wasAmount)}</s>
+              <span className="text-3xl font-extrabold text-[#5fd36f]">{formatPaise(free ? 0 : PLANS.season_pass.amount)}</span>
             </p>
             {free && <p className="text-xs text-[#f1f4f7]">Everything free till {shortDate(free)}</p>}
             <div className="mt-3">

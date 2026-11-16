@@ -1,6 +1,9 @@
-/** What each plan costs, in paise. The order route reads it; the browser never sends an amount. */
+/**
+ * What each plan costs, in paise. The order route reads it; the browser never sends an amount. `wasAmount` is display
+ * only: the struck-through "was" price beside every price ("~~₹499~~ ₹199").
+ */
 export const PLANS = {
-  season_pass: { amount: 49900, currency: "INR", description: "Season Pass" },
+  season_pass: { amount: 19900, wasAmount: 49900, currency: "INR", description: "Season Pass" },
 } as const;
 
 export type Plan = keyof typeof PLANS;

@@ -18,13 +18,13 @@ export const upiSchema = z
   .max(100)
   .regex(/^[a-zA-Z0-9._-]{2,64}@[a-zA-Z][a-zA-Z0-9]{1,63}$/, "Enter a UPI ID like name@bank");
 
-/** The friend's price: 20% off the list price, rounded down to whole rupees (49900 → 39900 paise). */
+/** The friend's price: 20% off the list price, rounded down to whole rupees (19900 → 15900 paise). */
 export const discountedPrice = (listPaise: number) => Math.floor((listPaise * (100 - REFERRAL_PERCENT)) / 10_000) * 100;
 
-/** The referrer's share: 20% of what was actually paid, rounded down to the paisa (39900 → 7980). */
+/** The referrer's share: 20% of what was actually paid, rounded down to the paisa (15900 → 3180). */
 export const earningFor = (paidPaise: number) => Math.floor((paidPaise * REFERRAL_PERCENT) / 100);
 
-/** ₹399, ₹79.80, ₹1,596. */
+/** ₹159, ₹31.80, ₹1,596. */
 export const formatPaise = (p: number) =>
   `₹${(p / 100).toLocaleString("en-IN", { minimumFractionDigits: p % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
 

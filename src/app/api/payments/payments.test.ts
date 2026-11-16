@@ -82,7 +82,7 @@ const alice = { id: "u_alice", email: "alice@seatora.test", name: "Alice" };
 const bob = { id: "u_bob", email: "bob@seatora.test", name: "Bob" };
 const rahul: User = { id: "u_rahul", email: "rahul@seatora.test", name: "Rahul Sharma", referralCode: "RHUX234", referredById: null };
 const row = (o: Partial<Row> = {}): Row => ({
-  id: "p1", userId: alice.id, plan: "season_pass", amount: 49900, listAmount: 49900, discount: 0, referrerId: null, currency: "INR",
+  id: "p1", userId: alice.id, plan: "season_pass", amount: 19900, listAmount: 19900, discount: 0, referrerId: null, currency: "INR",
   razorpayOrderId: "order_1", razorpayPaymentId: null, status: "created", paidAt: null, ...o,
 });
 const ordered = () => vi.fn(async () => Response.json({ id: "order_new" }));
@@ -117,12 +117,12 @@ describe("POST /api/payments/order", () => {
     const fetch = ordered();
     vi.stubGlobal("fetch", fetch);
     // Only referralCode is read: a client's { amount: 100 } changes nothing.
-    const res = await post(order.POST, { amount: 100, currency: "USD", plan: "x", discount: 49900 });
+    const res = await post(order.POST, { amount: 100, currency: "USD", plan: "x", discount: 19900 });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ orderId: "order_new", amount: 49900, listAmount: 49900, discount: 0, inviter: null, currency: "INR", keyId: "rzp_test_id", email: alice.email });
+    expect(await res.json()).toEqual({ orderId: "order_new", amount: 19900, listAmount: 19900, discount: 0, inviter: null, currency: "INR", keyId: "rzp_test_id", email: alice.email });
     const sent = JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(sent).toMatchObject({ amount: 49900, currency: "INR", receipt: m.rows[0].id });
-    expect(m.rows[0]).toMatchObject({ userId: alice.id, plan: "season_pass", amount: 49900, listAmount: 49900, discount: 0, referrerId: null, razorpayOrderId: "order_new", status: "created" });
+    expect(sent).toMatchObject({ amount: 19900, currency: "INR", receipt: m.rows[0].id });
+    expect(m.rows[0]).toMatchObject({ userId: alice.id, plan: "season_pass", amount: 19900, listAmount: 19900, discount: 0, referrerId: null, razorpayOrderId: "order_new", status: "created" });
     // An empty body is fine; a malformed code field is a 400.
     expect((await order.POST(new Request("http://test/api/payments/order", { method: "POST" }))).status).toBe(200);
     expect((await post(order.POST, { referralCode: 42 })).status).toBe(400);
@@ -142,20 +142,20 @@ describe("POST /api/payments/order", () => {
 });
 
 describe("referral pricing (order route)", () => {
-  it("a friend's code: 20% off, ₹499 → ₹399, the referrer on the row; the client's amount is still ignored", async () => {
+  it("a friend's code: 20% off, ₹199 → ₹159, the referrer on the row; the client's amount is still ignored", async () => {
     const fetch = ordered();
     vi.stubGlobal("fetch", fetch);
     const res = await post(order.POST, { referralCode: " rhux234 ", amount: 1 });
-    expect(await res.json()).toMatchObject({ amount: 39900, listAmount: 49900, discount: 10000, inviter: "Rahul" });
-    expect(sentAmount(fetch)).toBe(39900);
-    expect(m.rows[0]).toMatchObject({ amount: 39900, listAmount: 49900, discount: 10000, referrerId: rahul.id });
+    expect(await res.json()).toMatchObject({ amount: 15900, listAmount: 19900, discount: 4000, inviter: "Rahul" });
+    expect(sentAmount(fetch)).toBe(15900);
+    expect(m.rows[0]).toMatchObject({ amount: 15900, listAmount: 19900, discount: 4000, referrerId: rahul.id });
   });
 
   it("her own referredById comes first, whatever code she types", async () => {
     m.users[0].referredById = rahul.id;
     vi.stubGlobal("fetch", ordered());
-    expect(await (await post(order.POST, {})).json()).toMatchObject({ amount: 39900, inviter: "Rahul" });
-    expect(await (await post(order.POST, { referralCode: "ALCE234" })).json()).toMatchObject({ amount: 39900, inviter: "Rahul" });
+    expect(await (await post(order.POST, {})).json()).toMatchObject({ amount: 15900, inviter: "Rahul" });
+    expect(await (await post(order.POST, { referralCode: "ALCE234" })).json()).toMatchObject({ amount: 15900, inviter: "Rahul" });
     expect(m.rows.map((r) => r.referrerId)).toEqual([rahul.id, rahul.id]);
   });
 
@@ -174,8 +174,8 @@ describe("referral pricing (order route)", () => {
     m.users[0].referredById = rahul.id;
     m.rows.push(row({ id: "old", plan: "earlier_plan", status: "paid", razorpayOrderId: "order_old" }));
     vi.stubGlobal("fetch", ordered());
-    expect(await (await post(order.POST, {})).json()).toMatchObject({ amount: 49900, discount: 0, inviter: null });
-    expect(m.rows[1]).toMatchObject({ amount: 49900, discount: 0, referrerId: null });
+    expect(await (await post(order.POST, {})).json()).toMatchObject({ amount: 19900, discount: 0, inviter: null });
+    expect(m.rows[1]).toMatchObject({ amount: 19900, discount: 0, referrerId: null });
     expect((await post(order.POST, { referralCode: "RHUX234" })).status).toBe(400);
   });
 });
@@ -213,12 +213,12 @@ describe("POST /api/payments/verify", () => {
 });
 
 describe("referral earning (markPaid)", () => {
-  it("20% of what was paid (₹399 → ₹79.80), pending, once, inside the paid-mark transaction", async () => {
-    m.rows.push(row({ amount: 39900, discount: 10000, referrerId: rahul.id }));
+  it("20% of what was paid (₹159 → ₹31.80), pending, once, inside the paid-mark transaction", async () => {
+    m.rows.push(row({ amount: 15900, discount: 4000, referrerId: rahul.id }));
     for (let i = 0; i < 3; i++) await post(verify.POST, verifyBody());
     const captured = JSON.stringify({ event: "payment.captured", payload: { payment: { entity: { id: "pay_1", order_id: "order_1" } } } });
     await post(webhook.POST, captured, { "x-razorpay-signature": hmac(captured, WEBHOOK) });
-    expect(m.earnings).toEqual([{ referrerId: rahul.id, paymentId: "p1", buyerId: alice.id, amount: 7980, status: "pending", inTx: true }]);
+    expect(m.earnings).toEqual([{ referrerId: rahul.id, paymentId: "p1", buyerId: alice.id, amount: 3180, status: "pending", inTx: true }]);
     expect(m.grant).toHaveBeenCalledTimes(1);
   });
 
@@ -230,7 +230,7 @@ describe("referral earning (markPaid)", () => {
   });
 
   it("a refund (webhook) voids a pending earning", async () => {
-    m.rows.push(row({ amount: 39900, discount: 10000, referrerId: rahul.id }));
+    m.rows.push(row({ amount: 15900, discount: 4000, referrerId: rahul.id }));
     await post(verify.POST, verifyBody());
     const refund = JSON.stringify({ event: "refund.processed", payload: { refund: { entity: { id: "rfnd_1", payment_id: "pay_1" } } } });
     expect((await post(webhook.POST, refund, { "x-razorpay-signature": hmac(refund, WEBHOOK) })).status).toBe(200);

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { applyReferralCode } from "@/features/referrals/actions";
 import { formatPaise } from "@/features/referrals/lib";
 import { cn } from "@/lib/cn";
+import { PLANS } from "../plans";
 
 // Razorpay Standard Checkout for the Season Pass: the order route sets the amount, the modal takes the payment, verify
 // confirms it (the webhook covers a closed tab). checkout.js loads only where this button is shown to a signed-in buyer.
@@ -32,7 +33,7 @@ export type Offer = {
 
 /**
  * For a signed-in buyer; use through SeasonPassButton, which knows her state and price. The button reads
- * "<verb> for ~~₹499~~ ₹399 with Rahul's invite". "Have a referral code?" shows only to a buyer with no discount yet.
+ * "<verb> for ~~₹499~~ ₹159 with Rahul's invite" (struck: PLANS' display-only wasAmount). "Have a referral code?" shows only to a buyer with no discount yet.
  */
 export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassName }: { offer: Offer; verb: string; className?: string; noteClassName?: string }) {
   const router = useRouter();
@@ -43,12 +44,13 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
   const failed = useRef(false);
   const codeId = useId(); // the plan cards and a page's own button can both be on screen
 
+  // One span, so the button's flex keeps it one line of text (wrapping as words, not as columns).
   const label = (
-    <>
-      {verb} for {offer.amount < offer.listAmount && <s className="mr-1 opacity-70">{formatPaise(offer.listAmount)}</s>}
+    <span>
+      {verb} for {offer.amount < PLANS.season_pass.wasAmount && <s className="mr-1 opacity-70">{formatPaise(PLANS.season_pass.wasAmount)}</s>}
       {formatPaise(offer.amount)}
       {offer.inviter ? ` with ${offer.inviter}'s invite` : ""}
-    </>
+    </span>
   );
 
   if (paid) return <p className={cn("text-sm font-semibold", noteClassName)} role="status">Season Pass active</p>;

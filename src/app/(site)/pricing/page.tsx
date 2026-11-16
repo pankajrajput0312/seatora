@@ -5,10 +5,9 @@ import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
 import { business } from "@/config/business";
 import { FreePrice } from "@/components/marketing/free-price";
-import { formatINR } from "@/features/cutoffs/lib/format";
 import { askConfig } from "@/features/ask/config";
 import { getCurrentUser } from "@/features/auth/lib/session";
-import { paymentsOn } from "@/features/payments/plans";
+import { paymentsOn, PLANS } from "@/features/payments/plans";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { freeNow, longDate, shortDate } from "@/features/plans/plans";
 import { SEASON_PASS_UNTIL } from "@/features/payments/grant";
@@ -18,7 +17,7 @@ import { quote } from "@/features/referrals/service";
 
 export const metadata: Metadata = {
   title: "Pricing — Seatora NEET PG 2026 Season Pass",
-  description: `The Seatora NEET PG 2026 Season Pass: ${formatINR(business.regularPrice)} ${business.period}, paid once, with no subscription or auto-renewal. Free and Season Pass limits compared.`,
+  description: `The Seatora NEET PG 2026 Season Pass: ${formatPaise(PLANS.season_pass.amount)} (was ${formatPaise(PLANS.season_pass.wasAmount)}) ${business.period}, paid once, with no subscription or auto-renewal. Free and Season Pass limits compared.`,
 };
 
 /** Rendered per request: her price (a referral), her Season Pass, and whether the free period and payments are on. */
@@ -55,7 +54,7 @@ export default async function PricingPage() {
             <h2>What you pay</h2>
             {paying ? (
               <p className="mt-2">
-                The Season Pass costs {formatINR(business.regularPrice)} {business.period}, paid once by card or UPI through Razorpay
+                The Season Pass costs <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> {formatPaise(q.listAmount)} {business.period}, paid once by card or UPI through Razorpay
                 ({formatPaise(discountedPrice(q.listAmount))} with a friend&apos;s referral link), and runs till {longDate(SEASON_PASS_UNTIL)}.{" "}
                 {free && `Till ${shortDate(free)} you can also upgrade free, with no payment; that free upgrade ends on ${shortDate(free)}. `}There is no
                 subscription and nothing renews automatically. Prices are in Indian Rupees (INR).
@@ -63,7 +62,7 @@ export default async function PricingPage() {
             ) : (
               <p className="mt-2">
                 {free ? `Till ${shortDate(free)} you can upgrade to the Season Pass free` : "Paid passes open soon"} (regular price{" "}
-                {formatINR(business.regularPrice)}). Nothing is charged right now, there is no subscription and nothing renews automatically.
+                <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> {formatPaise(PLANS.season_pass.amount)}). Nothing is charged right now, there is no subscription and nothing renews automatically.
                 Any price is in Indian Rupees (INR).
               </p>
             )}

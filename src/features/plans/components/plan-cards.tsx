@@ -46,7 +46,7 @@ export async function PlanCards({ className }: { className?: string }) {
  * The Season Pass comes first in the page (first on phones); from sm the Free card is drawn on its left.
  */
 export function PlanCardsView({ current, free, cta, freeCta, className }: { current: Plan | null; free: Date | null; cta: React.ReactNode; freeCta?: React.ReactNode; className?: string }) {
-  const list = PLANS.season_pass.amount;
+  const { amount: list, wasAmount: was } = PLANS.season_pass;
   const yours = <span className="rounded-full bg-[#5ccfe6] px-2 py-0.5 text-xs font-bold text-[#0b0e12]">Your plan</span>;
   return (
     <div className={cn("grid gap-3 sm:grid-cols-2", className)}>
@@ -59,14 +59,16 @@ export function PlanCardsView({ current, free, cta, freeCta, className }: { curr
         <div className="flex flex-1 flex-col p-4">
           {free ? (
             <p className="flex items-baseline gap-2">
-              <span className="sr-only">Was {formatPaise(list)}, now ₹0 till {shortDate(free)}</span>
-              <s aria-hidden className="numeric text-lg text-muted-foreground">{formatPaise(list)}</s>
+              <span className="sr-only">Was {formatPaise(was)}, now ₹0 till {shortDate(free)}</span>
+              <s aria-hidden className="numeric text-lg text-muted-foreground">{formatPaise(was)}</s>
               <span aria-hidden className="numeric text-4xl font-extrabold">₹0</span>
               <span aria-hidden className="text-sm text-muted-foreground">till {shortDate(free)}</span>
             </p>
           ) : (
             <p className="flex items-baseline gap-2">
-              <span className="numeric text-4xl font-extrabold">{formatPaise(list)}</span>
+              <span className="sr-only">Was {formatPaise(was)}, now {formatPaise(list)}</span>
+              <s aria-hidden className="numeric text-lg text-muted-foreground">{formatPaise(was)}</s>
+              <span aria-hidden className="numeric text-4xl font-extrabold">{formatPaise(list)}</span>
               <span className="text-sm text-muted-foreground">paid once</span>
             </p>
           )}

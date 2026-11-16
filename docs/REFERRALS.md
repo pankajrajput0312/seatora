@@ -6,16 +6,16 @@ schema, pure and tested; `service.ts` the reads and writes; `actions.ts`; `compo
 `src/app/decide/refer`, the order route and `markPaid` (docs/PAYMENTS.md), the Referrals section of `/decide/admin`.
 
 ## Money (paise, decided on the server only)
-| | Rule | ₹499 list price |
+| | Rule | ₹199 price (`PLANS.season_pass.amount`; the struck ₹499 is display only) |
 |---|---|---|
-| Friend's price | 20% off, rounded down to whole rupees (`discountedPrice`) | ₹399 (39900; discount 10000) |
-| Referrer's earning | floor(20% of the amount actually paid) (`earningFor`) | ₹79.80 (7980) |
+| Friend's price | 20% off, rounded down to whole rupees (`discountedPrice`) | ₹159 (15900; discount 4000) |
+| Referrer's earning | floor(20% of the amount actually paid) (`earningFor`) | ₹31.80 (3180) |
 
 ## Flow
 1. **Her code**: `User.referralCode`, 7 characters of `23456789ABCDEFGHJKMNPQRSTUVWXYZ` (no 0/O, 1/I/L; a CHECK allows 6–8), made the first time she opens `/decide/refer` and never changed (no action edits it).
 2. **The link** `GET /r/CODE`: 30 lookups a minute per IP (`allow()`, 429 after). A real code sets the `seatora_ref` cookie (httpOnly, SameSite=Lax, 30 days, Secure in production) and redirects (307, relative) to `/signup?ref=CODE`, or `/pricing` when signed in. An unknown code redirects to `/signup` without the cookie. Sign-up and Pricing show "Rahul invited you — 20% off the Season Pass": the first name only, never the email.
 3. **Sign-up** sets `User.referredById` from the cookie, else `?ref=` (a code that exists; a new account can't be its own referrer; a DB CHECK forbids `referredById = id`).
-4. **Checkout** (`quote` in service.ts, used by the page for display and by `POST /api/payments/order` for the charge): the referrer is her own `referredById` first, else the code sent as `{ referralCode }` (from the cookie, or typed under "Have a referral code?", checked by `applyReferralCode`, 10 a minute). Refused: an unknown code, her own code, or a buyer with any paid payment (one discount per buyer, first purchase only); a typed code that fails is a 400 `invalid_referral` with the reason, never a silent full charge. The client never sends an amount. The `Payment` row keeps `listAmount`, `discount` and `referrerId`; the order response and the button show "₹399 with Rahul's invite", the Razorpay modal the ₹399 order.
+4. **Checkout** (`quote` in service.ts, used by the page for display and by `POST /api/payments/order` for the charge): the referrer is her own `referredById` first, else the code sent as `{ referralCode }` (from the cookie, or typed under "Have a referral code?", checked by `applyReferralCode`, 10 a minute). Refused: an unknown code, her own code, or a buyer with any paid payment (one discount per buyer, first purchase only); a typed code that fails is a 400 `invalid_referral` with the reason, never a silent full charge. The client never sends an amount. The `Payment` row keeps `listAmount`, `discount` and `referrerId`; the order response and the button show "~~₹499~~ ₹159 with Rahul's invite", the Razorpay modal the ₹159 order.
 5. **Earning**: in `markPaid`'s transaction, after the plan is granted, a payment with a `referrerId` gets a `ReferralEarning` (`pending`). Once per payment: `markPaid` lets one call through, and `createMany … skipDuplicates` on the unique `paymentId` backs it up without failing the transaction.
 6. **Refund**: the webhook's `refund.processed` / `payment.refunded` sets a still-pending earning `void` with the refund id and time in `note`. A partial refund voids it too. An earning already paid out is left as it is (recover it by hand).
 7. **Payout**: `/decide/admin` → Referrals: pending earnings grouped by referrer (email, UPI, total, payments, buyers' emails). Pay the total by UPI, type the UPI reference, "Mark paid out" (`paid_out`, `paidOutAt`, `note`); or "Void" with the reason. Only the earnings listed on the page change; owner or admin only; each writes an `AdminAudit` row (`referral_paid_out` / `referral_void`, target = the referrer).
