@@ -24,6 +24,8 @@ export function FilterDropdown({ label, name, options, selected, none = "All", i
   const [typed, setTyped] = useState("");
   const [ticked, setTicked] = useState(selected.length);
   const long = search || options.length > 12;
+  // A long list shows what is ticked first (her profile's courses among a hundred), in the list's order otherwise.
+  const shown = long ? [...options.filter((o) => selected.includes(o.value)), ...options.filter((o) => !selected.includes(o.value))] : options;
   const count = selected.length;
   const summary = count ? (count === 1 ? options.find((o) => o.value === selected[0])?.label ?? selected[0] : `${count} selected`) : none;
   return (
@@ -48,7 +50,7 @@ export function FilterDropdown({ label, name, options, selected, none = "All", i
         {long && typed.trim() && !options.some((o) => matchesSpecialty(typed, o.label)) && <p role="status" className="py-2 text-sm text-muted-foreground">No {label.toLowerCase()} matches “{typed.trim()}”.</p>}
         {/* Large chips that wrap, as in the profile editor: more of a long list in view than one row each. */}
         <div className="flex flex-wrap gap-2">
-          {options.map((o) => (
+          {shown.map((o) => (
             <label
               key={o.value}
               hidden={(long && !matchesSpecialty(typed, o.label)) || undefined}
