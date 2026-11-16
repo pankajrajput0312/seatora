@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { pageValue, parseSearchParams, rankValue } from "../../lib/params";
 import { anyTermFilter, feeValue, termFilterLists, termFilters, termFilterShape } from "../../lib/term-filters";
-import { profileFromParams } from "../../profile";
+import { profileFromParams, profileHasCourse } from "../../profile";
 import { getCollege, getMeta, listAllotments } from "../../service";
 import { baseCategories, roundLabel, rounds, termLabel, type Allotment, type PrevSeat, type Source, type Term } from "../../types";
 import { collegeTypeLabel } from "../institute/college-type";
@@ -18,7 +18,10 @@ export const allotmentCategories = [...baseCategories, ...baseCategories.map((c)
 // Page filters never reuse a profile key: quota is `aq`, seat category `acat` (lib/links.ts).
 const schema = z.object({
   inst: z.string().max(200).optional(),
-  course: z.string().max(100).optional(),
+  /** Course slugs (one or more). */
+  course: z.array(z.string().max(100)).optional(),
+  /** "0": not her profile's default (Show all). */
+  mine: z.literal("0").optional(),
   year: z.coerce.number().int().optional(),
   round: z.enum(rounds).optional(),
   aq: z.string().max(100).optional(),
@@ -36,12 +39,17 @@ export const statusLabel: Record<Allotment["status"], string> = { allotted: "All
 /** The remark the PDF prints beside the previous round's seat. */
 export const prevRemarkLabel: Record<PrevSeat["remark"], string> = { reported: "reported", not_reported: "not reported", seat_surrendered: "seat surrendered", seat_cancelled: "seat cancelled" };
 
+/** The rank window around her rank that the page opens on: −25% to +25%. */
+export const rankWindow = (rank: number) => ({ from: Math.max(1, Math.round(rank * 0.75)), to: Math.round(rank * 1.25) });
+
 /**
  * The page's params, leniently: a bad field falls back; a rank range that isn't one is reported (`rankError`) and not
- * applied. No filter at all = the latest year's latest round (`latest`). null: an unknown `inst` (a 404).
+ * applied. No filter at all = with her profile, her courses (all of them when it names none) in every year and round,
+ * ranks within 25% of hers (`fromProfile`, as if those were the params; mine=0 drops it), else the latest year's latest
+ * round (`latest`). null: an unknown `inst` (a 404).
  */
 export async function allotmentsView(params: URLSearchParams, pageSize: number) {
-  const f = parseSearchParams(schema, params, termFilterLists);
+  const f = parseSearchParams(schema, params, [...termFilterLists, "course"]);
   const [meta, inst] = await Promise.all([getMeta(), f.inst ? getCollege(f.inst) : null]);
   if (f.inst && !inst) return null;
   // A rank typed with commas ("30,000") is fine; anything else that isn't a rank is reported, not silently dropped.
@@ -56,17 +64,20 @@ export async function allotmentsView(params: URLSearchParams, pageSize: number) 
   // With no filter at all the page opens on the latest year's latest round (not all 2,09,571 rows); "All years" is year=all.
   // A term filter (fee, type…) alone keeps that default.
   const pristine = !["inst", "course", "year", "round", "aq", "acat", "state", "from", "to"].some((k) => params.get(k)?.trim());
-  const latest = pristine ? meta.years[0] : undefined;
+  const profile = profileFromParams(params);
+  const mine = profile && meta.courses.filter((c) => profileHasCourse(profile, c)).map((c) => c.slug);
+  const fromProfile = pristine && profile && f.mine !== "0" ? { courses: mine && mine.length < meta.courses.length ? mine : [], ...rankWindow(profile.rank) } : null;
+  const latest = pristine && !fromProfile ? meta.years[0] : undefined;
   const filters = {
     year: meta.years.some((y) => y.year === f.year) ? f.year : latest?.year,
     round: f.round ?? latest?.rounds.at(-1),
-    course: f.course,
+    courses: fromProfile?.courses ?? f.course,
     quota: f.aq,
     category: f.acat,
     state: f.state,
-    from: rankError ? undefined : f.from,
-    to: rankError ? undefined : f.to,
-    terms: termFilters(f, profileFromParams(params)),
+    from: fromProfile?.from ?? (rankError ? undefined : f.from),
+    to: fromProfile?.to ?? (rankError ? undefined : f.to),
+    terms: termFilters(f, profile),
   };
   // `unknownTerms`: the rows "Include not declared" (nd=keep) would add, i.e. left out only because a filtered figure is
   // not declared (keep is a superset: it only lets unknown values through). Counted only when that box is unticked.
@@ -78,7 +89,7 @@ export async function allotmentsView(params: URLSearchParams, pageSize: number) 
   ]);
   // Each row's MCC institute profile (the card's external link); null when the import has none.
   const rows = r.rows.map((a) => ({ ...a, mccProfileUrl: info.get(a.college.key)?.mccProfileUrl ?? null }));
-  return { f, meta, inst, typed, rankError, latest, filters, r: { ...r, rows, unknownTerms: all ? all.total - r.total : 0 } };
+  return { f, meta, inst, typed, rankError, latest, fromProfile, filters, r: { ...r, rows, unknownTerms: all ? all.total - r.total : 0 } };
 }
 export type AllotmentRow = NonNullable<Awaited<ReturnType<typeof allotmentsView>>>["r"]["rows"][number];
 

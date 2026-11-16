@@ -11,6 +11,7 @@ import { CsvLink, toolbarRow } from "@/features/decide/components/csv-link";
 import { AboutData } from "@/features/decide/components/filter-form";
 import { Dash, PageHead, Provisional } from "@/features/decide/components/bits";
 import { DataSource } from "@/features/decide/components/data-source";
+import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { termDocs } from "@/features/decide/components/fees";
 import { ResultCard, ResultCards } from "@/features/decide/components/result-card";
 import { StatHead, TermStatCells } from "@/features/decide/components/stat-cells";
@@ -62,14 +63,14 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const pageSize = await pageSizeFor(PAGE_SIZE);
   const [v, view] = await Promise.all([allotmentsView(params, pageSize), chosenView(params, "allotments")]);
   if (!v) notFound();
-  const { f, meta, inst, typed, rankError, latest, filters } = v;
+  const { f, meta, inst, typed, rankError, latest, fromProfile, filters } = v;
   const { rows, total, page, unknownTerms } = v.r;
   // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers: allotmentsView).
   const caps = profileFromParams(params);
   const rankInput = (name: "from" | "to") => ({
     name,
     inputMode: "numeric" as const,
-    defaultValue: typed(name) ?? "",
+    defaultValue: typed(name) ?? (fromProfile ? String(fromProfile[name]) : ""),
     "aria-invalid": rankError ? true : undefined,
     "aria-describedby": rankError ? "rank-error" : undefined,
     className: `${control} numeric`,
@@ -81,13 +82,20 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const stick = "sticky left-0 z-[1] border-r border-border bg-card";
   // Chips for the filters she set (the page's own default, the latest round, is not one); the institute has its own line.
   const here = (changes: Record<string, string | null>) => L.with("/decide/allotments", { page: null, ...changes });
+  // Every allotment, not her profile's default: also where Reset and Clear all go.
+  const showAll = L.to("/decide/allotments", { inst: inst?.slug, mine: "0" });
   const set = (k: string) => !!params.get(k)?.trim();
-  const course = meta.courses.find((c) => c.slug === filters.course);
-  const ranks = filters.from != null && filters.to != null ? `Ranks ${formatRank(filters.from)}–${formatRank(filters.to)}` : filters.from != null ? `From rank ${formatRank(filters.from)}` : filters.to != null ? `Up to rank ${formatRank(filters.to)}` : null;
+  const courseLabel = (slug: string) => {
+    const c = meta.courses.find((x) => x.slug === slug);
+    return c ? `${c.degree} ${c.name}` : slug;
+  };
+  const ranks = fromProfile ? null : filters.from != null && filters.to != null ? `Ranks ${formatRank(filters.from)}–${formatRank(filters.to)}` : filters.from != null ? `From rank ${formatRank(filters.from)}` : filters.to != null ? `Up to rank ${formatRank(filters.to)}` : null;
   const active = [
     set("year") && { label: filters.year ? `Year: ${meta.years.find((y) => y.year === filters.year)?.label ?? filters.year}` : "All years", param: "year", href: here({ year: null }) },
     set("round") && filters.round && { label: `Round: ${roundLabel[filters.round]}`, param: "round", href: here({ round: null }) },
-    course && { label: `${course.degree} ${course.name}`, param: "course", href: here({ course: null }) },
+    // Her profile's default (no filter set): one chip saying so; × shows every allotment (the latest round).
+    fromProfile && { label: `From your profile: ${fromProfile.courses.length ? `${fromProfile.courses.length === 1 ? courseLabel(fromProfile.courses[0]) : `your ${fromProfile.courses.length} courses`}, ` : ""}ranks ${formatRank(fromProfile.from)}–${formatRank(fromProfile.to)}`, param: "course", href: showAll },
+    ...(fromProfile ? [] : f.course ?? []).map((c) => ({ label: courseLabel(c), param: "course", href: L.without("/decide/allotments", "course", c) })),
     filters.quota && { label: `Quota: ${filters.quota}`, param: "aq", href: here({ aq: null }) },
     filters.category && { label: `${filters.category} seats`, param: "acat", href: here({ acat: null }) },
     filters.state && { label: `State: ${filters.state}`, href: here({ state: null }) },
@@ -252,18 +260,28 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
       <div className="filter-row">
-      <FilterBar action="/decide/allotments" params={params} active={active.length} clear={L.to("/decide/allotments", { inst: inst?.slug })} total={total} noun="allotments">
+      <FilterBar action="/decide/allotments" params={params} active={active.length} clear={showAll} total={total} noun="allotments">
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
+        {f.mine && <input type="hidden" name="mine" value={f.mine} />}
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
         <Field label="Round"><Select name="round" value={filters.round} all="All rounds" options={rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
-        <Field label="Course"><Select name="course" value={f.course} all="All courses" options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
+        <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={fromProfile?.courses ?? f.course ?? []} none="All courses" />
         <Field label="Quota"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
         <Field label="Seat category"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>
         <Field label="Rank from"><input {...rankInput("from")} /></Field>
         <Field label="Rank to"><input {...rankInput("to")} /></Field>
         <TermFilterControls f={f} caps={caps} />
       </FilterBar>
-      <ActiveFilters items={active} clear={L.to("/decide/allotments", { inst: inst?.slug })} />
+      <ActiveFilters items={active} clear={showAll} />
+      {fromProfile && (
+        <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+          <span>
+            From your profile: {fromProfile.courses.length ? fromProfile.courses.map(courseLabel).join(", ") : "every course"}, every year and round, ranks{" "}
+            <span className="numeric">{formatRank(fromProfile.from)}–{formatRank(fromProfile.to)}</span> (your rank ±25%).
+          </span>
+          <Link href={showAll} className={`${smallLink} text-sky`}>Show all</Link>
+        </p>
+      )}
       {rankError && <p id="rank-error" role="alert" className="text-sm text-ember">{rankError}</p>}
 
       <div className={toolbarRow}>
@@ -291,7 +309,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         </p>
       )}
       {total === 0 ? (
-        <EmptyState title="No allotments match these filters." href={L.to("/decide/allotments", { inst: inst?.slug, maxfee: "any", bondyrs: "any" })} />
+        <EmptyState title="No allotments match these filters." href={L.to("/decide/allotments", { inst: inst?.slug, mine: "0", maxfee: "any", bondyrs: "any" })} />
       ) : (
         <ViewPanes page="allotments" view={view} cards={cards} table={table} />
       )}

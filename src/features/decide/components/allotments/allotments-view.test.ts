@@ -42,3 +42,21 @@ it("unknownTerms: the rows Include not declared (nd=keep) would add; 0 with it t
   expect(keep.r.unknownTerms).toBe(0);
   expect((await allotmentsView(new URLSearchParams("year=all"), 10))!.r.unknownTerms).toBe(0);
 });
+
+it("with her profile and no filter: her courses in every year and round, ranks within 25% of hers; mine=0 or any filter drops it", async () => {
+  const p = (await allotmentsView(new URLSearchParams("rank=20000&cat=Open&sp=ANAESTHESIOLOGY&deg=MD"), 10))!;
+  expect(p.fromProfile).toEqual({ courses: ["md-anaesthesiology"], from: 15000, to: 25000 });
+  expect(p.filters).toMatchObject({ year: undefined, round: undefined, courses: ["md-anaesthesiology"], from: 15000, to: 25000 });
+  expect(p.latest).toBeUndefined();
+  expect(p.r.rows.every((a) => a.courseSlug === "md-anaesthesiology" && a.rank >= 15000 && a.rank <= 25000)).toBe(true);
+  // Her profile with every course: no course filter, the window still.
+  expect((await allotmentsView(new URLSearchParams("rank=20000&cat=Open"), 10))!.filters.courses).toEqual([]);
+  const all = (await allotmentsView(new URLSearchParams("rank=20000&cat=Open&sp=ANAESTHESIOLOGY&mine=0"), 10))!;
+  expect([all.fromProfile, all.filters.from, all.filters.year]).toEqual([null, undefined, all.meta.years[0].year]);
+  const set = (await allotmentsView(new URLSearchParams("rank=20000&cat=Open&sp=ANAESTHESIOLOGY&year=2025"), 10))!;
+  expect([set.fromProfile, set.filters.courses]).toEqual([null, undefined]);
+  // Several courses at once (the Course filter is a multi-select now).
+  const two = (await allotmentsView(new URLSearchParams("course=md-anaesthesiology&course=dnb-family-medicine&year=all"), 50))!;
+  expect(new Set(two.r.rows.map((a) => a.courseSlug)).size).toBeGreaterThan(0);
+  expect(two.r.rows.every((a) => ["md-anaesthesiology", "dnb-family-medicine"].includes(a.courseSlug))).toBe(true);
+});
