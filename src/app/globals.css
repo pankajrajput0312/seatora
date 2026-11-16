@@ -308,7 +308,7 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
   /* A sideways chip row never scrolls up and down (its 44px hit areas reach past its box). */
   .app .chip-row { overflow-y: hidden; }
   /* The Filters sheet open: no "Top" button over it (back-to-top.tsx). */
-  .app:has(details[data-filters][open]) [data-back-to-top] { display: none; }
+  .app:has(dialog[data-filters][open]) [data-back-to-top] { display: none; }
 }
 
 /* Astryx neutral theme, re-tokened to the case-sheet palette (beats @layer astryx-theme). */
@@ -496,7 +496,8 @@ html:has(.app dialog[data-filters][open]) { overflow: hidden; }
 /* A list page's filters and results tools on one row: the toolbar form (search, Filters), then the count, Cards | Table,
    CSV, Display; the rest (active-filter chips, notes) on the lines under it. */
 .filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
-.filter-row > :not(form, .toolbar) { order: 1; flex-basis: 100%; }
+/* md up only: on phones the row dissolves into the page's grid, where an order would send the chips to the page's end. */
+@media (min-width: 48rem) { .filter-row > :not(form, .toolbar) { order: 1; flex-basis: 100%; } }
 .filter-row > form:has(input[type="search"]) { flex: 1 1 18rem; }
 /* The tools take a line of their own rather than squeeze beside a search box. */
 .filter-row > .toolbar { min-width: min(100%, max-content); }
