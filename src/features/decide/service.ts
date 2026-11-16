@@ -592,7 +592,14 @@ function seatNames(cat: Catalog, s: { college: string; degree: string; specialty
 const namedPrev = (cat: Catalog, p: Allotment["prev"]) => p && { ...p, ...seatNames(cat, p) };
 
 /** `terms`: fee, stipend, bond, leaving and college-type filters on each option's course and quota (lib/term-filters.ts). */
-export type LastRanksFilters = { degree?: string; specialty: string; category?: string; quota?: string; years?: number[]; sort?: { year: number; round: Round; dir: "asc" | "desc" }; terms?: TermFilters };
+/**
+ * `courses`: several courses at once (Last ranks: her courses), else `specialty` (and `degree`). `quotas`: any of these
+ * (her quotas), else `quota`. `search`: institute or state words.
+ */
+export type LastRanksFilters = {
+  degree?: string; specialty?: string; courses?: { degree: string; specialty: string }[]; category?: string; quota?: string; quotas?: string[]; search?: string;
+  years?: number[]; sort?: { year: number; round: Round; dir: "asc" | "desc" }; terms?: TermFilters;
+};
 
 /**
  * Every institute's closing rank by year and round for one course, on one seat category (all when omitted); bracketed
@@ -603,8 +610,16 @@ export type LastRanksFilters = { degree?: string; specialty: string; category?: 
 export async function lastRanks(f: LastRanksFilters, pg?: PageQuery) {
   const cat = await getCatalog();
   const types = await typesFor(f.terms);
-  const opts = cat.options.filter((o) => o.specialty === f.specialty && (!f.degree || o.degree === f.degree) && (!f.quota || o.quota === f.quota) && optMatches(cat, o, null, f.terms ?? null, types));
-  const groups = groupByOption(await findCutoffs(cat, { cs: [...new Set(opts.map((o) => o.cs))], quotas: f.quota ? [f.quota] : undefined, years: f.years?.length ? f.years : undefined }));
+  const q = f.search?.trim().toLowerCase();
+  const course = (o: Opt) => (f.courses ? f.courses.some((c) => c.degree === o.degree && c.specialty === o.specialty) : o.specialty === f.specialty && (!f.degree || o.degree === f.degree));
+  const quotas = f.quotas?.length ? f.quotas : f.quota ? [f.quota] : undefined;
+  const text = (o: Opt) => {
+    if (!q) return true;
+    const c = cat.collegeByKey.get(o.college);
+    return `${c?.name ?? ""} ${c?.state ?? ""}`.toLowerCase().includes(q);
+  };
+  const opts = cat.options.filter((o) => course(o) && (!quotas || quotas.includes(o.quota)) && text(o) && optMatches(cat, o, null, f.terms ?? null, types));
+  const groups = groupByOption(await findCutoffs(cat, { cs: [...new Set(opts.map((o) => o.cs))], quotas, years: f.years?.length ? f.years : undefined }));
   const eligible = f.category ? new Set([f.category]) : undefined;
   const built = await withHospital(opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], null, true, eligible)));
   let rows = built.filter((r) => Object.keys(r.grid).length > 0);

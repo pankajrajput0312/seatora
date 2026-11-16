@@ -15,14 +15,17 @@ import { ResultCard, ResultCards } from "@/features/decide/components/result-car
 import { StatHead, TermStatCells } from "@/features/decide/components/stat-cells";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
-import { ActiveFilters, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
+import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { statKeys } from "@/features/decide/lib/stat-format";
 import { anyTermFilter, readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
-import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
+import { profileFromParams, profileQuotas, toURLSearchParams } from "@/features/decide/profile";
+import { courseFilter } from "@/features/decide/lib/course-filter";
+import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
+import { courseName } from "@/features/decide/components/options-view";
 import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
 import { baseCategories, roundLabel, rounds, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
@@ -33,9 +36,10 @@ const PAGE_SIZE = 25;
 const VIEW = "last-ranks";
 const categories = [...baseCategories, ...baseCategories.map((c) => `${c} PwD` as const)] as const;
 const schema = z.object({
-  course: z.string().max(100).optional(),
   lcat: z.enum(categories).optional(),
+  /** One quota, "all" for every one; absent = her quotas (the open ones when she ticked none), as Options. */
   lquota: z.string().max(100).optional(),
+  q: z.string().trim().max(100).optional(),
   inst: z.string().max(200).optional(),
   /** A year-round column, e.g. "2025-R1" or "2024-special_stray". */
   sort: z.string().regex(new RegExp(`^\\d{4}-(${rounds.join("|")})$`)).optional(),
@@ -81,7 +85,7 @@ function YearGrid({ r, cols, rds, caption }: { r: OptionRow; cols: Col[]; rds: R
   );
 }
 
-function LastRankCard({ r, cols, rds, stat, mcc, L, course, mine }: {
+function LastRankCard({ r, cols, rds, stat, mcc, L, mine }: {
   r: OptionRow;
   cols: Col[];
   rds: Round[];
@@ -89,10 +93,10 @@ function LastRankCard({ r, cols, rds, stat, mcc, L, course, mine }: {
   stat: { year: number; round: Round } | null;
   mcc: string | null | undefined;
   L: DecideLinks;
-  course: { slug: string; label: string };
   mine?: boolean;
 }) {
-  const of = `${r.college.name}, ${r.quota}`;
+  const course = { slug: r.course.slug, label: courseName(r) };
+  const of = `${r.college.name}, ${course.label}, ${r.quota}`;
   const big = bigClosing(r.grid, cols.map((c) => c.year), stat);
   return (
     <ResultCard
@@ -103,6 +107,7 @@ function LastRankCard({ r, cols, rds, stat, mcc, L, course, mine }: {
       title={r.college.name}
       href={L.institute(r.college.slug)}
       external={mcc ? { href: mcc, label: `MCC profile: ${r.college.name}` } : undefined}
+      subtitle={course.label}
       meta={cardMeta({ state: r.college.state, hospital: r.hospital }, r.college.name)}
       footer={
         <>
@@ -121,16 +126,20 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const f = parseSearchParams(schema, params);
   const tp = readTermFilters(params, profile);
   const meta = await getMeta();
-  // Default: one of her courses (when she named any), MD/MS first, then DNB, then the rest (meta sorts Diploma first).
-  const order = (d: string) => (["MD", "MS", "DNB"].includes(d) ? ["MD", "MS", "DNB"].indexOf(d) : 3);
-  const mine = profile && (profile.pairs?.length || profile.specialties.length) ? meta.courses.filter((c) => profileHasCourse(profile, c)) : [];
-  const course = meta.courses.find((c) => c.slug === f.course) ?? mine.sort((a, b) => order(a.degree) - order(b.degree))[0] ?? meta.courses[0];
+  // Every one of her courses by default (lib/course-filter.ts), the picked ones otherwise; no profile courses: the first course.
+  const cf = courseFilter(params, profile, meta.courses);
+  const picked = cf.slugs ? meta.courses.filter((c) => cf.slugs!.has(c.slug)) : [];
+  const courses = picked.length ? picked : [meta.courses[0]];
+  const course = courses[0];
   const category = f.lcat ?? profile?.category ?? "Open";
+  // Her quotas (the open ones when she ticked none) unless one is picked, or "all".
   const quota = f.lquota && meta.quotas.includes(f.lquota) ? f.lquota : undefined;
+  const allQuotas = f.lquota === "all";
+  const quotas = quota ? [quota] : allQuotas || !profile ? undefined : profileQuotas(profile);
   const [sortYear, sortRound] = f.sort?.split("-") ?? [];
   const sort = f.sort ? { year: Number(sortYear), round: sortRound as Round, dir: f.dir } : undefined;
   const filtered = anyTermFilter(tp.filters);
-  const base = { specialty: course.specialty, degree: course.degree, category, quota, sort };
+  const base = { courses: courses.map((c) => ({ degree: c.degree, specialty: c.specialty })), category, quotas, search: f.q, sort };
   const [lr, all, inst, info, view] = await Promise.all([
     lastRanks({ ...base, terms: tp.filters }),
     // A term filter set: every row as well, to count those left out only for a value not declared (as Rank scan), and
@@ -154,19 +163,23 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const rds = rounds.filter((rd) => cols.some((c) => c.rounds.includes(rd)));
   // The card's big number: the sorted column (else each row's newest closing).
   const stat = sort && cols.some((c) => c.year === sort.year) ? { year: sort.year, round: sort.round } : null;
-  const courseLabel = `${course.degree} ${course.name}`;
-  const courseRef = { slug: course.slug, label: courseLabel };
-  const caption = `Closing ranks for ${courseLabel}, ${category} seats${quota ? `, ${quota}` : ""}`;
+  const courseLabel = courses.length === 1 ? `${course.degree} ${course.name}` : courses.map((c) => `${c.degree} ${c.name}`).join(", ");
+  const quotaLabel = quotas ? quotas.join(", ") : "every quota";
+  const caption = `Closing ranks for ${courseLabel}, ${category} seats, ${quotaLabel}`;
+  const LR = "/decide/last-ranks";
   const sortHref = (key: string) => L.with("/decide/last-ranks", { sort: key, dir: f.sort === key && f.dir === "desc" ? "asc" : "desc", page: null });
   const pinned = at >= 0 ? lr.rows[at] : null;
   const mcc = (r: OptionRow) => info.get(r.college.key)?.mccProfileUrl;
   const chips = [
+    ...(f.q ? [{ label: `Search: “${f.q}”`, param: "q", href: L.with(LR, { q: null, page: null }) }] : []),
+    ...cf.chips((v) => L.with(LR, { course: v, page: null }), (s) => L.without(LR, "course", s)).filter((c) => c.label !== "All courses"),
+    ...(quota ? [{ label: quota, param: "lquota", href: L.with(LR, { lquota: null, page: null }) }] : allQuotas ? [{ label: "All quotas", param: "lquota", href: L.with(LR, { lquota: null, page: null }) }] : quotas ? [{ label: `Your quotas (${quotas.join(", ")})`, param: "lquota", href: L.with(LR, { lquota: "all", page: null }) }] : []),
     // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
     ...(profile?.maxFeeLakh != null && tp.params.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: L.with("/decide/last-ranks", { maxfee: "any", page: null }) }] : []),
     ...(profile?.maxBondYears != null && tp.params.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: L.with("/decide/last-ranks", { bondyrs: "any", page: null }) }] : []),
     ...termChips(tp.params).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/last-ranks", c.key, c.value) : L.with("/decide/last-ranks", { [c.key]: null, page: null }) })),
   ];
-  const clear = L.with("/decide/last-ranks", { ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
+  const clear = L.with("/decide/last-ranks", { q: null, course: null, lquota: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
   const about = (
     <>
       Closing = the highest All India Rank allotted that round on a {category} seat. Brackets = allotments made that round
@@ -215,11 +228,12 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
               <tr key={r.id} className={`border-b border-border last:border-0 hover:bg-muted/50 ${here ? "bg-sky/10" : ""}`}>
                 <th scope="row" className={`sticky left-0 z-[1] max-w-64 px-3 py-2 text-left font-normal ${here ? "bg-mist" : "bg-card"} ${tbl.pin}`}>
                   <Link href={L.institute(r.college.slug)} title={r.college.name} className={`font-medium hover:text-sky hover:underline ${tbl.clamp}`}>{r.college.name}</Link>
+                  <span className="block text-xs">{courseName(r)}</span>
                   <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                     <span>{r.college.state ?? <Dash />}, {r.quota}</span>
                     {r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />}
                   </span>
-                  <Link href={L.allotments({ course: course.slug, inst: r.college.slug })} className={`${smallLink} text-xs text-sky`}>Allotments</Link>
+                  <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={`${smallLink} text-xs text-sky`}>Allotments</Link>
                 </th>
                 {cols.flatMap((c) =>
                   c.rounds.map((round, i) => (
@@ -228,7 +242,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                     </td>
                   )),
                 )}
-                <TermStatCells t={r.fees} variant="compact" of={`${r.college.name}, ${courseLabel}`} tdClassName="px-2 py-2" />
+                <TermStatCells t={r.fees} variant="compact" of={`${r.college.name}, ${courseName(r)}`} tdClassName="px-2 py-2" />
               </tr>
             );
           })}
@@ -243,11 +257,25 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
       <div className="filter-row">
-      <FilterBar action="/decide/last-ranks" params={params} active={chips.length} clear={clear} total={lr.total} noun="options">
+      <FilterBar
+        action="/decide/last-ranks"
+        params={params}
+        active={chips.length}
+        clear={clear}
+        total={lr.total}
+        noun="options"
+        search={
+          <label className="grid min-w-0 text-sm">
+            <span className="sr-only">Institute or state</span>
+            <input name="q" type="search" defaultValue={f.q ?? ""} maxLength={100} placeholder="Institute or state" className={control} />
+          </label>
+        }
+      >
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
-        <Field label="Course"><Select name="course" value={course.slug} options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>
+        {/* Her courses by default (none ticked); the shared searchable chips, never a 100-item native list. */}
+        <FilterDropdown label="Course" name="course" search options={cf.choices.filter((c) => c.value !== "all")} selected={cf.typed} none={cf.mine.length ? `Your courses (${cf.mine.length})` : `${course.degree} ${course.name}`} info={cf.mine.length ? "None ticked means your courses." : undefined} />
         <Field label="Seat category"><Select name="lcat" value={category} options={categories.map((c) => ({ value: c, label: c }))} /></Field>
-        <Field label="Quota"><Select name="lquota" value={quota} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
+        <Field label="Quota"><Select name="lquota" value={f.lquota} all={profile ? `Your quotas (${profileQuotas(profile).join(", ")})` : "All quotas"} options={[...(profile ? [{ value: "all", label: "All quotas" }] : []), ...meta.quotas.map((q) => ({ value: q, label: q }))]} /></Field>
         <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
         <TermFilterControls f={tp.params} caps={profile} />
       </FilterBar>
@@ -262,7 +290,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
             </>
           ) : (
             <>
-              {inst.name}: no {category}-seat closing for {courseLabel}{quota ? `, ${quota}` : ""}.{" "}
+              {inst.name}: no {category}-seat closing for {courseLabel}, {quotaLabel}.{" "}
               {category !== "Open" && <Link href={L.with("/decide/last-ranks", { lcat: "Open", page: null })} className={`${smallLink} text-sky`}>Show Open seats</Link>}{" "}
               <Link href={L.allotments({ course: course.slug, inst: inst.slug })} className={`${smallLink} text-sky`}>See its allotments</Link>
             </>
@@ -276,7 +304,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
           <p id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
             <span><span className="numeric font-semibold text-foreground">{rangeLabel({ ...lr, rows, page, pageSize: PAGE_SIZE })}</span> options</span>
             <InfoTip label="these options">
-              Each option is an institute and quota with a closing on {category} seats for {courseLabel}
+              Each option is an institute, course and quota with a closing on {category} seats: {courseLabel}; {quotaLabel}
               {lr.empty > 0 && <>; <span className="numeric">{formatRank(lr.empty)}</span> more had no {category}-seat allotments for it</>}.
             </InfoTip>
             {unknown > 0 && (
@@ -294,19 +322,19 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       {/* Her institute (a link from it, #inst-…) in view in either view: its card above the list. */}
       {pinned && (
         <div id={`inst-${pinned.college.slug}`} tabIndex={-1} className="scroll-mt-24">
-          <LastRankCard r={pinned} cols={cols} rds={rds} stat={stat} mcc={mcc(pinned)} L={L} course={courseRef} mine />
+          <LastRankCard r={pinned} cols={cols} rds={rds} stat={stat} mcc={mcc(pinned)} L={L} mine />
         </div>
       )}
 
       {lr.total === 0 ? (
-        <EmptyState title={filtered && all?.total ? "No options match these filters" : `No ${category}-seat closings for ${courseLabel}${quota ? `, ${quota}` : ""}`} description="Try another seat category, quota or filter." href={L.to("/decide/last-ranks", { course: course.slug, maxfee: "any", bondyrs: "any" })} />
+        <EmptyState title={filtered && all?.total ? "No options match these filters" : `No ${category}-seat closings for ${courseLabel}, ${quotaLabel}${f.q ? `, “${f.q}”` : ""}`} description="Try another seat category, quota, search or filter." href={L.to("/decide/last-ranks", { lquota: "all", maxfee: "any", bondyrs: "any" })} />
       ) : (
         <ViewPanes
           page={VIEW}
           view={view}
           cards={
             <ResultCards title={caption} hideTitle>
-              {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} course={courseRef} mine={inst?.slug === r.college.slug} />)}
+              {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} mine={inst?.slug === r.college.slug} />)}
             </ResultCards>
           }
           table={table}
