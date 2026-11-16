@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { chooseEffort, runAsk, trimHistory } from "@/features/ask/agent";
+import { runAsk, trimHistory } from "@/features/ask/agent";
 import { finishAsk, startAsk } from "@/features/ask/budget";
 import { askClient } from "@/features/ask/client";
 import { ASK_MAX_TURNS, askConfig } from "@/features/ask/config";
@@ -16,7 +16,7 @@ import { getDecideData, getMeta } from "@/features/decide/service";
 import { baseCategories } from "@/features/decide/types";
 import { checkAndCount } from "@/features/plans/usage";
 import { db } from "@/lib/db";
-import { sendChoices, sendText, toWhatsApp, type Choice, type Incoming } from "./cloud-api";
+import { sendChoices, sendText, toWhatsApp, typing, type Choice, type Incoming } from "./cloud-api";
 
 // Ask Seatora on WhatsApp: the same assistant, tools, memory and plan limits as the Ask page, with two tools of its own
 // (offer_choices: buttons and lists; update_profile: her rank, category and courses) and rules for short chat messages.
@@ -101,7 +101,11 @@ async function saveProfile(userId: string, current: Profile | null, input: z.inf
 /** One WhatsApp message in, the assistant's reply out (text, then any options). A repeated delivery is ignored. */
 export async function handleMessage(m: Incoming) {
   if (!m.text) return sendText(m.phone, "I can read text messages only for now. Please type your question.");
+  void typing(m.id);
   const cfg = askConfig();
+  // Speed over depth on a chat (the voice agent's bot runs a fast model with no thinking): low effort always, and
+  // WHATSAPP_MODEL can name a faster model than the Ask page's.
+  const model = process.env.WHATSAPP_MODEL?.trim() || cfg.model;
   const user = await accountOf(m.phone, m.name);
   // Meta redelivers until it gets a 200: the message id is the turn's request id, so a repeat never runs twice.
   const requestId = createHash("sha256").update(m.id).digest("hex").slice(0, 40);
@@ -114,8 +118,8 @@ export async function handleMessage(m: Incoming) {
     await finishTurn(turn.answerId, { content: message, thinking: null, status: "error" });
     return sendText(m.phone, message);
   }
-  const effort = chooseEffort(m.text);
-  const started = await startAsk(user.id, { model: cfg.model, effort }, { hourly: cfg.hourlyRequests, daily: cfg.dailyTokens });
+  const effort = "low" as const;
+  const started = await startAsk(user.id, { model, effort }, { hourly: cfg.hourlyRequests, daily: cfg.dailyTokens });
   if (!started.ok) {
     await finishTurn(turn.answerId, { content: "limit", thinking: null, status: "error" });
     return sendText(m.phone, "You've reached the limit for now. Please try again in a while.");
@@ -145,16 +149,25 @@ export async function handleMessage(m: Incoming) {
 
   const t0 = Date.now();
   let text = "";
+  let noted = false;
   let status: "done" | "error" = "done";
   let result: Awaited<ReturnType<typeof runAsk>> | null = null;
   try {
     // One run, no checkpoints: a chat reply is short, and nobody is waiting to tap Continue.
     result = await runAsk({
-      client: askClient(), model: cfg.model, effort, maxOutputTokens: cfg.maxOutputTokens,
+      client: askClient(), model, effort, maxOutputTokens: cfg.maxOutputTokens,
       history: kept, earlier, prefs: await getPreferences(user.id), ctx: { userId: user.id, profile }, signal: new AbortController().signal,
       emit: (e) => {
         if (e.type === "text") text += e.text;
         else if (e.type === "replace") text = "";
+        else if (e.type === "tool") {
+          // A lookup: keep "typing…" up, and the first one says what is happening ("Looking up closing ranks…").
+          void typing(m.id);
+          if (!noted && e.name !== "offer_choices" && e.name !== "update_profile") {
+            noted = true;
+            void sendText(m.phone, e.label);
+          }
+        }
       },
       softAt: t0 + cfg.softMs, sliceAt: t0 + 240_000, capAt: t0 + 240_000, stallMs: cfg.stallMs,
       slugs: async () => new Set((await getDecideData()).colleges.map((c) => c.slug)),

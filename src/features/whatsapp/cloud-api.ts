@@ -83,6 +83,12 @@ export function toWhatsApp(md: string) {
     .trim();
 }
 
+/**
+ * Marks her message read and shows "typing…" until our next message or 25 s, whichever comes first (send again for
+ * longer).
+ */
+export const typing = (messageId: string) => post({ status: "read", message_id: messageId, typing_indicator: { type: "text" } });
+
 /** Text in pieces under WhatsApp's 4096 characters, split at paragraphs. */
 export async function sendText(to: string, text: string) {
   const parts: string[] = [];

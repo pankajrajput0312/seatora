@@ -29,3 +29,4 @@ No template is needed: she writes first, and every reply is inside WhatsApp's 24
 ## Limits
 - Text only; voice notes and images get a "please type" reply.
 - Two messages sent within seconds run as two turns side by side.
+- Speed: every turn runs at low effort; `WHATSAPP_MODEL` (optional) picks a faster model than `ASK_MODEL`. "typing…" shows while it works (re-sent on each lookup), and the first lookup sends a one-line note of what it is doing.
