@@ -29,7 +29,7 @@ import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, type Profile } from "@/features/decide/profile";
 import { allotmentTrends, getMeta, LATEST_YEAR, PAST_YEARS, YEARS } from "@/features/decide/service";
 import { fmtDay, listDay } from "@/features/decide/lib/format";
-import { openQuotas, openQuotasNote, roundLabel, rounds, seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
+import { openQuotas, openQuotasNote, quotaScopeNote, roundLabel, rounds, seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Seats" };
 const PAGE_SIZE = 50;
@@ -211,7 +211,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
             none={profile ? "Open quotas" : undefined}
             info={profile ? openQuotasNote : undefined}
           />
-          <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.st} none="All states" />
+          <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.st} none="All states" info={quotaScopeNote} />
           {matrix && (
             <FilterDropdown
               label={`Seats in ${round}`}

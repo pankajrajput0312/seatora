@@ -6,10 +6,14 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
-import { baseCategories, openQuotas } from "../types";
+import { baseCategories, openQuotasNote } from "../types";
+import { formatRank } from "@/features/cutoffs/lib/format";
 import { BOND_YEAR_CHOICES, coursesFromPicks, feeChoices, picksOf, profileSchema, type Profile } from "../profile";
 import { control } from "./ui";
 import { matchesSpecialty } from "../lib/specialty-search";
+
+/** "Open (General/UR)": what Open means, where she picks it and on her rank chip; the stored value stays "Open". */
+export const categoryName = (c: string) => (c === "Open" ? "Open (General/UR)" : c);
 
 export type ProfileMeta = { courses: { degree: string; specialty: string }[]; specialties: { code: string; name: string }[]; degrees: string[]; quotas: string[]; states: string[] };
 
@@ -69,7 +73,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
   const current = () => courses && { ...draft, pairs: undefined, ...courses };
 
   const rank = () => Number(rankText.replace(/\D/g, ""));
-  const rankError = "Enter your All India Rank: a number from 1 to about 2,50,000.";
+  const rankError = `Enter your All India Rank: a number from 1 to ${formatRank(profileSchema.shape.rank.maxValue ?? 0)}.`; // the schema's limit
   // Said as she types (a rank typed into a filled field used to run on: 4228442284), not only on Save.
   const rankOff = rankText.trim() !== "" && !profileSchema.shape.rank.safeParse(rank()).success;
   const rankMsg = error ?? (rankOff ? rankError : null);
@@ -143,7 +147,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
         <label className="grid gap-1.5 text-sm font-medium">
           Category
           <select value={draft.category} onChange={(e) => set("category", e.target.value as Profile["category"])} className={control}>
-            {baseCategories.map((c) => <option key={c}>{c}</option>)}
+            {baseCategories.map((c) => <option key={c} value={c}>{categoryName(c)}</option>)}
           </select>
         </label>
         <label className="inline-flex min-h-11 items-center gap-2 text-sm">
@@ -211,7 +215,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
   const quotaStep = (
     <Checks
       legend="Quotas"
-      note={`None ticked = ${openQuotas.join(", ")}, the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible.`}
+      note={openQuotasNote}
       options={meta.quotas.map((q) => ({ value: q, label: q }))}
       value={draft.quotas}
       onChange={(v) => set("quotas", v)}

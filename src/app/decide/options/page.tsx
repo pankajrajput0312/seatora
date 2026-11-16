@@ -25,7 +25,7 @@ import { eligibleCategories, reachLabel, reachOrder, reachWindow, resultsSpan } 
 import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, LATEST_YEAR, listOptions, optionsView, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
-import { openQuotas, openQuotasNote, optionsViews, roundLabel, seatKindLabel, seatKinds, type SeatKind } from "@/features/decide/types";
+import { openQuotas, openQuotasNote, quotaScopeNote, optionsViews, roundLabel, seatKindLabel, seatKinds, type SeatKind } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
@@ -206,7 +206,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
               </>
             )}
             <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" info={openQuotasNote} />
-            <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} none="All states" />
+            <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} none="All states" info={quotaScopeNote} />
             {lists.length > 0 && (
               <Field label="Seats">
                 <select name="seats" defaultValue={r.seats ?? "all"} className={control}>

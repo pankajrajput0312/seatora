@@ -119,8 +119,10 @@ export type DecideData = {
  * with no quota ticked means these three, and a restricted quota counts only once she ticks it.
  */
 export const openQuotas = ["All India", "DNB Quota", "Deemed/Paid Seats"];
-/** The Quota filter's note when her profile ticks none (Options, Seats). */
-export const openQuotasNote = `None ticked means ${openQuotas.join(", ")}: the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible.`;
+/** What Seatora covers: the State filter's note, and the end of the Quota notes (Options, Seats, the rank sheet). */
+export const quotaScopeNote = "Seatora covers MCC's All India counselling (AIQ, central and deemed quotas). State quota counselling (e.g. Maharashtra's CET Cell) isn't covered: the State filter shows All India seats in that state.";
+/** The Quota filter's note when her profile ticks none (Options, Seats, the rank sheet's Quotas). */
+export const openQuotasNote = `None ticked means ${openQuotas.join(", ")}: the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible. ${quotaScopeNote}`;
 
 /**
  * Options' two views. "round": the newest round's seat lists first: every option with seats in them (in her courses,
