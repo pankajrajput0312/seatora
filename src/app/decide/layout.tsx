@@ -16,7 +16,9 @@ import { NavPending } from "@/features/decide/components/nav-pending";
 import type { ProfileMeta } from "@/features/decide/components/profile-dialog";
 import { EmptyState } from "@/features/decide/components/ui";
 import { deviceView } from "@/features/decide/components/view-toggle";
-import { getMeta } from "@/features/decide/service";
+import { nextChoiceFilling, roundName, stepsNow } from "@/features/decide/lib/round-status";
+import { roundStatus } from "@/features/decide/server/notices";
+import { getMeta, LATEST_YEAR } from "@/features/decide/service";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { PlanPrompt } from "@/features/plans/components/plan-prompt";
 import { freeNow, passState, planLine, shortDate } from "@/features/plans/plans";
@@ -52,6 +54,10 @@ export default async function DecideLayout({ children }: { children: React.React
   const phone = deviceView(h.get("user-agent"), h.get("sec-ch-ua-mobile")) === "cards";
   // Ask Seatora's nav entry: only for the owner while ASK_ENABLED=1 (no database read otherwise).
   const ask = !!meta && (await askUser().catch(() => null)) != null;
+  // Her first choice list's name: the round she fills next (MCC's schedule, as Choices names it).
+  const rs = meta ? await roundStatus(LATEST_YEAR).catch(() => null) : null;
+  const fill = rs && nextChoiceFilling(stepsNow(rs, new Date()));
+  const listName = fill ? `${roundName[fill.round]} · ${rs.year}` : null;
   // Admin's nav entry: only for an owner or admin.
   const admin = !!meta && (await staffUser().catch(() => null)) != null;
   // The sidebar's account footer and the header's plan chip: her name, her plan, and "Upgrade" without the Season Pass.
@@ -68,7 +74,7 @@ export default async function DecideLayout({ children }: { children: React.React
   return (
     <div className={`app ${app.variable} ${mono.variable} min-h-screen`}>
       <AstryxProvider>
-        <DecideShell phone={phone} ask={ask} admin={admin} account={account} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
+        <DecideShell phone={phone} ask={ask} admin={admin} account={account} listName={listName} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (
             <NavPending>{children}</NavPending>
           ) : (

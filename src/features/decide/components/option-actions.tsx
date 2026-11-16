@@ -15,6 +15,7 @@ import { roundLabel, type SeatList } from "../types";
 import { Dash, HistoryNote, Provisional, ReachBadge } from "./bits";
 import { AboutData } from "./filter-form";
 import { FocusItem } from "./focus-item";
+import { toast } from "./nav-pending";
 import { Beds } from "./pages/beds";
 import { cardClosing, ClosingCell, courseName, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, seatKindShort, toChoiceItem, type ListRow } from "./options-view";
 import { ResultCard, ResultCards } from "./result-card";
@@ -34,7 +35,10 @@ export function ChoiceStar({ item }: { item: ChoiceItem }) {
       variant="ghost"
       aria-pressed={on}
       aria-label={`In ${active?.name ?? "choices"}: ${item.institute}, ${item.course}, ${item.quota}`}
-      onClick={() => setState((s) => toggleItem(s, item))}
+      onClick={() => {
+        setState((s) => toggleItem(s, item));
+        toast(on ? `Removed from ${active?.name ?? "choices"}` : `Added to ${active?.name ?? "choices"}`);
+      }}
     >
       <Star className={cn("size-5", on && "fill-sky text-sky")} strokeWidth={1.75} aria-hidden />
     </Button>

@@ -44,6 +44,18 @@ export function updateActive(state: ChoicesState, fn: (l: ChoiceList) => ChoiceL
   return { ...state, lists: state.lists.map((l) => (l.id === state.activeId ? fn(l) : l)) };
 }
 
+/**
+ * The first list, still under its default name, takes the name of the round she fills next (MCC's schedule: "Round 3 ·
+ * 2026"), so the star and Choices say the same; a list she named or duplicated keeps its own, and no two lists end up
+ * with one name. Null: nothing to rename.
+ */
+export function nameFirstList(state: ChoicesState, name: string): ChoicesState | null {
+  const first = defaultChoices.lists[0];
+  const own = (l: ChoiceList) => l.id === first.id && l.name === first.name;
+  if (name === first.name || state.lists.some((l) => l.name === name) || !state.lists.some(own)) return null;
+  return { ...state, lists: state.lists.map((l) => (own(l) ? { ...l, name } : l)) };
+}
+
 /** Copies a list as the next round's list, e.g. "Round 2 · 2026" → "Round 3 · 2026". */
 export function duplicateList(state: ChoicesState, sourceId: string): ChoicesState {
   const src = state.lists.find((l) => l.id === sourceId);

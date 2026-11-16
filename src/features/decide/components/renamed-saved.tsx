@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { collegeKeyOf, renameOptionId, renameSaved, type RenamedCollege } from "../lib/choices";
+import { collegeKeyOf, nameFirstList, renameOptionId, renameSaved, type RenamedCollege } from "../lib/choices";
 import { useChoices, useCompare } from "../lib/use-decide-store";
 import { navigating } from "./nav-pending";
 
@@ -16,10 +16,14 @@ let checked = false;
 /**
  * Option ids saved in this browser (choice lists, the compare tray, a compare link's ?ids=) under a college key an MCC
  * import retired (merged colleges, neutral names) move to the key the college has now (/api/v1/retired-keys, keyed by
- * the old key or its sha256), and a notice says how many.
+ * the old key or its sha256), and a notice says how many. `listName`: the round she fills next ("Round 3 · 2026", the
+ * layout's from MCC's schedule): her first list takes it on any page, so a star on Options names the list Choices shows.
  */
-export function RenamedSaved() {
+export function RenamedSaved({ listName }: { listName?: string | null }) {
   const [choices, setChoices, hydrated] = useChoices();
+  useEffect(() => {
+    if (hydrated && listName && nameFirstList(choices, listName)) setChoices((s) => nameFirstList(s, listName) ?? s);
+  }, [hydrated, listName, choices, setChoices]);
   const [compare, setCompare] = useCompare();
   const sp = useSearchParams();
   const router = useRouter();

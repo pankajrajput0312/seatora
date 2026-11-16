@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultChoices, duplicateList, markTypedUpTo, move, parseChoices, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, type ChoiceItem, type RenamedCollege } from "./choices";
+import { defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, parseChoices, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, type ChoiceItem, type RenamedCollege } from "./choices";
 
 const item = (id: string): ChoiceItem => ({ id, institute: `Inst ${id}`, slug: id, state: "S", course: "DNB Anaesthesiology", quota: "DNB Quota", reachLabel: "", closedEveryRound: false });
 
@@ -81,5 +81,17 @@ describe("retired college keys", () => {
     expect(r.compare).toEqual([id("SEPNEWNAME#400001"), id("SEPNEWNAME#400001", "FAMILYMEDICINE")]);
     expect(r.renamed).toHaveLength(3);
     expect(renameSaved(r.choices, r.compare, of).renamed).toEqual([]);
+  });
+});
+
+describe("nameFirstList", () => {
+  it("the default first list takes the round's name once; a named list, a clash or the same name: nothing", () => {
+    const renamed = nameFirstList(defaultChoices, "Round 3 · 2026")!;
+    expect(renamed.lists[0].name).toBe("Round 3 · 2026");
+    expect(nameFirstList(renamed, "Round 3 · 2026")).toBeNull();
+    expect(nameFirstList(defaultChoices, "Round 2 · 2026")).toBeNull();
+    expect(nameFirstList({ ...defaultChoices, lists: [{ ...defaultChoices.lists[0], name: "Mine" }] }, "Round 3 · 2026")).toBeNull();
+    const twoLists = { activeId: "r2-2026", lists: [defaultChoices.lists[0], { id: "x", name: "Round 3 · 2026", items: [], typedIds: [] }] };
+    expect(nameFirstList(twoLists, "Round 3 · 2026")).toBeNull();
   });
 });

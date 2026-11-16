@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { defaultChoices, duplicateList, markTypedUpTo, move, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
+import { duplicateList, markTypedUpTo, move, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
 import { LATEST_YEAR, PAST_YEARS, reachWindow, seatsBelowNotes, type Reach, type SeatsBelow } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
 import { useChoices, useDecideLinks } from "../lib/use-decide-store";
@@ -49,14 +49,8 @@ type ReachFor = (ids: string[], profile: string) => Promise<{ lists: SeatList[];
 /** `hasLists`: the server has the newest round's seat lists, so a card keeps room for its seats line while it loads. */
 /** `nextRound`: the choice filling she fills next (MCC's schedule): its list name ("Round 3 · 2026") and dates. */
 export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nextRound }: { reachFor?: ReachFor; view: View; maxLists?: number; hasLists?: boolean; nextRound?: { name: string; when: string } | null }) {
+  // Its first list takes the round's name on every Decide page (RenamedSaved, lib/choices.ts nameFirstList).
   const [state, setState, hydrated] = useChoices();
-  // The first list, still under its default name (lib/choices.ts), takes the name of the round she fills next; a list she
-  // named or duplicated keeps its own, and no two lists end up with one name.
-  const first = defaultChoices.lists[0];
-  const rename = !!nextRound && nextRound.name !== first.name && !state.lists.some((l) => l.name === nextRound.name) && state.lists.some((l) => l.id === first.id && l.name === first.name);
-  useEffect(() => {
-    if (hydrated && rename) setState((s) => ({ ...s, lists: s.lists.map((l) => (l.id === first.id && l.name === first.name ? { ...l, name: nextRound!.name } : l)) }));
-  }, [hydrated, rename, nextRound, first, setState]);
   const L = useDecideLinks();
   const sp = useSearchParams();
   const list = state.lists.find((l) => l.id === state.activeId) ?? state.lists[0];

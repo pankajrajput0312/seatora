@@ -18,7 +18,7 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
   const [lists, view, me, rs] = await Promise.all([currentSeatLists(), chosenView(params, "choices"), currentPlan(), roundStatus(LATEST_YEAR).catch(() => null)]);
-  // Her list is for the choice filling she fills next (MCC's schedule), never a fixed round.
+  // Her list is for the choice filling she fills next (MCC's schedule), never a fixed round (the layout names it the same).
   const fill = rs && nextChoiceFilling(stepsNow(rs, new Date()));
   const nextRound = fill && { name: `${roundName[fill.round]} · ${rs.year}`, when: `${roundName[fill.round]} choice filling, ${fillWindow(fill)}` };
   return (

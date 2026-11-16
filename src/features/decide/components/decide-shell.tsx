@@ -64,7 +64,8 @@ const bottom = [
 /** `ask`: the server says she is the owner with Ask Seatora on (layout.tsx); only then is its nav entry rendered. */
 /** `admin`: the server says she is an owner or admin (layout.tsx); only then is the Admin nav entry rendered. */
 /** `account`: the signed-in user (layout.tsx) for the sidebar's footer and the header's plan chip; null signed out. */
-export function DecideShell({ meta, phone, ask, admin, account, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; account: ShellAccount | null; children: React.ReactNode }) {
+/** `listName`: the round she fills next, for her first choice list's name (RenamedSaved). */
+export function DecideShell({ meta, phone, ask, admin, account, listName, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; account: ShellAccount | null; listName?: string | null; children: React.ReactNode }) {
   const pathname = usePathname();
   const sp = useSearchParams();
   const router = useRouter();
@@ -257,7 +258,7 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
       >
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
         <div aria-busy={loading || undefined} className={cn("isolate pb-[calc(6rem+env(safe-area-inset-bottom))] transition-opacity md:pb-0", loading && "opacity-60")}>
-          <RenamedSaved />
+          <RenamedSaved listName={listName} />
           <AccountSync />
           {children}
         </div>
