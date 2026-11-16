@@ -516,10 +516,12 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
 }
 
 /** Compare: options by id (new ones too), labelled; unknown ids are left out. */
+/** Compare: the ids as rows (unknown ones left out), with their seats in each list of the newest round (`seatsBy`, as Choices). */
 export async function getOptionsByIds(ids: string[], profile: Profile | null) {
   const cat = await getCatalog();
-  const { opts } = await optionsByIds(cat, await roundLists(cat), ids, false);
-  return rowsFor(cat, opts, profile, true); // no ids → no query (cs = [])
+  const lists = await roundLists(cat);
+  const { opts, seats } = await optionsByIds(cat, lists, ids, ids.length > 0);
+  return withSeats(await rowsFor(cat, opts, profile, true), lists, seats, profile); // no ids → no query (cs = [])
 }
 
 const sumYear = (opts: Opt[], year: number) => (opts.some((o) => o.byYear[year] != null) ? opts.reduce((s, o) => s + (o.byYear[year] ?? 0), 0) : null);

@@ -7,7 +7,8 @@ import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { Dash, HistoryNote, PageHead, ReachBadge } from "@/features/decide/components/bits";
 import { CompareFromDevice, RemoveFromCompare } from "@/features/decide/components/compare-controls";
-import { ClosingCell, courseName, RoundGrid } from "@/features/decide/components/options-view";
+import { ClosingCell, courseName } from "@/features/decide/components/options-view";
+import { Sup } from "@/features/decide/components/fees";
 import { Beds } from "@/features/decide/components/pages/beds";
 import { StatCellView } from "@/features/decide/components/stat-cells";
 import { TypeBadge } from "@/features/decide/components/type-badge";
@@ -15,12 +16,15 @@ import { EmptyState, smallLink, tbl } from "@/features/decide/components/ui";
 import { MAX_COMPARE } from "@/features/decide/lib/choices";
 import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams } from "@/features/decide/lib/params";
-import { eligibleCategories } from "@/features/decide/lib/reach";
+import { deepestOf, eligibleCategories } from "@/features/decide/lib/reach";
+import { inrFull } from "@/features/decide/lib/stat-format";
+import { lowestRisk } from "@/features/decide/lib/term-filters";
+import { roundLabel, rounds, seatKindLabel, type SeatList } from "@/features/decide/types";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { statCells, statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { Paywall } from "@/features/plans/components/paywall";
 import { currentPlan } from "@/features/plans/usage";
-import { currentOptionIds, getMeta, getOptionsByIds, LATEST_YEAR, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
+import { currentOptionIds, currentSeatLists, getMeta, getOptionsByIds, LATEST_YEAR, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 
 export const metadata: Metadata = { title: "Compare" };
@@ -31,6 +35,57 @@ export const metadata: Metadata = { title: "Compare" };
  */
 const paramsSchema = z.object({ ids: z.array(z.string().min(1).max(300)).default([]) });
 
+/**
+ * Closing ranks by year and round, one block a year (newest first), no scroller of its own: "2025: deepest 60,351
+ * (Stray)" (the one definition, lib/reach.ts deepestOf), then each round with its seat category, wrapping in the column.
+ */
+function YearLines({ r }: { r: OptionRow }) {
+  const years = Object.keys(r.grid).map(Number).sort((a, b) => b - a);
+  if (!years.length) return <span className="text-xs text-muted-foreground">{r.reach === "new" ? "Never allotted before: no closing rank in any round." : "No closing rank on these seat categories in any round."}</span>;
+  return (
+    <dl className="grid gap-1.5 text-xs">
+      {years.map((y) => {
+        const cells = rounds.flatMap((rd) => (r.grid[y]?.[rd] ? [{ round: rd, ...r.grid[y][rd]! }] : []));
+        const d = deepestOf(cells);
+        return (
+          <div key={y}>
+            <dt className="font-semibold">
+              <span className="numeric">{y}</span>: deepest <span className="numeric">{d ? formatRank(d.closing) : "—"}</span>{d && ` (${roundLabel[d.round]})`}
+            </dt>
+            <dd className="text-muted-foreground">
+              {cells.map((c, i) => (
+                <span key={c.round} className="inline-block whitespace-nowrap pr-1">
+                  {roundLabel[c.round]} <span className="numeric text-foreground">{formatRank(c.closing)}</span> {c.category}{i < cells.length - 1 && " ·"}
+                </span>
+              ))}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
+/** "If you leave": the leaving penalty after joining, and what MCC lets the college keep if you resign or don't join from Round 2. */
+function IfYouLeave({ r, leaving }: { r: OptionRow; leaving: string }) {
+  const t = r.fees;
+  return (
+    <span className="grid gap-1 text-xs">
+      <span><span className="text-muted-foreground">After joining:</span> <span className="font-semibold">{leaving === "—" ? "no penalty published" : leaving}</span></span>
+      <span>
+        <span className="text-muted-foreground">Resign or don&apos;t join from Round 2:</span>{" "}
+        {t.resignForfeit ? (
+          <>MCC lets the college keep <span className="font-semibold">{inrFull(t.resignForfeit.inr)}</span><Sup n={t.resignForfeit.src} sources={t.sources} /></>
+        ) : t.resignForfeitText ? (
+          <>{t.resignForfeitText.text}<Sup n={t.resignForfeitText.src} sources={t.sources} /></>
+        ) : (
+          "not published"
+        )}
+      </span>
+    </span>
+  );
+}
+
 export default async function ComparePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
@@ -40,6 +95,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const cap = Math.min(MAX_COMPARE, me?.eff.limits.compare ?? MAX_COMPARE);
   const options = known.slice(0, cap);
   const L = decideLinks(params);
+  const lists: SeatList[] = options.length ? await currentSeatLists() : [];
+  const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
+  const risk = options.length > 1 && lowestRisk(options.map((r) => ({ name: r.college.name, t: r.fees })));
   const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
   const [older, last] = PAST_YEARS;
   // Each option's stat cells (statKeys order), one per row.
@@ -58,11 +116,25 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           <Link href={L.with("/decide/compare", { editProfile: "1" })} className={`${smallLink} text-sky`}>Set your rank to see</Link>
         ),
     },
-    ...statKeys.map((k, i) => ({ label: statLabel[k], cell: (r: OptionRow) => <StatCellView c={terms.get(r.id)![i]} t={r.fees} of={`${r.college.name}, ${courseName(r)}, ${r.quota}`} /> })),
+    ...(lists.length
+      ? [{
+          label: `Seats in MCC's ${round} lists`,
+          // Each list on its own, never added (a seat can be in two). No intake figure: Seatora has no sanctioned-seat data.
+          cell: (r: OptionRow) => (
+            <span className="grid text-xs">
+              {lists.map((l) => (
+                <span key={l.key}><span className="text-muted-foreground">{seatKindLabel[l.kind]}:</span> <span className="numeric font-semibold">{r.seatsBy?.[l.kind] != null ? formatRank(r.seatsBy[l.kind]!) : "—"}</span></span>
+              ))}
+            </span>
+          ),
+        }]
+      : []),
+    ...statKeys.map((k, i) => ({ label: statLabel[k], cell: (r: OptionRow) => <StatCellView c={terms.get(r.id)![i]} t={r.fees} of={`${r.college.name}, ${courseName(r)}, ${r.quota}`} wrap /> })),
+    { label: "If you leave", cell: (r: OptionRow) => <IfYouLeave r={r} leaving={terms.get(r.id)!.find((c) => c.key === "leaving")!.full} /> },
     { label: `${LATEST_YEAR} R1 closing`, cell: (r) => <ClosingCell d={r.latest} /> },
     { label: `${last} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[last]} /> },
     { label: `${older} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[older]} /> },
-    { label: "Closing by year and round", cell: (r) => <RoundGrid row={r} caption={`${r.college.name}, ${courseName(r)}, ${r.quota}: closing ranks by year and round`} /> },
+    { label: "Closing by year and round", cell: (r) => <YearLines r={r} /> },
     {
       label: "Allotments made (all rounds, all categories)",
       cell: (r) => (
@@ -102,6 +174,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       ) : (
         <>
         {me && known.length > cap && <Paywall feature="compare" eff={me.eff} className="mt-6" />}
+        {risk && <p className="mt-3 text-sm">{risk}</p>}
         {/* Phones: two options fit the width beside the labels; three or four get 10rem columns, so the next one peeks in
             at the edge (ScrollTable's edge shadow and first-time "Swipe for more" say there are more). */}
         <ScrollTable label="Comparison" className="mt-3 rounded-xl border border-border bg-card md:mt-8" scrollClassName="[scroll-padding-inline-start:11rem]">
@@ -130,7 +203,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
               {rows.map((s) => (
                 <tr key={s.label} className="border-b border-border align-top last:border-0">
                   <th scope="row" className="sticky left-0 z-[1] bg-card p-3 text-left text-xs font-normal text-muted-foreground max-md:p-2">{s.label}</th>
-                  {options.map((r) => <td key={r.id} className="numeric p-3 max-md:p-2">{s.cell(r)}</td>)}
+                  {options.map((r) => <td key={r.id} className="numeric p-3 break-words max-md:p-2">{s.cell(r)}</td>)}
                 </tr>
               ))}
             </tbody>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Amount, Bond, Figure, ProgrammeTerms } from "../server/terms";
-import { anyTermFilter, readTermFilters, splitByTerms, termChips, termFilters, termMoreOpen, termParamsSchema, termsPass, termVerdict } from "./term-filters";
+import { anyTermFilter, lowestRisk, readTermFilters, splitByTerms, termChips, termFilters, termMoreOpen, termParamsSchema, termsPass, termVerdict } from "./term-filters";
 
 const none: Amount = { state: "none", min: null, max: null, perYear: null, varies: false, more: false, extra: null };
 const amt = (max: number, min = max): Amount => ({ ...none, state: "figure", min, max });
@@ -160,5 +160,18 @@ describe("unknown values", () => {
     expect(s.unknown).toEqual([blank]);
     expect(splitByTerms(rows, { maxFee: 300000, keepUnknown: true }, (t) => t, () => null)).toEqual({ kept: [known, noBond, blank], unknown: [] });
     expect(splitByTerms(rows, {}, (t) => t, () => null).kept).toBe(rows);
+  });
+});
+
+describe("lowestRisk (Compare)", () => {
+  it("only from the bond and leaving penalties shown: the lowest bond wins; unknown never counts as 0", () => {
+    expect(lowestRisk([{ name: "A", t: known }, { name: "B", t: noBond }, { name: "C", t: blank }])).toBe(
+      "Lowest risk here: B (no bond, leaving penalty not published), from the bond and leaving penalties shown. 1 with no bond figure not counted.",
+    );
+    expect(lowestRisk([{ name: "A", t: known }])).toBe("Lowest risk here: A (bond penalty ₹20 L, leaving ₹5 L), from the bond and leaving penalties shown.");
+  });
+  it("all unknown, or all none: said plainly", () => {
+    expect(lowestRisk([{ name: "A", t: blank }, { name: "B", t: blank }])).toBe("Can't tell: none of these publishes a bond or leaving penalty figure.");
+    expect(lowestRisk([{ name: "A", t: noBond }, { name: "B", t: noBond }])).toBe("No bond on record at any of these, and no leaving penalty published: nothing here to tell them apart.");
   });
 });

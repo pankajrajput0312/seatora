@@ -66,11 +66,12 @@ const Marker = ({ c, block }: { c: StatCell; block?: boolean }) =>
  * One cell's value with its (i), the marker on the line under it (`tip={false}`: no (i), for a table whose header has
  * StatHead). For a cell of the page's own (Compare's rows); TermStatCells' table cells are this. `short`: the cards' value.
  */
-export function StatCellView({ c, t, of, short, tip = true }: { c: StatCell; t: ProgrammeTerms; of?: string; short?: boolean; tip?: boolean }) {
+export function StatCellView({ c, t, of, short, tip = true, wrap }: { c: StatCell; t: ProgrammeTerms; of?: string; short?: boolean; tip?: boolean; wrap?: boolean }) {
+  // `wrap`: a narrow fixed column (Compare on a phone) wraps a long value at its spaces instead of running into the next.
   return (
     <>
-      <span className="inline-flex items-center gap-0.5">
-        <Value c={c} full={!short} nb />
+      <span className={wrap ? "inline" : "inline-flex items-center gap-0.5"}>
+        <Value c={c} full={!short} nb={!wrap} />
         {tip && <CellTip c={c} t={t} of={of} />}
       </span>
       <Marker c={c} block />
