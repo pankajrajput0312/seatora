@@ -146,7 +146,9 @@ export function StatStrip({ items, children }: { items: React.ComponentProps<typ
 }
 
 /** A link inside small text (notes, captions) that still meets the 44px touch target. */
-export const smallLink = "inline-flex min-h-11 items-center underline hover:text-foreground";
+// Compact text link in a line of prose: its 44px touch target is the invisible `hit` box, not its height (a 44px line box
+// spread the lines it sits in). gap-x-1 keeps the space between a number and its word ("624 new") inside the flex.
+export const smallLink = "hit inline-flex min-h-6 items-center gap-x-1 underline hover:text-foreground";
 
 /** "51–100 of 710" for a page of results. */
 export const rangeLabel = (r: { page: number; pageSize: number; total: number; rows: unknown[] }) =>

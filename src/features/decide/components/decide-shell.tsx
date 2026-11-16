@@ -181,7 +181,7 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
                 {account && (
                   <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className="hit inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap">
                     <span className="sr-only">Your plan: </span>
-                    <span className="font-semibold">{account.upgrade ? "Free" : account.plan.split(" · ")[0]}</span>
+                    <span className={cn("font-semibold", account.upgrade && "max-[25rem]:hidden")}>{account.upgrade ? "Free" : account.plan.split(" · ")[0]}</span>
                     {account.upgrade && <span className="-mr-1.5 rounded-full bg-[#5ccfe6] px-2 py-0.5 font-semibold text-[#0b0e12]">Upgrade</span>}
                   </Link>
                 )}
@@ -199,7 +199,7 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
                 {/* Phones: the rank and its edit button as one chip here (the sidebar, with its rank card, is in the drawer). */}
                 <button type="button" data-profile-edit aria-label={shown ? `AIR ${formatRank(shown.rank)} ${shown.category}${shown.pwd ? " PwD" : ""}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(true)}
                   className="hit inline-flex h-8 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
-                  {shown ? <><span className="numeric font-semibold">AIR {formatRank(shown.rank)}</span><span className="text-muted-foreground">· {shown.category}{shown.pwd ? " PwD" : ""}</span></> : hydrated ? "Set your rank" : "Loading…"}
+                  {shown ? <><span className="numeric font-semibold">AIR {formatRank(shown.rank)}</span><span className="text-muted-foreground max-[25rem]:hidden">· {shown.category}{shown.pwd ? " PwD" : ""}</span></> : hydrated ? "Set your rank" : "Loading…"}
                   <Pencil className="size-3 text-muted-foreground" aria-hidden />
                 </button>
                 <Link href="/" className="hidden min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground md:inline-flex">Back to site</Link>
