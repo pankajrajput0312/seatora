@@ -166,8 +166,11 @@ export async function handleMessage(m: Incoming) {
     console.error("[whatsapp] ask failed", x.name, x.status ?? "", String(x.message ?? e).slice(0, 300));
     text = "Sorry, I couldn't answer that right now. Please send it again in a minute.";
   }
-  const offered = choices as z.infer<typeof choicesInput> | null;
-  await finishTurn(turn.answerId, { content: text + (offered ? `\n\n[Options: ${offered.options.map((o) => o.title).join(" | ")}]` : ""), thinking: null, status });
+  // A failed turn sends only its apology: options from a run that failed would answer a question she never saw.
+  const offered = status === "done" ? (choices as z.infer<typeof choicesInput> | null) : null;
+  // The question and its options go into the chat's history, so the next turn knows what her tap answers.
+  const asked = offered ? `\n\n${offered.question}\n[Options: ${offered.options.map((o) => o.title).join(" | ")}]` : "";
+  await finishTurn(turn.answerId, { content: text + asked, thinking: null, status });
   if (result) {
     const { usage, tools, rounds, check, corrected, timing } = result;
     const outcome = result.outcome === "checkpoint" ? "partial" : result.outcome;
