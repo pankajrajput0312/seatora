@@ -493,6 +493,9 @@ model User {
   /// and the admin page's possible duplicates. Never the raw IP.
   signupAid    String?
   signupIpHash String?
+  /// WhatsApp number, digits with country code (91…), proven by a message from it (features/whatsapp). An account made
+  /// on WhatsApp has a placeholder email and an unusable password until she sets them.
+  phone        String?           @unique
   funnelEvents FunnelEvent[]
   couponRedemptions CouponRedemption[]
 

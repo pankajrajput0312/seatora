@@ -10,7 +10,7 @@ import { ASK_MAX_INPUT_CHARS, ASK_MAX_ROUNDS, ASK_TOOL_TIMEOUT_MS } from "./conf
 import { prefLabel, type PrefKey } from "./prefs";
 import { skillIndex, loadSkills } from "./skills";
 import type { ChatEvent } from "./sse";
-import { runTool, toolDefs, toolLabel, type ToolContext, type ToolName } from "./tools";
+import { runTool, toolDefs, toolLabel, type ToolContext, type ToolName, type ToolResult } from "./tools";
 
 // The assistant's loop: stream a reply, run the tools it asks for, send their results, repeat (at most ASK_MAX_ROUNDS
 // model calls). The system prompt and tools are one stable, cached prefix; her profile and the date come after it.
@@ -207,6 +207,10 @@ export async function runAsk(o: {
   onCheckpoint?: (c: Checkpoint, shown: string) => Promise<void>;
   /** Institute slugs that exist (link check); omit to skip checking. */
   slugs?: () => Promise<Set<string>>;
+  /** A channel's own tools (WhatsApp buttons) and rules: `runExtra` answers its tools, undefined for any other. */
+  extraTools?: Anthropic.Tool[];
+  runExtra?: (name: string, input: unknown, ctx: ToolContext) => Promise<ToolResult> | undefined;
+  channelRules?: string;
 }): Promise<RunResult> {
   const t0 = Date.now();
   const haiku = /haiku/.test(o.model);
@@ -217,9 +221,10 @@ export async function runAsk(o: {
   };
   const messages: Anthropic.MessageParam[] = cp ? structuredClone(cp.messages) : o.history.map((t) => ({ role: t.role, content: t.content }));
   if (cp && o.resume!.shown.length > cp.shownLen) noteOnLast(messages, resumeNote(o.resume!.shown.slice(cp.shownLen)));
-  const context = contextBlock(o.ctx.profile, o.prefs, o.earlier);
+  const context = [contextBlock(o.ctx.profile, o.prefs, o.earlier), o.channelRules].filter(Boolean).join("\n\n");
   const system: Anthropic.TextBlockParam[] = [{ type: "text", text: systemPrompt(), cache_control: { type: "ephemeral" } }, { type: "text", text: context }];
-  const tools = toolDefs.map((t, i) => (i === toolDefs.length - 1 ? { ...t, cache_control: { type: "ephemeral" as const } } : t));
+  const allTools = [...toolDefs, ...(o.extraTools ?? [])];
+  const tools = allTools.map((t, i) => (i === allTools.length - 1 ? { ...t, cache_control: { type: "ephemeral" as const } } : t));
   const given = () => [context, ...o.history.map((t) => t.content), ...res.transcript.map((t) => t.result)].join("\n");
   let timeNoted = cp?.timeNoted ?? false;
   // `moved`: any progress in this run (stall check); `kept`: progress that survives a cut (shown text, a finished round),
@@ -377,7 +382,7 @@ export async function runAsk(o: {
         uses.map(async (u): Promise<Anthropic.ToolResultBlockParam> => {
           res.tools.push(u.name);
           o.emit({ type: "tool", name: u.name, label: toolLabel[u.name as ToolName] ?? "Looking it up…" });
-          const r = await runTool(u.name, u.input, ctx, ASK_TOOL_TIMEOUT_MS);
+          const r = (await o.runExtra?.(u.name, u.input, ctx)) ?? (await runTool(u.name, u.input, ctx, ASK_TOOL_TIMEOUT_MS));
           moved = kept = Date.now();
           const content = r.ok ? JSON.stringify(r.data) : r.error;
           res.transcript.push({ tool: u.name, result: content });
