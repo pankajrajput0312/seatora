@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Atkinson_Hyperlegible_Next } from "next/font/google";
+import { Atkinson_Hyperlegible_Mono, Atkinson_Hyperlegible_Next } from "next/font/google";
 import { cookies, headers } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import { DatabaseZap } from "lucide-react";
@@ -7,6 +7,7 @@ import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
 import "@astryxdesign/theme-neutral/theme.css";
 import { askUser } from "@/features/ask/access";
+import { displayName } from "@/features/auth/lib/display-name";
 import { getCurrentUser, staffUser } from "@/features/auth/lib/session";
 import { AppPage } from "@/features/decide/components/app-page";
 import { AstryxProvider } from "@/features/decide/components/astryx-provider";
@@ -24,6 +25,8 @@ import { db } from "@/lib/db";
 
 // Inside app uses its own "case sheet" system (docs/APP_DESIGN_SYSTEM.md): light, hyperlegible numerals.
 const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
+// Stats and numbers only (font-mono, globals.css). Not preloaded: only a page that shows a stat fetches it.
+const mono = Atkinson_Hyperlegible_Mono({ subsets: ["latin"], variable: "--font-app-mono", display: "swap", preload: false });
 
 // Every Decide page reads profile params, so render on request. The shell is not suspended (its meta comes from the
 // cached catalog); each route's loading.tsx streams a skeleton of its page inside it until the page's data is in. So a
@@ -55,7 +58,7 @@ export default async function DecideLayout({ children }: { children: React.React
   const me = meta ? await getCurrentUser().catch(() => null) : null;
   const upgrade = !!me && ["claimable", "free"].includes(passState(me).state);
   const free = freeNow();
-  const account = me && { name: me.name.trim() || me.email.split("@")[0], plan: planLine(me), upgrade, freeTill: free && shortDate(free) };
+  const account = me && { name: displayName(me.name) || me.email.split("@")[0], plan: planLine(me), upgrade, freeTill: free && shortDate(free) };
   // The plan pop-up: right after signing in (the cookie createSession sets), only without the Season Pass, and at most
   // once in PLAN_PROMPT_EVERY_MS per account (her last plan_popup_shown, any device: a new phone's sign-in doesn't repeat it).
   const prompt =
@@ -63,7 +66,7 @@ export default async function DecideLayout({ children }: { children: React.React
     !!(await cookies()).get(PLAN_PROMPT_COOKIE) &&
     !(await db.funnelEvent.findFirst({ where: { userId: me!.id, name: "plan_popup_shown", at: { gte: new Date(Date.now() - PLAN_PROMPT_EVERY_MS) } }, select: { id: true } }).catch(() => null));
   return (
-    <div className={`app ${app.variable} min-h-screen`}>
+    <div className={`app ${app.variable} ${mono.variable} min-h-screen`}>
       <AstryxProvider>
         <DecideShell phone={phone} ask={ask} admin={admin} account={account} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (

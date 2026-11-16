@@ -2,16 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
-import { HistoryNote, PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
+import { Button } from "@/components/ui/button";
+import { HistoryNote, Provisional } from "@/features/decide/components/bits";
 import { ChartCard, LabelBars, RankStrip, RoundTrend } from "@/features/decide/components/charts";
-import { ChoicesStat, TopChoices } from "@/features/decide/components/dashboard-parts";
+import { ChoicesStat, SetupCard, TopChoices } from "@/features/decide/components/dashboard-parts";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { RoundStatusBanner } from "@/features/decide/components/round-status";
-import { HomeHub } from "@/features/decide/components/home-hub";
+import { ResidentsPromo, ToolGroups } from "@/features/decide/components/home-hub";
 import { EmptyState, smallLink, StatStrip } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
-import { roundName } from "@/features/decide/lib/round-status";
+import { fmtIST, nextDate, nextFilling, roundName, stepName, stepsNow } from "@/features/decide/lib/round-status";
+import { roundStatus } from "@/features/decide/server/notices";
 import { termValueLabel } from "@/features/decide/lib/term-filters";
 import { eligibleCategories, reachLabel, reachOrder, reachWindow } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
@@ -31,26 +33,31 @@ function At({ p }: { p: StripPoint | null }) {
   );
 }
 
+/** The page's h1: the sidebar already says where she is, so it is for screen readers (and focus) only. */
+const title = <h1 id="main-h1" tabIndex={-1} className="sr-only">Home</h1>;
+
 /**
- * What's open now, then her options as Options opens them (service.ts optionsView: the round view while a round's seat
- * lists are out and its result isn't, else every option with past allotments), so every number here is the count of
- * the Options page its link opens. History charts follow.
+ * No rank yet: the three-step setup first, then today's MCC step, Residents and the tools. With a rank: the next step
+ * to take, today's MCC step, the tools, then Residents, then her options as Options opens them (service.ts optionsView:
+ * the round view while a round's seat lists are out and its result isn't, else every option with past allotments), so
+ * every number here is the count of the Options page its link opens. History charts follow.
  */
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
   if (!profile)
     return (
-      <AppPage>
-        <PageHead title="Home" />
-        <div className="mt-3"><HomeHub L={decideLinks(params)} /></div>
-        <div className="mt-3"><RoundStatusBanner params={params} /></div>
-        <SetRankPrompt path="/decide" />
+      <AppPage className="grid grid-cols-1 gap-4">
+        {title}
+        <SetupCard />
+        <RoundStatusBanner params={params} />
+        <ResidentsPromo L={decideLinks(params)} />
+        <ToolGroups L={decideLinks(params)} />
       </AppPage>
     );
 
   // pageSize 1: only the counts and the round summary are used, not the rows.
-  const [d, meta, r] = await Promise.all([dashboard(profile), getMeta(), listOptions(profile, {}, { page: 1, pageSize: 1 })]);
+  const [d, meta, r, rs] = await Promise.all([dashboard(profile), getMeta(), listOptions(profile, {}, { page: 1, pageSize: 1 }), roundStatus(LATEST_YEAR)]);
   const L = decideLinks(params);
   const list = r.view === "round" ? r.seatLists[0] : undefined;
   const roundWords = list && roundName[list.round];
@@ -65,21 +72,51 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // Her fee / bond caps leave out options whose figure is not declared (in words only, or missing): say so, with the way back.
   const caps = [profile.maxFeeLakh != null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && termValueLabel.bondyrs(profile.maxBondYears)].flatMap((c) => (c ? [c[0].toLowerCase() + c.slice(1)] : [])).join(", ");
   const leftOut = r.unknownTerms > 0 ? ` Your caps (${caps}) leave out ${formatRank(r.unknownTerms)} more without a published figure (in words only, or none published).` : "";
+  // The next-step card names a round only from MCC's schedule: the choice filling open now, else the next one scheduled.
+  const filling = rs && nextFilling(stepsNow(rs, new Date()));
   const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} without a published figure</Link></>;
 
   return (
-    <AppPage className="grid grid-cols-1 gap-3 md:gap-4">
-      <PageHead title="Home" about={`Closing ranks here are on ${seats} seats, the seat categories you can take.`} />
-      <HomeHub L={L} />
+    <AppPage className="grid grid-cols-1 gap-4">
+      {title}
+      <section aria-labelledby="next-step-h" className="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <p className="section-label text-muted-foreground">Next recommended step</p>
+        {total ? (
+          <>
+            <h2 id="next-step-h" className="mt-1 text-h2 font-bold">Review your options</h2>
+            {filling && (
+              <p className="mt-1 text-body">
+                <span className="font-semibold">{roundName[filling.round]} {stepName[filling.step].toLowerCase()}</span>{" "}
+                {filling.now === "open"
+                  ? <>open now{filling.scheduled?.to && <>, until <span className="numeric">{fmtIST(filling.scheduled.to)}</span></>}</>
+                  : <>{filling.scheduled?.from ? "from" : "on"} <span className="numeric">{fmtIST(nextDate(filling)!)}</span>{filling.scheduled?.tentative && " (tentative)"}</>}
+              </p>
+            )}
+            <p className="mt-1 text-body text-muted-foreground">
+              <span className="numeric">{formatRank(total)}</span> {list ? "options with seats in MCC's latest seat lists, in your courses" : "options in your profile"};{" "}
+              <span className="numeric">{formatRank(reached)}</span> reached your rank in a past round.
+            </p>
+            <Button asChild size="lg" className="mt-3 min-h-11 max-sm:w-full"><Link href={L.options()}>Open Options</Link></Button>
+          </>
+        ) : (
+          <>
+            <h2 id="next-step-h" className="mt-1 text-h2 font-bold">Widen your profile</h2>
+            <p className="mt-1 text-body text-muted-foreground">Your courses, quotas, states, fee or bond limits leave no options. Add courses or lift a limit.</p>
+            <Button asChild size="lg" className="mt-3 min-h-11 max-sm:w-full"><Link href={L.to("/decide", { editProfile: 1 })}>Edit your profile</Link></Button>
+          </>
+        )}
+      </section>
       <RoundStatusBanner params={params} />
+      <ToolGroups L={L} />
+      <ResidentsPromo L={L} />
 
       <section aria-labelledby="numbers-h" className="grid gap-2">
         <div className="flex items-center gap-1">
-          <h2 id="numbers-h" className="text-lg font-semibold">{list ? `${roundWords} seats in your courses` : "Your options"}</h2>
+          <h2 id="numbers-h" className="text-h2 font-bold">{list ? `${roundWords} seats in your courses` : "Your options"}</h2>
           <InfoTip label={list ? `${roundWords} seats in your courses` : "your options"}>
             {list
               ? `Options with seats in MCC's ${list.year} ${roundWords} lists, in your courses, quotas and ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`
-              : `Every option in your profile with past allotments, labelled from closing ranks in ${counted}. Each number opens them on Options.`}
+              : `Every option in your profile with past allotments, on ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`}
           </InfoTip>
         </div>
         <StatStrip
@@ -87,20 +124,20 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             sum && list
               ? {
                   label: `Options with ${roundWords} seats`,
-                  value: formatRank(total),
+                  value: <span className="font-mono">{formatRank(total)}</span>,
                   info: `${formatRank(sum.clear)} in the clear vacancy list, ${formatRank(sum.virtualOnly)} virtual only${sum.newOnly > 0 ? `, ${formatRank(sum.newOnly)} only newly added` : ""}.${leftOut}`,
                   note: <><Link href={L.options()} className={smallLink}>{formatRank(sum.clear)} clear, {formatRank(sum.virtualOnly)} virtual only</Link>{undeclared}</>,
                 }
               : {
                   label: "Options in your profile",
-                  value: formatRank(total),
+                  value: <span className="font-mono">{formatRank(total)}</span>,
                   info: `Every option in your profile's ${formatRank(d.summary.length)} ${d.summary.length === 1 ? "course" : "courses"} with past allotments; ${formatRank(r.counts["closed-before"])} of them closed before your rank.${leftOut}`,
                   note: <><Link href={L.options({ closed: true })} className={smallLink}>{formatRank(r.counts["closed-before"])} closed before your rank</Link>{undeclared}</>,
                 },
             {
               label: "Reached your rank in a past round",
               info: `Options whose closing rank reached yours in at least one of R1 to R3 of ${counted}. Stray rounds don't count here: an option reached only there is labelled "${reachLabel("stray-only", LATEST_YEAR, PAST_YEARS)}".`,
-              value: formatRank(reached),
+              value: <span className="font-mono">{formatRank(reached)}</span>,
               note: (
                 <span className="inline-flex flex-wrap items-center gap-x-1.5">
                   <Link href={L.options({ reach: "reached-latest" })} className={smallLink}>{formatRank(r.counts["reached-latest"])} in {LATEST_YEAR} R1</Link>
@@ -111,7 +148,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             {
               label: "Within 10% in a past round",
               info: "Options that closed just before your rank (within 10% of it) in a past round.",
-              value: formatRank(r.counts["within-10"]),
+              value: <span className="font-mono">{formatRank(r.counts["within-10"])}</span>,
               note: <Link href={L.options({ reach: "within-10" })} className={smallLink}>See them</Link>,
             },
           ]}
@@ -123,7 +160,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       {reached === 0 && (
         <section aria-labelledby="next-h" className="rounded-xl border border-border bg-card p-4">
-          <h2 id="next-h" className="text-lg font-semibold">None of these reached your rank in {counted}: what you can still do</h2>
+          <h2 id="next-h" className="text-title font-semibold">None of these reached your rank in {counted}: what you can still do</h2>
           <ul className="mt-2 grid list-disc gap-1.5 pl-5 text-sm">
             {list && sum && sum.fresh > 0 && (
               <li><Link href={L.options({ reach: "new" })} className={smallLink}>{formatRank(sum.fresh)} new {sum.fresh === 1 ? "option" : "options"} in the {roundWords} lists</Link> have no past allotment, so no closing rank to compare. Look at them.</li>
@@ -224,7 +261,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </table>
         }
       >
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {/* Cards at least 284px wide: the 260-unit chart plus its padding, so its 12-unit labels draw at 12px or more. */}
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,17.75rem),1fr))] gap-3">
           {d.trend.map((t) => <RoundTrend key={t.course.slug} title={`${t.course.degree} ${t.course.name}`} href={L.lastRanks(t.course.slug)} rank={profile.rank} points={t.points} />)}
         </div>
       </ChartCard>

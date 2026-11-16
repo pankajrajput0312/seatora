@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoundStepInfo } from "../types";
-import { currentSteps, fillWindow, fmtIST, fmtNote, nextChoiceFilling, statusNow, stepsNow } from "./round-status";
+import { currentSteps, dueToday, fillWindow, fmtIST, fmtNote, nextChoiceFilling, nextFilling, statusNow, stepsNow } from "./round-status";
 
 // 2026 R2 as round_status.json gives it (as of 14 Nov 2026 17:27 IST).
 const choice = { status: "open", scheduled: { from: "2026-11-10T13:00:00+05:30", to: "2026-11-15T23:55:00+05:30", on: null, tentative: false } } as const;
@@ -61,4 +61,10 @@ it("banner: open steps now, then the earliest upcoming date", () => {
   expect(fill("2026-11-16T09:00:00+05:30")).toBe("R3: 27 Nov – 2 Dec 10:00 IST (tentative)");
   expect(fill("2026-11-28T09:00:00+05:30")).toBe("R3: open until 2 Dec 10:00 IST");
   expect(fill("2026-12-03T09:00:00+05:30")).toBeNull();
+  // Home's "Today": the next step when its first date is today in IST (05:00 IST on the 16th is still the 15th in UTC).
+  const today = (now: string) => { const { next } = currentSteps(stepsNow(rs, at(now))); return !!next && dueToday(next, at(now)); };
+  expect([today("2026-11-15T23:00:00+05:30"), today("2026-11-16T05:00:00+05:30"), today("2026-11-16T23:59:00+05:30"), today("2026-11-26T09:00:00+05:30")]).toEqual([false, true, true, false]);
+  // The next-step card's round: R2 filling while open, then R3's once R2 closed, never a closed one.
+  const filling = (now: string) => { const s = nextFilling(stepsNow(rs, at(now))); return s && `${s.round} ${s.now}`; };
+  expect([filling("2026-11-14T17:27:28+05:30"), filling("2026-11-16T09:00:00+05:30"), filling("2026-11-28T09:00:00+05:30"), filling("2026-12-03T09:00:00+05:30")]).toEqual(["R2 open", "R3 upcoming", "R3 open", null]);
 });

@@ -52,6 +52,15 @@ export function clockNote(s: StepNow) {
 /** An upcoming step's first scheduled date (start of a window, or its one day). */
 export const nextDate = (s: StepNow) => (s.now === "upcoming" ? s.scheduled?.from ?? s.scheduled?.on ?? null : null);
 
+/** True when an upcoming step's first scheduled date (nextDate) is today in IST: Home says "Today" for it, not "Next". */
+export const dueToday = (s: StepNow, now: Date) => nextDate(s)?.slice(0, 10) === new Date(now.getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10);
+
+/** Home's next-step card: the choice filling open now, else the next one MCC has scheduled (earliest first date); null for none. */
+export const nextFilling = (steps: StepNow[]) =>
+  steps.find((s) => s.step === "choice_filling" && s.now === "open") ??
+  steps.filter((s) => s.step === "choice_filling" && nextDate(s)).sort((a, b) => +instant(nextDate(a)!) - +instant(nextDate(b)!))[0] ??
+  null;
+
 /** Banner lines: steps open or suspended now, and the upcoming step with the earliest scheduled date. */
 export function currentSteps(steps: StepNow[]) {
   const live = steps.filter((s) => s.now === "open" || s.now === "suspended");

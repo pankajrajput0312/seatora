@@ -31,12 +31,12 @@ const sections = [
       { href: "/decide/residents", label: "Residents", icon: Users },
       { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
       { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
-      { href: "/decide/choices", label: "Choices", icon: ListOrdered },
+      { href: "/decide/choices", label: "Choice list", icon: ListOrdered },
       { href: "/decide/compare", label: "Compare", icon: GitCompareArrows },
     ],
   },
   // Above Research: the round schedule must show without scrolling the sidebar on a 1280x800 laptop.
-  { title: "Counselling", items: [{ href: "/decide/counselling", label: "Schedule & notices", icon: CalendarDays }] },
+  { title: "Counselling", items: [{ href: "/decide/counselling", label: "Schedule", icon: CalendarDays }] },
   {
     title: "Research",
     items: [
@@ -56,7 +56,7 @@ const bottom = [
   { href: "/decide", label: "Home", icon: House },
   { href: "/decide/residents", label: "Residents", icon: Users },
   { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
-  { href: "/decide/choices", label: "Choices", icon: ListOrdered },
+  { href: "/decide/choices", label: "Choice list", icon: ListOrdered },
 ];
 
 /** `phone`: the server's guess from the user agent (layout.tsx), so the first paint has the right layout. */
@@ -242,7 +242,7 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
             {nav.map((sec) => (
               <SideNavSection key={sec.title} title={sec.title}>
                 {sec.items.map(({ href, label, icon }) => (
-                  <SideNavItem key={href} label={label} icon={icon} href={href.startsWith("/decide") ? L.to(href) : href} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className="rounded-full bg-[#6d28d9] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">77K NAMES</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">BETA</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-full bg-foreground px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-background">20%</span> })} />
+                  <SideNavItem key={href} label={label} icon={icon} href={href.startsWith("/decide") ? L.to(href) : href} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className={newBadge}>New</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 text-xs font-bold text-white">BETA</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-full bg-foreground px-1.5 text-xs font-bold text-background">20%</span> })} />
                 ))}
               </SideNavSection>
             ))}
@@ -266,10 +266,10 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
       <BackToTop />
       <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {[...bottom, compare.length ? { href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows } : { href: "/decide/seats", label: "Seats", icon: LayoutGrid }].map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-[11px]", href === "/decide/residents" ? cn("font-semibold text-[#6d28d9]", isCurrent(href) ? "border-[#6d28d9]" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
+          <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", href === "/decide/residents" ? cn("font-semibold text-[#6d28d9]", isCurrent(href) ? "border-[#6d28d9]" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <span className="relative">
               <Icon className="size-[1.25rem]" strokeWidth={1.75} aria-hidden />
-              {href === "/decide/residents" && <span className="absolute -top-1.5 -right-3 rounded-full bg-[#6d28d9] px-1 text-[8px] leading-3 font-bold text-white">NEW</span>}
+              {href === "/decide/residents" && <span className={cn(newBadge, "absolute -top-2 left-1/2 ml-2.5 bg-background")}>New</span>}
             </span>
             <span className="numeric">{label}</span>
           </Link>
@@ -293,6 +293,9 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
     </>
   );
 }
+
+/** Residents' "New": a small outlined badge in the item's own colour (currentColor), never a fill like the current item's. */
+const newBadge = "rounded-full border border-current px-1.5 text-xs leading-4 font-semibold";
 
 export type ShellAccount = { name: string; plan: string; upgrade: boolean; freeTill: string | null };
 
@@ -329,7 +332,7 @@ function AccountFooter({ account, href, current }: { account: ShellAccount | nul
         </Link>
         <LogOutButton
           className="flex min-h-12 min-w-12 max-md:min-h-11 max-md:min-w-11 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground aria-disabled:opacity-60"
-          label="text-[11px] font-semibold"
+          label="text-xs font-semibold"
           icon={<LogOut className="size-4" aria-hidden />}
         />
       </div>

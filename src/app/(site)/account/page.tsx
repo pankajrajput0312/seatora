@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { LogOutButton } from "@/features/auth/components/log-out-button";
 import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
+import { displayName } from "@/features/auth/lib/display-name";
 import { getCurrentUser } from "@/features/auth/lib/session";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { effectivePlan, planLine, usedOf } from "@/features/plans/plans";
@@ -23,7 +24,7 @@ export default async function AccountPage() {
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-8">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{user.email}</p>
-          <h1 className="glow mt-3 font-pixel text-4xl leading-none md:text-5xl">Hi, {user.name}.</h1>
+          <h1 className="glow mt-3 font-pixel text-4xl leading-none md:text-5xl">Hi, {displayName(user.name) || user.email.split("@")[0]}.</h1>
         </div>
         <LogOutButton className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-secondary px-4 text-sm font-medium text-foreground hover:bg-raised aria-disabled:opacity-60" />
       </div>

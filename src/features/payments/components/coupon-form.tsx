@@ -27,7 +27,8 @@ export function CouponForm({ initialCode, noteClassName }: { initialCode?: strin
     });
   return (
     <details open={!!initialCode} className={cn("mt-2 text-xs", noteClassName)}>
-      <summary className="cursor-pointer">Have a coupon?</summary>
+      {/* hit: a 44px touch target around the small words. */}
+      <summary className="hit w-fit cursor-pointer">Have a coupon?</summary>
       {/* onSubmit, not action: a POST form dims the Decide shell until the address changes (nav-pending.tsx), and this one never navigates. */}
       <form onSubmit={(e) => {
           e.preventDefault();

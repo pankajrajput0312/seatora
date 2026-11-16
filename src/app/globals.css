@@ -53,6 +53,30 @@
   --container-prose: 42rem;
 }
 
+/* Decide's type scale (docs/APP_DESIGN_SYSTEM.md "Type"): text-h1 32/40, text-h2 24/32, text-title 16/24 (card titles,
+   semibold), text-body 14/20, text-caption 12/16, the same at every width; nothing in Decide is set below 12px. */
+@theme {
+  --text-h1: 2rem;
+  --text-h1--line-height: 2.5rem;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 2rem;
+  --text-title: 1rem;
+  --text-title--line-height: 1.5rem;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+}
+/* The one section-label style, on the page and in the sidebar (Astryx's SideNavSection title is the same: 12px semibold,
+   sentence case, no tracking, secondary ink). Colour is the caller's (text-muted-foreground on the sheet). */
+@utility section-label {
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 /* ---------- Inside app: "case sheet" system (docs/APP_DESIGN_SYSTEM.md) ----------
    Scoped token overrides: shared components use the same token classes and restyle automatically. */
 @layer base {
@@ -82,7 +106,9 @@
     --shadow-overlay: 0 12px 32px rgb(16 34 49 / 0.14);
     --font-sans: var(--font-app), ui-sans-serif, system-ui, sans-serif;
     --font-pixel: var(--font-app), ui-sans-serif, system-ui, sans-serif;
-    --font-mono: var(--font-app), ui-sans-serif, system-ui, sans-serif;
+    /* Stats and numbers only (font-mono): Atkinson Hyperlegible Mono, the UI face's own mono. A glyph it lacks (₹ is
+       checked) falls back to the UI face, glyph by glyph. */
+    --font-mono: var(--font-app-mono), var(--font-app), ui-monospace, monospace;
     font-family: var(--font-sans);
     background: var(--color-background);
     color: var(--color-foreground);

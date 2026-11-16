@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { siteConfig } from "@/config/site";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { toolbarRow } from "@/features/decide/components/csv-link";
 import { AppPage } from "@/features/decide/components/app-page";
@@ -8,7 +9,7 @@ import { hospitalInfo } from "@/features/decide/components/institute/institute-d
 import { residentsFilters, ResidentsAbout, ResidentsCards, ResidentsTable, type ResidentTypes } from "@/features/decide/components/residents-results";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { ResidentsSearch } from "@/features/decide/components/residents-search";
-import { ActiveFilters, EmptyState, Field, FilterBar, Pager, Select } from "@/features/decide/components/ui";
+import { ActiveFilters, EmptyState, Field, FilterBar, Pager, Select, smallLink } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { decideLinks } from "@/features/decide/lib/links";
 import { specialtyName } from "@/features/decide/lib/specialty-search";
@@ -95,6 +96,10 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     query.sort !== "year" && { label: `Sorted by ${sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`, param: "sort", href: here({ sort: null }) },
   ].filter((x) => !!x);
   const clear = L.to("/decide/residents", { course: "all" });
+  // A name taken off: by email when the site has a contact address (as the page's (i) says), else the request form.
+  const removal = siteConfig.contactEmail
+    ? `mailto:${siteConfig.contactEmail}?${new URLSearchParams({ subject: "Residents: request removal", body: "Please hide this name from Seatora's Residents.\n\nName:\nCollege:\nCourse and year:\n" }).toString().replace(/\+/g, "%20")}`
+    : L.to("/decide/requests");
   const courseChoices = [
     ...(yours ? [{ value: "all", label: "All courses" }] : []),
     ...meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${specialtyName(c.name)}` })),
@@ -148,6 +153,10 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
           Only the first <span className="numeric">{formatRank(pages * res.pageSize)}</span> ({pages} pages) are shown: narrow the filters (name, college, course, state or year) to see the others.
         </p>
       )}
+      <footer className="flex flex-wrap items-center gap-x-3 text-caption text-muted-foreground">
+        <span>From MCC&apos;s official admitted lists{years.length > 0 && <>, <span className="numeric">{years.length > 1 ? `${years.at(-1)}–${years[0]}` : years[0]}</span></>}.</span>
+        <a href={removal} className={`${smallLink} text-sky`}>Request removal</a>
+      </footer>
     </AppPage>
   );
 }

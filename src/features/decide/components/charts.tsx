@@ -42,7 +42,7 @@ export function ChartCard({ title, subtitle, legend, table, children, className,
     <figure aria-labelledby={id} className={cn("m-0 rounded-xl border border-border bg-card p-5", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-1.5">
-          <h2 id={id} className="text-base font-medium">{title}</h2>
+          <h2 id={id} className="text-title font-semibold">{title}</h2>
           {subtitle && <InfoTip label={title}>{subtitle}</InfoTip>}
         </div>
         {/* The label says what it does, so no aria-pressed (a pressed "Show chart" contradicts itself). */}
@@ -77,6 +77,7 @@ export function RankStrip({ rank, rows }: { rank: number; rows: { course: string
   const [tip, setTip] = useState<Tip>(null);
   const all = rows.flatMap((r) => r.points.map((p) => p.closing));
   const max = niceMax(Math.max(rank * 1.2, ...all));
+  // Text sizes are viewBox units: at the 860px minimum width (scale 0.86) the 14-unit labels draw at 12px or more.
   const W = 1000, L = 250, R = 44, rowH = 46, top = 28;
   const H = top + rows.length * rowH + 28;
   const x = (v: number) => L + (v / max) * (W - L - R);
@@ -96,11 +97,11 @@ export function RankStrip({ rank, rows }: { rank: number; rows: { course: string
   const summary = rows.map((r) => `${r.course}: ${r.points.length} options, ${r.points.filter((p) => p.closing >= rank).length} closed at or after your rank`).join("; ");
   return (
     <div role="region" aria-label="Where your rank sits (chart)" tabIndex={0} className="relative overflow-x-auto overflow-y-hidden" onPointerLeave={() => setTip(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[720px]" role="img" aria-label={`2025 deepest closing rank of each option, with your rank ${formatRank(rank)} marked. ${summary}.`} onPointerMove={onMove}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[860px]" role="img" aria-label={`2025 deepest closing rank of each option, with your rank ${formatRank(rank)} marked. ${summary}.`} onPointerMove={onMove}>
         {ticks(max).map((t) => (
           <g key={t}>
             <line x1={x(t)} x2={x(t)} y1={top - 8} y2={H - 24} className="stroke-border" strokeWidth={1} />
-            <text x={x(t)} y={H - 8} textAnchor="middle" className="numeric fill-muted-foreground text-[12px]">{formatRank(t)}</text>
+            <text x={x(t)} y={H - 8} textAnchor="middle" className="numeric fill-muted-foreground text-[14px]">{formatRank(t)}</text>
           </g>
         ))}
         {rows.map((r, i) => {
@@ -114,7 +115,7 @@ export function RankStrip({ rank, rows }: { rank: number; rows: { course: string
           );
         })}
         <line x1={x(rank)} x2={x(rank)} y1={top - 20} y2={H - 24} className="stroke-foreground" strokeWidth={2} />
-        <text x={x(rank) + 6} y={top - 10} className="numeric fill-foreground text-[13px] font-bold">You, {formatRank(rank)}</text>
+        <text x={x(rank) + 6} y={top - 10} className="numeric fill-foreground text-[14px] font-bold">You, {formatRank(rank)}</text>
       </svg>
       <Tooltip tip={tip} setTip={setTip} />
     </div>
@@ -153,10 +154,10 @@ export function RoundTrend({ title, href, rank, points }: { title: string; href?
   const last = [...points].reverse().find((p) => p.median);
   return (
     <div className="relative rounded-lg border border-border p-3" onPointerLeave={() => setTip(null)}>
-      <h3 className="text-sm font-medium">{href ? <Link href={href} className="inline-flex min-h-11 items-center text-sky underline">{title}</Link> : title}</h3>
+      <h3 className="text-title font-semibold">{href ? <Link href={href} className="inline-flex min-h-11 items-center text-sky underline">{title}</Link> : title}</h3>
       <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" role="img" aria-label={`${title}: median closing rank by round in 2025. ${points.map((p) => `${roundLabel[p.round]} ${p.median ? formatRank(p.median) : "none"}`).join(", ")}. Your rank ${formatRank(rank)}.`}>
         <line x1={L} x2={W - R} y1={y(rank)} y2={y(rank)} className="stroke-foreground/70" strokeWidth={1} />
-        <text x={L} y={y(rank) - 4} className="numeric fill-muted-foreground text-[10px]">You, {formatRank(rank)}</text>
+        <text x={L} y={y(rank) - 4} className="numeric fill-muted-foreground text-[12px]">You, {formatRank(rank)}</text>
         <polyline points={line} className="fill-none stroke-mark" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         {points.map((p, i) =>
           p.median ? (
@@ -168,8 +169,8 @@ export function RoundTrend({ title, href, rank, points }: { title: string; href?
             </g>
           ) : null,
         )}
-        {points.map((p, i) => <text key={p.round} x={x(i)} y={H - 6} textAnchor="middle" className="fill-muted-foreground text-[10px]">{roundLabel[p.round]}</text>)}
-        {last?.median && <text x={x(points.indexOf(last))} y={y(last.median) - 8} textAnchor="end" className="numeric fill-foreground text-[11px] font-semibold">{formatRank(last.median)}</text>}
+        {points.map((p, i) => <text key={p.round} x={x(i)} y={H - 6} textAnchor="middle" className="fill-muted-foreground text-[12px]">{roundLabel[p.round]}</text>)}
+        {last?.median && <text x={x(points.indexOf(last))} y={y(last.median) - 8} textAnchor="end" className="numeric fill-foreground text-[13px] font-semibold">{formatRank(last.median)}</text>}
       </svg>
       <Tooltip tip={tip} setTip={setTip} />
     </div>
