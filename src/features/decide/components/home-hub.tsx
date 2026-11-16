@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, Building2, CalendarDays, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
+import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import type { DecideLinks } from "../lib/links";
 
 // The planner's home, in Seatora's own look (the logo's ink, cyan and green; a faint pixel grid): the Residents card first,
@@ -62,6 +63,13 @@ export function HomeHub({ L }: { L: DecideLinks }) {
               <span className="text-3xl font-extrabold text-[#5fd36f]">₹0</span>
             </p>
             <p className="text-xs text-[#f1f4f7]">Everything free till {FREE_UNTIL}</p>
+            <div className="mt-3">
+              <SeasonPassButton
+                next="/decide"
+                className="min-h-10 rounded-md bg-[#5fd36f] px-4 text-sm font-semibold text-[#0b0e12] hover:bg-[#7fe08b]"
+                noteClassName="text-[#a3abb3]"
+              />
+            </div>
           </div>
         </div>
       </section>

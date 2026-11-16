@@ -477,6 +477,7 @@ model User {
   askReports   AskReport[]
   askChats     AskConversation[]
   askPrefs     AskPreference[]
+  payments     Payment[]
 }
 
 /// The Decide profile (features/decide/profile.ts profileSchema) of a signed-in user, so it follows the account across
@@ -657,4 +658,23 @@ model AskPreference {
   updatedAt DateTime @updatedAt
 
   @@id([userId, key])
+}
+
+/// A Razorpay checkout (features/payments). The amount comes from PLANS on the server, never from the browser. The
+/// order's receipt is this id. status: created, paid (verified signature or webhook; paidAt set), failed.
+model Payment {
+  id                String    @id
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan              String
+  /// In paise.
+  amount            Int
+  currency          String
+  razorpayOrderId   String    @unique
+  razorpayPaymentId String?   @unique
+  status            String    @default("created")
+  createdAt         DateTime  @default(now())
+  paidAt            DateTime?
+
+  @@index([userId])
 }

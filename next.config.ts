@@ -12,13 +12,15 @@ if (!isDev) {
 }
 
 // Static pages can't carry per-request nonces, so inline scripts/styles Next emits are allowed.
+// Razorpay Checkout (features/payments): its script, its modal (an iframe on api.razorpay.com) and its calls.
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' https://checkout.razorpay.com${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://*.razorpay.com",
   "font-src 'self'",
-  `connect-src 'self'${isDev ? " ws:" : ""}`,
+  "frame-src https://api.razorpay.com https://checkout.razorpay.com",
+  `connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com${isDev ? " ws:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

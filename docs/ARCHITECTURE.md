@@ -111,6 +111,9 @@ A NEET PG counselling assistant at `/decide/ask` (Claude on Amazon Bedrock, `src
 ## Plans, roles and admin
 `User.role` (OWNER, ADMIN, PREMIUM, FREE) and `User.premiumUntil` decide the plan (Free or Premium; `FREE_FOR_ALL_UNTIL` makes everyone Premium until then). Limits live in one table, `src/features/plans/plans.ts` (env overrides `PLAN_<PLAN>_<FEATURE>`); `usage.ts` `checkAndCount(userId, feature, key?)` counts per IST day in `UsageDaily` / `UsageDistinct`, server-side only. Enforced in the institute page and API (distinct institutes a day), Residents (reads a day), the CSV export routes (403 `plan_required`), Compare (cap), Ask (questions a day; `create_report`, `save_choice_list`) and the choices sync (saved lists). Over a limit a page shows the `Paywall` card; the header's `PlanChip` shows the plan and today's institutes. `/decide/admin` (owner and admin only, else not found): accounts, roles, Season Pass dates (audited in `AdminAudit`) and usage totals. `getCurrentUser()` is React-cached, so the layout, page and plan checks share one session read per render. Details: [PLANS_AND_ROLES.md](PLANS_AND_ROLES.md).
 
+## Payments
+Razorpay Standard Checkout for the Season Pass (`src/features/payments`, `/api/payments/order`, `/verify`, `/webhook`): the server picks the amount, verify and the webhook both check Razorpay's HMAC, and marking paid is idempotent. Details, env and setup: [PAYMENTS.md](PAYMENTS.md).
+
 ## Validation
 Zod is the single validation layer:
 - Forms use React Hook Form with `zodResolver`.

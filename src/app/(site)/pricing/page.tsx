@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { business } from "@/config/business";
 import { FreePrice } from "@/components/marketing/free-price";
 import { formatINR } from "@/features/cutoffs/lib/format";
+import { BuySeasonPass } from "@/features/payments/components/buy-season-pass";
 
 export const metadata: Metadata = {
   title: "Pricing — Seatora NEET PG 2026 Season Pass",
   description: `The Seatora NEET PG 2026 Season Pass is free: ${formatINR(business.price)} (regular price ${formatINR(business.regularPrice)}) ${business.period}, with no subscription or auto-renewal.`,
 };
+
+const buyClass = "h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90";
 
 export default function PricingPage() {
   return (
@@ -24,9 +27,9 @@ export default function PricingPage() {
           Online NEET PG counselling planner for MCC All India counselling: Round 2 seats, past closing ranks, fees, stipends and bonds, and
           residents at each college, from official MCC, NBEMS and NMC documents. Create a free account and access is switched on immediately.
         </p>
-        <Button asChild className="mt-5">
-          <Link href="/signup">Create free account</Link>
-        </Button>
+        <div className="mt-5">
+          <BuySeasonPass next="/pricing" className={buyClass} noteClassName="text-muted-foreground" />
+        </div>
         <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-15">15 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
           <section>

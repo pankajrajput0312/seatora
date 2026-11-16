@@ -71,6 +71,8 @@ One row per signed-in user (`userId` is the key, cascade on account delete): the
 
 ## Accounts, plans and usage (`User.role`, `UsageDaily`, `UsageDistinct`, `AdminAudit`)
 `User.role` (enum Role: OWNER, ADMIN, PREMIUM, FREE, default FREE), `premiumUntil` (Season Pass expiry), `createdVia` ("signup"), `notes` (admin page). The counters and the audit log above. Migration `20261122000000_plans_roles` (also creates `pg_trgm` in schema `extensions` and the Resident indexes). On Supabase run the lockdown after it. Details: [PLANS_AND_ROLES.md](PLANS_AND_ROLES.md).
+## Payments (`Payment`)
+One row per Razorpay order (docs/PAYMENTS.md): `plan`, `amount` (paise, from `PLANS` on the server), `currency`, `razorpayOrderId` (unique; the order's receipt is our `id`), `razorpayPaymentId` (unique, set when paid), `status` (created, paid, failed; a CHECK constraint), `paidAt`. A paid row is the record of a Season Pass. Index (userId). Cascades on account delete.
 
 ## Ask Seatora (`AskLog`, `AskReport`, `AskConversation`, `AskMessage`, `AskPreference`)
 Owner-only assistant (docs/ASK_SEATORA.md). All cascade on account delete.
