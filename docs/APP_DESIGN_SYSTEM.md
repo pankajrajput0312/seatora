@@ -35,7 +35,7 @@ Colour repeats what the words already say and never replaces them: a badge names
 | College type | green state government + municipal, teal central government (AIIMS-type, armed forces, railway, PSU), violet ESIC, blue deemed, plum trust, grey private | `collegeTypeGroup` / `collegeTypeClass` (institute/college-type.ts), `TypeBadge` |
 | Bond (years) | green "No bond" (a no-bond with a caveat stays ink), amber "1Y"/"2Y"/"Yes", orange 3Y or more, grey "Unknown"/"—" | `StatCell.level` (lib/stat-format.ts), `levelClass` (stat-cells.tsx) |
 | Bond ₹, Leaving ₹ | red ₹25 L or more (`HIGH_PENALTY`), amber a smaller bond amount, green "None" | same |
-| Fee a year | green low, ink middle, red high, by course type: MD/MS and Diploma under ₹1 L / from ₹5 L; DNB and NBEMS Diploma under / above the NBEMS maximum of ₹1.25 L. No band for an NBEMS maximum or a sum paid at admission | same (`feeBandText`) |
+| Fee a year | green low, ink middle, red high, by course type: MD/MS and Diploma under ₹1 L / from ₹5 L; DNB and NBEMS Diploma under / above the NBEMS maximum of ₹1.25 L. No band for an NBEMS maximum or an amount at admission that is not also every later year's fee | same (`feeBandText`) |
 | Stipend | amber when below the NBEMS minimum (marker "below NBEMS min") | same |
 | Seats in the round | green clear, amber virtual, blue "+ new" | institute header and key facts (key-facts.tsx) |
 | Reach | blue reached, amber within 10%, grey the rest (unchanged) | `reachTone` (lib/reach.ts) |

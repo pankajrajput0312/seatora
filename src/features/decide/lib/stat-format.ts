@@ -34,8 +34,11 @@ export function inrL(inr: number): string {
   const [v, u] = inr >= 1e7 ? [inr / 1e7, "Cr"] : inr >= 1e5 ? [inr / 1e5, "L"] : [0, ""];
   return u ? `₹${Math.floor(v * 100 + 1e-9) / 100} ${u}` : formatINR(inr);
 }
-/** A card's ₹: "₹10k" for whole thousands under ₹1 L, else inrL. */
-export const inrCard = (inr: number) => (inr > 0 && inr < 1e5 && inr % 1e3 === 0 ? `₹${inr / 1e3}k` : inrL(inr));
+/**
+ * One money style on cards for fees, stipends and penalties (Indian notation): lakh / crore from ₹1 L ("₹1.25 L",
+ * "₹1.05 L", cut, never rounded up), full grouping under it ("₹43,000"); never "₹43k". Tables and (i)s: inrFull.
+ */
+export const inrCard = inrL;
 /** A fee range: "₹15–25 L" when both are lakh, else "₹50,000–₹1.5 L". */
 export function feeRange(min: number | null | undefined, max: number): string {
   if (min == null || min === max) return inrL(max);
@@ -77,8 +80,9 @@ export type StatCell = {
   short: string;
   full: string;
   /**
-   * Tiny warning beside the value, only two: "below NBEMS min" (stipend), "state law may apply" (bond not published).
-   * Everything else a value leaves out is said in its (i), never in the cell.
+   * Tiny note beside the value: two warnings, "below NBEMS min" (stipend) and "state law may apply" (bond not
+   * published), and a range's reason, "depends on specialty" (RANGE_HINT), where the data gives it. Everything else a
+   * value leaves out is said in its (i), never in the cell.
    */
   marker: string | null;
   /** The value is a link (a fee "On college website ↗"). */
@@ -105,7 +109,7 @@ export const HIGH_PENALTY = 25e5;
 /**
  * Fee bands a year, by course type: MD/MS and Diploma low under ₹1 L, high from ₹5 L; DNB and NBEMS Diploma (NBEMS lets a
  * hospital charge at most ₹1.25 L) low under ₹1.25 L, high above it. Between: no colour. An NBEMS maximum (no figure
- * of the college's own) and a sum paid at admission get no band.
+ * of the college's own) and an amount at admission that is not also every later year's fee (feeBasis) get no band.
  */
 const FEE_BANDS = { "MD/MS": [1e5, 5e5], Diploma: [1e5, 5e5], DNB: [125000, 125001], "NBEMS Diploma": [125000, 125001] } as const;
 export const feeBandText = "MD/MS and Diploma: low under ₹1 L a year, high from ₹5 L. DNB and NBEMS Diploma: low under the NBEMS maximum of ₹1.25 L, high above it.";
@@ -141,7 +145,7 @@ const yearLines = (t: ProgrammeTerms, pick: "fee" | "stipend", unit: string): Ti
     const f: Figure | null = y[pick];
     const bound = f?.kind === "maximum" ? "up to " : f?.kind === "minimum" ? "at least " : "";
     const declared = f?.declared != null ? ` (declared ${inrFull(f.declared)}; see below)` : "";
-    return f ? { text: `Year ${y.year}: ${bound}${inrRange(f.min, f.inr, false)}${f.atAdmission ? " paid at admission" : unit}${declared}`, src: f.src } : { text: `Year ${y.year}: not stated` };
+    return f ? { text: `Year ${y.year}: ${bound}${inrRange(f.min, f.inr, false)}${f.atAdmission ? ", paid at admission" : unit}${declared}`, src: f.src } : { text: `Year ${y.year}: not stated` };
   });
 /** The record's words on how a figure was read (a GST taken off), once each. */
 const figureNotes = (t: ProgrammeTerms): TipLine[] =>
@@ -172,20 +176,40 @@ function textLines(t: ProgrammeTerms, u: ReturnType<typeof unread>): TipLine[] {
  * website ↗" (words pointing to the college's site: the link is the words' own address, else the college's MCC
  * website), a ₹ range the words give, else "Not stated". The words are in the (i).
  */
-function feeWords(text: string, website: string | null | undefined): { label: string; href?: string } {
+function feeWords(text: string, website: string | null | undefined): { label: string; href?: string; hint?: string } {
   const url = websiteUrl(text.match(/\b(?:https?:\/\/|www\.)[^\s,;()<>"']+[^\s,;()<>"'.]/i)?.[0]);
   // A ₹ range in the words ("100000 to 4000000 depending upon the specialty", "Rs.3,00,000/- to Rs.48,00,000/-"): shown
   // as the range, never US$ (an NRI line).
   const r = text.replace(/US\$[^|]*/gi, "").match(/(\d[\d,]{4,})\s*(?:\/-)?\s*(?:to|-|–)\s*(?:rs\.?|₹|inr)?\s*(\d[\d,]{4,})/i);
+  const varies = /\b(?:by|per|depend\w*(?: up)?on)\b[^.|]{0,20}?\b(?:subject|speciality|specialty|branch|discipline)|(?:subject|speciality|specialty|branch|course)[- ]?wise|var(?:y|ies)|differ/i.test(text);
   if (r) {
     const [lo, hi] = [r[1], r[2]].map((x) => Number(x.replace(/,/g, "")));
-    if (lo >= 10000 && hi > lo) return { label: `${inrShort(lo)}–${inrShort(hi).replace("₹", "")}/yr`, ...(url && { href: url }) };
+    if (lo >= 10000 && hi > lo) return { label: `${feeRange(lo, hi)}/yr`, ...(url && { href: url }), ...(varies && { hint: RANGE_HINT }) };
   }
-  if (/\b(?:by|per|depend\w* on)\b[^.|]{0,20}?\b(?:subject|speciality|specialty|branch|discipline)|(?:subject|speciality|specialty|branch|course)[- ]?wise|var(?:y|ies)|differ/i.test(text))
-    return { label: "Varies by subject", ...(url && { href: url }) };
+  if (varies) return { label: "Varies by subject", ...(url && { href: url }) };
   const href = url ?? (/website|web ?site|\bsite\b|portal|online/i.test(text) ? websiteUrl(website) : null);
   return href ? { label: "On college website ↗", href } : { label: "Not stated" };
 }
+
+/**
+ * How a fee figure is shown, stated once (the cell): "yearly" ("₹1.25 L/yr"): a fee a year, including MCC's "At
+ * admission" amount when every later year is the same yearly figure (year 1's is paid at admission; CIHSR: ₹1,25,000 at
+ * admission, then ₹1,25,000 a year, ₹3,75,000 for the course); "admission" ("₹1.25 L at admission (Year 1)"): the
+ * amount at admission, with later years different or not stated. MCC's form never says an amount at admission is
+ * one-time, so no screen says "not a yearly fee". The whole course is "₹3.75 L for the course".
+ */
+export function feeBasis(t: Pick<ProgrammeTerms, "years">): "yearly" | "admission" | null {
+  const f = t.years[0]?.fee;
+  if (!f) return null;
+  if (!f.atAdmission) return "yearly";
+  const later = t.years.slice(1).map((y) => y.fee);
+  return later.length && later.every((g) => g && !g.atAdmission && g.inr === f.inr && g.min === f.min && g.kind === f.kind) ? "yearly" : "admission";
+}
+const PER = { yearly: "/yr", admission: " at admission (Year 1)" } as const;
+/** "₹3.75 L for the course" (a card's short form; the (i) and tables give it in full). */
+export const courseFeeText = (inr: number, short = true) => `${short ? inrL(inr) : inrFull(inr)} for the course`;
+/** Why a ₹ range is a range, when the data says so (a fee or amount priced by specialty): the cell's hint. */
+export const RANGE_HINT = "depends on specialty";
 
 function feeCell(t: ProgrammeTerms): StatCell {
   const c = { key: "fee", label: statLabel.fee, about: "fee" } as const;
@@ -195,7 +219,7 @@ function feeCell(t: ProgrammeTerms): StatCell {
     if (u) {
       const w = feeWords(u.text, t.website);
       const link: TipLine[] = w.href ? [{ text: w.href.replace(/^https?:\/\/|\/$/g, ""), href: w.href }] : [];
-      return { ...words(c, [{ text: "The MCC profile gives this fee in words only (no one figure for this course and seat type), so Seatora shows no figure. Its words:" }, asQuote(u), ...link, ...hostelLines(t)], w.label), ...(w.href && { href: w.href }) };
+      return { ...words(c, [{ text: "The MCC profile gives this fee in words only (no one figure for this course and seat type), so Seatora shows no figure. Its words:" }, asQuote(u), ...link, ...hostelLines(t)], w.label), ...(w.href && { href: w.href }), ...(w.hint && { marker: w.hint }) };
     }
     return dash(c, t.notes.length ? t.notes.map((text) => ({ text, ...(t.notesSrc != null && { src: t.notesSrc }) })) : [{ text: NOT_IN_DATA }]);
   }
@@ -204,9 +228,10 @@ function feeCell(t: ProgrammeTerms): StatCell {
     ...(f?.kind === "maximum" ? [{ text: "NBEMS limit; hospital declared none." }, { text: `Up to ${inrFull(f.inr)} a year: ${NBEMS_MAX}.`, src: f.src }] : []),
     ...(f?.above ? [{ text: ABOVE_MAX, warn: true as const }] : []),
     ...yearLines(t, "fee", " a year"),
-    ...(t.wholeCourseFee != null ? [{ text: `Whole course: ${max ? "up to " : ""}${inrFull(t.wholeCourseFee)} total (${t.durationYears} yrs)${max ? " (NBEMS maximum)" : ""}` }] : []),
-    ...(f?.min != null ? [{ text: "A range: the fee depends on the subject." }] : []),
-    ...(f?.atAdmission ? [{ text: "Paid at admission, not a yearly fee." }] : []),
+    ...(t.wholeCourseFee != null ? [{ text: `For the whole course: ${max ? "up to " : ""}${inrFull(t.wholeCourseFee)} (${yrs(t.durationYears)})${max ? " (NBEMS maximum)" : ""}` }] : []),
+    ...(f?.min != null ? [{ text: "A range: the fee depends on the specialty (subject)." }] : []),
+    // The amount at admission with no later year stated: MCC's form gives only that (never "one-time" or "yearly").
+    ...(f?.atAdmission && t.years.slice(1).some((y) => !y.fee) ? [{ text: "MCC's form gives the amount paid at admission (Year 1); it does not state the later years' fees." }] : []),
     ...(f?.declared != null ? [{ text: `GST removed: the college declared ${inrFull(f.declared)}.`, warn: true as const }] : []),
     ...hostelLines(t),
     ...figureNotes(t),
@@ -214,18 +239,20 @@ function feeCell(t: ProgrammeTerms): StatCell {
     ...textLines(t, u),
   ];
   if (!f) return { ...dash(c, tip), tip: [{ text: "Year 1's fee is not stated." }, ...tip] };
-  // A year's fee says so, cards too: "₹1.71 L/yr", "₹15–25 L/yr"; a sum paid at admission "₹5 L at admission"; the NBEMS
-  // ceiling "Up to ₹1.25 L/yr" (cards "≤ ₹1.25 L/yr"), never the college's own. No marker: what a figure leaves out is in the (i).
+  // A year's fee says so, cards too: "₹1.71 L/yr", "₹15–25 L/yr"; an amount at admission only "₹5 L at admission (Year 1)"
+  // (feeBasis); the NBEMS ceiling "Up to ₹1.25 L/yr" (cards "≤ ₹1.25 L/yr"), never the college's own. A range's marker
+  // says why it is one; everything else a figure leaves out is in the (i).
   const v = feeRange(f.min, f.inr);
-  const per = f.atAdmission ? " at admission" : "/yr";
+  const basis = feeBasis(t)!;
+  const per = PER[basis];
   const cell: StatCell = {
     ...c,
     short: (f.kind === "maximum" ? "≤ " : "") + v + per,
     full: (f.kind === "maximum" ? "Up to " : "") + v + per,
-    marker: null, tone: null, tip,
+    marker: f.min != null ? RANGE_HINT : null, tone: null, tip,
   };
   const [low, high] = FEE_BANDS[t.programme as keyof typeof FEE_BANDS] ?? [];
-  if (f.kind === "maximum" || f.atAdmission || low == null) return cell;
+  if (f.kind === "maximum" || basis === "admission" || low == null) return cell;
   const band = f.above || f.inr >= high ? "high" : f.inr < low ? "low" : null;
   if (!band) return cell;
   const word = `${band === "high" ? "High" : "Low"} fee for ${t.programme}`;
@@ -247,8 +274,9 @@ function stipendCell(t: ProgrammeTerms): StatCell {
     ...(s.plusDa ? [{ text: "Plus DA (dearness allowance), as the college declared." }] : []),
     ...(s.kind === "minimum" ? [{ text: NBEMS_MIN }] : s.kind === "nmc" ? [{ text: NMC }] : []),
   ];
+  // Always a month, one money style: "₹35,000/mo", "₹1.05 L/mo", "≥ ₹43,000/mo" (full: "From ₹43,000/mo").
   const min = s.kind === "minimum";
-  return levelOf({ ...c, short: min ? `≥ ${inrCard(s.inr)}` : inrShort(s.inr), full: min ? `From ${inrFull(s.inr)}` : inrFull(s.inr), marker: s.below ? "below NBEMS min" : null, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
+  return levelOf({ ...c, short: `${min ? "≥ " : ""}${inrCard(s.inr)}/mo`, full: `${min ? "From " : ""}${inrFull(s.inr)}/mo`, marker: s.below ? "below NBEMS min" : null, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
 }
 
 /** A bond that is not declared: why ("Not published": the record's words; "—": no record, or a record for other courses). */
@@ -351,6 +379,8 @@ const amountValue = (a: Amount, short: boolean, exact = false) => {
   const v = a.min != null && a.min !== a.max ? `${f(a.min)}–${f(a.max!)}` : f(a.max!);
   return `${a.perYear ? (exact ? "up to " : "≤ ") : a.formula?.bound && (a.min == null || a.min === a.max) ? BOUND[a.formula.bound] : ""}${v}${a.more && !exact ? "+" : ""}`;
 };
+/** A ₹ range priced by specialty says so beside it; any other range's reason is in its (i) (the record's words). */
+const rangeHint = (a: Amount) => (a.varies && a.min != null && a.min !== a.max ? RANGE_HINT : null);
 const partLines = (parts: TermPart[], src: number | null): TipLine[] => parts.map((p) => ({ text: p.text, src: p.src ?? src }));
 
 function bondInrCell(t: ProgrammeTerms): StatCell {
@@ -368,7 +398,7 @@ function bondInrCell(t: ProgrammeTerms): StatCell {
   if (a.state === "figure" && a.max != null) {
     const high = a.max >= HIGH_PENALTY;
     return {
-      ...c, short: amountValue(a, true), full: amountValue(a, false), marker: null, tone: "bond",
+      ...c, short: amountValue(a, true), full: amountValue(a, false), marker: rangeHint(a), tone: "bond",
       level: high ? "heavy" : "caution", levelWord: high ? "₹25 L or more" : "a bond amount",
       tip: [head, { text: `${amountValue(a, false, true)} for this course.`, src: rule?.src ?? b.src }, ...ruleLine, ...amountLines(a, b.years, b.src), ...parts, ...other],
     };
@@ -398,7 +428,7 @@ function leavingCell(t: ProgrammeTerms): StatCell {
   }
   const tip = [head, ...partLines(b.leaving, b.src), ...amountLines(a, null, b.leaving[0]?.src ?? b.src), ...other, ...forfeit];
   if (a.state !== "figure" || a.max == null) return words(c, tip, phrase(a, b.leaving.map((p) => p.text)));
-  return levelOf({ ...c, short: amountValue(a, true), full: amountValue(a, false), marker: null, tone: null, tip }, a.max >= HIGH_PENALTY ? "heavy" : undefined, "₹25 L or more");
+  return levelOf({ ...c, short: amountValue(a, true), full: amountValue(a, false), marker: rangeHint(a), tone: null, tip }, a.max >= HIGH_PENALTY ? "heavy" : undefined, "₹25 L or more");
 }
 
 /**

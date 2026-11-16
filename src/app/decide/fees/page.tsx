@@ -145,11 +145,12 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         title="Fees, stipend and bond"
         about={
           <>
-            <strong>Fee</strong>: a year, from the college&apos;s MCC profile (the table: years 1 to 3). &quot;Up to ₹1.25 L&quot;: a DNB
+            <strong>Fee</strong>: a year (/yr; year 1&apos;s may be paid at admission), from the college&apos;s MCC profile (the table: years 1 to 3).
+            &quot;At admission (Year 1)&quot;: MCC&apos;s form gives the amount paid at admission, and later years differ or are not stated. &quot;Up to ₹1.25 L&quot;: a DNB
             hospital that declared none; the most NBEMS lets it charge (no GST, paid to the hospital), not its own fee. &quot;Varies by
             subject&quot;, &quot;On college website&quot;, &quot;Not stated&quot;: the profile gives no one figure for these seats; its
             words are in the (i). The whole-course fee is in the Fee (i).
-            <br /><strong>Stipend</strong>: a month, before tax. &quot;From ₹…&quot;: the NBEMS floor; the pay may be higher.
+            <br /><strong>Stipend</strong>: a month (/mo), before tax. &quot;From ₹…&quot;: the NBEMS floor; the pay may be higher.
             <br /><strong>Bond period</strong>: years to serve after the course; <strong>Bond penalty</strong>: what you pay if you don&apos;t serve
             it (a range where it varies by specialty; sorting and filters use the highest).
             <br /><strong>Leaving penalty</strong>: the penalty for leaving the seat or course after joining. MCC&apos;s Round 2 forfeit is on

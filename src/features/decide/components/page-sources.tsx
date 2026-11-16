@@ -139,14 +139,19 @@ function openSource(e: React.MouseEvent<HTMLAnchorElement>, n: number) {
 const docName = (d: SourceDoc) => d.name;
 const refClass = "underline decoration-dotted underline-offset-2 hover:text-sky";
 
-/** A numbered superscript for one document (a figure's source): "Source 3: name", linking the footer entry. */
+/**
+ * A numbered superscript for one document (a figure's source): "Source 3: name", linking the footer entry. In brackets
+ * after a thin gap ("₹1,25,000 a year [10]"), so it never reads as a digit of the amount, nor two side by side as one number.
+ */
 export function SourceRef({ doc, first, className }: { doc: SourceDoc; first?: boolean; className?: string }) {
   const [n] = useSources([doc], first);
   // Outside a page, and before hydration (or without JS: the numbers are the browser's), the document itself.
   if (n == null) return <Fallback docs={[doc]} sup />;
   return (
-    <sup className={className ?? "ml-0.5 text-[max(0.75em,0.75rem)] font-normal text-muted-foreground"}>
+    <sup className={className ?? "ml-[0.25em] text-[max(0.75em,0.75rem)] font-normal text-muted-foreground"}>
+      <span aria-hidden>[</span>
       <a href={`#source-${n}`} onClick={(e) => openSource(e, n)} aria-label={`Source ${n}: ${docName(doc)}`} title={docName(doc)} className={`hit ${refClass}`}>{n}</a>
+      <span aria-hidden>]</span>
     </sup>
   );
 }

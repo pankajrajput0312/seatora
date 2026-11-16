@@ -53,7 +53,8 @@ describe("fee and stipend cells", () => {
     expect(c.fee.tip.slice(0, 3)).toEqual([{ text: "Year 1: ₹41,000 a year", src: 1 }, { text: "Year 2: ₹41,000 a year", src: 1 }, { text: "Year 3: not stated" }]);
     // Its band (green) in words, last.
     expect([c.fee.level, c.fee.tip[3].text]).toEqual(["good", expect.stringMatching(/^Low fee for MD\/MS \(MD\/MS and Diploma: low under ₹1 L/)]);
-    expect(shown(c.stipend)).toEqual(["₹1,36,008", "₹1,36,008", null, null]);
+    // A stipend always says its period; one money style on cards (lakh from ₹1 L, cut), in full in tables.
+    expect(shown(c.stipend)).toEqual(["₹1.36 L/mo", "₹1,36,008/mo", null, null]);
     expect(c.stipend.tip[0]).toEqual({ text: "Year 1: ₹1,36,008 a month", src: 1 });
   });
 
@@ -69,8 +70,8 @@ describe("fee and stipend cells", () => {
     expect(c.fee.tip[1]).toMatchObject({ text: expect.stringMatching(/^Up to ₹1,25,000 a year: the most NBEMS lets a DNB hospital charge .*not the college's own fee\.$/), src: 1 });
     // Every line says it is a ceiling, the whole course too.
     expect(tip(c.fee)).toContain("Year 2: up to ₹1,25,000 a year");
-    expect(tip(c.fee)).toContain("Whole course: up to ₹3,75,000 total (3 yrs) (NBEMS maximum)");
-    expect(shown(c.stipend)).toEqual(["≥ ₹43k", "From ₹43,000", null, null]);
+    expect(tip(c.fee)).toContain("For the whole course: up to ₹3,75,000 (3 years) (NBEMS maximum)");
+    expect(shown(c.stipend)).toEqual(["≥ ₹43,000/mo", "From ₹43,000/mo", null, null]);
     expect(tip(c.stipend)).toMatch(/Year 2: at least ₹45,000 a month .*NBEMS minimum: the hospital must pay at least this/);
   });
 
@@ -83,7 +84,7 @@ describe("fee and stipend cells", () => {
     expect([...shown(c.fee), c.fee.markerWarn]).toEqual(["₹1.45 L/yr", "₹1.45 L/yr", null, null, undefined]);
     expect(c.fee.tip).toContainEqual({ text: "Above the NBEMS maximum: the hospital declared more than NBEMS lets a DNB hospital charge.", warn: true });
     expect(c.fee.tip).toContainEqual({ text: "Declared ₹1,47,500 = ₹1,25,000 + 18% GST; NBEMS withdrew the GST on 17-11-2023, so ₹1,25,000 is shown", src: 2 });
-    expect([...shown(c.stipend), c.stipend.markerWarn]).toEqual(["₹35,000", "₹35,000", "below NBEMS min", null, true]);
+    expect([...shown(c.stipend), c.stipend.markerWarn]).toEqual(["₹35,000/mo", "₹35,000/mo", "below NBEMS min", null, true]);
     expect(c.stipend.tip).toContainEqual({ text: "Below the NBEMS minimum: the college declared less than NBEMS's minimum stipend.", warn: true, src: undefined });
     // With the record's NBEMS minimum: its figure and source.
     const nb = cells("DNB", fees("DNB", [rec("DNB", { stipend_per_month: [{ inr: 35000, kind: "declared", src: 1, below_nbems_minimum: true }, null, null], stipend_nbems_minimum: [{ inr: 43000, kind: "nbems_minimum", minimum: true, src: 2 }] })]));
@@ -94,7 +95,7 @@ describe("fee and stipend cells", () => {
     expect(gst.fee.tip).toContainEqual({ text: "GST removed: the college declared ₹1,47,500.", warn: true });
     expect(gst.fee.tip).toContainEqual({ text: "Year 1: ₹1,25,000 a year (declared ₹1,47,500; see below)", src: 1 });
     const da = cells("MD/MS", fees("MD", [rec("MD/MS", { stipend_per_month: [{ inr: 55200, kind: "declared", src: 1, plus_da: true }, null, null] })]));
-    expect(shown(da.stipend)).toEqual(["₹55,200", "₹55,200", null, null]);
+    expect(shown(da.stipend)).toEqual(["₹55,200/mo", "₹55,200/mo", null, null]);
     expect(tip(da.stipend)).toContain("Plus DA (dearness allowance), as the college declared.");
   });
 
@@ -109,8 +110,9 @@ describe("fee and stipend cells", () => {
     const varies = said("FEES VARIES WITH SPECAILITIES. Visit www.sbmch.ac.in for further Information");
     expect([varies.short, varies.href]).toEqual(["Varies by subject", "http://www.sbmch.ac.in/"]);
     expect(said("For details of Course fee visit website.").short).toBe("Not stated");
-    expect(said("Tuition fee ranges from Rs.3,00,000/- to Rs.48,00,000/- per annum as per the opted speciality by student").short).toBe("₹3 L–48 L/yr"); // the range the words give
-    expect(said("At admission / Year 1 / Year 2 / Year 3 / Annual fees: 100000 to 4000000 Depending upon the Specialty").short).toBe("₹1 L–40 L/yr");
+    expect(said("Tuition fee ranges from Rs.3,00,000/- to Rs.48,00,000/- per annum as per the opted speciality by student").short).toBe("₹3–48 L/yr"); // the range the words give
+    // The range with its reason when the words give it.
+    expect(shown(said("At admission / Year 1 / Year 2 / Year 3 / Annual fees: 100000 to 4000000 Depending upon the Specialty")).slice(0, 3)).toEqual(["₹1–40 L/yr", "₹1–40 L/yr", "depends on specialty"]);
     const site = { ...normalizeProgramme("MD/MS", fees("MD", [{ ...verbatim, fee_text: "For details of Course fee visit website." }])), website: "www.x.ac.in" };
     expect([statCells(site)[0].short, statCells(site)[0].href]).toEqual(["On college website ↗", "http://www.x.ac.in/"]);
     // No words for these seats: "—", saying so.
@@ -142,7 +144,7 @@ describe("fee and stipend cells", () => {
     expect(c.fee.tip.at(-1)).toMatchObject({ text, quote: true });
     // Only a sum at admission: year 1, marked; a DNB figure above the NBEMS ₹1,25,000 warned.
     const adm = cells("MD/MS", fees("MD", [rec("MD/MS", { fee_display: "verbatim", fee_text: "At admission: 40476", fee_parsed: { basis: parsed.basis, src: 1, per_year: [null, null, null], at_admission: { amount: 40476, currency: "INR", quote: "At admission: 40476" } } })]));
-    expect(shown(adm.fee)).toEqual(["₹40,476 at admission", "₹40,476 at admission", null, null]);
+    expect(shown(adm.fee)).toEqual(["₹40,476 at admission (Year 1)", "₹40,476 at admission (Year 1)", null, null]);
     const above = cells("DNB", fees("DNB", [{ ...v, fee_parsed: { ...parsed, per_year: [1, 2, 3].map(() => fig(150000, "Year 1", y.quote)) } }]));
     expect([above.fee.marker, above.fee.markerWarn]).toEqual([null, undefined]);
     const usd = cells("MD/MS", fees("MD", [rec("MD/MS", { seat_groups: ["NRI"], fee_display: "verbatim", fee_text: "NRI year 1 (US$ field): 42000", fee_parsed: { basis: parsed.basis, src: 1, per_year: [{ amount: 42000, currency: "USD", quote: "NRI year 1 (US$ field): 42000" }, null, null] } })]));
@@ -155,9 +157,9 @@ describe("fee and stipend cells", () => {
     expect([yearValue(t, "fee", 2), yearValue(t, "stipend", 2), yearValue(t, "fee", 3)]).toEqual([{ text: "≤ ₹1.25 L", marker: null }, { text: "—", marker: null }, null]);
   });
 
-  it("inrL cuts to two decimals of a lakh or crore; inrCard writes whole thousands as k; feeRange shares the unit", () => {
+  it("inrL cuts to two decimals of a lakh or crore; inrCard is the same one style (never ₹43k); feeRange shares the unit", () => {
     expect([171462, 124999, 1980000, 41000, 12345678].map(inrL)).toEqual(["₹1.71 L", "₹1.24 L", "₹19.8 L", "₹41,000", "₹1.23 Cr"]);
-    expect([43000, 10000, 43500, 150000].map(inrCard)).toEqual(["₹43k", "₹10k", "₹43,500", "₹1.5 L"]);
+    expect([43000, 10000, 43500, 150000, 100800].map(inrCard)).toEqual(["₹43,000", "₹10,000", "₹43,500", "₹1.5 L", "₹1 L"]);
     expect([feeRange(1500000, 2500000), feeRange(50000, 150000), feeRange(null, 171462)]).toEqual(["₹15–25 L", "₹50,000–₹1.5 L", "₹1.71 L"]);
   });
 
@@ -165,12 +167,26 @@ describe("fee and stipend cells", () => {
     expect([171462, 125000, 41000, 2900000, 12345678].map(inrApprox)).toEqual(["₹1.7 L", "₹1.25 L", "₹41,000", "₹29 L", "₹1.2 Cr"]);
   });
 
-  it("a fee paid at admission is marked so; a range by subject shows both ends", () => {
+  it("fee wording: one basis, stated once; the amount at admission is year 1, never 'not a yearly fee'", () => {
+    // Only an amount at admission (later years not stated): "at admission (Year 1)", and the (i) says the rest is not stated.
     const goa = cells("MD/MS", fees("MD", [rec("MD/MS", { fee_per_year: [{ ...fee(70324), kind: "amount_at_admission" }, null, null] })]));
-    expect(shown(goa.fee)).toEqual(["₹70,324 at admission", "₹70,324 at admission", null, null]);
-    expect(goa.fee.tip[0].text).toBe("Year 1: ₹70,324 paid at admission");
+    expect(shown(goa.fee)).toEqual(["₹70,324 at admission (Year 1)", "₹70,324 at admission (Year 1)", null, null]);
+    expect(goa.fee.tip[0].text).toBe("Year 1: ₹70,324, paid at admission");
+    expect(tip(goa.fee)).toContain("MCC's form gives the amount paid at admission (Year 1); it does not state the later years' fees.");
+    // CIHSR DNB: ₹1,25,000 at admission, then ₹1,25,000 a year, ₹3,75,000 for the course. A yearly fee, year 1's paid at
+    // admission: "₹1.25 L/yr", and no line contradicting it.
+    const cihsr = cells("DNB", fees("DNB", [rec("DNB", {
+      seat_groups: ["DNB Quota"], fee_per_year: [{ ...fee(125000), kind: "amount_at_admission" }, fee(125000), fee(125000)], fee_whole_course: { amount: 375000, currency: "INR" },
+    })]));
+    expect(shown(cihsr.fee)).toEqual(["₹1.25 L/yr", "₹1.25 L/yr", null, null]);
+    expect(cihsr.fee.tip.map((l) => l.text)).toEqual(["Year 1: ₹1,25,000, paid at admission", "Year 2: ₹1,25,000 a year", "Year 3: ₹1,25,000 a year", "For the whole course: ₹3,75,000 (3 years)"]);
+    expect(tip(cihsr.fee)).not.toMatch(/not a yearly fee/);
+    // A different figure at admission than a year: at admission (Year 1), each year in the (i).
+    const diff = cells("MD/MS", fees("MD", [rec("MD/MS", { fee_per_year: [{ ...fee(200000), kind: "amount_at_admission" }, fee(150000), fee(150000)] })]));
+    expect(diff.fee.short).toBe("₹2 L at admission (Year 1)");
+    // A range by subject shows both ends, and why it is a range.
     const range = cells("MD/MS", fees("MD", [rec("MD/MS", { fee_per_year: [{ ...fee(100000), amount_max: 6800000 }, null, null] })]));
-    expect(shown(range.fee).slice(0, 2)).toEqual(["₹1–68 L/yr", "₹1–68 L/yr"]);
+    expect(shown(range.fee).slice(0, 3)).toEqual(["₹1–68 L/yr", "₹1–68 L/yr", "depends on specialty"]);
   });
 
   it("missing is '—' (none published), never 0", () => {
@@ -199,7 +215,7 @@ describe("bond cells, by record status", () => {
     const raj = bond("MD", "Service bond: 1 + 3 years · ₹25 L–₹1.5 Cr by subject", 15000000, { status: "documented", years: "1 + 3", by_subject: { ANAESTHESIOLOGY: 5000000, PATHOLOGY: 2500000, GENERALSURGERY: 15000000 } });
     const c = cells("MD/MS", [raj]);
     expect(shown(c.bond)).toEqual(["4Y", "1 + 3 = 4 years", null, "bond"]);
-    expect(shown(c.bondInr)).toEqual(["₹25 L–₹1.5 Cr", "₹25 L–₹1.5 Cr", null, "bond"]);
+    expect(shown(c.bondInr)).toEqual(["₹25 L–₹1.5 Cr", "₹25 L–₹1.5 Cr", "depends on specialty", "bond"]);
     expect(c.bondInr.tip).toContainEqual({ text: "The amount varies by specialty: this is the range over the subjects.", warn: true });
   });
 
@@ -342,7 +358,7 @@ describe("leaving cell", () => {
     const ag = bond("MD", "Service bond: 1 year · ₹50 L clinical · ₹35 L pre/para-clinical", 5000000, {
       status: "yes", years: 1, amounts: [{ applies_to: "PG degree, clinical subjects", inr: 5000000 }, { applies_to: "PG degree, pre/para-clinical subjects", inr: 3500000 }],
     });
-    expect(shown(cells("MD/MS", [ag]).bondInr)).toEqual(["₹35 L–₹50 L", "₹35 L–₹50 L", null, "bond"]);
+    expect(shown(cells("MD/MS", [ag]).bondInr)).toEqual(["₹35 L–₹50 L", "₹35 L–₹50 L", "depends on specialty", "bond"]);
   });
 
   it("an additional item owed on top is included and marked; words only is a short phrase", () => {
