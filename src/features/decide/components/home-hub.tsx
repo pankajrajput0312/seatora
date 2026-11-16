@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
+import { ArrowRight, Building2, ChevronRight, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
 import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import { PLANS } from "@/features/payments/plans";
 import { limitLine, passView } from "@/features/plans/components/plan-cards";
@@ -40,7 +40,7 @@ const groups = [
   },
 ] as const;
 
-/** Plan and Research: a section label and its one-line hint, then a card per tool (one column on phones). */
+/** Plan and Research: a section label and its one-line hint, then a tile per tool (two across on phones). */
 export function ToolGroups({ L }: { L: DecideLinks }) {
   return (
     <div className="grid gap-4">
@@ -50,18 +50,19 @@ export function ToolGroups({ L }: { L: DecideLinks }) {
             <h2 id={`tools-${g.title}`} className="section-label text-muted-foreground">{g.title}</h2>
             <p className="text-body text-muted-foreground">{g.hint}</p>
           </div>
-          <ul className={cn("grid grid-cols-1 gap-2 sm:grid-cols-2", g.cols)}>
+          {/* Navigation tiles (the owner's call: they must read as places to go): two across on phones, a chevron on each. */}
+          <ul className={cn("grid grid-cols-2 gap-2", g.cols)}>
             {g.tools.map(({ href, label, note, icon: Icon }) => (
               <li key={href}>
-                <Link href={L.to(href)} className="group flex h-full min-h-14 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 hover:border-[#5ccfe6]">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-md bg-[#0b0e12] text-[#5ccfe6]">
-                    <Icon className="size-[1.125rem]" strokeWidth={1.75} aria-hidden />
+                <Link href={L.to(href)} className="group relative flex h-full min-h-14 items-center gap-2 rounded-lg border border-border bg-card py-2 pr-7 pl-2.5 hover:border-[#5ccfe6] focus-visible:border-[#5ccfe6] sm:gap-3 sm:pl-3">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-md bg-[#0b0e12] text-[#5ccfe6] sm:size-9">
+                    <Icon className="size-4 sm:size-[1.125rem]" strokeWidth={1.75} aria-hidden />
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-title font-semibold text-foreground">{label}</span>
-                    <span className="line-clamp-2 text-body text-muted-foreground">{note}</span>
+                    <span className="block text-sm leading-5 font-semibold text-foreground sm:text-title">{label}</span>
+                    <span className="line-clamp-2 text-caption text-muted-foreground sm:text-body">{note}</span>
                   </span>
-                  <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" aria-hidden />
+                  <ChevronRight className="absolute top-1/2 right-2 size-4 -translate-y-1/2 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden />
                 </Link>
               </li>
             ))}

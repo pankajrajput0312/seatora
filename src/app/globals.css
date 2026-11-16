@@ -518,9 +518,12 @@ html:has(.app dialog[data-filters][open]) { overflow: hidden; }
   .app .astryx-top-nav-heading { min-height: 2.5rem; }
   .app header:has(.astryx-top-nav-heading) > * { padding-block: 0.25rem; }
 }
-/* Phones: the brand is its logo (the plan and rank chips need the row); the name stays the link's accessible name. */
+/* Phones: "Seatora" beside the logo, the chips shortened to fit (decide-shell). */
 @media (width < 30rem) {
-  .app .astryx-top-nav-heading > span + span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  /* Phones: the brand reads "Seatora" beside the logo (the owner's call); "Seatora Decide" stays its accessible name. */
+  .app .astryx-top-nav-heading > span + span { white-space: nowrap; }
+  .app .astryx-top-nav-heading > span + span > * { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .app .astryx-top-nav-heading > span + span::before { content: "Seatora"; font-size: 1rem; font-weight: 600; }
 }
 /* A list page's filters and results tools on one row: the toolbar form (search, Filters), then the count, Cards | Table,
    CSV, Display; the rest (active-filter chips, notes) on the lines under it. */

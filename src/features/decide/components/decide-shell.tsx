@@ -216,7 +216,7 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
                 {/* Phones: the rank and its edit button as one chip here (the sidebar, with its rank card, is in the drawer). */}
                 <button type="button" data-profile-edit aria-label={shown ? `AIR ${formatRank(shown.rank)} ${categoryName(shown.category)}${shown.pwd ? " PwD" : ""}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(true)}
                   className="hit inline-flex h-8 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
-                  {shown ? <><span className="numeric font-semibold">AIR {formatRank(shown.rank)}</span><span className="text-muted-foreground max-[25rem]:hidden">· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</span></> : hydrated ? "Set your rank" : "Loading…"}
+                  {shown ? <><span className="numeric font-semibold"><span className="max-[23.75rem]:hidden">AIR </span>{formatRank(shown.rank)}</span><span className="text-muted-foreground max-[25rem]:hidden">· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</span></> : hydrated ? <>Set <span className="max-[23.75rem]:hidden">your </span>rank</> : "Loading…"}
                   <Pencil className="size-3 text-muted-foreground" aria-hidden />
                 </button>
                 <Link href="/" className="hidden min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground md:inline-flex">Back to site</Link>
