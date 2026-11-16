@@ -28,3 +28,13 @@ describe("isValidWebhookSignature", () => {
     expect(isValidWebhookSignature(body, sign(body, "other"), secret)).toBe(false);
   });
 });
+
+describe("paymentsOn", () => {
+  it("needs both keys and refuses test keys on production", async () => {
+    const { paymentsOn } = await import("./plans");
+    expect(paymentsOn({})).toBe(false);
+    expect(paymentsOn({ RAZORPAY_KEY_ID: "rzp_test_x", RAZORPAY_KEY_SECRET: "s" })).toBe(true);
+    expect(paymentsOn({ RAZORPAY_KEY_ID: "rzp_test_x", RAZORPAY_KEY_SECRET: "s", VERCEL_ENV: "production" })).toBe(false);
+    expect(paymentsOn({ RAZORPAY_KEY_ID: "rzp_live_x", RAZORPAY_KEY_SECRET: "s", VERCEL_ENV: "production" })).toBe(true);
+  });
+});

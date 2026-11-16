@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getCurrentUser } from "@/features/auth/lib/session";
-import { PLANS } from "@/features/payments/plans";
+import { PLANS, paymentsOn } from "@/features/payments/plans";
 import { createOrder, RazorpayError } from "@/features/payments/razorpay";
 import { hasPaid } from "@/features/payments/service";
 import { db } from "@/lib/db";
@@ -13,6 +13,7 @@ const headers = { "Cache-Control": "private, no-store" };
 const fail = (status: number, code: string, message: string) => Response.json({ ok: false, error: { code, message } }, { status, headers });
 
 export async function POST() {
+  if (!paymentsOn()) return fail(503, "payments_off", "Payments are not open yet.");
   const user = await getCurrentUser();
   if (!user) return fail(401, "unauthorized", "Sign in to buy the Season Pass.");
   if (!allow(`pay-order:${user.id}`, 10, 60_000)) return fail(429, "rate_limited", "Too many tries. Wait a minute and try again.");

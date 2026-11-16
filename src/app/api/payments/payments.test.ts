@@ -12,8 +12,8 @@ vi.mock("@/features/payments/grant", () => ({ grantPlan: m.grant }));
 vi.mock("@/lib/db", () => {
   const match = (r: Row, w: Record<string, unknown>) =>
     Object.entries(w).every(([k, v]) => (v && typeof v === "object" && "not" in v ? r[k as keyof Row] !== v.not : r[k as keyof Row] === v));
-  return {
-    db: {
+  const db = {
+      $transaction: async (fn: (tx: unknown) => unknown) => fn(db),
       payment: {
         create: async ({ data }: { data: Omit<Row, "razorpayPaymentId" | "status" | "paidAt"> }) => m.rows.push({ razorpayPaymentId: null, status: "created", paidAt: null, ...data }),
         findUnique: async ({ where }: { where: Record<string, unknown> }) => m.rows.find((r) => match(r, where)) ?? null,
@@ -24,8 +24,8 @@ vi.mock("@/lib/db", () => {
           return { count: hit.length };
         },
       },
-    },
-  };
+    };
+  return { db };
 });
 
 const order = await import("./order/route");
@@ -114,7 +114,7 @@ describe("POST /api/payments/verify", () => {
     expect(m.rows[0]).toMatchObject({ status: "paid", razorpayPaymentId: "pay_1" });
     expect(m.rows[0].paidAt).toBeInstanceOf(Date);
     expect(m.grant).toHaveBeenCalledTimes(1);
-    expect(m.grant).toHaveBeenCalledWith(alice.id, "season_pass");
+    expect(m.grant).toHaveBeenCalledWith(alice.id, "season_pass", expect.anything());
   });
 });
 

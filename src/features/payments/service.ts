@@ -9,13 +9,15 @@ import type { Plan } from "./plans";
  * (Checkout lets her retry on the same order).
  */
 export async function markPaid(razorpayOrderId: string, razorpayPaymentId: string) {
-  const { count } = await db.payment.updateMany({
-    where: { razorpayOrderId, status: { not: "paid" } },
-    data: { status: "paid", razorpayPaymentId, paidAt: new Date() },
+  await db.$transaction(async (tx) => {
+    const { count } = await tx.payment.updateMany({
+      where: { razorpayOrderId, status: { not: "paid" } },
+      data: { status: "paid", razorpayPaymentId, paidAt: new Date() },
+    });
+    if (count !== 1) return;
+    const p = await tx.payment.findUnique({ where: { razorpayOrderId }, select: { userId: true, plan: true } });
+    if (p) await grantPlan(p.userId, p.plan as Plan, tx);
   });
-  if (count !== 1) return;
-  const p = await db.payment.findUnique({ where: { razorpayOrderId }, select: { userId: true, plan: true } });
-  if (p) await grantPlan(p.userId, p.plan as Plan);
 }
 
 export async function markFailed(razorpayOrderId: string) {

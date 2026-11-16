@@ -6,6 +6,7 @@ import { business } from "@/config/business";
 import { FreePrice } from "@/components/marketing/free-price";
 import { formatINR } from "@/features/cutoffs/lib/format";
 import { BuySeasonPass } from "@/features/payments/components/buy-season-pass";
+import { paymentsOn } from "@/features/payments/plans";
 
 export const metadata: Metadata = {
   title: "Pricing — Seatora NEET PG 2026 Season Pass",
@@ -28,7 +29,7 @@ export default function PricingPage() {
           residents at each college, from official MCC, NBEMS and NMC documents. Create a free account and access is switched on immediately.
         </p>
         <div className="mt-5">
-          <BuySeasonPass next="/pricing" className={buyClass} noteClassName="text-muted-foreground" />
+          {paymentsOn() && <BuySeasonPass next="/pricing" className={buyClass} noteClassName="text-muted-foreground" />}
         </div>
         <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-15">15 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
