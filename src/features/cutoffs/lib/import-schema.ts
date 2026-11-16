@@ -37,7 +37,7 @@ export const mccCollegeSchema = z
 export type MccCollege = z.infer<typeof mccCollegeSchema>;
 
 /** Institution type of the bundle (a name and quota heuristic, not an official field: `basis` says how it was inferred). */
-export const collegeTypes = ["govt", "private", "trust", "deemed", "central", "esic", "municipal", "armed_forces", "psu", "railway"] as const;
+export const collegeTypes = ["govt", "private", "trust", "deemed", "central", "esic", "municipal", "armed_forces", "psu", "railway", "govt_private"] as const;
 /** Schema 2 adds: every MCC institute id the seat PDFs print for the college, its main id's MCC profile, the type, the website its own MCC profile declares. */
 export const mccCollegeV2Schema = mccCollegeSchema
   .extend({

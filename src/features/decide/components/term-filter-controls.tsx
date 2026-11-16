@@ -2,7 +2,7 @@ import { termChoices, termValueLabel, typeValues, withCurrent, type TermParams }
 import type { Profile } from "../profile";
 import { FilterDropdown } from "./filter-dropdown";
 import { FilterSection } from "./filter-form";
-import { collegeTypeLabel } from "./institute/college-type";
+import { typeCategoryLabel } from "./institute/college-type";
 import { control, Field } from "./ui";
 
 // The term filters' controls (lib/term-filters.ts params) for the Filters sheet (FiltersPanel) of a list page: College
@@ -42,7 +42,7 @@ export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Pro
       <FilterDropdown
         label="College type"
         name="ctype"
-        options={typeValues.map((t) => ({ value: t, label: collegeTypeLabel[t] }))}
+        options={typeValues.map((t) => ({ value: t, label: typeCategoryLabel[t] }))}
         selected={f.ctype ?? []}
         none="Any"
         info="Types are inferred from the name and quota, not official."

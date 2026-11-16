@@ -2,7 +2,7 @@ import { z } from "zod";
 import { formatInrShort } from "./format";
 import { inrL } from "./stat-format";
 import { parseSearchParams } from "./params";
-import { collegeTypeLabel, type CollegeType } from "../components/institute/college-type";
+import { asCategory, typeCategories, typeCategoryLabel, typesIn, type CollegeType, type TypeCategory } from "../components/institute/college-type";
 import { BOND_YEAR_CHOICES, FEE_LAKH_CHOICES, type Profile } from "../profile";
 import type { ProgrammeTerms } from "../server/terms";
 
@@ -18,7 +18,8 @@ import type { ProgrammeTerms } from "../server/terms";
 // college's figure: inside the cap it passes, outside it the figure is unknown (as a "+ DA" basic stipend under a floor).
 
 export type TypeValue = CollegeType["value"];
-export const typeValues = Object.keys(collegeTypeLabel) as [TypeValue, ...TypeValue[]];
+/** The filter's values: the six shown types (an old link's stored type, ctype=esic, reads as its type). */
+export const typeValues = typeCategories as unknown as [TypeCategory, ...TypeCategory[]];
 
 /**
  * Page params (never a profile key: fee, bond…). Absent = her profile's cap where the page applies her profile
@@ -27,7 +28,13 @@ export const typeValues = Object.keys(collegeTypeLabel) as [TypeValue, ...TypeVa
  */
 export const termFilterShape = {
   /** College types (inferred from name and quota, not official), any of. */
-  ctype: z.preprocess((v) => (typeof v === "string" ? v.split(",").map((x) => x.trim()).filter(Boolean) : v), z.array(z.enum(typeValues)).optional()),
+  ctype: z.preprocess(
+    (v) => {
+      const xs = typeof v === "string" ? v.split(",").map((x) => x.trim()).filter(Boolean) : Array.isArray(v) ? v : v;
+      return Array.isArray(xs) ? [...new Set(xs.map((x) => asCategory(String(x)) ?? x))] : xs;
+    },
+    z.array(z.enum(typeValues)).optional(),
+  ),
   /** Fee ₹ lakh a year (year 1) at most. */
   maxfee: z.union([z.literal("any"), z.coerce.number().positive().max(1000)]).optional(),
   /** Stipend ₹ a month (year 1) at least. */
@@ -65,7 +72,7 @@ const lakh = (v: number | null | undefined) => (v == null ? null : Math.round(v 
 /** The params as ₹ filters. `profile`: her caps where the page applies her profile (an absent maxfee / bondyrs is hers). */
 export function termFilters(f: TermParams, profile?: Pick<Profile, "maxFeeLakh" | "maxBondYears"> | null): TermFilters {
   return {
-    types: f.ctype?.length ? f.ctype : undefined,
+    types: f.ctype?.length ? f.ctype.flatMap(typesIn) : undefined,
     maxFee: f.maxfee === "any" ? null : lakh(f.maxfee ?? profile?.maxFeeLakh),
     minStipend: f.minstip ?? null,
     maxBondYears: f.bondyrs === "any" ? null : (f.bondyrs ?? profile?.maxBondYears ?? null),
@@ -187,7 +194,7 @@ export const termValueLabel = {
  */
 export function termChips(f: TermParams): { key: keyof TermParams; label: string; value?: string }[] {
   const out: { key: keyof TermParams; label: string; value?: string }[] = [];
-  for (const t of f.ctype ?? []) out.push({ key: "ctype", label: collegeTypeLabel[t], value: t });
+  for (const t of f.ctype ?? []) out.push({ key: "ctype", label: typeCategoryLabel[t], value: t });
   for (const k of ["maxfee", "minstip", "bondyrs", "maxbond", "maxleave"] as const) {
     const v = f[k];
     if (typeof v === "number") out.push({ key: k, label: termValueLabel[k](v) });

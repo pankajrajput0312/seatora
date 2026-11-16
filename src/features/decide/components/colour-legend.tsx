@@ -23,11 +23,11 @@ export function ColourLegend({ className }: { className?: string }) {
       <InfoTip label="colour key">
         <span className="block">Colours repeat what the words say; the words always carry it.</span>
         <Row head="College type">
-          <span className={cn(badge, collegeTypeClass.govt)}>Government</span>
-          <span className={cn(badge, collegeTypeClass.central)}>Central government</span>
-          <span className={cn(badge, collegeTypeClass.esic)}>ESIC</span>
+          <span className={cn(badge, collegeTypeClass.govt)}>Govt</span>
+          <span className={cn(badge, collegeTypeClass.trust)}>Govt-Private</span>
+          <span className={cn(badge, collegeTypeClass.esic)}>Public Sector</span>
+          <span className={cn(badge, collegeTypeClass.central)}>AFMS</span>
           <span className={cn(badge, collegeTypeClass.deemed)}>Deemed</span>
-          <span className={cn(badge, collegeTypeClass.trust)}>Trust</span>
           <span className={cn(badge, collegeTypeClass.private)}>Private</span>
         </Row>
         <Row head="Bond">

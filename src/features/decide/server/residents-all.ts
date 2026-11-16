@@ -76,7 +76,7 @@ export const residentNames = async (q: string, take = 10) =>
   (await db.resident.findMany({ where: { hidden: false, AND: tokens(q).map((name) => ({ name })) }, select: { name: true }, distinct: ["name"], orderBy: { name: "asc" }, take })).map((r) => r.name);
 
 /** Every college with residents (not hidden): the search box's list before she types. Government first (govt, central, ESIC, municipal, armed forces, railway, PSU), then the others, each by name. */
-const PUBLIC = new Set(["govt", "central", "esic", "municipal", "armed_forces", "railway", "psu"]);
+const PUBLIC = new Set(["govt", "central", "esic", "municipal", "armed_forces", "railway", "psu", "govt_private"]);
 export async function allResidentColleges() {
   const rows = await db.college.findMany({ where: { residents: { some: { hidden: false } } }, select: { slug: true, name: true, state: true, type: true, address: true }, orderBy: { name: "asc" } });
   const gov = (t: string | null) => (t && PUBLIC.has(t) ? 0 : 1);

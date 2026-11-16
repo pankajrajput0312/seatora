@@ -16,7 +16,7 @@ export function TypeBadge({ type, of, className }: { type: CollegeType; of?: str
       <InfoTip label={of ? `college type, ${of}` : "college type"}>
         <span className="font-semibold">{label}</span>: {typeNote(type)}
         <span className="mt-1 block text-muted-foreground">
-          Colours: green state government, teal central government (AIIMS-type, armed forces, railway, PSU), violet ESIC, blue deemed, plum trust, grey private.
+          Colours: green Govt, plum Govt-Private, violet Public Sector, teal AFMS, blue Deemed, grey Private.
         </span>
       </InfoTip>
     </span>

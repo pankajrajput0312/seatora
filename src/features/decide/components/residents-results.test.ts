@@ -68,7 +68,7 @@ describe("Residents views", () => {
     expect(html).toContain("/decide/institutes/some-college?rank=40000&amp;cat=Open&amp;tab=residents");
     expect(html).not.toMatch(/\bRank\b|AIR /);
     expect(html).not.toContain("Hide"); // Hide control taken out (owner, 15 Nov 2026)
-    expect(html).toContain("Government");
+    expect(html).toContain(">Govt<");
     expect(html).not.toMatch(/categor/i);
   });
 
@@ -78,9 +78,9 @@ describe("Residents views", () => {
     expect(html.match(/<h3/g)).toHaveLength(2); // the college, a heading per card
     expect(html).toContain('href="/decide/institutes/some-college?rank=40000&amp;cat=Open&amp;tab=residents"');
     expect(html).not.toMatch(/\bRank\b|AIR /);
-    for (const s of ["Test Resident A", "Year", "2025", "MD Anaesthesiology", "Kerala", "Government"]) expect(html).toContain(s);
+    for (const s of ["Test Resident A", "Year", "2025", "MD Anaesthesiology", "Kerala", ">Govt<"]) expect(html).toContain(s);
     for (const s of ["MCC list", "All India", ">R2<"]) expect(html).not.toContain(s);
-    expect(html.match(/Government/g)).toHaveLength(2); // the first card's badge and its (i) only: none for the other college
+    expect(html.match(/>Govt</g)).toHaveLength(2); // the first card's badge and its (i) only: none for the other college
     expect(html).not.toContain("Hide"); // Hide control taken out (owner, 15 Nov 2026)
     expect(html).not.toMatch(/categor/i);
   });

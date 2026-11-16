@@ -24,7 +24,7 @@ it("card's big number: the sorted column, else the newest year with a closing, R
 it("meta skips what is not known; More filters opens when one of them is set", () => {
   const html = renderToStaticMarkup(h("div", null, ...cardMeta({ state: "Delhi", hospital: { type: { value: "govt", basis: "inferred from name and quota" }, beds: { n: 1538, kind: null, meta: null, own: true } } }, "MAMC")));
   expect(html).toContain("Delhi");
-  expect(html).toContain("Government");
+  expect(html).toContain(">Govt<");
   expect(html).toContain("1,538");
   expect(html).toContain('aria-label="About beds, MAMC"');
   expect(renderToStaticMarkup(h("div", null, ...cardMeta({ state: null, hospital: null }, "X")))).toBe("<div></div>");

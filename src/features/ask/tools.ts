@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
-import { collegeTypeLabel } from "@/features/decide/components/institute/college-type";
+import { collegeTypeLabel, typesIn } from "@/features/decide/components/institute/college-type";
 import { courseName, toChoiceItem } from "@/features/decide/components/options-view";
 import { CHOICES_KEY, defaultChoices, parseChoices, pinOf, toMccText, type ChoiceItem, type ChoicesState } from "@/features/decide/lib/choices";
 import { LATEST_YEAR, PAST_YEARS, reachLabel, reachOrder } from "@/features/decide/lib/reach";
@@ -109,7 +109,7 @@ export const toolSchemas = {
   find_colleges: z.strictObject({
     query: z.string().min(2).max(160),
     state: z.string().max(60).optional(),
-    type: z.enum(typeValues).optional().describe("govt, private, trust, deemed, central, esic, municipal, armed_forces, psu, railway"),
+    type: z.enum(typeValues).optional().describe("govt, govt_private, private, deemed, afms, public_sector"),
   }),
   assess_chances: z.strictObject({
     courses: strs.optional().describe("Courses ('MD Anaesthesiology', 'DNB Family Medicine', or a specialty for every degree). Default: her profile's."),
@@ -555,7 +555,7 @@ const handlers: Handlers = {
     const { colleges } = await getDecideData();
     const info = await hospitalInfo();
     const st = i.state?.toLowerCase();
-    const found = findColleges(i.query, colleges).filter((c) => (!st || c.state?.toLowerCase() === st) && (!i.type || info.get(c.key)?.type?.value === i.type));
+    const found = findColleges(i.query, colleges).filter((c) => (!st || c.state?.toLowerCase() === st) && (!i.type || typesIn(i.type).includes(info.get(c.key)?.type?.value as never)));
     return {
       total: found.length,
       colleges: found.slice(0, MAX_ROWS).map((c) => ({ name: c.name, slug: c.slug, state: c.state, type: info.get(c.key)?.type ? collegeTypeLabel[info.get(c.key)!.type!.value] : null, link: instLink(c.slug) })),
@@ -568,7 +568,7 @@ const handlers: Handlers = {
     const p = profileWith(profile, { rank: i.rank, category: i.category, pairs, quotas: quotasOf(i.quotas, m.quotas), states: statesOf(i.states, m.states) });
     if (!p.pairs?.length && !p.specialties.length) fail("Which courses? Ask her (or use her course priority from get_preferences); assess_chances needs at least one course.");
     const tf: TermFilters = {
-      types: i.govtOnly ? ["govt", "central", "esic", "municipal", "armed_forces", "railway", "psu"] : undefined,
+      types: i.govtOnly ? ["govt", "central", "esic", "municipal", "armed_forces", "railway", "psu", "govt_private"] : undefined,
       maxFee: lakh(i.maxFeeLakh ?? p.maxFeeLakh ?? undefined) ?? null,
       maxBondYears: i.maxBondYears ?? p.maxBondYears ?? null,
     };
@@ -713,7 +713,7 @@ const handlers: Handlers = {
     const p = profileWith(profile, { pairs, quotas: quotasOf(i.quotas, m.quotas), states: statesOf(i.states, m.states) });
     const avoid = new Set(statesOf(i.avoidStates, m.states) ?? []);
     const tf: TermFilters = {
-      types: i.types,
+      types: i.types?.flatMap(typesIn),
       maxFee: lakh(i.maxFeeLakh) ?? null,
       maxBondYears: i.maxBondYears ?? null,
       maxBondInr: lakh(i.maxBondPenaltyLakh) ?? null,

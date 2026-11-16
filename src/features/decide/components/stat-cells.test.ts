@@ -55,6 +55,6 @@ it("type badge: coloured by kind, an (i) by tap or keyboard for inferred and res
   expect(text(inferred)).toContain("Inferred from name and quota. Not an official field.");
   const researched = renderToStaticMarkup(h(TypeBadge, { type: { value: "trust", basis: "data/curated/clinical_facts.json (kind trust_dnb)" } }));
   expect(researched).toContain('aria-label="About college type"');
-  expect(text(researched)).toContain("Trust : From Seatora&#x27;s research on this hospital. Not an official field.");
+  expect(text(researched)).toContain("Private : Charitable trust. From Seatora&#x27;s research on this hospital. Not an official field.");
   expect(renderToStaticMarkup(h(TypeBadge, { type: { value: "deemed", basis: "inferred from name and quota" } }))).toContain("bg-type-deemed/10");
 });

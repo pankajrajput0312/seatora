@@ -23,8 +23,9 @@ describe("params", () => {
   it("parse leniently: lakh and ₹ values, any, repeated or comma-joined types; a bad value is dropped, the rest kept", () => {
     const p = new URLSearchParams("ctype=govt,esic&ctype=deemed&maxfee=5&minstip=80000&bondyrs=0&maxbond=10&maxleave=2.5&nd=keep");
     const { params, filters } = readTermFilters(p);
-    expect(params).toEqual({ ctype: ["govt", "esic", "deemed"], maxfee: 5, minstip: 80000, bondyrs: 0, maxbond: 10, maxleave: 2.5, nd: "keep" });
-    expect(filters).toEqual({ types: ["govt", "esic", "deemed"], maxFee: 500000, minStipend: 80000, maxBondYears: 0, maxBondInr: 1000000, maxLeavingInr: 250000, keepUnknown: true });
+    // An old link's stored type (esic) reads as its shown type (Govt); the filter compares every stored type in it.
+    expect(params).toEqual({ ctype: ["govt", "deemed"], maxfee: 5, minstip: 80000, bondyrs: 0, maxbond: 10, maxleave: 2.5, nd: "keep" });
+    expect(filters).toEqual({ types: ["govt", "municipal", "central", "esic", "railway", "deemed"], maxFee: 500000, minStipend: 80000, maxBondYears: 0, maxBondInr: 1000000, maxLeavingInr: 250000, keepUnknown: true });
     expect(readTermFilters(new URLSearchParams("ctype=govt&ctype=castle&maxfee=-1&bondyrs=2")).params).toEqual({ bondyrs: 2 });
     expect(readTermFilters(new URLSearchParams("")).filters).toEqual({ types: undefined, maxFee: null, minStipend: null, maxBondYears: null, maxBondInr: null, maxLeavingInr: null, keepUnknown: false });
   });
@@ -46,7 +47,7 @@ describe("params", () => {
   });
 
   it("chips name each applied value; termMoreOpen opens the fold for a folded one", () => {
-    expect(termChips({ ctype: ["govt", "esic"], maxfee: 5, bondyrs: 0, nd: "keep" }).map((c) => c.label)).toEqual(["Government", "ESIC", "Fee up to ₹5 L/yr", "No bond", "Including not published"]);
+    expect(termChips({ ctype: ["govt", "public_sector"], maxfee: 5, bondyrs: 0, nd: "keep" }).map((c) => c.label)).toEqual(["Govt", "Public Sector", "Fee up to ₹5 L/yr", "No bond", "Including not published"]);
     expect(termChips({ maxfee: "any" })).toEqual([]);
     expect(termMoreOpen({ maxfee: 5 })).toBe(false);
     expect(termMoreOpen({ maxleave: 5 })).toBe(true);
