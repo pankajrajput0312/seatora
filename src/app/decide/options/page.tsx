@@ -18,6 +18,7 @@ import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
+import { iniCetIn } from "@/features/decide/lib/college-aliases";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -62,6 +63,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const roundView = r.view === "round";
   // The round view lists the seats with no past allotment as rows; the other view names them and links Seats.
   const unlisted = roundView ? null : await unlistedSeats(profile, r.seats === "virtual" || r.seats === "new" ? r.seats : "clear");
+  // Nothing with the round's seats: how many match without that filter (the empty state offers them).
+  const withoutSeats = !r.total && r.seats ? (await listOptions(profile, { ...filters, hasSeats: false }, { page: 1, pageSize: 1 })).total : 0;
   const L = decideLinks(params);
   const here = (changes: Record<string, string | null>) => L.with("/decide/options", { page: null, ...changes });
   // The All chip counts what it lists: closed-before options only while they are shown.
@@ -84,16 +87,25 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   for (const [k, v] of Object.entries(tp)) if (v != null) api.set(k, Array.isArray(v) ? v.join(",") : String(v));
   const caption = `Options for AIR ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added` : ""}`;
   // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
+  const pairLabel = (c: string) => pairChoices(meta.courses).find((x) => x.value === c)?.label ?? c.replace("~", " ");
   const seatsWords = (s: SeatKind | "any") => (s === "any" ? `Has seats in a ${round} list` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
   const closedDefault = roundView ? "1" : "0";
   const termKeys = ["ctype", "maxfee", "minstip", "bondyrs", "maxbond", "maxleave", "nd"] as const;
   const active = [
     f.q && { label: `Search: “${f.q}”`, param: "q", href: here({ q: null }) },
     f.reach && { label: reachLabel(f.reach, LATEST_YEAR, PAST_YEARS, !f.prov), href: here({ reach: null, closed: null }) },
-    f.seats && lists.length > 0 && (r.seats ?? null) !== (roundView ? "any" : null) && { label: r.seats ? seatsWords(r.seats) : `With or without ${round} seats`, param: "seats", href: here({ seats: null }) },
+    // The seats filter, the round view's default too ("Only with R2 seats"): × shows the options with or without seats.
+    lists.length > 0 && r.seats && { label: r.seats === "any" ? `Only with ${roundLabel[lists[0].round]} seats` : seatsWords(r.seats), param: "seats", href: here({ seats: roundView ? "all" : null }) },
+    lists.length > 0 && !r.seats && f.seats && { label: `With or without ${round} seats`, param: "seats", href: here({ seats: null }) },
     f.closed && f.closed !== closedDefault && !f.reach && { label: f.closed === "1" ? "Closed before your rank: shown" : "Closed before your rank: hidden", href: here({ closed: null }) },
     f.prov && { label: `Without ${LATEST_YEAR} R1 (provisional)`, param: "prov", href: here({ prov: null }) },
-    // One chip per quota and state: the × takes that one out.
+    // One chip per course (or specialty and degree), quota and state, her profile's for this visit: the × takes that one out.
+    ...(profile.pairs?.length
+      ? profile.pairs.map((c) => ({ label: pairLabel(c), param: "c", href: L.without("/decide/options", "c", c) }))
+      : [
+          ...profile.specialties.map((sp) => ({ label: meta.specialties.find((x) => x.code === sp)?.name ?? sp, param: "sp", href: L.without("/decide/options", "sp", sp) })),
+          ...profile.degrees.map((d) => ({ label: d, param: "deg", href: L.without("/decide/options", "deg", d) })),
+        ]),
     ...profile.quotas.map((q) => ({ label: q, param: "quota", href: L.without("/decide/options", "quota", q) })),
     ...profile.states.map((s) => ({ label: s, param: "st", href: L.without("/decide/options", "st", s) })),
     // Her profile's caps, while the page's own fee / bond filter does not replace them.
@@ -101,7 +113,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: here({ bond: null }) },
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/options", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
-  const clearAll = here({ q: null, reach: null, seats: null, closed: null, prov: null, quota: null, st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
+  const clearAll = here({ q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, quota: null, st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const n = (x: number) => <span className="numeric font-semibold">{formatRank(x)}</span>;
@@ -194,7 +206,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             </label>
           </Fragment>
         </ToolbarSearch>
-        <FiltersPanel count={active.length} clear={clearAll} total={r.total}>
+        <FiltersPanel count={active.length} clear={clearAll} total={r.total} saveDefaults>
           <Fragment key={params.toString()}>
             {/* Exact courses in her profile (pairs) replace course x degree, so they get one exact-course filter. */}
             {profile.pairs?.length ? (
@@ -284,10 +296,14 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             </>
           }
         />
+      ) : withoutSeats > 0 ? (
+        <EmptyState title="No options match" description={`${formatRank(withoutSeats)} ${withoutSeats === 1 ? "matches" : "match"} without ${roundLabel[lists[0].round]} seats.`}>
+          <Link href={here({ seats: "all" })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Show {withoutSeats === 1 ? "it" : "them"}</Link>
+        </EmptyState>
       ) : (
         <EmptyState
           title="No options match"
-          description="Clear the search and page filters, or widen your courses, quotas or states above."
+          description={iniCetIn(f.q) ? `${iniCetIn(f.q)} admits through INI-CET, not MCC's NEET PG counselling, so it is not in MCC's data.` : "Clear the search and page filters, or widen your courses, quotas or states above."}
           href={here({ q: null, reach: null, closed: "1", seats: roundView ? "all" : null, ...Object.fromEntries(termKeys.map((k) => [k, null])) })}
           action="Clear search and page filters"
         />

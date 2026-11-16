@@ -89,11 +89,12 @@ function Related({ r, L }: { r: ListRow; L: DecideLinks }) {
 }
 
 const summary = "inline-flex min-h-11 cursor-pointer items-center text-sky";
-// The star and the row header stay in view while the table scrolls sideways (the star column is w-12, 3rem). Phones:
-// only a narrow row header is pinned (tbl.pin: the short name, the course), the star scrolls away under it.
-const stick = "sticky left-0 z-[1] bg-card max-md:static";
-const stickName = cn("sticky left-12 z-[1] min-w-52 max-w-72 border-r border-border bg-card max-md:left-0", tbl.pin);
-// Phones: the two closing ranks come right after the row header (from md, after the terms and seats, where they were).
+// The star and the row header stay in view while the table scrolls sideways (the star column is w-12, 3rem; on phones
+// both scale with the spacing). Phones: the row header is narrow (tbl.pin: the short name, the course) and carries the
+// latest closing rank, so swiping to the fee or stipend keeps the star, the option and its closing rank in view.
+const stick = "sticky left-0 z-[1] bg-card";
+const stickName = cn("sticky left-12 z-[1] min-w-52 max-w-72 border-r border-border bg-card", tbl.pin);
+// Phones: the deepest closing comes right after the row header (from md, after the terms and seats, where it was).
 const phoneOnly = "px-3 py-3 text-right md:hidden";
 const notPhone = "px-3 py-3 text-right max-md:hidden";
 
@@ -214,8 +215,7 @@ function OptionsList({ rows, caption, start, L, view, latestYear, pastYears, inc
           {/* Fee…Leaving sit right after Reach (tight px-2 cells), so they are in view from 1280px wide; the seat lists and closings follow. */}
           <tr className="text-left text-xs font-semibold text-muted-foreground">
             <th scope="col" className={cn(stick, "w-12 px-2 py-3 print:hidden")}><span className="sr-only">Add to choices</span></th>
-            <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course</th>
-            <th scope="col" className={phoneOnly}>{latestYear} R1 closing</th>
+            <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course<span className="md:hidden">, {latestYear} R1 closing</span></th>
             <th scope="col" className={phoneOnly}>{last} deepest</th>
             <th scope="col" className="px-3 py-3">Reach</th>
             {statKeys.map((k) => <th key={k} scope="col" data-col={k} className="px-2 py-3 text-right">{statLabel[k]}</th>)}
@@ -237,8 +237,11 @@ function OptionsList({ rows, caption, start, L, view, latestYear, pastYears, inc
                 <Link href={L.institute(r.college.slug)} title={r.college.name} className={cn("font-semibold hover:text-sky hover:underline", tbl.clamp)}>{r.college.name}</Link>
                 <span className={cn("block max-md:text-xs", tbl.clamp)}>{courseName(r)}<span className="text-muted-foreground">, {r.quota}<span className="max-md:hidden">, {r.college.state ?? "state not listed"}</span></span></span>
                 <span className="block max-md:hidden"><HospitalLine h={r.hospital} of={r.college.name} /></span>
+                <span className="mt-1 block text-xs text-muted-foreground md:hidden">
+                  {latestYear} R1 <span className="numeric text-sm font-semibold text-foreground">{r.latest ? formatRank(r.latest.closing) : "—"}</span>
+                  {r.latest?.provisional && <span className="mt-0.5 block"><Provisional when /></span>}
+                </span>
               </th>
-              <td className={phoneOnly}><ClosingCell d={r.latest} /></td>
               <td className={phoneOnly}><ClosingCell d={r.byYear[last]} /></td>
               <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} includeLatest={includeLatest} /><SeatsBelowNote r={r} includeLatest={includeLatest} /></td>
               <TermStatCells t={r.fees} variant="table" of={rowLabel(r)} tdClassName="px-2!" />
@@ -260,7 +263,7 @@ function OptionsList({ rows, caption, start, L, view, latestYear, pastYears, inc
             open.has(r.id) && (
               <tr key={`${r.id}-rounds`} className="bg-muted/30">
                 <td />
-                <td colSpan={9 + statKeys.length + seatLists.length} className="px-3 pb-4"><RoundGrid row={r} caption={gridCaption(r)} /></td>
+                <td colSpan={8 + statKeys.length + seatLists.length} className="px-3 pb-4"><RoundGrid row={r} caption={gridCaption(r)} /></td>
               </tr>
             ),
           ])}

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { cache } from "react";
 import { hospitalInfo, type HospitalInfo } from "./components/institute/institute-data";
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
+import { searchMatcher } from "./lib/college-aliases";
 import { anyTermFilter, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
 import { buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { pairKey, profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
@@ -435,12 +436,13 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   const round = view === "round";
   const kind: SeatKind | "any" | null = f.hasSeats === undefined ? (round ? "any" : null) : f.hasSeats === true ? "clear" : f.hasSeats || null;
   const showClosed = (f.showClosed ?? round) || !!f.reach?.includes("closed-before");
-  const q = f.search?.trim().toLowerCase();
+  // Every word in the institute's name, state, address (its city) or the course; a short name ("KEM") as its official words.
+  const match = searchMatcher(f.search);
   const text = (o: Opt) => {
-    if (!q) return true;
+    if (!match) return true;
     const college = cat.collegeByKey.get(o.college)!;
     const course = cat.courseOf.get(`${o.degree}|${o.specialty}`)!;
-    return `${college.name} ${college.state ?? ""} ${course.name} ${course.degree}`.toLowerCase().includes(q);
+    return match(`${college.name} ${college.state ?? ""} ${college.address ?? ""} ${course.name} ${course.degree}`);
   };
   const tf = f.terms ?? (profile && profileTermFilters(profile));
   const types = await typesFor(tf);
@@ -725,11 +727,11 @@ export type InstituteFilters = {
  */
 export async function listInstitutes(profile: Profile | null, f: InstituteFilters = {}, pg?: PageQuery) {
   const cat = await getCatalog();
-  const q = f.search?.trim().toLowerCase();
+  const match = searchMatcher(f.search);
   const byCollege = new Map<string, Opt[]>();
   for (const o of cat.options) (byCollege.get(o.college) ?? byCollege.set(o.college, []).get(o.college)!).push(o);
   const colleges = cat.colleges
-    .filter((c) => !q || `${c.name} ${c.state ?? ""}`.toLowerCase().includes(q))
+    .filter((c) => !match || match(`${c.name} ${c.state ?? ""} ${c.address ?? ""}`))
     .filter((c) => !f.state?.length || [f.state].flat().includes(c.state ?? ""))
     .filter((c) => !f.type || c.type === f.type)
     .filter((c) => !f.only || f.only.has(c.key))
@@ -777,7 +779,8 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
 }
 
 /** `terms`: fee, stipend, bond, leaving and college-type filters on each allotment's course and quota (lib/term-filters.ts). */
-export type AllotmentFilters = { year?: number; round?: Round; course?: string; quota?: string; category?: string; state?: string; from?: number; to?: number; terms?: TermFilters };
+/** `course`: one course slug; `courses`: any of these (with `course`, both narrow). */
+export type AllotmentFilters = { year?: number; round?: Round; course?: string; courses?: string[]; quota?: string; category?: string; state?: string; from?: number; to?: number; terms?: TermFilters };
 
 /**
  * Allotments (ranks only, never names), newest year, then round, then rank, one page. A page past the end returns the
@@ -787,11 +790,18 @@ export type AllotmentFilters = { year?: number; round?: Round; course?: string; 
 export async function listAllotments(f: AllotmentFilters, pg: PageQuery, collegeKey?: string) {
   const cat = await getCatalog();
   const course = f.course ? cat.courses.find((c) => c.slug === f.course) : undefined;
+  const courses = f.courses?.length ? cat.courses.filter((c) => f.courses!.includes(c.slug)) : null;
   // College, course and state become a list of CollegeSpecialty ids for the SQL WHERE.
-  const narrow = collegeKey || f.course || f.state;
+  const narrow = collegeKey || f.course || courses || f.state;
   const cs = narrow
     ? [...cat.pairs.values()]
-        .filter((p) => (!collegeKey || p.college === collegeKey) && (!f.course || (course && p.degree === course.degree && p.specialty === course.specialty)) && (!f.state || cat.collegeByKey.get(p.college)?.state === f.state))
+        .filter(
+          (p) =>
+            (!collegeKey || p.college === collegeKey) &&
+            (!f.course || (course && p.degree === course.degree && p.specialty === course.specialty)) &&
+            (!courses || courses.some((c) => p.degree === c.degree && p.specialty === c.specialty)) &&
+            (!f.state || cat.collegeByKey.get(p.college)?.state === f.state),
+        )
         .map((p) => p.cs)
     : undefined;
   // Term filters: the courses and quotas (options) whose terms pass, into the SQL WHERE as (course, quota) pairs.
