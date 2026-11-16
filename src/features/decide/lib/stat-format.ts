@@ -93,6 +93,11 @@ export type StatCell = {
   /** "—": not in the data (screen readers hear it). */
   missing?: true;
   tip: TipLine[];
+  /**
+   * Bond, Bond penalty and Leaving: one plain line on what the row's bond and penalties mean for her, before the record's
+   * words (the (i) shows `tip` under a "Source" heading after it). From the cells' own fields (bondPlain), never new data.
+   */
+  lead?: string;
   /** Display colour only (docs/APP_DESIGN_SYSTEM.md "Colour key"), never a new reading; `levelWord` says it in words. */
   level?: Level;
   levelWord?: string;
@@ -453,5 +458,28 @@ export function yearValue(t: ProgrammeTerms, pick: "fee" | "stipend", year: numb
   return { text: `${f.kind === "maximum" ? "≤ " : f.kind === "minimum" ? "≥ " : ""}${pick === "fee" ? feeRange(f.min, f.inr) : inrRange(f.min, f.inr, false)}`, marker: f.below ? "below NBEMS min" : null };
 }
 
-/** The five cells of one course's terms, in order: Fee, Stipend, Bond, Bond ₹, Leaving. */
-export const statCells = (t: ProgrammeTerms): StatCell[] => [feeCell(t), stipendCell(t), bondCell(t), bondInrCell(t), leavingCell(t)];
+/**
+ * One plain line for the bond row, from the same fields the cells read: "Leave after joining: ₹5 L. Skip the 2 years'
+ * service: ₹40 L. The years are written more than one way (2 (2018 GO); attached bond form says 1): confirm with the
+ * college." A conflict in the record (years written two ways) is said plainly, never resolved.
+ */
+export function bondPlain(t: ProgrammeTerms): string {
+  const b = t.bond;
+  const money = (a: Amount, words: (string | null | undefined)[]) => (a.state === "figure" && a.max != null ? amountValue(a, true) : a.state === "words" ? phrase(a, words).toLowerCase() : "amount not stated");
+  const leave = b.leaving.length ? money(b.leavingAmount, b.leaving.map((p) => p.text)) : "not published";
+  const parts = [`Leave after joining: ${leave}.`];
+  if (b.status === "declared") {
+    parts.push(`Skip ${b.years == null ? "the bond's" : `the ${yrs(b.years)}'`} service: ${money(b.amount, [b.text, b.quote])}.`);
+    if (b.yearsText && !sameYears(b.yearsText, b.years)) parts.push(`The years are written more than one way (${b.yearsText}): confirm with the college.`);
+    if (b.basis === "state_rule" || b.yearsFrom) parts.push("Years from the state's rule, not the college's own bond document: confirm with the college.");
+  } else if (b.status === "none") parts.push(b.caveat || b.stateRule ? "No bond on record, with a caveat (below): confirm with the college." : "No bond: no service to serve, nothing to pay for one.");
+  else if (noneDeclared(t)) parts.push("No bond declared, so none can be imposed this session.");
+  else parts.push("Bond: no clear answer published; ask the college.");
+  return parts.join(" ");
+}
+
+/** The five cells of one course's terms, in order: Fee, Stipend, Bond, Bond ₹, Leaving (the bond three lead with bondPlain). */
+export function statCells(t: ProgrammeTerms): StatCell[] {
+  const lead = bondPlain(t);
+  return [feeCell(t), stipendCell(t), ...[bondCell(t), bondInrCell(t), leavingCell(t)].map((c) => ({ ...c, lead }))];
+}

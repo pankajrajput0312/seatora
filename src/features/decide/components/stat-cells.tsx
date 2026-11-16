@@ -16,6 +16,13 @@ function CellTip({ c, t, of }: { c: StatCell; t: ProgrammeTerms; of?: string }) 
     <InfoTip label={of ? `${c.about}, ${of}` : c.about}>
       {/* Spans only: the panel may sit inside a <p> (a card's meta line). */}
       <span className="block font-semibold">{c.label}: <span className="numeric">{c.full}</span></span>
+      {/* The bond row's plain line first, then the record's own words under "Source". */}
+      {c.lead && (
+        <>
+          <span className="mt-1 block">{c.lead}</span>
+          <span className="mt-2 block border-t border-border pt-1 font-semibold">Source</span>
+        </>
+      )}
       {c.tip.map((l, i) => {
         const d = l.src != null ? doc(l.src) : undefined;
         return (

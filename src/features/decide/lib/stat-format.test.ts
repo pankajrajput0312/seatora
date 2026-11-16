@@ -313,6 +313,21 @@ describe("bond cells, by record status", () => {
     }
   });
 
+  it("every bond tooltip leads with one plain line from the cells' own fields; a conflict in the record said plainly", () => {
+    // Azamgarh-like: a 2-year ₹40 L bond whose years the record writes two ways, and a ₹5 L leaving penalty.
+    const up = bond("MD", "Service bond: 2 years · ₹40 L · ₹20 L diploma", 4000000, {
+      status: "documented", years: "2 (2018 GO); attached bond form says 1", amounts: [{ applies_to: "PG degree", inr: 4000000 }, { applies_to: "PG diploma", inr: 2000000 }],
+    });
+    const leave = penalty("MD", { items: [{ kind: "leaving_penalty", applies_to: "PG", inr: 500000, when: "resigning from the course", quote: null, source_url: MCC.url }] });
+    const c = cells("MD/MS", [up, leave]);
+    const lead = "Leave after joining: ₹5 L. Skip the 2 years' service: ₹40 L. The years are written more than one way (2 (2018 GO); attached bond form says 1): confirm with the college.";
+    expect([c.bond.lead, c.bondInr.lead, c.leaving.lead]).toEqual([lead, lead, lead]);
+    expect(c.fee.lead).toBeUndefined();
+    // The record's own words stay, under the lead.
+    expect(c.bond.tip[0]).toEqual({ text: "Service bond: 2 years · ₹40 L · ₹20 L diploma", src: 1 });
+    expect(cells("MD/MS", []).bond.lead).toBe("Leave after joining: not published. Bond: no clear answer published; ask the college.");
+  });
+
   it("a DNB hospital that declared no bond, where NBEMS lets none be imposed: 'None declared', never 'No bond'", () => {
     const words = "Not declared by the hospital (checked MCC profile and bond page, Uttar Pradesh rules, NBEMS rules on 15 Nov 2026); NBEMS: an undeclared bond can't be imposed this session";
     const c = cells("DNB", [bond("DNB", words, null, { status: "not_declared", reason: "not_declared_no_document" })]);
