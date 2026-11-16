@@ -5,13 +5,14 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, House, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { CircleArrowUp, Gift, MessageCircle, Pencil, ShieldCheck, Sparkles } from "lucide-react";
+import { CircleArrowUp, Gift, LogOut, MessageCircle, Pencil, ShieldCheck, Sparkles } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { LogoMark } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { signOut } from "@/features/auth/actions";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { MAX_COMPARE } from "../lib/choices";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
@@ -284,7 +285,7 @@ export type ShellAccount = { name: string; plan: string; upgrade: boolean; freeT
 const cyan = "flex min-h-11 flex-col items-center justify-center rounded-md bg-[#5ccfe6] px-3 py-1 text-[#0b0e12] hover:bg-[#7fdcef]";
 
 /**
- * The sidebar's (and the phone menu's) bottom: her initial, name and plan line, both to /decide/plan, and above it a cyan
+ * The sidebar's (and the phone menu's) bottom: her initial, name and plan line, both to /decide/plan, Log out beside them, and above it a cyan
  * "Upgrade" without the Season Pass ("Free till 20 Nov" in the free period). Signed out: Create free account and Sign in.
  * `data-nav-footer`: globals.css pins it to the menu's bottom (Astryx pins it in the sidebar).
  */
@@ -304,13 +305,21 @@ function AccountFooter({ account, href, current }: { account: ShellAccount | nul
           {account.freeTill && <span className="text-xs font-semibold">Free till {account.freeTill}</span>}
         </Link>
       )}
-      <Link href={href} aria-current={current ? "page" : undefined} className={cn("flex min-h-12 items-center gap-2.5 rounded-md px-2 hover:bg-muted", current && "bg-muted")}>
-        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-[#0b0e12] text-sm font-bold text-[#5ccfe6]">{account.name[0]?.toUpperCase()}</span>
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold">{account.name}</span>
-          <span className="block truncate text-xs text-muted-foreground">{account.plan}</span>
-        </span>
-      </Link>
+      <div className="flex items-center gap-1">
+        <Link href={href} aria-current={current ? "page" : undefined} className={cn("flex min-h-12 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 hover:bg-muted", current && "bg-muted")}>
+          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-[#0b0e12] text-sm font-bold text-[#5ccfe6]">{account.name[0]?.toUpperCase()}</span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold">{account.name}</span>
+            <span className="block truncate text-xs text-muted-foreground">{account.plan}</span>
+          </span>
+        </Link>
+        <form action={signOut}>
+          <button type="submit" title="Log out" className="flex min-h-12 min-w-12 flex-col items-center justify-center gap-0.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+            <LogOut className="size-4" aria-hidden />
+            <span className="text-[11px] font-semibold">Log out</span>
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
