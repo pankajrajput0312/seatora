@@ -79,6 +79,7 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
         currency: body.currency,
         order_id: body.orderId,
         name: "Seatora",
+        image: `${window.location.origin}/icons/icon-192.png`,
         description: body.discount ? `Season Pass · ${formatPaise(body.discount)} off with ${body.inviter}'s invite` : "Season Pass",
         prefill: { email: body.email },
         theme: { color: "#0b0e12" },

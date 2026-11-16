@@ -58,7 +58,12 @@ export async function SeasonPassButton({ className, noteClassName }: { className
             Keep it for the whole season (till {longDate(SEASON_PASS_UNTIL)})
             {q.inviter ? "" : `: ${formatPaise(q.listAmount)}, or ${formatPaise(discountedPrice(q.listAmount))} with an invite`}
           </p>
-          <BuySeasonPass offer={offer} verb="Pay" className="mt-1.5 min-h-10 rounded-md border border-current px-3 text-sm font-semibold" noteClassName={noteClassName} />
+          <BuySeasonPass
+            offer={offer}
+            verb="Pay"
+            className={s.state === "claimed" ? cn("mt-1.5", className) : "mt-1.5 min-h-11 rounded-md bg-[#5ccfe6] px-4 text-sm font-semibold text-[#0b0e12] hover:bg-[#7fdcef]"}
+            noteClassName={noteClassName}
+          />
         </div>
       )}
     </div>
