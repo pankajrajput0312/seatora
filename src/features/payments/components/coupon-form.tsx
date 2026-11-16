@@ -7,8 +7,9 @@ import { cn } from "@/lib/cn";
 
 /**
  * Redeems a code through the order route: a 100% coupon gives the whole Season Pass at once (no Razorpay); any other
- * code gets the server's reason (`message`). On success the button stays busy until the refreshed page swaps the card
- * (the refresh joins this transition), then the toast says it (`done(coupon)`): this form unmounts once the pass is on.
+ * code gets the server's reason (`message`). On success the button stays busy until the refreshed page (less its ?coupon=)
+ * swaps the card (the refresh joins this transition), then the toast says it (`done(coupon)`): this form unmounts once the
+ * pass is on.
  */
 function useRedeem(done: (coupon: string) => string) {
   const router = useRouter();
@@ -24,7 +25,11 @@ function useRedeem(done: (coupon: string) => string) {
       if (!body?.free) return setMessage(body?.error?.message ?? "Couldn't apply the coupon. Try again.");
       applied.current = done(body.coupon);
       navigating(true); // inside Decide: the shell keeps the refresh moving (decide-shell.tsx)
-      router.refresh();
+      // The page again, without its ?coupon= (used now: its banner would say so).
+      const url = new URL(location.href);
+      if (!url.searchParams.has("coupon")) return router.refresh();
+      url.searchParams.delete("coupon");
+      router.replace(url.pathname + url.search + url.hash, { scroll: false });
     });
   return { pending, message, redeem };
 }

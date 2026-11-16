@@ -67,8 +67,8 @@ export function duplicateList(state: ChoicesState, sourceId: string): ChoicesSta
   return { lists: [...state.lists, { ...src, id, name: name === src.name ? `${src.name} (copy)` : name, typedIds: [] }], activeId: id };
 }
 
-/** One choice's fee, bond and penalties in words, for sharing: "Fee ₹1.71 L/yr; Bond period 1 year; Bond penalty ₹10 L; Leaving penalty None". What isn't in the data is left out. */
-export const termsWords = (t: ProgrammeTerms) => statCells(t).filter((c) => c.key !== "stipend" && !c.missing).map((c) => `${c.label} ${c.full}`).join("; ");
+/** One choice's fee, bond and penalties in words, for sharing: "Fee: ₹1.71 L/yr; Bond period: 1 year; Bond penalty: ₹10 L; Leaving penalty: None". What isn't in the data is left out. */
+export const termsWords = (t: ProgrammeTerms) => statCells(t).filter((c) => c.key !== "stipend" && !c.missing).map((c) => `${c.label}: ${c.full}`).join("; ");
 
 /** The list for WhatsApp, in order, one line a choice (`terms`: its termsWords, null while not loaded), then a link to Seatora. */
 export function shareText(list: ChoiceList, terms: (id: string) => string | null, url: string) {

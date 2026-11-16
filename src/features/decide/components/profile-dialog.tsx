@@ -286,7 +286,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
           {setup && <h3 ref={stepHead} tabIndex={-1} className="sr-only">Step <span className="numeric">{step + 1}</span> of <span className="numeric">{steps.length}</span>: {steps[step]}</h3>}
           {setup ? (
             <>
-              {[rankStep, courseStep, <>{quotaStep}{budget}</>][step]}
+              {[rankStep, courseStep, <>{budget}{quotaStep}</>][step]}
               {step === 2 && <p className="text-sm text-muted-foreground">States can wait: add them later with Edit, beside your rank.</p>}
             </>
           ) : (

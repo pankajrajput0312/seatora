@@ -362,7 +362,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                     {handle(item, i, picking)}
                     {/* The choice number is its "Move to #": pick a position, the row goes straight there. */}
                     <label className="sr-only" htmlFor={`pos-${item.id}`}>Move {name(item)} to position</label>
-                    <select id={`pos-${item.id}`} value={i + 1} onChange={(e) => moveTo(i, Number(e.target.value), "pos")} className="numeric h-11 min-w-12 shrink-0 cursor-pointer rounded-md border border-input bg-card px-1 text-base font-bold">
+                    <select id={`pos-${item.id}`} value={i + 1} onChange={(e) => moveTo(i, Number(e.target.value), "pos")} className="numeric mr-1.5 h-11 min-w-12 shrink-0 cursor-pointer rounded-md border border-input bg-card px-1 text-base font-bold">
                       {items.map((x, k) => <option key={x.id} value={k + 1}>{k + 1}</option>)}
                     </select>
                     <span className="min-w-0 py-1">
