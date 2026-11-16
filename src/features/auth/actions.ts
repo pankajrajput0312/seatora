@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { clientIp, deviceAid, ipHash, track } from "@/features/funnel/service";
@@ -117,7 +117,21 @@ export async function signUp(input: SignUpInput, next?: string, ref?: string): P
     console.error("signUp failed", err);
     return { ok: false, error: "We couldn't create your account. Please try again." };
   }
-  redirect(safeNext(next));
+  redirect(safeNext(next), RedirectType.replace); // the page replaces the form in history: Back never bounces off it
+}
+
+export type AuthFormState = { error: string; values: { name: string; email: string } } | null;
+
+/**
+ * The sign-in / sign-up form (components/auth-form.tsx, useActionState): a plain POST works before the page's script has
+ * loaded (slow 3G), and an error comes back with her name and email to fill in again. `mode`, `next` and `ref` are hidden
+ * fields; signUp and signIn check everything, and redirect on success.
+ */
+export async function authFormAction(_prev: AuthFormState, form: FormData): Promise<AuthFormState> {
+  const str = (k: string) => (typeof form.get(k) === "string" ? (form.get(k) as string) : "");
+  const input = { name: str("name"), email: str("email"), password: str("password"), invite: str("invite") };
+  const res = str("mode") === "signup" ? await signUp(input, str("next") || undefined, str("ref") || undefined) : await signIn(input, str("next") || undefined);
+  return { error: res.error, values: { name: input.name.slice(0, 80), email: input.email.slice(0, 254) } };
 }
 
 export async function signIn(input: SignInInput, next?: string): Promise<AuthResult> {
@@ -150,7 +164,7 @@ export async function signIn(input: SignInInput, next?: string): Promise<AuthRes
     console.error("signIn failed", err);
     return { ok: false, error: "We couldn't sign you in. Please try again." };
   }
-  redirect(safeNext(next));
+  redirect(safeNext(next), RedirectType.replace); // the page replaces the form in history: Back never bounces off it
 }
 
 /** `field`: the error is about that field (the form marks it). */
@@ -215,5 +229,5 @@ export async function resetPassword(token: string, input: ResetPasswordInput): P
 
 export async function signOut() {
   await deleteSession();
-  redirect("/");
+  redirect("/?out=1"); // the landing page says "Logged out" (LoggedOut) and starts at its top
 }

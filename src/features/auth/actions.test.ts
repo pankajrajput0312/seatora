@@ -18,7 +18,7 @@ vi.mock("next/headers", () => ({
     delete: (name: string) => ctx.jar.delete(name),
   }),
 }));
-vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`REDIRECT ${to}`); } }));
+vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`REDIRECT ${to}`); }, RedirectType: { push: "push", replace: "replace" } }));
 vi.mock("./lib/password", () => ({
   dummyHash: Promise.resolve("hash:"),
   hashPassword: async (p: string) => `hash:${p}`,
