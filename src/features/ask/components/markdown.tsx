@@ -31,8 +31,8 @@ export function inline(text: string, key = "i"): ReactNode[] {
     else if (m[4] != null) {
       const href = safeHref(m[5]);
       if (!href) out.push(m[4]);
-      else if (href.startsWith("/")) out.push(<Link key={k} href={href} className="text-sky underline underline-offset-2">{m[4]}</Link>);
-      else out.push(<a key={k} href={href} target="_blank" rel="noopener noreferrer" className="text-sky underline underline-offset-2">{m[4]}</a>);
+      else if (href.startsWith("/")) out.push(<Link key={k} href={href} className="text-sky underline decoration-sky/40 underline-offset-2 hover:decoration-sky">{m[4]}</Link>);
+      else out.push(<a key={k} href={href} target="_blank" rel="noopener noreferrer" className="text-sky underline decoration-sky/40 underline-offset-2 hover:decoration-sky">{m[4]}</a>);
     } else if (m[6] != null) out.push(<em key={k}>{inline(m[6], k)}</em>);
     last = m.index + m[0].length;
   }
@@ -107,34 +107,34 @@ export function blocks(md: string): Block[] {
 
 export function Markdown({ text, codeAction }: { text: string; codeAction?: (b: { title: string; text: string }) => ReactNode }) {
   return (
-    <div className="grid gap-3 text-[0.9375rem] leading-relaxed">
+    <div className="grid min-w-0 gap-3 text-[0.9375rem] leading-relaxed break-words">
       {blocks(text).map((b, n) => {
         const k = `b${n}`;
         switch (b.kind) {
           case "h":
-            return <p key={k} className={b.level <= 2 ? "text-lg font-semibold" : "font-semibold"}>{inline(b.text, k)}</p>;
+            return <p key={k} className={b.level <= 2 ? "mt-2 text-lg leading-snug font-bold tracking-tight" : b.level === 3 ? "mt-1 font-semibold" : "text-sm font-semibold text-muted-foreground"}>{inline(b.text, k)}</p>;
           case "p":
             return <p key={k} className="whitespace-pre-line">{inline(b.text, k)}</p>;
           case "ul":
           case "ol": {
             const L = b.kind;
             return (
-              <L key={k} className={`grid gap-1 pl-5 ${L === "ul" ? "list-disc" : "list-decimal"}`}>
-                {b.items.map((it, j) => <li key={j}>{inline(it, `${k}-${j}`)}</li>)}
+              <L key={k} className={`grid gap-1.5 pl-5 marker:text-muted-foreground ${L === "ul" ? "list-disc" : "list-decimal"}`}>
+                {b.items.map((it, j) => <li key={j} className="pl-1">{inline(it, `${k}-${j}`)}</li>)}
               </L>
             );
           }
           case "table":
             return (
-              <div key={k} className="overflow-x-auto rounded-lg border border-border">
+              <div key={k} tabIndex={0} role="region" aria-label="Table, scrolls sideways" className="max-w-full overflow-x-auto rounded-lg border border-border bg-card">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-muted">
-                    <tr>{b.head.map((c, j) => <th key={j} scope="col" className="px-2 py-1.5 font-semibold whitespace-nowrap">{inline(c, `${k}-h${j}`)}</th>)}</tr>
+                  <thead className="bg-muted text-xs text-muted-foreground">
+                    <tr>{b.head.map((c, j) => <th key={j} scope="col" className="px-3 py-2 font-semibold whitespace-nowrap">{inline(c, `${k}-h${j}`)}</th>)}</tr>
                   </thead>
                   <tbody>
                     {b.rows.map((r, j) => (
-                      <tr key={j} className="border-t border-border align-top">
-                        {r.map((c, x) => <td key={x} className="numeric px-2 py-1.5">{inline(c, `${k}-${j}-${x}`)}</td>)}
+                      <tr key={j} className="border-t border-border align-top even:bg-muted/50">
+                        {r.map((c, x) => <td key={x} className={`numeric px-3 py-2 ${c.length > 14 ? "min-w-[10rem]" : "whitespace-nowrap"}`}>{inline(c, `${k}-${j}-${x}`)}</td>)}
                       </tr>
                     ))}
                   </tbody>

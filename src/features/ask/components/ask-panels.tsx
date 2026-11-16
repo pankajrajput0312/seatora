@@ -20,10 +20,10 @@ export function ChatsPanel({ current, onOpen, onDeleted }: { current: string | n
   if (!chats) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (!chats.length) return <p className="text-sm text-muted-foreground">No saved chats yet. Chats are kept for 30 days.</p>;
   return (
-    <ul className="grid max-h-80 grid-cols-1 gap-1 overflow-y-auto">
+    <ul className="grid grid-cols-1 gap-1">
       {chats.map((c) => (
         <li key={c.id} className="flex min-w-0 items-center gap-1">
-          <button type="button" onClick={() => onOpen(c.id)} className={`flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-muted ${c.id === current ? "font-semibold" : ""}`}>
+          <button type="button" onClick={() => onOpen(c.id)} className={`flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-muted ${c.id === current ? "bg-muted font-semibold" : ""}`}>
             <span className="min-w-0 flex-1 truncate">{c.title}</span>
             <span className="shrink-0 text-xs text-muted-foreground">{new Date(c.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
           </button>
