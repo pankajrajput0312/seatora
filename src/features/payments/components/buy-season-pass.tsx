@@ -32,7 +32,7 @@ export type Offer = {
 
 /**
  * For a signed-in buyer; use through SeasonPassButton, which knows her state and price. The button reads
- * "<verb> · ₹399 with Rahul's invite". "Have a referral code?" shows only to a buyer with no discount yet.
+ * "<verb> for ~~₹499~~ ₹399 with Rahul's invite". "Have a referral code?" shows only to a buyer with no discount yet.
  */
 export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassName }: { offer: Offer; verb: string; className?: string; noteClassName?: string }) {
   const router = useRouter();
@@ -43,7 +43,13 @@ export function BuySeasonPass({ offer: initialOffer, verb, className, noteClassN
   const failed = useRef(false);
   const codeId = useId(); // the plan cards and a page's own button can both be on screen
 
-  const label = `${verb} · ${formatPaise(offer.amount)}${offer.inviter ? ` with ${offer.inviter}'s invite` : ""}`;
+  const label = (
+    <>
+      {verb} for {offer.amount < offer.listAmount && <s className="mr-1 opacity-70">{formatPaise(offer.listAmount)}</s>}
+      {formatPaise(offer.amount)}
+      {offer.inviter ? ` with ${offer.inviter}'s invite` : ""}
+    </>
+  );
 
   if (paid) return <p className={cn("text-sm font-semibold", noteClassName)} role="status">Season Pass active</p>;
 

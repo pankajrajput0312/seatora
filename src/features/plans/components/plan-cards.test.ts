@@ -18,7 +18,7 @@ describe("PlanCardsView", () => {
     const pass = text(card(html, "PREMIUM"));
     expect(pass).toContain("Free till 20 Nov");
     expect(pass).toContain("₹499₹0till 20 Nov");
-    expect(pass).toContain("Then ₹499 (₹399 with an invite), valid till 31 Mar 2027.");
+    expect(pass).toContain("Free for everyone till 20 Nov. After that ₹499 (₹399 with an invite), valid till 31 Mar 2027.");
     expect(pass).toContain("CTA");
   });
 

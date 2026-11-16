@@ -36,7 +36,7 @@ export default async function ReferPage() {
         <p className="rounded-md border border-border bg-card px-3 py-2 text-sm">
           {!paymentsOn()
             ? `Paid passes aren't open yet, so discounts and earnings start when they open. Sharing works now: friends who sign up through your link get their ${REFERRAL_PERCENT}% off when they buy.`
-            : `Till ${shortDate(free!)} everyone can upgrade free. Friends who pay to keep the Season Pass for the whole season get ${REFERRAL_PERCENT}% off, and you earn ${REFERRAL_PERCENT}% of what they pay.`}
+            : `The Season Pass is free for everyone till ${shortDate(free!)}. Share your link now: after that, friends who buy it get ${REFERRAL_PERCENT}% off, and you earn ${REFERRAL_PERCENT}% of what they pay.`}
         </p>
       )}
 

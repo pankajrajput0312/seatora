@@ -71,7 +71,9 @@ export function PlanCardsView({ current, free, cta, freeCta, className }: { curr
             </p>
           )}
           <p className="mt-1 text-sm text-muted-foreground">
-            {free ? `Then ${formatPaise(list)} (${formatPaise(discountedPrice(list))} with an invite)` : `${formatPaise(discountedPrice(list))} with an invite`}, valid till {longDate(SEASON_PASS_UNTIL)}.
+            {free
+              ? `Free for everyone till ${shortDate(free)}. After that ${formatPaise(list)} (${formatPaise(discountedPrice(list))} with an invite), valid till ${longDate(SEASON_PASS_UNTIL)}.`
+              : `${formatPaise(discountedPrice(list))} with an invite, valid till ${longDate(SEASON_PASS_UNTIL)}.`}
           </p>
           <Lines plan="PREMIUM" />
           <div className="mt-auto pt-5">{cta}</div>

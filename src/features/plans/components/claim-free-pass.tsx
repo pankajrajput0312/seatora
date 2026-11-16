@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { claimFreeSeasonPass } from "../actions";
 
 /** "Upgrade to Season Pass, free till 20 Nov": the free upgrade (claim.ts), then the page (and the layout: the sidebar and the plan chip) reads it again. */
-export function ClaimFreePass({ label, className, noteClassName }: { label: string; className?: string; noteClassName?: string }) {
+export function ClaimFreePass({ label, className, noteClassName }: { label: React.ReactNode; className?: string; noteClassName?: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
