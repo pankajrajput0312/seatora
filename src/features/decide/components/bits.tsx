@@ -2,6 +2,7 @@ import { History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
+import { shortName } from "../lib/format";
 import { LATEST_YEAR, PAST_YEARS, reachLabel, reachTone, type Deepest, type Reach } from "../lib/reach";
 import { roundLabel, type Term } from "../types";
 import { InfoTip } from "./info-tip";
@@ -95,3 +96,16 @@ export function TermText({ term }: { term: Pick<Term, "text" | "source"> | null 
 
 // A client component (it reads the saved profile), kept importable from here with the other page bits.
 export { SetRankPrompt } from "./dashboard-parts";
+
+/**
+ * An institute's name in a narrow cell: the full name from md up; on phones its short name with the state code
+ * ("GMC Latur, MH", lib/format.ts shortName) so a clamped cell never hides which college it is, the full name read out.
+ */
+export function InstName({ name, state }: { name: string; state?: string | null }) {
+  return (
+    <>
+      <span className="max-md:hidden">{name}</span>
+      <span className="md:hidden"><span aria-hidden title={name}>{shortName(name, state)}</span><span className="sr-only">{name}</span></span>
+    </>
+  );
+}

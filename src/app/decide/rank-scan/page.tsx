@@ -11,7 +11,7 @@ import { courseFilter } from "@/features/decide/lib/course-filter";
 import { eligibleCategories } from "@/features/decide/lib/reach";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { PageHead, Provisional } from "@/features/decide/components/bits";
+import { InstName, PageHead, Provisional } from "@/features/decide/components/bits";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { cardMeta, subLink, termCol, withRowInfo, youMarks } from "@/features/decide/components/ranks/rank-cards";
 import { ResultCard } from "@/features/decide/components/result-card";
@@ -225,7 +225,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                               <td className={`${tbl.num} sticky left-0 z-[1] bg-card max-md:text-left ${tbl.pin}`}>
                                 {formatRank(a.rank)}
                                 <span className="block text-xs font-normal md:hidden">{a.category} seat</span>
-                                <span title={a.collegeName} className={`block text-xs font-normal text-muted-foreground md:hidden ${tbl.clamp}`}>{a.collegeName}</span>
+                                <span title={a.collegeName} className={`block text-xs font-normal text-muted-foreground md:hidden ${tbl.clamp}`}><InstName name={a.collegeName} state={a.state} /></span>
                               </td>
                               <td className={`${tbl.td} max-md:hidden`}>{a.category}</td>
                               <td className={`${tbl.td} min-w-52`}>

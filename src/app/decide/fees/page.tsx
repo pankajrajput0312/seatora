@@ -3,7 +3,7 @@ import { ColourLegend } from "@/features/decide/components/colour-legend";
 import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
-import { PageHead } from "@/features/decide/components/bits";
+import { InstName, PageHead } from "@/features/decide/components/bits";
 import { CsvLink, toolbarRow } from "@/features/decide/components/csv-link";
 import { NotDeclared, programmeTitle } from "@/features/decide/components/fees";
 import { feeDefaults, feesFilters, feesParamsSchema } from "@/features/decide/components/fees-view";
@@ -131,7 +131,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                 {/* z-[1]: above the cells' (i) buttons (positioned) as they scroll under it. */}
                 {/* Phones: narrow (tbl.pin), the name on two lines, the programme, no state line. */}
                 <th scope="row" className={`${tbl.td} sticky left-0 z-[1] min-w-48 max-w-72 bg-card text-left font-medium ${tbl.pin}`}>
-                  <Link href={years(r)} title={r.college.name} className={`hover:text-sky hover:underline ${tbl.clamp}`}>{r.college.name}</Link>
+                  <Link href={years(r)} title={r.college.name} className={`hover:text-sky hover:underline ${tbl.clamp}`}><InstName name={r.college.name} state={r.college.state} /></Link>
                   <span className="mt-0.5 block font-normal max-md:text-xs">{rowTitle(r)}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs font-normal text-muted-foreground max-md:hidden">
                     {r.college.state ?? <NotDeclared what="state not available" />}

@@ -8,7 +8,7 @@ import type { DecideLinks } from "../../lib/links";
 import { LATEST_YEAR, PAST_YEARS, reachWindow } from "../../lib/reach";
 import { statKeys, statLabel } from "../../lib/stat-format";
 import { openQuotas, roundLabel, rounds, seatKindLabel, type Round, type SeatKind, type SeatList } from "../../types";
-import { Dash, Provisional, ReachBadge } from "../bits";
+import { Dash, InstName, Provisional, ReachBadge } from "../bits";
 import { InfoTip } from "../info-tip";
 import { TermStatCells } from "../stat-cells";
 import { TypeBadge } from "../type-badge";
@@ -172,7 +172,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
             return (
               <tr key={`${r.list}|${r.college.key}|${r.degree}|${r.specialty}|${r.quota}|${r.category}|${i}`} className={tbl.row}>
                 <th scope="row" className={cn(td, sticky, "text-left font-normal")}>
-                  <Link href={L.institute(r.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{r.college.name}</Link>
+                  <Link href={L.institute(r.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
                   <span className="block text-xs text-muted-foreground">
                     {courseOf(r)}, {r.quota ?? "quota not printed"}, {r.college.state ?? "state not listed"}
                   </span>

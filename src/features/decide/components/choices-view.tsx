@@ -16,7 +16,7 @@ import { keepProfileParams } from "../profile";
 import type { ProgrammeTerms } from "../server/terms";
 import type { RowHospital, SeatsBy } from "../service";
 import { roundLabel, type SeatList } from "../types";
-import { Dash, ReachBadge } from "./bits";
+import { Dash, InstName, ReachBadge } from "./bits";
 import { InfoTip } from "./info-tip";
 import { CompareToggle } from "./option-actions";
 import { SeatsLink } from "./options-view";
@@ -366,7 +366,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                       {items.map((x, k) => <option key={x.id} value={k + 1}>{k + 1}</option>)}
                     </select>
                     <span className="min-w-0 py-1">
-                      <Link href={L.institute(item.slug)} className="font-medium hover:text-sky hover:underline">{item.institute}</Link>
+                      <Link href={L.institute(item.slug)} className="font-medium hover:text-sky hover:underline"><InstName name={item.institute} state={item.state} /></Link>
                       <span className="block text-xs text-muted-foreground">{item.course}, {item.quota}</span>
                       <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                         {item.state ?? "State not listed"}

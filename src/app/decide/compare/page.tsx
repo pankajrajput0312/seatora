@@ -5,7 +5,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { gridRounds } from "@/features/decide/api";
 import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
-import { Dash, HistoryNote, PageHead, ReachBadge } from "@/features/decide/components/bits";
+import { Dash, HistoryNote, InstName, PageHead, ReachBadge } from "@/features/decide/components/bits";
 import { CompareFromDevice, RemoveFromCompare } from "@/features/decide/components/compare-controls";
 import { ClosingCell, courseName } from "@/features/decide/components/options-view";
 import { Sup } from "@/features/decide/components/fees";
@@ -189,7 +189,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                     {/* Phones: the remove button wraps under a long name rather than squeezing it. */}
                     <div className="flex items-start justify-between gap-x-2 max-md:flex-wrap">
                       <span>
-                        <Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline">{r.college.name}</Link>
+                        <Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
                         {/* The quota is the first row; screen readers hear it with each cell's column name. */}
                         <span className="block text-xs font-normal text-muted-foreground">{courseName(r)}<span className="sr-only">, {r.quota}</span></span>
                       </span>
