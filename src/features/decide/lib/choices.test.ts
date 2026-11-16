@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, parseChoices, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, type ChoiceItem, type RenamedCollege } from "./choices";
+import { defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, parseChoices, shareText, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, type ChoiceItem, type RenamedCollege } from "./choices";
 
 const item = (id: string): ChoiceItem => ({ id, institute: `Inst ${id}`, slug: id, state: "S", course: "DNB Anaesthesiology", quota: "DNB Quota", reachLabel: "", closedEveryRound: false });
 
@@ -93,5 +93,14 @@ describe("nameFirstList", () => {
     expect(nameFirstList({ ...defaultChoices, lists: [{ ...defaultChoices.lists[0], name: "Mine" }] }, "Round 3 · 2026")).toBeNull();
     const twoLists = { activeId: "r2-2026", lists: [defaultChoices.lists[0], { id: "x", name: "Round 3 · 2026", items: [], typedIds: [] }] };
     expect(nameFirstList(twoLists, "Round 3 · 2026")).toBeNull();
+  });
+});
+
+describe("shareText", () => {
+  it("the list in order with each choice's terms when loaded, then the link", () => {
+    const list = { id: "a", name: "Round 3 · 2026", items: [item("x"), item("y")], typedIds: [] };
+    expect(shareText(list, (id) => (id === "x" ? "Fee ₹1.71 L/yr; Bond period 1 year" : null), "https://seatora.test")).toBe(
+      "My NEET PG choice list (Round 3 · 2026), in order:\n1. Inst x — DNB Anaesthesiology, DNB Quota. Fee ₹1.71 L/yr; Bond period 1 year\n2. Inst y — DNB Anaesthesiology, DNB Quota\n\nMade with Seatora: https://seatora.test",
+    );
   });
 });

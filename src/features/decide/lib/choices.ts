@@ -1,5 +1,7 @@
 // Pure choice-list logic (tested). Items are snapshots so a list renders without refetching.
 import { z } from "zod";
+import type { ProgrammeTerms } from "../server/terms";
+import { statCells } from "./stat-format";
 
 export type ChoiceItem = {
   id: string; // option id
@@ -63,6 +65,18 @@ export function duplicateList(state: ChoicesState, sourceId: string): ChoicesSta
   const name = src.name.replace(/Round (\d+)/, (_, n) => `Round ${Number(n) + 1}`);
   const id = `${sourceId}-copy-${state.lists.length}`;
   return { lists: [...state.lists, { ...src, id, name: name === src.name ? `${src.name} (copy)` : name, typedIds: [] }], activeId: id };
+}
+
+/** One choice's fee, bond and penalties in words, for sharing: "Fee ₹1.71 L/yr; Bond period 1 year; Bond penalty ₹10 L; Leaving penalty None". What isn't in the data is left out. */
+export const termsWords = (t: ProgrammeTerms) => statCells(t).filter((c) => c.key !== "stipend" && !c.missing).map((c) => `${c.label} ${c.full}`).join("; ");
+
+/** The list for WhatsApp, in order, one line a choice (`terms`: its termsWords, null while not loaded), then a link to Seatora. */
+export function shareText(list: ChoiceList, terms: (id: string) => string | null, url: string) {
+  const lines = list.items.map((i, n) => {
+    const t = terms(i.id);
+    return `${n + 1}. ${i.institute} — ${i.course}, ${i.quota}${t ? `. ${t}` : ""}`;
+  });
+  return [`My NEET PG choice list (${list.name}), in order:`, ...lines, "", `Made with Seatora: ${url}`].join("\n");
 }
 
 /** The PIN in the item's college key (types.ts optionId: "NAME…#PIN~degree~specialty~quota"); null when the key has none. */

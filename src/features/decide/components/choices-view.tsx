@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { duplicateList, markTypedUpTo, move, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
+import { duplicateList, markTypedUpTo, move, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
 import { LATEST_YEAR, PAST_YEARS, reachWindow, seatsBelowNotes, type Reach, type SeatsBelow } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
 import { useChoices, useDecideLinks } from "../lib/use-decide-store";
@@ -99,7 +99,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
   const fresh = live?.key === liveKey;
 
   /** Focus a control of the item with this id after React re-renders, and keep it in view (it may have moved). */
-  const focusItem = (id: string | undefined, which: "handle" | "up" | "down" = "handle") =>
+  const focusItem = (id: string | undefined, which: "handle" | "up" | "down" | "pos" = "handle") =>
     requestAnimationFrame(() => {
       const el = id ? document.getElementById(`${which}-${id}`) : null;
       const handle = id ? document.getElementById(`handle-${id}`) : null;
@@ -138,6 +138,12 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     }
   };
 
+  /** "Move to #": straight to a position (the cards' field, the table's position select). */
+  const moveTo = (i: number, pos: number, which: "handle" | "pos" = "handle") => {
+    const t = reorder(i, pos - 1);
+    focusItem(items[i].id, which);
+    setAnnounce(`${name(items[i])} moved to position ${t + 1} of ${n}.`);
+  };
   const moveBy = (i: number, delta: -1 | 1) => {
     const to = reorder(i, i + delta);
     focusItem(items[i].id, delta < 0 ? "up" : "down");
@@ -177,6 +183,19 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       setCopyMsg({ text: "Couldn't copy. Use CSV or Print instead." });
     }
     setTimeout(() => setCopyMsg(null), 8000);
+  };
+
+  // A phone: its share sheet (WhatsApp among them); else WhatsApp's own link. Fee, bond and penalties once loaded.
+  const share = async () => {
+    const text = shareText(list, (id) => (current?.[id] ? termsWords(current[id].fees) || null : null), location.origin);
+    if (navigator.share && matchMedia("(pointer: coarse)").matches) {
+      try {
+        return await navigator.share({ text });
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return; // she closed the sheet
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   };
 
   const dupKey = (i: ChoiceItem) => `${i.slug}|${i.course}`;
@@ -250,7 +269,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
   /** Cards: move to a position, compare, remove (the table has drag, the handle and up / down). */
   const tools = (item: ChoiceItem, i: number) => (
     <span className="flex flex-wrap items-center gap-1" data-print-hide>
-      <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("to")); if (v) { const t = reorder(i, v - 1); focusItem(item.id); setAnnounce(`${name(item)} moved to position ${t + 1} of ${n}.`); } }}>
+      <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("to")); if (v) moveTo(i, v); }}>
         <label className="sr-only" htmlFor={`to-${item.id}`}>Move {name(item)} to position</label>
         <span className="w-16"><input id={`to-${item.id}`} name="to" type="number" min={1} max={n} placeholder="#" className={cn(control, "numeric")} /></span>
         <Button type="submit" variant="ghost">Move</Button>
@@ -341,7 +360,11 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                 <th scope="row" className={cn(tbl.td, "min-w-64 bg-card py-2 text-left font-normal md:sticky md:left-0 md:z-[1] md:w-64")}>
                   <span className="flex items-start gap-1">
                     {handle(item, i, picking)}
-                    <span className="numeric grid h-11 min-w-8 place-items-center text-base font-bold">{i + 1}</span>
+                    {/* The choice number is its "Move to #": pick a position, the row goes straight there. */}
+                    <label className="sr-only" htmlFor={`pos-${item.id}`}>Move {name(item)} to position</label>
+                    <select id={`pos-${item.id}`} value={i + 1} onChange={(e) => moveTo(i, Number(e.target.value), "pos")} className="numeric h-11 min-w-12 shrink-0 cursor-pointer rounded-md border border-input bg-card px-1 text-base font-bold">
+                      {items.map((x, k) => <option key={x.id} value={k + 1}>{k + 1}</option>)}
+                    </select>
                     <span className="min-w-0 py-1">
                       <Link href={L.institute(item.slug)} className="font-medium hover:text-sky hover:underline">{item.institute}</Link>
                       <span className="block text-xs text-muted-foreground">{item.course}, {item.quota}</span>
@@ -413,6 +436,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
         <ViewToggle page="choices" view={view} />
         <Button variant="secondary" disabled={!n} onClick={download} aria-label={`Download CSV of ${list.name}`}><Download className="size-4" aria-hidden />CSV</Button>
         <Button variant="secondary" disabled={!n} onClick={copy}>Copy in MCC order</Button>
+        <Button variant="secondary" disabled={!n} onClick={share}>Share on WhatsApp</Button>
         <Button variant="secondary" disabled={!n} onClick={() => window.print()}>Print</Button>
         <label className="inline-flex min-h-11 items-center gap-2 text-sm">
           Mark how far you&apos;ve typed into MCC: up to choice

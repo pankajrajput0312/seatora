@@ -23,7 +23,7 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   const nextRound = fill && { name: `${roundName[fill.round]} · ${rs.year}`, when: `${roundName[fill.round]} choice filling, ${fillWindow(fill)}` };
   return (
     <AppPage>
-      <PageHead title="Choices" about="Your list in the order you'll enter it on the MCC portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons." />
+      <PageHead title="Choices" about="Your list in the order you'll enter it on the MCC portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons; in the table, pick a choice's number to move it straight there." />
       <ChoicesView reachFor={liveReach} view={view} maxLists={me?.eff.limits.choiceLists} hasLists={lists.length > 0} nextRound={nextRound} />
       <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
         <HistoryNote />
