@@ -54,7 +54,9 @@ export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Pro
           <>
             A college whose figure is not published, or has no number, is left out of a fee, stipend, bond or leaving filter
             unless &quot;Include not published&quot; is ticked. &quot;No bond&quot; only lists colleges whose record says no bond (ticked, also those where a
-            state law&apos;s service may still apply), and a type filter never lists a college without a type.
+            state law&apos;s service may still apply), and a type filter never lists a college without a type. &quot;None declared&quot; (a DNB hospital
+            that declared no bond to MCC, so NBEMS lets it impose none this session) is not &quot;No bond&quot;: no document of its own says so, so it
+            counts as not published.
           </>
         }
       >

@@ -277,7 +277,8 @@ describe("bond cells, by record status", () => {
     expect([...shown(c.bond), c.bond.markerWarn]).toEqual(["No bond", "No bond", null, null, undefined]);
     expect(c.bond.tip[0]).toEqual({ text: "No bond (the college's own document).", src: 1 });
     expect(c.bond.tip).toContainEqual({ text: "A state rule may apply: 1 yr in Delhi Govt hospitals, ₹20 L", warn: true });
-    expect(shown(c.bondInr)).toEqual(["None", "None", null, "muted"]);
+    // In ink like the "No bond" beside it (no colour with a caveat): one colour per row.
+    expect(shown(c.bondInr)).toEqual(["None", "None", null, null]);
     const plain = cells("MD/MS", [bond("MD", "No service bond (per the college's MCC bond document)", 0, { status: "no_bond_verified" })]);
     expect(plain.bond.marker).toBeNull();
   });
@@ -310,6 +311,17 @@ describe("bond cells, by record status", () => {
       expect(shown(c[k])).toEqual(["Not published", "Not published", null, "muted"]);
       expect(c[k].tip[0]).toEqual({ text: "MCC bond document has no clear terms — check with the college", src: 1 });
     }
+  });
+
+  it("a DNB hospital that declared no bond, where NBEMS lets none be imposed: 'None declared', never 'No bond'", () => {
+    const words = "Not declared by the hospital (checked MCC profile and bond page, Uttar Pradesh rules, NBEMS rules on 15 Nov 2026); NBEMS: an undeclared bond can't be imposed this session";
+    const c = cells("DNB", [bond("DNB", words, null, { status: "not_declared", reason: "not_declared_no_document" })]);
+    for (const k of ["bond", "bondInr"] as const) {
+      expect(shown(c[k])).toEqual(["None declared", "None declared", null, "muted"]);
+      expect(c[k].tip[0].text).toMatch(/^None declared: the hospital declared no bond to MCC/);
+    }
+    // Words that don't say so (an MD record): still "Not published".
+    expect(cells("MD/MS", [bond("MD", "Not declared by the college", null, { status: "not_declared", reason: "not_declared_no_document" })]).bond.short).toBe("Not published");
   });
 
   it("no bond record at all: '—' with 'not checked yet' (never 'No bond'); DNB cites the NBEMS rule", () => {

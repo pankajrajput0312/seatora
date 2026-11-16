@@ -279,9 +279,19 @@ function stipendCell(t: ProgrammeTerms): StatCell {
   return levelOf({ ...c, short: `${min ? "≥ " : ""}${inrCard(s.inr)}/mo`, full: `${min ? "From " : ""}${inrFull(s.inr)}/mo`, marker: s.below ? "below NBEMS min" : null, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
 }
 
-/** A bond that is not declared: why ("Not published": the record's words; "—": no record, or a record for other courses). */
+/**
+ * A DNB hospital's bond its checked record finds not declared to MCC, where the record says NBEMS lets none be imposed
+ * this session (an undeclared bond can't be: NBEMS bulletin para 5.10). Shown "None declared", never "No bond": no
+ * document of the hospital's says no bond, so the No bond filter still leaves it out (its (i) says why).
+ */
+export const noneDeclared = (t: Pick<ProgrammeTerms, "programme" | "bond">) =>
+  isDnb(t as ProgrammeTerms) && t.bond.status === "not_declared" && !t.bond.caveat && /\bcan(?:'|’|no)t be imposed\b/i.test(t.bond.text ?? "");
+const NONE_DECLARED = "None declared: the hospital declared no bond to MCC, and NBEMS lets a DNB hospital impose only a bond declared before counselling, so none can be imposed this session. Not \"No bond\" in the filters: no document of the hospital's says so.";
+
+/** A bond that is not declared: why ("Not published": the record's words; "None declared": see noneDeclared; "—": no record, or a record for other courses). */
 function bondMissing(t: ProgrammeTerms, c: Pick<StatCell, "key" | "label" | "about">): StatCell {
   const b = t.bond;
+  if (noneDeclared(t)) return { ...c, short: "None declared", full: "None declared", marker: null, tone: "muted", tip: [{ text: NONE_DECLARED }, { text: b.text!, src: b.src }, ...(b.doc != null ? [{ text: "The college's own bond document on MCC", src: b.doc }] : []), { text: "NBEMS bond rules", rules: true }] };
   const doc: TipLine[] = b.doc != null ? [{ text: "The college's own bond document on MCC", src: b.doc }] : [];
   const rules: TipLine[] = isDnb(t) ? [{ text: DNB_RULE, rules: true }] : [{ text: STATE_CAUTION }];
   if (b.status === "other_course") return dash(c, [{ text: `Not published for ${t.programme}: the bond on the college's MCC profile is for other courses.`, src: b.src }, ...rules]);
@@ -386,7 +396,8 @@ const partLines = (parts: TermPart[], src: number | null): TipLine[] => parts.ma
 function bondInrCell(t: ProgrammeTerms): StatCell {
   const c = { key: "bondInr", label: statLabel.bondInr, about: "bond amount" } as const;
   const b = t.bond;
-  if (b.status === "none") return levelOf({ ...c, short: "None", full: "None", marker: null, tone: "muted", tip: [{ text: "No bond, so no bond amount." }, ...noBondTip(t)] }, b.caveat || b.stateRule ? undefined : "good", undefined);
+  // Ink with a caveat (as the Bond cell's "No bond" beside it), green without: one colour per row.
+  if (b.status === "none") return levelOf({ ...c, short: "None", full: "None", marker: null, tone: b.caveat || b.stateRule ? null : "muted", tip: [{ text: "No bond, so no bond amount." }, ...noBondTip(t)] }, b.caveat || b.stateRule ? undefined : "good", undefined);
   if (b.status !== "declared") return bondMissing(t, c);
   const a = b.amount;
   const head: TipLine = { text: "What you pay if you do not serve the bond (bond penalty)." };

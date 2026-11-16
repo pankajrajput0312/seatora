@@ -32,10 +32,11 @@ export function ColourLegend({ className }: { className?: string }) {
         </Row>
         <Row head="Bond">
           <Val c={levelClass.good}>No bond</Val>
+          <Val c="">No bond (no colour): private / trust status inferred from the name, or a state rule may apply</Val>
           <Val c={levelClass.caution}>1Y–2Y</Val>
           <Val c={levelClass.strong}>3Y or more</Val>
           <Val c={levelClass.heavy}>₹25 L or more to pay</Val>
-          <Val c="text-muted-foreground font-normal">Not published / —</Val>
+          <Val c="text-muted-foreground font-normal">None declared / Not published / —</Val>
         </Row>
         <Row head="Fee a year">
           <Val c={levelClass.good}>low</Val>
