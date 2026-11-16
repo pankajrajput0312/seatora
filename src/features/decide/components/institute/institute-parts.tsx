@@ -34,14 +34,17 @@ export function CategoryToggle({ mine, all, href }: { mine: string[]; all: boole
   );
 }
 
-/** One seat list's rows at one institute: course, quota, seat category, seats (as the PDF printed them). */
+/**
+ * One seat list's rows at one institute: course, quota, seat category, seats (as the PDF printed them). Fits a phone's
+ * width; a big college's list is long, so its header row pins under the top bar (ScrollTable).
+ */
 export function CollegeSeatTable({ rows, caption }: { rows: SeatRow[]; caption: string }) {
   const td = "px-3 py-3 align-top max-sm:px-2 md:px-4";
   return (
-    <div role="region" aria-label={caption} tabIndex={0} className={tbl.wrap}>
+    <ScrollTable label={caption}>
       <table className={tbl.table}>
         <caption className="sr-only">{caption}</caption>
-        <thead>
+        <thead className={tbl.head}>
           <tr className={tbl.headRow}>
             <th scope="col" className={cn(tbl.th, "px-3 max-sm:px-2 md:px-4")}>Course</th>
             <th scope="col" className={cn(tbl.th, "px-3 max-sm:px-2 md:px-4")}>Quota</th>
@@ -60,7 +63,7 @@ export function CollegeSeatTable({ rows, caption }: { rows: SeatRow[]; caption: 
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollTable>
   );
 }
 

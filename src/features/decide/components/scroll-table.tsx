@@ -5,23 +5,21 @@ import { cn } from "@/lib/cn";
 import { useLocal } from "../lib/local-store";
 
 // A wide table that never traps the finger: the page is the one vertical scroller (the box scrolls sideways only), and
-// a copy of the header row stays pinned under the app's top bar while the page scrolls past the table. CSS sticky
+// a copy of the header row stays pinned under the app's top bar (and a pinned toolbar) while the page scrolls past it. CSS sticky
 // can't leave a sideways-scrolling box, so the copy sits outside it: a separate table, each header cell sized from the
 // real one (ResizeObserver), scrolled sideways with the body both ways. The real <thead> stays in the table for screen
 // readers; the copy is aria-hidden and out of the tab order, and a click on its links and buttons is the real one's.
 
-/** The app's top bar height (plus any bar pinned under it, `data-app-top`) as --app-top on <html>: one observer a page. */
-let topBars: ResizeObserver | null = null;
-const BARS = ".app .astryx-app-shell-header, .app [data-app-top]";
-function watchAppTop() {
-  if (topBars) return;
-  const set = () => {
-    const h = [...document.querySelectorAll<HTMLElement>(BARS)].reduce((a, e) => a + e.offsetHeight, 0);
-    document.documentElement.style.setProperty("--app-top", `${h}px`);
-  };
-  topBars = new ResizeObserver(set);
-  document.querySelectorAll(BARS).forEach((e) => topBars!.observe(e));
-  set();
+/**
+ * Where a pinned header copy sits, as --table-top on <html>: under the app's top bar and under any bar pinned below it
+ * (a list page's toolbar on phones, globals.css .filter-toolbar; `data-app-top` for another), each counted only while it
+ * is pinned (sticky or fixed). Not --app-top: the toolbar itself pins at that (FiltersPanel measures it).
+ */
+const BARS = ".app .astryx-app-shell-header, .app [data-app-top], .app .filter-toolbar";
+function setTableTop() {
+  const pinned = (e: HTMLElement) => /^(sticky|fixed)$/.test(getComputedStyle(e).position);
+  const h = [...document.querySelectorAll<HTMLElement>(BARS)].filter(pinned).reduce((a, e) => a + e.offsetHeight, 0);
+  document.documentElement.style.setProperty("--table-top", `${h}px`);
 }
 
 /** What a click in the header copy is forwarded for (the same index in the real header). */
@@ -50,7 +48,11 @@ export function ScrollTable({ label, id, scope, className = FRAME, scrollClassNa
 
   useEffect(() => {
     const o = outer.current!, p = pin.current!, hb = headBox.current!, b = body.current!;
-    watchAppTop();
+    // The bars of this page (they change with it): their heights, and a toolbar that pins only below md.
+    const bars = new ResizeObserver(setTableTop);
+    document.querySelectorAll(BARS).forEach((e) => bars.observe(e));
+    window.addEventListener("resize", setTableTop);
+    setTableTop();
     let table: HTMLTableElement | null = null;
     let copy: HTMLTableElement | null = null;
     let from: HTMLElement | null = null; // the thead copied
@@ -143,6 +145,8 @@ export function ScrollTable({ label, id, scope, className = FRAME, scrollClassNa
       cancelAnimationFrame(frame);
       changes.disconnect();
       sizes.disconnect();
+      bars.disconnect();
+      window.removeEventListener("resize", setTableTop);
       b.removeEventListener("scroll", fromBody);
       hb.removeEventListener("scroll", fromHead);
       window.removeEventListener("scroll", stuck);
@@ -170,7 +174,7 @@ export function ScrollTable({ label, id, scope, className = FRAME, scrollClassNa
         ref={pin}
         aria-hidden
         onClick={forward}
-        className="invisible sticky top-[var(--app-top,0px)] z-[5] bg-card data-[stuck]:visible data-[stuck]:shadow-[0_2px_4px_-2px_rgb(0_0_0/0.18)] print:hidden"
+        className="invisible sticky top-[var(--table-top,0px)] z-[5] bg-card data-[stuck]:visible data-[stuck]:shadow-[0_2px_4px_-2px_rgb(0_0_0/0.18)] print:hidden"
       >
         <div ref={headBox} className="overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" />
       </div>

@@ -414,7 +414,8 @@ test("wide tables: the page is the one vertical scroller, the header row pins un
   // Mid-table: the copy shows, right under the app's top bar.
   await table.evaluate((e) => scrollTo(0, e.getBoundingClientRect().top + scrollY + 400));
   await expect(pinned).toBeVisible();
-  const bar = await page.locator(".astryx-app-shell-header").evaluate((e) => e.getBoundingClientRect().bottom);
+  // Under the top bar, and on a phone under the toolbar pinned below it.
+  const bar = await page.evaluate(() => Math.max(...[...document.querySelectorAll(".astryx-app-shell-header, .filter-toolbar")].filter((e) => getComputedStyle(e).position === "sticky").map((e) => e.getBoundingClientRect().bottom)));
   expect(Math.abs((await pinned.boundingBox())!.y - bar)).toBeLessThanOrEqual(1);
   // The wheel over the table scrolls the page; the table box never scrolls up and down.
   const box = (await body.boundingBox())!;

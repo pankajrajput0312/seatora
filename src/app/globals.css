@@ -279,8 +279,11 @@ html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
 }
 
 /* Tables (docs/APP_DESIGN_SYSTEM.md "Tables"). The page is the one vertical scroller: a table box scrolls sideways only.
-   A cell focused by Tab stops below a ScrollTable's pinned header copy (--head-h), not under it. */
-.app [data-scroll-table] tbody * { scroll-margin-top: var(--head-h, 0px); }
+   A cell focused by Tab stops below a ScrollTable's pinned header copy (--head-h) and the bars above it (--table-top,
+   beyond the page's 6rem scroll-padding), not under them. */
+.app [data-scroll-table] tbody * { scroll-margin-top: calc(var(--head-h, 0px) + max(0px, var(--table-top, 0px) - 6rem)); }
+/* On paper no 44px hit box (as the (i)'s): in a table's last row it would reach past the box, as if a row were cut off. */
+@media print { .hit::before { display: none; } }
 /* A row that scrolls sideways (.fade-x: SubTabs) fades out at an edge with more beyond it, by its own scroll position
    (scroll-driven; a row that fits, or a browser without scroll timelines, shows no fade). */
 @property --fade-l { syntax: "<length>"; inherits: false; initial-value: 0px; }
