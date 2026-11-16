@@ -16,6 +16,9 @@ import { cn } from "@/lib/cn";
  */
 export const NAV_EVENT = "decide:navigating";
 export const navigating = (refresh = false) => window.dispatchEvent(new CustomEvent(NAV_EVENT, { detail: { refresh } }));
+/** A few seconds of a short message in the shell's toast (DecideShell), e.g. "Added to Round 3 · 2026". Outside Decide: nothing. */
+export const TOAST_EVENT = "decide:toast";
+export const toast = (text: string) => window.dispatchEvent(new CustomEvent(TOAST_EVENT, { detail: text }));
 
 export function NavPending({ children }: { children: React.ReactNode }) {
   const here = `${usePathname()}?${useSearchParams()}`;

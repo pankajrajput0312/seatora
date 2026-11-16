@@ -19,7 +19,7 @@ import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-s
 import { profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
 import { AccountSync } from "./account-sync";
 import { BackToTop } from "./back-to-top";
-import { NAV_EVENT, navigating } from "./nav-pending";
+import { NAV_EVENT, navigating, TOAST_EVENT } from "./nav-pending";
 import { ProfileDialog, type ProfileMeta } from "./profile-dialog";
 import { RenamedSaved } from "./renamed-saved";
 
@@ -100,17 +100,22 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
     }
   }, [hydrated, profile, sp, pathname, router]);
 
-  // "Saved your rank": a few seconds after each save, above the phone's bottom bar.
-  const [toast, setToast] = useState(false);
+  // "Saved your rank" after each save, or another page's toast() (nav-pending.tsx): a few seconds, above the phone's bottom bar.
+  const [toast, setToast] = useState<{ text: string; at: number } | null>(null);
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(false), 3000);
+    const t = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(t);
   }, [toast]);
+  useEffect(() => {
+    const on = (e: Event) => setToast({ text: String((e as CustomEvent).detail), at: Date.now() });
+    window.addEventListener(TOAST_EVENT, on);
+    return () => window.removeEventListener(TOAST_EVENT, on);
+  }, []);
 
   const save = (p: Profile) => {
     setStored(p);
-    setToast(true);
+    setToast({ text: "Saved your rank", at: Date.now() });
     // First run: on to Options, which opens on the current round's seats in her courses (service.ts optionsView).
     if (!shown) {
       landing.current = "/decide/options";
@@ -260,7 +265,7 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
       <div aria-hidden className={cn("fixed inset-x-0 top-0 z-50 h-0.5 bg-mark", loading ? "animate-pulse" : "hidden")} />
       <p role="status" className="sr-only">{loading ? "Loading the page…" : ""}</p>
       <p role="status" className={cn("pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto w-fit rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background shadow-overlay md:bottom-6", !toast && "sr-only")}>
-        {toast ? "Saved your rank" : ""}
+        {toast?.text ?? ""}
       </p>
 
       <BackToTop />

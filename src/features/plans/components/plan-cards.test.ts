@@ -3,12 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { limitLine, PlanCardsView } from "./plan-cards";
 
-const text = (html: string) => html.replace(/<[^>]+>/g, "");
+const text = (html: string) => html.replace(/<[^>]+>/g, "").replaceAll("&#x27;", "'");
 const card = (html: string, plan: "FREE" | "PREMIUM") => html.split(`data-plan="${plan}"`)[1].split("data-plan=")[0];
 
 describe("PlanCardsView", () => {
-  const render = (current: "FREE" | "PREMIUM" | null, free: Date | null) =>
-    renderToStaticMarkup(h(PlanCardsView, { current, free, cta: h("button", null, "CTA"), freeCta: h("a", { href: "/signup" }, "Create free account") }));
+  const render = (current: "FREE" | "PREMIUM" | null, free: Date | null, more: { got?: string; invite?: { name: string; amount: number } } = {}) =>
+    renderToStaticMarkup(h(PlanCardsView, { current, free, ...more, cta: h("button", null, "CTA"), freeCta: h("a", { href: "/signup" }, "Create free account") }));
 
   it("a Free user: the badge and a disabled Current plan on Free; the free period's ribbon and ₹0 on the Season Pass", () => {
     const html = render("FREE", new Date("2026-11-20T18:29:59Z"));
@@ -33,5 +33,14 @@ describe("PlanCardsView", () => {
     expect(text(card(html, "PREMIUM"))).toContain("₹159 with an invite, valid till 31 Mar 2027.");
     expect(card(html, "FREE")).toContain('<a href="/signup">Create free account</a>');
     expect(limitLine("ask", 0)).toBe("No Ask Seatora questions a day");
+  });
+
+  it("her pass: what she got in place of the price; a friend's invite: its price, in and after the free period", () => {
+    const pass = text(card(render("PREMIUM", null, { got: "₹0 · code DRTARAL · till 31 Mar 2027" }), "PREMIUM"));
+    expect(pass).toContain("₹0 · code DRTARAL · till 31 Mar 2027");
+    expect(pass).not.toMatch(/₹499|₹199/);
+    const sneha = { name: "Sneha", amount: 15900 };
+    expect(text(card(render("FREE", new Date("2026-11-20T18:29:59Z"), { invite: sneha }), "PREMIUM"))).toContain("Sneha's invite: ₹159 after 20 Nov (instead of ₹199)");
+    expect(text(card(render("FREE", null, { invite: sneha }), "PREMIUM"))).toContain("Was ₹499, now ₹159₹499₹159with Sneha's invite");
   });
 });

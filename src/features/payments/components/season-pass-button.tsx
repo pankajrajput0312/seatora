@@ -6,10 +6,12 @@ import { freeNow, longDate, passState, shortDate } from "@/features/plans/plans"
 import { formatPaise, REF_COOKIE } from "@/features/referrals/lib";
 import { quote } from "@/features/referrals/service";
 import { cn } from "@/lib/cn";
+import type { CouponBannerInfo } from "../coupons";
+import { SEASON_PASS_UNTIL } from "../grant";
 import { paymentsOn, PLANS } from "../plans";
 import { priceFor } from "../service";
 import { BuySeasonPass } from "./buy-season-pass";
-import { CouponForm } from "./coupon-form";
+import { ApplyCoupon, CouponForm } from "./coupon-form";
 
 /**
  * The Season Pass call to action everywhere (Pricing #buy, the planner's home, the paywall, the account page), from her
@@ -19,7 +21,9 @@ import { CouponForm } from "./coupon-form";
  *   done), and "Have a coupon?" (CouponForm: a 100% coupon gives the whole season). No paid option while it is free;
  * - after it: "Upgrade for ~~₹499~~ ₹199" ("Upgrade for ~~₹499~~ ₹159 with Rahul's invite" with a referrer: her own, or the /r/
  *   cookie's code; "… with coupon X" with a coupon), or "Payments open soon" and "Have a coupon?";
- * - signed out: the same words, to /signup?next=/pricing#buy.
+ * - signed out: the same words, to /signup?next=/pricing#buy;
+ * - a valid 100% ?coupon= (any of these but a pass): "Apply DRTARAL: free till 31 Mar 2027" in their place (ApplyCoupon;
+ *   signed out, to /signup?coupon=, which lands on the plan page with it).
  * `className`: the primary button; `noteClassName`: text (and the secondary button's colour). Each Upgrade carries
  * data-upgrade: a click is an upgrade_click at the nearest data-placement (docs/FUNNEL.md). `coupon`: the page's
  * ?coupon=, applied to the price (or filled into "Have a coupon?") and kept through sign-up. `freeLabel`: the free
@@ -38,10 +42,16 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
   const was = formatPaise(PLANS.season_pass.wasAmount); // struck beside every price
   const claimLabel = free && (freeLabel ?? <span>Upgrade free till {shortDate(free)}</span>);
 
+  const c = coupon ? await priceFor(user?.id ?? null, coupon) : null; // ?coupon=: priced as if she had typed it
+  const ok = c && !c.error ? c : null;
+  const season = longDate(SEASON_PASS_UNTIL);
+  const freeCoupon = ok?.coupon && ok.amount === 0 ? ok.coupon : null;
+  const applyLabel = freeCoupon && `Apply ${freeCoupon}: free till ${season}`;
+
   if (!user)
     return (
-      <Link href={`/signup?${new URLSearchParams({ next: `/pricing${coupon ? `?coupon=${coupon}` : ""}#buy` })}`} data-upgrade="" className={cn("inline-flex items-center justify-center", className)}>
-        {claimLabel ||
+      <Link href={coupon ? `/signup?${new URLSearchParams({ coupon })}` : `/signup?${new URLSearchParams({ next: "/pricing#buy" })}`} data-upgrade="" className={cn("inline-flex items-center justify-center", className)}>
+        {applyLabel || claimLabel ||
           (q ? (
             <span>
               Upgrade for {q.amount < PLANS.season_pass.wasAmount && <s className="mr-1 opacity-70">{was}</s>}
@@ -54,7 +64,8 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
       </Link>
     );
 
-  const couponForm = <CouponForm initialCode={coupon} noteClassName={noteClassName} />;
+  if (freeCoupon) return <ApplyCoupon code={freeCoupon} label={`Apply ${freeCoupon}: free till ${season}`} done={`Season Pass till ${season}`} className={className} noteClassName={noteClassName} />;
+  const couponForm = <CouponForm initialCode={coupon} done={`Season Pass till ${season}`} noteClassName={noteClassName} />;
   if (!free || !s || s.state === "free") {
     if (!q)
       return (
@@ -63,8 +74,6 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
           {couponForm}
         </div>
       );
-    const c = coupon ? await priceFor(user.id, coupon) : null; // ?coupon=: priced as if she had typed it
-    const ok = c && !c.error ? c : null;
     const p = ok ?? q;
     const offer = { amount: p.amount, listAmount: p.listAmount, inviter: p.inviter, coupon: ok?.coupon ?? null, code: ok ? (coupon ?? null) : q.referrerId ? code : null };
     const initial = coupon ? { code: coupon, error: c?.error ?? null } : undefined;
@@ -76,9 +85,19 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
       {s.state === "claimed" ? (
         <p className={cn(text, "font-semibold")} role="status">Season Pass · free till {shortDate(free)}</p>
       ) : (
-        <ClaimFreePass label={claimLabel} className={className} noteClassName={noteClassName} />
+        <ClaimFreePass label={claimLabel} done={`Season Pass active till ${shortDate(free)}`} className={className} noteClassName={noteClassName} />
       )}
       {couponForm}
     </div>
+  );
+}
+
+/** The ?coupon= banner on Pricing, sign-up and the plan page (couponCheck): what the code gives, or quietly why it gives nothing. */
+export function CouponBanner({ b, className }: { b: CouponBannerInfo | null; className?: string }) {
+  if (!b) return null;
+  return b.ok ? (
+    <p role="status" className={cn("rounded-md border border-sky/40 bg-sky/10 px-3 py-2 text-sm font-semibold text-foreground", className)}>{b.text}</p>
+  ) : (
+    <p role="status" className={cn("text-sm text-muted-foreground", className)}>{b.text}</p>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { couponCodeSchema, couponCreateSchema, couponEditSchema, couponError, couponPrice } from "./coupons";
+import { couponBanner, couponCodeSchema, couponCreateSchema, couponEditSchema, couponError, couponPrice } from "./coupons";
 import { PLANS } from "./plans";
 
 const now = new Date("2026-11-25T12:00:00+05:30");
@@ -52,5 +52,15 @@ describe("coupon codes and the admin form", () => {
   it("edit: active only from the toggle button", () => {
     expect(couponEditSchema.parse({ id: "c1", maxUses: "", allowedEmail: "", validUntil: "" })).toEqual({ id: "c1", maxUses: null, allowedEmail: null, validUntil: null });
     expect(couponEditSchema.parse({ id: "c1", active: "0" }).active).toBe("0");
+  });
+});
+
+describe("couponBanner", () => {
+  const season = new Date("2027-03-31T23:59:59+05:30");
+  it("a good code says what it gives; a bad one quietly why not, and is never the main action", () => {
+    expect(couponBanner("DRTARAL", { percentOff: 100, error: null }, season)).toEqual({ ok: true, free: true, text: "Code DRTARAL: Season Pass free till 31 Mar 2027" });
+    expect(couponBanner("SAVE20", { percentOff: 20, error: null }, season)).toEqual({ ok: true, free: false, text: "Code SAVE20: 20% off the Season Pass" });
+    expect(couponBanner("OLD", { percentOff: 100, error: "This coupon has expired." }, season)).toEqual({ ok: false, free: false, text: "Code OLD: This coupon has expired." });
+    expect(couponBanner("NOPE", null, season)).toEqual({ ok: false, free: false, text: "NOPE isn't a valid coupon code." });
   });
 });

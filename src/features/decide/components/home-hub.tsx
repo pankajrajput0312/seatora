@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { ArrowRight, Building2, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
-import { getCurrentUser } from "@/features/auth/lib/session";
 import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import { PLANS } from "@/features/payments/plans";
-import { limitLine } from "@/features/plans/components/plan-cards";
-import { freeNow, passState, planLimits, shortDate } from "@/features/plans/plans";
+import { limitLine, passView } from "@/features/plans/components/plan-cards";
+import { freeNow, inviteLine, planLimits, shortDate } from "@/features/plans/plans";
 import { formatPaise, REFERRAL_PERCENT } from "@/features/referrals/lib";
 import { cn } from "@/lib/cn";
 import type { DecideLinks } from "../lib/links";
@@ -76,8 +75,8 @@ export function ToolGroups({ L }: { L: DecideLinks }) {
 /** The Residents card, compact, with the Season Pass box beside it (under it on phones). */
 export async function ResidentsPromo({ L }: { L: DecideLinks }) {
   const free = freeNow();
-  const user = await getCurrentUser();
-  const state = user && passState(user).state;
+  const { state, got, invite } = await passView(); // what the plan cards say: her pass, or her invite's price
+  const list = PLANS.season_pass.amount;
   // What the Free plan keeps once the free period ends: not said to a paid pass or staff, whom it doesn't concern.
   const keeps = planLimits("FREE");
   const after = free && state !== "pass" && state !== "staff" && `Free until ${shortDate(free)}. After that: ${limitLine("institutes", keeps.institutes).replace(/ a day$/, "")} and ${limitLine("residents", keeps.residents)}.`;
@@ -107,10 +106,24 @@ export async function ResidentsPromo({ L }: { L: DecideLinks }) {
         </div>
         <div data-placement="home_card" className="rounded-lg border border-dashed border-[#2b3a45] px-4 py-3 md:max-w-72">
           <p className="section-label text-[#a3abb3]">Season Pass</p>
-          <p className="mt-1 flex items-baseline gap-2">
-            <s className="font-mono text-body text-[#6b7480]" aria-label={`Was ${formatPaise(PLANS.season_pass.wasAmount)}`}>{formatPaise(PLANS.season_pass.wasAmount)}</s>
-            <span className="font-mono text-h2 font-bold text-[#5fd36f]">{formatPaise(free ? 0 : PLANS.season_pass.amount)}</span>
-          </p>
+          {got ? (
+            <p className="mt-1 font-mono text-body font-bold text-[#5fd36f]">{got}</p>
+          ) : free ? (
+            // As the plan card: ₹0 now, never a struck "was" price beside it.
+            <p className="mt-1 flex items-baseline gap-2">
+              <span className="font-mono text-h2 font-bold text-[#5fd36f]">₹0</span>
+              <span className="text-caption text-[#a3abb3]">now</span>
+            </p>
+          ) : (
+            <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
+              <s className="font-mono text-body text-[#6b7480]" aria-label={`Was ${formatPaise(PLANS.season_pass.wasAmount)}`}>{formatPaise(PLANS.season_pass.wasAmount)}</s>
+              <span className="font-mono text-h2 font-bold text-[#5fd36f]">{formatPaise(invite?.amount ?? list)}</span>
+              {invite && <span className="text-caption text-[#f1f4f7]">with {invite.name}&apos;s invite</span>}
+            </p>
+          )}
+          {free && state !== "pass" && state !== "staff" && (
+            <p className="text-caption text-[#f1f4f7]">{invite ? inviteLine(invite.name, invite.amount, list, free) : `Then ${formatPaise(list)} once.`}</p>
+          )}
           {after && <p className="text-caption text-[#f1f4f7]">{after}</p>}
           <div className="mt-3">
             <SeasonPassButton

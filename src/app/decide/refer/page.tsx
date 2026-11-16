@@ -28,7 +28,10 @@ export default async function ReferPage() {
   const price = discountedPrice(list);
   const free = freeNow();
   const url = `${siteConfig.url}/r/${code}`;
-  const message = `I'm planning NEET PG counselling on Seatora. Sign up with my link for ${REFERRAL_PERCENT}% off the Season Pass:`;
+  // The free window: nothing to discount yet, so say when the discount starts.
+  const message = free
+    ? `Seatora is free till ${shortDate(free)} — then ${REFERRAL_PERCENT}% off with my link:`
+    : `I'm planning NEET PG counselling on Seatora. Sign up with my link for ${REFERRAL_PERCENT}% off the Season Pass:`;
 
   return (
     <AppPage className="grid max-w-3xl grid-cols-1 gap-6">

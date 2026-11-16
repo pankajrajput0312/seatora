@@ -1,3 +1,5 @@
+import { formatPaise } from "@/features/referrals/lib";
+
 // Plans and their limits: one table, overridable per value from env (docs/PLANS_AND_ROLES.md). Pure, so tested.
 // Limits are per account per IST day (00:00 Asia/Kolkata). Infinity = unlimited.
 
@@ -112,6 +114,27 @@ export function planLine(a: Account, now = new Date(), env: Record<string, strin
   if (s.state === "pass") return s.until ? `Season Pass · till ${longDate(s.until)}` : "Season Pass";
   return "Free plan";
 }
+
+/**
+ * What her Season Pass is, on its card and the Home box, from her paid Season Pass payment (`paid`, with its coupon's
+ * code) and premiumUntil: "₹0 · code DRTARAL · till 31 Mar 2027", "Paid ₹199 · till 31 Mar 2027", "Free till 20 Nov
+ * (free period)" (the free claim); "Season Pass · till …" when granted without a payment. Null without a pass.
+ */
+export function gotLine(s: { state: PassState; until: Date | null }, paid: { amount: number; coupon: string | null } | null) {
+  if (s.state === "claimed") return `Free till ${shortDate(s.until!)} (free period)`;
+  if (s.state === "staff") return "Staff account: no limits";
+  if (s.state !== "pass") return null;
+  const till = s.until ? ` · till ${longDate(s.until)}` : "";
+  if (!paid) return `Season Pass${till}`;
+  return `${paid.amount ? `Paid ${formatPaise(paid.amount)}` : formatPaise(0)}${paid.coupon ? ` · code ${paid.coupon}` : ""}${till}`;
+}
+
+/**
+ * Her friend's invite on the Season Pass card (first name only): "Sneha's invite: ₹159 after 20 Nov (instead of ₹199)"
+ * while it is free, "₹159 with Sneha's invite" after (beside the struck "was" price).
+ */
+export const inviteLine = (name: string, amount: number, list: number, free: Date | null) =>
+  free ? `${name}'s invite: ${formatPaise(amount)} after ${shortDate(free)} (instead of ${formatPaise(list)})` : `${formatPaise(amount)} with ${name}'s invite`;
 
 /** Today's use against a limit: "3/10", or "3" when unlimited. */
 export const usedOf = (n: number, limit: number) => (limit === Infinity ? String(n) : `${n}/${limit}`);

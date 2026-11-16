@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { effectivePlan, freeForAllUntil, istDay, passState, planLimits, planLine } from "./plans";
+import { effectivePlan, freeForAllUntil, gotLine, inviteLine, istDay, passState, planLimits, planLine } from "./plans";
 
 const now = new Date("2026-11-20T06:00:00Z");
 const free = { role: "FREE" as const, premiumUntil: null };
@@ -52,5 +52,25 @@ describe("istDay", () => {
   it("is the date in India, resetting at 00:00 IST", () => {
     expect(istDay(new Date("2026-11-19T18:29:59Z"))).toEqual({ day: "2026-11-19", resetAt: new Date("2026-11-19T18:30:00Z") });
     expect(istDay(new Date("2026-11-19T18:30:00Z")).day).toBe("2026-11-20");
+  });
+});
+
+describe("gotLine and inviteLine", () => {
+  const season = new Date("2027-03-31T18:29:59Z");
+  const freeEnd = new Date("2026-11-20T18:29:59Z");
+  it("an active pass says what she got: a ₹0 coupon, a paid price, a grant; the free claim says till when", () => {
+    const pass = { state: "pass" as const, until: season };
+    expect(gotLine(pass, { amount: 0, coupon: "DRTARAL" })).toBe("₹0 · code DRTARAL · till 31 Mar 2027");
+    expect(gotLine(pass, { amount: 19900, coupon: null })).toBe("Paid ₹199 · till 31 Mar 2027");
+    expect(gotLine(pass, { amount: 9900, coupon: "HALF" })).toBe("Paid ₹99 · code HALF · till 31 Mar 2027");
+    expect(gotLine(pass, null)).toBe("Season Pass · till 31 Mar 2027");
+    expect(gotLine({ state: "pass", until: null }, null)).toBe("Season Pass");
+    expect(gotLine({ state: "claimed", until: freeEnd }, null)).toBe("Free till 20 Nov (free period)");
+    expect(gotLine({ state: "claimable", until: freeEnd }, null)).toBeNull();
+    expect(gotLine({ state: "free", until: null }, null)).toBeNull();
+  });
+  it("a friend's invite: the price after the free period while it is on, the price with her name after it", () => {
+    expect(inviteLine("Sneha", 15900, 19900, freeEnd)).toBe("Sneha's invite: ₹159 after 20 Nov (instead of ₹199)");
+    expect(inviteLine("Sneha", 15900, 19900, null)).toBe("₹159 with Sneha's invite");
   });
 });

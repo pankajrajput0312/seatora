@@ -8,7 +8,9 @@ import { FreePrice } from "@/components/marketing/free-price";
 import { askConfig } from "@/features/ask/config";
 import { getCurrentUser } from "@/features/auth/lib/session";
 import { couponCodeSchema } from "@/features/payments/coupons";
+import { CouponBanner } from "@/features/payments/components/season-pass-button";
 import { paymentsOn, PLANS } from "@/features/payments/plans";
+import { couponCheck } from "@/features/payments/service";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { freeNow, longDate, shortDate } from "@/features/plans/plans";
 import { SEASON_PASS_UNTIL } from "@/features/payments/grant";
@@ -27,6 +29,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
   const coupon = couponCodeSchema.safeParse((await searchParams).coupon).data ?? null;
   const user = await getCurrentUser();
   const q = await quote(user?.id ?? null, (await cookies()).get(REF_COOKIE)?.value);
+  const banner = coupon && (await couponCheck(user?.id ?? null, coupon));
   const free = freeNow();
   const paying = paymentsOn();
   const askOpen = askConfig().enabled && process.env.ASK_FOR_MEMBERS === "1";
@@ -37,6 +40,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Pricing</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Seatora NEET PG 2026 Season Pass</h1>
         {q.inviter && <InviteBanner inviter={q.inviter} className="mt-4" />}
+        <CouponBanner b={banner || null} className="mt-4" />
         <p className="mt-3 text-lg font-semibold">
           <FreePrice />
         </p>
@@ -113,7 +117,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
             <div className="mt-4 flex flex-wrap gap-3">
               {!user && (
                 <Button asChild>
-                  <Link href="/signup">Create free account</Link>
+                  <Link href={coupon ? `/signup?${new URLSearchParams({ coupon })}` : "/signup"}>Create free account</Link>
                 </Button>
               )}
               <Button asChild variant="ghost">

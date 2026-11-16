@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { beacon } from "@/features/funnel/components/beacon";
 import { PLAN_PROMPT_COOKIE } from "../prompt";
 
@@ -9,17 +10,20 @@ import { PLAN_PROMPT_COOKIE } from "../prompt";
  * The plan pop-up right after signing in ("Choose your plan": the plan cards), over the planner; a bottom sheet on phones. "Not now", ×, Esc or a
  * click outside closes it for this sign-in. A fixed layer rather than <dialog>: the top layer would sit above Razorpay's
  * checkout when she pays from here. Funnel: plan_popup_shown when it opens, plan_popup_dismissed when she closes it (an
- * Upgrade in it is data-placement "popup"; upgrading unmounts it without a dismiss).
+ * Upgrade in it is data-placement "popup"; upgrading unmounts it without a dismiss). Not over the plan page, which is the
+ * same choice (and where sign-up lands her with a coupon to apply): it waits for her next page.
  */
 export function PlanPrompt({ title, children }: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(true);
+  const [shown, setOpen] = useState(true);
+  const path = usePathname();
+  const open = shown && path !== "/decide/plan";
   const closeRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => {
     document.cookie = `${PLAN_PROMPT_COOKIE}=; Max-Age=0; path=/`;
     setOpen(false);
     beacon({ name: "plan_popup_dismissed" });
   }, []);
-  useEffect(() => beacon({ name: "plan_popup_shown" }), []);
+  useEffect(() => void (open && beacon({ name: "plan_popup_shown" })), [open]);
   useEffect(() => {
     if (!open) return; // closed: Esc does nothing (and isn't a second dismissal)
     closeRef.current?.focus();

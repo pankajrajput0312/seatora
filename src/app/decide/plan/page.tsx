@@ -4,6 +4,8 @@ import { getCurrentUser, requireDecideAccess } from "@/features/auth/lib/session
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
 import { couponCodeSchema } from "@/features/payments/coupons";
+import { CouponBanner } from "@/features/payments/components/season-pass-button";
+import { couponCheck } from "@/features/payments/service";
 import { smallLink, StatCell } from "@/features/decide/components/ui";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { effectivePlan, planLine, shortDate, usedOf } from "@/features/plans/plans";
@@ -22,12 +24,14 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const user = await getCurrentUser();
   const eff = user && effectivePlan(user);
   const used = user && (await usageToday(user.id));
+  const banner = coupon && (await couponCheck(user?.id ?? null, coupon));
   const [name, until] = user ? planLine(user).split(" · ") : [];
   const daily = (n: number, limit: number) => ({ value: <span className="numeric">{usedOf(n, limit)}</span>, note: limit === Infinity ? "No daily limit" : "More at 00:00 IST" });
 
   return (
     <AppPage className="grid max-w-4xl grid-cols-1 gap-6">
       <PageHead title="Your plan" about="Daily limits reset at 00:00 IST. The Season Pass is paid once for the counselling season: no subscription, nothing renews." />
+      <CouponBanner b={banner || null} />
       {user && eff && used ? (
         <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3 max-sm:[&>:first-child]:col-span-2">
           <StatCell label="Plan" value={name} note={until ?? (eff.freeUntil && `Season Pass limits till ${shortDate(eff.freeUntil)}`)} />

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { shortDate } from "@/features/plans/plans";
+import { longDate, shortDate } from "@/features/plans/plans";
 import { discountedPrice } from "@/features/referrals/lib";
 
 // Season Pass coupons (docs/PAYMENTS.md "Coupons"): the rules, pure (coupons.test.ts). Reads and writes: service.ts.
@@ -24,6 +24,19 @@ export function couponError(c: Coupon, buyer: Buyer, now: Date, freeUntil: Date 
   if (freeUntil && c.percentOff < 100) return `This coupon works after ${shortDate(freeUntil)}.`;
   return null;
 }
+
+/**
+ * The ?coupon= banner (Pricing, sign-up, the plan page) from the server's check of the code (`c`: null when no coupon has
+ * it): "Code DRTARAL: Season Pass free till 31 Mar 2027" (100%), "Code SAVE20: 20% off the Season Pass", else why it gives
+ * nothing (ok false: a quiet note). `free`: a 100% coupon, applied as the plan's main action.
+ */
+export function couponBanner(code: string, c: { percentOff: number; error: string | null } | null, seasonEnd: Date) {
+  if (!c) return { ok: false, free: false, text: `${code} isn't a valid coupon code.` };
+  if (c.error) return { ok: false, free: false, text: `Code ${code}: ${c.error}` };
+  const free = c.percentOff >= 100;
+  return { ok: true, free, text: `Code ${code}: ${free ? `Season Pass free till ${longDate(seasonEnd)}` : `${c.percentOff}% off the Season Pass`}` };
+}
+export type CouponBannerInfo = ReturnType<typeof couponBanner>;
 
 // The admin form (/decide/admin): empty optional fields are null.
 const orNull = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);

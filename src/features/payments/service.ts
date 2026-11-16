@@ -5,8 +5,8 @@ import { track } from "@/features/funnel/service";
 import { freeNow } from "@/features/plans/plans";
 import { quote, recordEarning, type Quote } from "@/features/referrals/service";
 import { db } from "@/lib/db";
-import { couponCodeSchema, couponError, couponPrice } from "./coupons";
-import { grantPlan } from "./grant";
+import { couponBanner, couponCodeSchema, couponError, couponPrice } from "./coupons";
+import { grantPlan, SEASON_PASS_UNTIL } from "./grant";
 import { PLANS, type Plan } from "./plans";
 
 /**
@@ -48,7 +48,7 @@ export async function hasPaid(userId: string, plan: Plan = "season_pass") {
   return !!(await db.payment.findFirst({ where: { userId, plan, status: "paid" }, select: { id: true } }));
 }
 
-export type Price = Quote & { couponId: string | null; coupon: string | null };
+export type Price = Quote & { couponId: string | null; coupon: string | null; percentOff?: number };
 
 /**
  * Her Season Pass price with `code` (paise): a coupon first (it replaces any referral discount, and earns no referrer),
@@ -68,7 +68,19 @@ export async function priceFor(buyerId: string | null, code?: string | null, now
     : [null, null, null];
   const error = couponError(c, buyer && { email: buyer.email, redeemed: !!redeemed, paid: !!paid }, now, freeNow(now));
   const amount = error ? listAmount : couponPrice(listAmount, c.percentOff);
-  return { listAmount, amount, discount: listAmount - amount, referrerId: null, inviter: null, couponId: error ? null : c.id, coupon: c.code, error };
+  return { listAmount, amount, discount: listAmount - amount, referrerId: null, inviter: null, couponId: error ? null : c.id, coupon: c.code, percentOff: c.percentOff, error };
+}
+
+/** ?coupon= on Pricing, sign-up and the plan page: what the code gives this buyer now (null: signed out), as the order route would price it. */
+export async function couponCheck(buyerId: string | null, code: string) {
+  const p = await priceFor(buyerId, code);
+  return couponBanner(p.coupon ?? code, p.coupon ? { percentOff: p.percentOff ?? 0, error: p.error } : null, SEASON_PASS_UNTIL);
+}
+
+/** Her paid Season Pass payment (the newest), with its coupon's code: what the pass card says she got. */
+export async function paidPass(userId: string) {
+  const p = await db.payment.findFirst({ where: { userId, plan: "season_pass", status: "paid" }, orderBy: { paidAt: "desc" }, select: { amount: true, coupon: { select: { code: true } } } });
+  return p && { amount: p.amount, coupon: p.coupon?.code ?? null };
 }
 
 /**
