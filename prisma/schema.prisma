@@ -477,7 +477,19 @@ model User {
   askReports   AskReport[]
   askChats     AskConversation[]
   askPrefs     AskPreference[]
-  payments     Payment[]
+  payments     Payment[]         @relation("PaymentBuyer")
+  /// Referrals (docs/REFERRALS.md). Set once, on her first view of /decide/refer; never changed by her.
+  referralCode String?           @unique
+  /// Who invited her (the /r/ link or ?ref= at sign-up). Never herself.
+  referredById String?
+  referredBy   User?             @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    User[]            @relation("Referrals")
+  /// UPI ID for referral payouts (name@bank).
+  payoutUpi    String?
+  refPayments  Payment[]         @relation("PaymentReferrer")
+  earnings     ReferralEarning[]
+
+  @@index([referredById])
 }
 
 /// The Decide profile (features/decide/profile.ts profileSchema) of a signed-in user, so it follows the account across
@@ -663,18 +675,46 @@ model AskPreference {
 /// A Razorpay checkout (features/payments). The amount comes from PLANS on the server, never from the browser. The
 /// order's receipt is this id. status: created, paid (verified signature or webhook; paidAt set), failed.
 model Payment {
-  id                String    @id
+  id                String           @id
   userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User             @relation("PaymentBuyer", fields: [userId], references: [id], onDelete: Cascade)
   plan              String
-  /// In paise.
+  /// In paise: what she pays (listAmount - discount).
   amount            Int
+  /// The plan's price before any discount, paise.
+  listAmount        Int
+  /// The referral discount, paise (0 without one).
+  discount          Int              @default(0)
+  /// Whose invite gave the discount; earns them a ReferralEarning when paid.
+  referrerId        String?
+  referrer          User?            @relation("PaymentReferrer", fields: [referrerId], references: [id], onDelete: SetNull)
   currency          String
-  razorpayOrderId   String    @unique
-  razorpayPaymentId String?   @unique
-  status            String    @default("created")
-  createdAt         DateTime  @default(now())
+  razorpayOrderId   String           @unique
+  razorpayPaymentId String?          @unique
+  status            String           @default("created")
+  createdAt         DateTime         @default(now())
   paidAt            DateTime?
+  referralEarning   ReferralEarning?
 
   @@index([userId])
+  @@index([referrerId])
+}
+
+/// 20% of a referred friend's payment, owed to the referrer (docs/REFERRALS.md). Created with the payment's paid mark.
+model ReferralEarning {
+  id         String    @id @default(cuid())
+  referrerId String
+  referrer   User      @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+  paymentId  String    @unique
+  payment    Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  buyerId    String
+  /// Paise.
+  amount     Int
+  /// pending, paid_out or void (a CHECK constraint).
+  status     String    @default("pending")
+  createdAt  DateTime  @default(now())
+  paidOutAt  DateTime?
+  note       String?
+
+  @@index([referrerId])
 }

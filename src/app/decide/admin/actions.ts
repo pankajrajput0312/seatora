@@ -41,3 +41,34 @@ export async function setUserAccess(form: FormData) {
   ]);
   back("saved");
 }
+
+const settleSchema = z.object({
+  referrerId: z.string().min(1).max(40),
+  /** The earnings shown on the page, comma-separated: only these change (not one that arrived since). */
+  ids: z.string().max(5000).transform((s) => s.split(",").filter(Boolean)).pipe(z.array(z.string().min(1).max(40)).min(1).max(200)),
+  to: z.enum(["paid_out", "void"]),
+  /** The UPI reference, or why it was voided. */
+  note: z.string().trim().max(500).default(""),
+});
+
+/**
+ * Referrals: marks a referrer's pending earnings paid out (paidOutAt now) or void, with the note and an AdminAudit row.
+ * Owner or admin only. Back to the admin page's Referrals section with ?msg=.
+ */
+export async function settleReferrals(form: FormData) {
+  const me = await staffUser();
+  if (!me) redirect("/decide");
+  const parsed = settleSchema.safeParse(Object.fromEntries(form));
+  const back = (msg: string) => redirect(`/decide/admin?${new URLSearchParams({ msg })}#referrals-h`);
+  if (!parsed.success) back("invalid");
+  const { referrerId, ids, to, note } = parsed.data!;
+  const where = { id: { in: ids }, referrerId, status: "pending" };
+  const before = await db.referralEarning.findMany({ where, select: { id: true, amount: true, status: true } });
+  if (!before.length) back("nothing_pending");
+  const after = { status: to, paidOutAt: to === "paid_out" ? new Date() : null, note: note || null };
+  await db.$transaction([
+    db.referralEarning.updateMany({ where: { ...where, id: { in: before.map((e) => e.id) } }, data: after }),
+    db.adminAudit.create({ data: { actorId: me.id, targetId: referrerId, action: `referral_${to}`, before: { earnings: before }, after: JSON.parse(JSON.stringify(after)) } }),
+  ]);
+  back(to === "paid_out" ? "paid_out" : "voided");
+}

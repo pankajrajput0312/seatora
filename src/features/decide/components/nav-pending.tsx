@@ -24,6 +24,8 @@ export function NavPending({ children }: { children: React.ReactNode }) {
 
   const onSubmit = (e: React.FormEvent) => {
     const form = e.target as HTMLFormElement;
+    // A Server Action form (the admin page's) redirects back here with ?msg=: a same-route navigation, kept moving by the shell.
+    if (form.method.toLowerCase() === "post") return navigating();
     if (!form.getAttribute("action") || form.method.toLowerCase() !== "get") return; // next/form prevents the default itself
     setFrom(here);
     setTimeout(() => setFrom((f) => (f === here ? null : f)), 10_000);

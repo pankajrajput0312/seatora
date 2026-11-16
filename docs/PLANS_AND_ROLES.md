@@ -15,7 +15,12 @@ Who may do how much in Decide. Code: `src/features/plans` (`plans.ts` limits and
 - `User.premiumUntil`: Premium until then whatever the role (a Season Pass with an end; set as a date, it runs to 23:59:59 IST that day). `createdVia` ("signup") and `notes` are for the admin page only.
 
 ## Effective plan
-Premium if the role is `OWNER`, `ADMIN` or `PREMIUM`, or `premiumUntil` is in the future, or now is before `FREE_FOR_ALL_UNTIL`; else Free. Owner and admin get no limits at all (their use is still counted). While `FREE_FOR_ALL_UNTIL` is ahead the chip reads "Free till 19 Nov" and the paywall says "Everything is free till 19 Nov."
+Premium if the role is `OWNER`, `ADMIN` or `PREMIUM`, or `premiumUntil` is in the future, or now is before `FREE_FOR_ALL_UNTIL`; else Free. Owner and admin get no limits at all (their use is still counted). Every "free till 20 Nov" in the copy (chip, paywall, Pricing, home card, sign-up, FreePrice on the landing page and the policies) is `FREE_FOR_ALL_UNTIL` formatted (`freeNow()`, `shortDate()`), never typed in. The landing page re-renders hourly, so its price turns to ₹499 within an hour of the end.
+
+## Upgrade (free in the free period)
+`passState()` (plans.ts) says where she stands: `staff`, `pass` (Season Pass beyond the free period), `claimed` (the free upgrade), `claimable` (free period on, not upgraded), `free` (Free plan after it).
+- **Free upgrade**: "Upgrade to Season Pass, free till 20 Nov" (`ClaimFreePass` → `claimFreeSeasonPass` action → `claimFreePass`, claim.ts) sets `premiumUntil = FREE_FOR_ALL_UNTIL` when it is null or earlier: no payment, no table, a `free_pass_claimed` console event. Idempotent, never shortens a later (paid) date, refused once the free period is over. When FREE_FOR_ALL_UNTIL passes, her `premiumUntil` has passed too, so she is back on Free and sees "Upgrade · ₹499".
+- **Where**: the plan chip ("Free till 20 Nov · Upgrade free" / "Free · Upgrade", to `/pricing#buy`; "Season Pass · free till 20 Nov" after the free upgrade), the sidebar's Account group ("Upgrade" for `claimable` and `free`; plus "Refer & earn" and "Your plan" = `/account`), the planner's home card, `/pricing#buy`, the account page's "Your plan" (plan, limits, today's use, Season Pass until) and the paywall. All of them use `SeasonPassButton` (docs/PAYMENTS.md): the paid "Keep it for the whole season" option sits under the free upgrade while payments are on.
 
 ## Limits (per account, per IST day: they reset at 00:00 Asia/Kolkata)
 | Feature (`Feature`) | Free | Premium | Env override | Enforced in |
@@ -47,7 +52,7 @@ On `/decide/admin`, search the email, then either set the role to Premium (no en
 ## Env
 | Variable | Default | |
 |---|---|---|
-| `FREE_FOR_ALL_UNTIL` | unset | ISO date-time, e.g. `2026-11-19T23:59:59+05:30`: everyone gets Premium limits before it |
+| `FREE_FOR_ALL_UNTIL` | unset | ISO date-time, e.g. `2026-11-20T23:59:59+05:30`: everyone gets Premium limits before it, the free upgrade runs to it, and every "free till" date shown is it |
 | `ASK_FOR_MEMBERS` | unset | `1` opens Ask Seatora (still needs `ASK_ENABLED=1`) to every signed-in member, with their plan's questions a day |
 | `PLAN_<PLAN>_<FEATURE>` | the table above | Overrides one limit |
 
@@ -68,5 +73,5 @@ Checked and left alone (already indexed or no gain): institute Residents tab (2.
 
 ## Deploy
 1. Back up, then `DATABASE_URL="$DIRECT_URL" npx prisma migrate deploy` (`20261122000000_plans_roles`: the role columns, `UsageDaily`, `UsageDistinct`, `AdminAudit`, `pg_trgm` and the indexes below). On Supabase run `tools/sql/supabase_lockdown.sql` right after (RUNBOOK 1.3 c): the three new tables need RLS on and no Data API grants.
-2. Set `FREE_FOR_ALL_UNTIL=2026-11-19T23:59:59+05:30` on Vercel (Production) before deploying, so nobody meets a limit before then. Deploy.
+2. Set `FREE_FOR_ALL_UNTIL=2026-11-20T23:59:59+05:30` on Vercel (Production) before deploying, so nobody meets a limit before then. Deploy.
 3. Sign in as the owner once (promotes the account to `OWNER`), open `/decide/admin`. A member: no Admin entry, `/decide/admin` is not found.

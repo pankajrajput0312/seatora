@@ -6,8 +6,7 @@ export const business = {
   address: "B-1/13 Shiv Ram Park, Nangloi, New Delhi 110041, India",
   phone: "+91 93156 30275",
   email: siteConfig.contactEmail,
-  /** The Season Pass is free right now; regularPrice is shown struck through beside it. */
-  price: 0,
+  /** The Season Pass's price in rupees (features/payments PLANS charges it in paise). Free till FREE_FOR_ALL_UNTIL. */
   regularPrice: 499,
   period: "per NEET PG counselling season",
   /** What a season is and when access ends (Pricing and Terms). */

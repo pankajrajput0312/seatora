@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { ArrowRight, Building2, CalendarDays, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
+import { business } from "@/config/business";
+import { formatINR } from "@/features/cutoffs/lib/format";
 import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
+import { freeNow, shortDate } from "@/features/plans/plans";
+import { REFERRAL_PERCENT } from "@/features/referrals/lib";
 import type { DecideLinks } from "../lib/links";
 
 // The planner's home, in Seatora's own look (the logo's ink, cyan and green; a faint pixel grid): the Residents card first,
-// then every tool as a row with what it answers. Free till 19 Nov.
-const FREE_UNTIL = "19 Nov";
+// then every tool as a row with what it answers. The Season Pass card: ₹0 while FREE_FOR_ALL_UNTIL is ahead, then ₹499.
 
 const groups = [
   {
@@ -32,6 +35,7 @@ const groups = [
 ] as const;
 
 export function HomeHub({ L }: { L: DecideLinks }) {
+  const free = freeNow();
   return (
     <div className="grid gap-4">
       <section aria-labelledby="residents-h" className="relative overflow-hidden rounded-xl border border-[#1f2a33] bg-[#0b0e12] text-[#f1f4f7]">
@@ -59,17 +63,19 @@ export function HomeHub({ L }: { L: DecideLinks }) {
           <div className="rounded-lg border border-dashed border-[#2b3a45] px-4 py-3 md:text-right">
             <p className="font-mono text-[10px] tracking-[0.25em] text-[#a3abb3]">SEASON PASS</p>
             <p className="mt-1 flex items-baseline gap-2 md:justify-end">
-              <s className="text-sm text-[#6b7480]" aria-label="Was ₹499">₹499</s>
-              <span className="text-3xl font-extrabold text-[#5fd36f]">₹0</span>
+              {free && <s className="text-sm text-[#6b7480]" aria-label={`Was ${formatINR(business.regularPrice)}`}>{formatINR(business.regularPrice)}</s>}
+              <span className="text-3xl font-extrabold text-[#5fd36f]">{formatINR(free ? 0 : business.regularPrice)}</span>
             </p>
-            <p className="text-xs text-[#f1f4f7]">Everything free till {FREE_UNTIL}</p>
+            {free && <p className="text-xs text-[#f1f4f7]">Everything free till {shortDate(free)}</p>}
             <div className="mt-3">
               <SeasonPassButton
-                next="/decide"
                 className="min-h-10 rounded-md bg-[#5fd36f] px-4 text-sm font-semibold text-[#0b0e12] hover:bg-[#7fe08b]"
                 noteClassName="text-[#a3abb3]"
               />
             </div>
+            <Link href={L.to("/decide/refer")} className="mt-1 inline-flex min-h-10 items-center text-xs text-[#5ccfe6] underline">
+              Refer a friend: {REFERRAL_PERCENT}% off for them, {REFERRAL_PERCENT}% for you
+            </Link>
           </div>
         </div>
       </section>

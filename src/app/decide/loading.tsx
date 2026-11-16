@@ -1,6 +1,6 @@
 import { LoadingPage, SkHead, SkPanel, SkStats, Skeleton } from "@/features/decide/components/skeleton";
 
-// Overview (and the frame every Decide page shows first, so no title here): round status, the seats strip, the label bars beside the top choices.
+// Home (and the frame every Decide page shows first, so no title here): round status, the seats strip, the label bars beside the top choices.
 export default function Loading() {
   return (
     <LoadingPage className="grid grid-cols-1 gap-6">

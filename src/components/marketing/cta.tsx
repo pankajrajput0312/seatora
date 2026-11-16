@@ -14,7 +14,7 @@ export function Cta() {
             Make your next career decision with clarity.
           </h2>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground">
-            Seatora NEET PG 2026 Season Pass: <FreePrice className="font-semibold text-foreground" /> for the whole 2026 counselling season. Create a free account and access is switched on immediately.
+            Seatora NEET PG 2026 Season Pass, for the whole 2026 counselling season: <FreePrice className="font-semibold text-foreground" />. Create a free account and start straight away.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg" className="w-full sm:w-auto">

@@ -7,7 +7,7 @@ import { hasSiteAccess, isOwner } from "./lib/session";
 const ctx = vi.hoisted(() => ({
   ip: "203.0.113.1",
   jar: new Map<string, string>(),
-  users: [] as { id: string; email: string; name: string; passwordHash: string; failedLogins: number; lockedUntil: Date | null }[],
+  users: [] as { id: string; email: string; name: string; passwordHash: string; failedLogins: number; lockedUntil: Date | null; referralCode?: string; referredById?: string | null }[],
   sessions: new Map<string, { userId: string; expiresAt: Date }>(),
 }));
 vi.mock("next/headers", () => ({
@@ -38,7 +38,8 @@ vi.mock("@/lib/db", () => {
           ctx.users.push(u);
           return u;
         },
-        findUnique: async ({ where }: { where: { email?: string; id?: string } }) => ctx.users.find((u) => u.email === where.email || u.id === where.id) ?? null,
+        findUnique: async ({ where }: { where: { email?: string; id?: string; referralCode?: string } }) =>
+          ctx.users.find((u) => u.email === where.email || u.id === where.id || (!!where.referralCode && u.referralCode === where.referralCode)) ?? null,
         update: async ({ where }: { where: { id: string } }) => user(where.id),
         updateMany: async () => ({ count: 0 }),
       },
@@ -101,6 +102,21 @@ describe("open access (SEATORA_OPEN_ACCESS=1)", () => {
     expect(ctx.users).toHaveLength(5);
     fresh();
     expect(await failsWith(signUp(person("n6@seatora.test")))).toBe("REDIRECT /decide"); // another IP
+  });
+
+  it("a referral: the seatora_ref cookie (or ?ref=) sets referredById; an unknown code sets nothing", async () => {
+    ctx.users.push({ id: "u_ref", email: "rahul@seatora.test", name: "Rahul", passwordHash: "x", failedLogins: 0, lockedUntil: null, referralCode: "RHUX234" });
+    ctx.jar.set("seatora_ref", "RHUX234");
+    await failsWith(signUp(person("a@seatora.test")));
+    fresh();
+    await failsWith(signUp(person("b@seatora.test"), undefined, "rhux234"));
+    fresh();
+    await failsWith(signUp(person("c@seatora.test"), undefined, "ZZZZ999"));
+    expect(ctx.users.slice(1).map((u) => [u.email, u.referredById])).toEqual([
+      ["a@seatora.test", "u_ref"],
+      ["b@seatora.test", "u_ref"],
+      ["c@seatora.test", null],
+    ]);
   });
 
   it("switching the mode signs everyone out of Decide (the cookie key changes)", async () => {

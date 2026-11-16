@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
+import { SeasonPassPrice } from "@/components/marketing/free-price";
 import { business } from "@/config/business";
-import { formatINR } from "@/features/cutoffs/lib/format";
 
 export const metadata: Metadata = {
   title: "Refund & Cancellation Policy",
-  description: "The Seatora Season Pass is currently free. For any future paid purchase: no refunds once access is granted, except for duplicate charges or payments where access was never granted.",
+  description: "Seatora Season Pass payments: no refunds once access is granted, except for duplicate charges or payments where access was never granted.",
 };
 
 export default function RefundPolicyPage() {
@@ -16,14 +16,13 @@ export default function RefundPolicyPage() {
       <article className="max-w-prose">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Legal</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Refund &amp; Cancellation Policy</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-15">15 November 2026</time></p>
+        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-16">16 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
           <section>
             <h2>Price</h2>
             <p className="mt-2">
-              The Seatora NEET PG 2026 Season Pass is currently free ({formatINR(business.price)}, regular price{" "}
-              {formatINR(business.regularPrice)}). Nothing is charged for it, so there is nothing to refund. The rules below apply to any
-              future paid purchase.
+              <SeasonPassPrice /> A free account and the free upgrade cost nothing, so there is nothing to refund for them. The rules
+              below apply to paid purchases.
             </p>
           </section>
           <section>

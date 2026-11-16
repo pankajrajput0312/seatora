@@ -10,7 +10,7 @@ const PROFILE = "rank=42284&cat=OBC&sp=ANAESTHESIOLOGY,FAMILYMEDICINE";
 test("plan routes render real data, never demo data", async ({ page }) => {
   test.setTimeout(120_000);
   for (const [path, h1] of [
-    ["/decide", "Overview"], ["/decide/options", "Options"], ["/decide/choices", "Choices"], ["/decide/compare", "Compare"],
+    ["/decide", "Home"], ["/decide/options", "Options"], ["/decide/choices", "Choices"], ["/decide/compare", "Compare"],
     // Rank scan, last ranks, seats, counselling, institutes, allotments and fees: see "research and counselling routes" below.
   ]) {
     await page.goto(`${path}${path.includes("?") ? "&" : "?"}${PROFILE}`);

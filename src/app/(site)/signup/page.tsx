@@ -1,27 +1,39 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/features/auth/components/auth-form";
 import { AuthShell } from "@/features/auth/components/auth-shell";
 import { hasSiteAccess } from "@/features/auth/lib/session";
+import { freeNow, shortDate } from "@/features/plans/plans";
+import { InviteBanner } from "@/features/referrals/components/invite-banner";
+import { REF_COOKIE } from "@/features/referrals/lib";
+import { referrerByCode } from "@/features/referrals/service";
 import { openAccess, safeNext } from "@/lib/site-access";
 
 export const metadata: Metadata = { title: "Create account", robots: { index: false } };
 
-type Props = { searchParams: Promise<{ next?: string | string[] }> };
+type Props = { searchParams: Promise<{ next?: string | string[]; ref?: string | string[] }> };
 
 export default async function SignupPage({ searchParams }: Props) {
-  const { next } = await searchParams;
+  const { next, ref } = await searchParams;
   const to = typeof next === "string" ? next : undefined;
   if (await hasSiteAccess()) redirect(safeNext(to));
+  // A referral (/r/CODE's cookie, else ?ref=): her inviter's first name, and sign-up records who invited her.
+  const refCode = typeof ref === "string" ? ref : undefined;
+  const inviter = await referrerByCode((await cookies()).get(REF_COOKIE)?.value ?? refCode);
+  const freeUntil = freeNow();
   if (openAccess()) {
     return (
       <AuthShell eyebrow="Free account" title="Create your account.">
+        {inviter && <InviteBanner inviter={inviter.name} className="mb-4" />}
         <p className="mb-6 text-sm text-muted-foreground max-sm:order-last max-sm:mt-6 max-sm:mb-0">
-          The Seatora NEET PG 2026 Season Pass is free (₹0, regular ₹499): anyone can create an account and open the planner.
+          {freeUntil
+            ? `Everything is free till ${shortDate(freeUntil)} (Season Pass ₹0, regular ₹499): anyone can create an account and open the planner.`
+            : "A free account opens the planner with the Free plan's daily limits; the Season Pass (₹499) lifts them."}{" "}
           Already have an account?{" "}
           <a href="/login" className="text-sky underline">Sign in</a>.
         </p>
-        <AuthForm mode="signup" next={to} open />
+        <AuthForm mode="signup" next={to} open refCode={refCode} />
       </AuthShell>
     );
   }

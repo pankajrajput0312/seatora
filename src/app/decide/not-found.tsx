@@ -10,7 +10,7 @@ export default function DecideNotFound() {
     <AppPage>
       <EmptyState headingLevel={1} icon={FileQuestion} title="Not found" description="This institute or page isn't in the MCC data. A saved link may be out of date." className="mt-6">
         <Button asChild variant="secondary"><Link href="/decide/institutes">All institutes</Link></Button>
-        <Button asChild variant="ghost"><Link href="/decide">Overview</Link></Button>
+        <Button asChild variant="ghost"><Link href="/decide">Home</Link></Button>
       </EmptyState>
     </AppPage>
   );

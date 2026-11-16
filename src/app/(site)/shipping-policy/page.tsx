@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
+import { SeasonPassPrice } from "@/components/marketing/free-price";
 import { business } from "@/config/business";
-import { formatINR } from "@/features/cutoffs/lib/format";
 
 export const metadata: Metadata = {
   title: "Shipping & Delivery Policy",
@@ -17,7 +17,7 @@ export default function ShippingPolicyPage() {
       <article className="max-w-prose">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Legal</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Shipping &amp; Delivery Policy</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-15">15 November 2026</time></p>
+        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-16">16 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
           <section>
             <h2>Shipping</h2>
@@ -26,9 +26,8 @@ export default function ShippingPolicyPage() {
           <section>
             <h2>Delivery</h2>
             <p className="mt-2">
-              The Seatora NEET PG 2026 Season Pass is currently free ({formatINR(business.price)}, regular price{" "}
-              {formatINR(business.regularPrice)}). Access is switched on for your Seatora account immediately after you create it. For any
-              future paid purchase, access is switched on immediately after your payment is confirmed.
+              <SeasonPassPrice /> A free account (and the free upgrade) is switched on immediately; a paid Season Pass immediately after
+              your payment is confirmed.
             </p>
             <p className="mt-2">
               If you have paid and don&apos;t have access, email us{mail && <> at {mail}</>} or use our{" "}

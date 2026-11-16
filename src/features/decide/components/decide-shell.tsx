@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Building2, CalendarDays, GitCompareArrows, IndianRupee, LayoutDashboard, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
+import { Building2, CalendarDays, GitCompareArrows, House, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { MessageCircle, Pencil, ShieldCheck, Sparkles } from "lucide-react";
+import { CircleArrowUp, Gift, MessageCircle, Pencil, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -26,7 +26,7 @@ const sections = [
   {
     title: "Plan",
     items: [
-      { href: "/decide", label: "Overview", icon: LayoutDashboard },
+      { href: "/decide", label: "Home", icon: House },
       { href: "/decide/residents", label: "Residents", icon: Users },
       { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
       { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
@@ -49,18 +49,20 @@ const sections = [
   },
   { title: "Help", items: [{ href: "/decide/requests", label: "Request a feature", icon: MessageCircle }] },
 ];
-// Phones: Residents (the main feature) first, then the round's working screens, in the sidebar's order; the fifth slot is the Compare tray when it has items.
+// Phones: Home, Residents (the main feature), then the round's working screens; the fifth slot is the Compare tray when it
+// has items, else Seats. Five columns fit every label at 360 px; Rank scan (and Seats while comparing) are in the menu.
 const bottom = [
+  { href: "/decide", label: "Home", icon: House },
   { href: "/decide/residents", label: "Residents", icon: Users },
   { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
-  { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
   { href: "/decide/choices", label: "Choices", icon: ListOrdered },
 ];
 
 /** `phone`: the server's guess from the user agent (layout.tsx), so the first paint has the right layout. */
 /** `ask`: the server says she is the owner with Ask Seatora on (layout.tsx); only then is its nav entry rendered. */
 /** `admin`: the server says she is an owner or admin (layout.tsx); only then is the Admin nav entry rendered. */
-export function DecideShell({ meta, phone, ask, admin, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; children: React.ReactNode }) {
+/** `upgrade`: she is on the Free plan (layout.tsx), so the Account group offers "Upgrade" (Pricing's buy section). */
+export function DecideShell({ meta, phone, ask, admin, upgrade, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; upgrade?: boolean; children: React.ReactNode }) {
   const pathname = usePathname();
   const sp = useSearchParams();
   const router = useRouter();
@@ -155,6 +157,21 @@ export function DecideShell({ meta, phone, ask, admin, children }: { meta: Profi
   }, []);
 
   const isCurrent = (href: string) => (href === "/decide" ? pathname === href : pathname.startsWith(href));
+  // The sidebar: the Plan … Research groups, then Account (Refer & earn, Upgrade on the Free plan, the account page), then
+  // Help with Ask and Admin for those who have them.
+  const help = sections.at(-1)!;
+  const nav = [
+    ...sections.slice(0, -1),
+    {
+      title: "Account",
+      items: [
+        { href: "/decide/refer", label: "Refer & earn", icon: Gift },
+        ...(upgrade ? [{ href: "/pricing#buy", label: "Upgrade", icon: CircleArrowUp }] : []),
+        { href: "/account", label: "Your plan", icon: UserRound },
+      ],
+    },
+    { ...help, items: [...help.items, ...(ask ? [{ href: "/decide/ask", label: "Ask Seatora", icon: Sparkles }] : []), ...(admin ? [{ href: "/decide/admin", label: "Admin", icon: ShieldCheck }] : [])] },
+  ];
 
   return (
     <>
@@ -212,10 +229,10 @@ export function DecideShell({ meta, phone, ask, admin, children }: { meta: Profi
               </div>
             }
           >
-            {(ask || admin ? [...sections.slice(0, -1), { ...sections.at(-1)!, items: [...sections.at(-1)!.items, ...(ask ? [{ href: "/decide/ask", label: "Ask Seatora", icon: Sparkles }] : []), ...(admin ? [{ href: "/decide/admin", label: "Admin", icon: ShieldCheck }] : [])] }] : sections).map((sec) => (
+            {nav.map((sec) => (
               <SideNavSection key={sec.title} title={sec.title}>
                 {sec.items.map(({ href, label, icon }) => (
-                  <SideNavItem key={href} label={label} icon={icon} href={L.to(href)} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className="rounded-full bg-[#6d28d9] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">77K NAMES</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">BETA</span> })} />
+                  <SideNavItem key={href} label={label} icon={icon} href={href.startsWith("/decide") ? L.to(href) : href} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className="rounded-full bg-[#6d28d9] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">77K NAMES</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">BETA</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-full bg-foreground px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-background">20%</span> })} />
                 ))}
               </SideNavSection>
             ))}
@@ -234,7 +251,7 @@ export function DecideShell({ meta, phone, ask, admin, children }: { meta: Profi
       <p role="status" className="sr-only">{loading ? "Loading the page…" : ""}</p>
 
       <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
-        {[...bottom, compare.length ? { href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows } : { href: "/decide/rank-scan", label: "Rank scan", icon: ScanSearch }].map(({ href, label, icon: Icon }) => (
+        {[...bottom, compare.length ? { href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows } : { href: "/decide/seats", label: "Seats", icon: LayoutGrid }].map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-[11px]", href === "/decide/residents" ? cn("font-semibold text-[#6d28d9]", isCurrent(href) ? "border-[#6d28d9]" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <span className="relative">
               <Icon className="size-[1.25rem]" strokeWidth={1.75} aria-hidden />

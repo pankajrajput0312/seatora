@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { effectivePlan, freeForAllUntil, istDay, planLimits } from "./plans";
+import { effectivePlan, freeForAllUntil, istDay, passState, planLimits } from "./plans";
 
 const now = new Date("2026-11-20T06:00:00Z");
 const free = { role: "FREE" as const, premiumUntil: null };
@@ -23,6 +23,24 @@ describe("effectivePlan", () => {
     const l = planLimits("FREE", { PLAN_FREE_INSTITUTES: "25", PLAN_FREE_CHOICE_LISTS: "unlimited", PLAN_FREE_ASK: "-1", PLAN_FREE_COMPARE: "x" });
     expect([l.institutes, l.choiceLists, l.ask, l.compare]).toEqual([25, Infinity, Infinity, 2]);
     expect(freeForAllUntil("not a date")).toBeNull();
+  });
+});
+
+describe("passState", () => {
+  const env = { FREE_FOR_ALL_UNTIL: "2026-11-20T23:59:59+05:30" };
+  const end = new Date("2026-11-20T18:29:59Z");
+  const before = new Date("2026-11-18T06:00:00Z");
+  const after = new Date("2026-11-21T06:00:00Z");
+  const paid = new Date("2027-03-31T18:29:59Z");
+  it("claimable in the free period, claimed once premiumUntil is its end, a pass beyond it, Free after", () => {
+    expect(passState(free, before, env)).toEqual({ state: "claimable", until: end });
+    expect(passState({ ...free, premiumUntil: end }, before, env)).toEqual({ state: "claimed", until: end });
+    expect(passState({ ...free, premiumUntil: paid }, before, env)).toEqual({ state: "pass", until: paid });
+    expect(passState({ ...free, premiumUntil: end }, after, env)).toEqual({ state: "free", until: null }); // the free upgrade ran out
+    expect(passState({ ...free, premiumUntil: paid }, after, env).state).toBe("pass");
+    expect(passState({ role: "PREMIUM", premiumUntil: null }, after, env).state).toBe("pass");
+    expect(passState({ role: "ADMIN", premiumUntil: null }, after, env).state).toBe("staff");
+    expect(passState(free, after, {}).state).toBe("free");
   });
 });
 

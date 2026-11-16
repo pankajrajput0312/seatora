@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import type { Plan } from "./plans";
 
 // The Season Pass runs to the end of the counselling season (env override for a later season).
-const SEASON_PASS_UNTIL = new Date(process.env.SEASON_PASS_UNTIL || "2027-03-31T23:59:59+05:30");
+export const SEASON_PASS_UNTIL = new Date(process.env.SEASON_PASS_UNTIL || "2027-03-31T23:59:59+05:30");
 
 /**
  * What a paid plan unlocks: Premium until the season ends (User.premiumUntil, read by effectivePlan). Runs in the same

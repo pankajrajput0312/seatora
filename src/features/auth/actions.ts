@@ -1,9 +1,11 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { REF_COOKIE } from "@/features/referrals/lib";
+import { referrerByCode } from "@/features/referrals/service";
 import { allow, isLimited, reset } from "@/lib/rate-limit";
 import { inviteMatches, isAllowed, isMember, openAccess, parseAllowlist, safeNext } from "@/lib/site-access";
 import { dummyHash, hashPassword, verifyPassword } from "./lib/password";
@@ -63,7 +65,8 @@ async function recordFailure(pairKey: string, userId?: string) {
 // SEATORA_OPEN_ACCESS=1: anyone may sign up, no invite code; an owner address (SEATORA_OWNER_EMAILS) can't be claimed,
 // since nothing verifies the email. Otherwise invite-only: an allowlisted account (SEATORA_ALLOWED_EMAILS) with
 // SEATORA_INVITE_CODE. Either way at most SIGNUPS_PER_HOUR tries reach the database per IP. `next` is ?next= from the page.
-export async function signUp(input: SignUpInput, next?: string): Promise<AuthResult> {
+// `ref`: the page's ?ref=; the seatora_ref cookie (/r/CODE) comes first. A real code's owner becomes her referredById.
+export async function signUp(input: SignUpInput, next?: string, ref?: string): Promise<AuthResult> {
   if (await rateLimited("signup")) return { ok: false, error: "Too many attempts. Please wait a minute." };
   const open = openAccess();
   const parsed = open ? openSignUpSchema.safeParse(input) : signUpSchema.safeParse(input);
@@ -81,8 +84,15 @@ export async function signUp(input: SignUpInput, next?: string): Promise<AuthRes
   }
 
   try {
+    const referrer = await referrerByCode((await cookies()).get(REF_COOKIE)?.value ?? ref);
     const user = await db.user.create({
-      data: { name: parsed.data.name, email: parsed.data.email, passwordHash: await hashPassword(parsed.data.password), createdVia: "signup" },
+      data: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        passwordHash: await hashPassword(parsed.data.password),
+        createdVia: "signup",
+        referredById: referrer?.id ?? null,
+      },
     });
     await createSession(user);
   } catch (err) {

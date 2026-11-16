@@ -43,10 +43,16 @@ export function planLimits(plan: Plan, env: Record<string, string | undefined> =
   return Object.fromEntries(Object.entries(DEFAULTS[plan]).map(([f, n]) => [f, envLimit(env[envKey(plan, f as Feature)], n)])) as Limits;
 }
 
-/** FREE_FOR_ALL_UNTIL (ISO date-time, e.g. 2026-11-19T23:59:59+05:30): before it everyone gets Premium limits. Null: unset or invalid. */
+/** FREE_FOR_ALL_UNTIL (ISO date-time, e.g. 2026-11-20T23:59:59+05:30): before it everyone gets Premium limits. Null: unset or invalid. */
 export function freeForAllUntil(raw = process.env.FREE_FOR_ALL_UNTIL) {
   const t = raw?.trim() ? Date.parse(raw.trim()) : NaN;
   return Number.isFinite(t) ? new Date(t) : null;
+}
+
+/** FREE_FOR_ALL_UNTIL while it is still ahead, else null. */
+export function freeNow(now = new Date(), raw = process.env.FREE_FOR_ALL_UNTIL) {
+  const until = freeForAllUntil(raw);
+  return until && until > now ? until : null;
 }
 
 export type Account = { role: Role; premiumUntil: Date | null };
@@ -71,6 +77,21 @@ export function effectivePlan(a: Account, now = new Date(), env: Record<string, 
   return { plan, staff, freeUntil, limits: staff ? UNLIMITED : planLimits(plan, env) };
 }
 
+export type PassState = "staff" | "pass" | "claimed" | "claimable" | "free";
+/**
+ * Where she stands for the Season Pass call to action. staff: owner or admin. pass: a Season Pass beyond the free period
+ * (paid, PREMIUM, or granted on the admin page; `until` its end, null without one). claimed: the free upgrade, which ends
+ * with FREE_FOR_ALL_UNTIL (`until`). claimable: the free period is on and she hasn't upgraded (`until` its end). free:
+ * the Free plan after it.
+ */
+export function passState(a: Account, now = new Date(), env: Record<string, string | undefined> = process.env): { state: PassState; until: Date | null } {
+  if (a.role === "OWNER" || a.role === "ADMIN") return { state: "staff", until: null };
+  if (a.role === "PREMIUM") return { state: "pass", until: null };
+  const all = freeForAllUntil(env.FREE_FOR_ALL_UNTIL);
+  if (a.premiumUntil && a.premiumUntil > now) return { state: all && a.premiumUntil <= all ? "claimed" : "pass", until: a.premiumUntil };
+  return all && all > now ? { state: "claimable", until: all } : { state: "free", until: null };
+}
+
 const IST_MS = 5.5 * 3_600_000;
 /** The IST calendar day of `now` as "YYYY-MM-DD", and when it ends (the next 00:00 IST). */
 export function istDay(now = new Date()) {
@@ -78,5 +99,7 @@ export function istDay(now = new Date()) {
   return { day, resetAt: new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000 - IST_MS) };
 }
 
-/** "Free till 19 Nov" style date (IST). */
+/** "Free till 20 Nov" style date (IST). */
 export const shortDate = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+/** "Season Pass active till 31 Mar 2027" style date (IST). */
+export const longDate = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });

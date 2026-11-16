@@ -157,7 +157,7 @@ for p in / /pricing /about /contact /terms /privacy /refund-policy /shipping-pol
   printf '%s ' "$p"; curl -s -o /dev/null -w '%{http_code}\n' "https://www.seatora.co.in$p"; done   # all 200
 ```
 Then sign in and check four screens with her profile (rank 42,284, OBC, her five courses):
-- Overview: the round status shows the new step.
+- Home (`/decide`): the round status shows the new step.
 - Counselling → Schedule: the new notice is listed.
 - Options: once a result is imported, a new result opens the "every option" view. New seat lists open the round view, with the new round's seat columns.
 - One college page (for example Kokilaben Navi Mumbai, Residents tab): the new round's closing ranks and residents are there.

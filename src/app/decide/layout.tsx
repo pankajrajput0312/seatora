@@ -7,7 +7,7 @@ import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
 import "@astryxdesign/theme-neutral/theme.css";
 import { askUser } from "@/features/ask/access";
-import { staffUser } from "@/features/auth/lib/session";
+import { getCurrentUser, staffUser } from "@/features/auth/lib/session";
 import { AppPage } from "@/features/decide/components/app-page";
 import { AstryxProvider } from "@/features/decide/components/astryx-provider";
 import { DecideShell } from "@/features/decide/components/decide-shell";
@@ -16,6 +16,7 @@ import type { ProfileMeta } from "@/features/decide/components/profile-dialog";
 import { EmptyState } from "@/features/decide/components/ui";
 import { deviceView } from "@/features/decide/components/view-toggle";
 import { getMeta } from "@/features/decide/service";
+import { passState } from "@/features/plans/plans";
 
 // Inside app uses its own "case sheet" system (docs/APP_DESIGN_SYSTEM.md): light, hyperlegible numerals.
 const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
@@ -46,10 +47,13 @@ export default async function DecideLayout({ children }: { children: React.React
   const ask = !!meta && (await askUser().catch(() => null)) != null;
   // Admin's nav entry: only for an owner or admin.
   const admin = !!meta && (await staffUser().catch(() => null)) != null;
+  // "Upgrade" in the nav: signed in without the Season Pass (the free upgrade in the free period, the paid one after).
+  const me = meta ? await getCurrentUser().catch(() => null) : null;
+  const upgrade = !!me && ["claimable", "free"].includes(passState(me).state);
   return (
     <div className={`app ${app.variable} min-h-screen`}>
       <AstryxProvider>
-        <DecideShell phone={phone} ask={ask} admin={admin} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
+        <DecideShell phone={phone} ask={ask} admin={admin} upgrade={upgrade} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (
             <NavPending>{children}</NavPending>
           ) : (

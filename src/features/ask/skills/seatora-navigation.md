@@ -4,7 +4,7 @@ description: Which Seatora page answers what, with link formats (/decide/options
 ---
 # Seatora pages (links are relative; her saved profile fills in on open)
 
-- Overview `/decide`: where counselling stands now (round status), summary of her options by course.
+- Home `/decide`: where counselling stands now (round status), summary of her options by course.
 - Options `/decide/options`: every option for her rank and courses with reach labels; `?view=round` (options with seats in the current round's lists, the default while choice filling is open) or `?view=all` (every option with past allotments).
 - Seats `/decide/seats`: MCC's seat lists for the round (clear vacancy, virtual vacancy, newly added) as published.
 - Choices `/decide/choices`: her choice lists: reorder, mark what is typed into MCC, "Copy in MCC order", CSV.

@@ -18,7 +18,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { dashboard, getMeta, LATEST_YEAR, listOptions, PAST_YEARS, type StripPoint } from "@/features/decide/service";
 import { roundLabel } from "@/features/decide/types";
 
-export const metadata: Metadata = { title: "Overview" };
+export const metadata: Metadata = { title: "Home" };
 
 /** A summary closing with the option it comes from: a closing is never shown without its seat category. */
 function At({ p }: { p: StripPoint | null }) {
@@ -36,13 +36,13 @@ function At({ p }: { p: StripPoint | null }) {
  * lists are out and its result isn't, else every option with past allotments), so every number here is the count of
  * the Options page its link opens. History charts follow.
  */
-export default async function OverviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
   if (!profile)
     return (
       <AppPage>
-        <PageHead title="Overview" />
+        <PageHead title="Home" />
         <div className="mt-3"><HomeHub L={decideLinks(params)} /></div>
         <div className="mt-3"><RoundStatusBanner params={params} /></div>
         <SetRankPrompt path="/decide" />
@@ -69,7 +69,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
   return (
     <AppPage className="grid grid-cols-1 gap-3 md:gap-4">
-      <PageHead title="Overview" about={`Closing ranks here are on ${seats} seats, the seat categories you can take.`} />
+      <PageHead title="Home" about={`Closing ranks here are on ${seats} seats, the seat categories you can take.`} />
       <HomeHub L={L} />
       <RoundStatusBanner params={params} />
 

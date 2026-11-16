@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
+import { SeasonPassPrice } from "@/components/marketing/free-price";
 import { business } from "@/config/business";
-import { formatINR } from "@/features/cutoffs/lib/format";
 
 export const metadata: Metadata = {
   title: "Terms & Conditions",
@@ -17,7 +17,7 @@ export default function TermsPage() {
       <article className="max-w-prose">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Legal</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Terms &amp; Conditions</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-15">15 November 2026</time></p>
+        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-16">16 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
           <section>
             <h2>About these terms</h2>
@@ -62,10 +62,18 @@ export default function TermsPage() {
           <section>
             <h2>Payments and refunds</h2>
             <p className="mt-2">
-              The Seatora NEET PG 2026 Season Pass is currently free ({formatINR(business.price)}, regular price{" "}
-              {formatINR(business.regularPrice)}); see our <Link href="/pricing" className="text-sky underline">Pricing</Link> page.{" "}
-              {business.season} Refunds for any future paid purchase and
+              <SeasonPassPrice /> See our <Link href="/pricing" className="text-sky underline">Pricing</Link> page.{" "}
+              {business.season} Refunds and
               cancellations are covered by our <Link href="/refund-policy" className="text-sky underline">Refund &amp; Cancellation Policy</Link>.
+            </p>
+          </section>
+          <section id="referrals">
+            <h2>Referrals</h2>
+            <p className="mt-2">
+              A friend who signs up through your referral link gets 20% off their first Season Pass, and you earn 20% of the amount they
+              actually pay. We pay earnings by UPI to the ID you save on the Refer &amp; earn page, within 7 days after your friend&apos;s
+              payment and any refund window; a refunded payment earns nothing. You can&apos;t refer yourself, and each person gets the
+              discount once. We may withhold or cancel earnings and discounts for abuse, such as duplicate or fake accounts.
             </p>
           </section>
           <section>

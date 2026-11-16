@@ -26,16 +26,16 @@ Good to know:
 
 ## A plan for today
 
-1. **Overview:** see where Round 2 stands and how many Round 2 seats are in your courses.
+1. **Home:** see where Round 2 stands and how many Round 2 seats are in your courses.
 2. **Options:** go through the Round 2 view, label by label, and star what you would accept.
 3. **Seats:** check seat counts and every past closing rank for the rows you starred.
 4. **College pages:** read the fees, bond, hospital facts and residents before deciding.
 5. **Compare:** line up two to four close calls side by side.
 6. **Choices:** put the list in the order you want the seats, then type it into the MCC portal, save and lock it before 23:55 IST.
 
-## Overview
+## Home
 
-Overview is your summary page:
+Home is your summary page:
 - **Where the round stands.** It shows, for example, "Open now: Round 2 choice filling until 15 Nov 23:55 IST" and "Next: Round 2 provisional result on 16 Nov", each linked to its MCC notice. The status comes from MCC's notices and shows the time it was read. Check the MCC site before acting on it.
 - **Round 2 seats in your courses.** On 15 Nov this was about 1,000 options with seats in MCC's Round 2 lists for this profile, about two thirds of them in the clear vacancy list. It also shows how many reached your rank in a past round and how many came within 10%. Every number opens those options on Options.
 - **Options by label, Where your rank sits, How closing ranks moved through 2025.** Charts of the same options: how many fall under each label, and where your rank sits among the 2025 closing ranks.

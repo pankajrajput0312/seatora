@@ -14,9 +14,9 @@ type Mode = "signin" | "signup";
 
 /**
  * `next`: the page's ?next=, passed through (the actions sanitise it) and kept on the sign-in / sign-up link. `open`:
- * SEATORA_OPEN_ACCESS=1, so sign-up has no invite code field.
+ * SEATORA_OPEN_ACCESS=1, so sign-up has no invite code field. `refCode`: the page's ?ref= (a referral), passed to sign-up.
  */
-export function AuthForm({ mode, next, open = false }: { mode: Mode; next?: string; open?: boolean }) {
+export function AuthForm({ mode, next, open = false, refCode }: { mode: Mode; next?: string; open?: boolean; refCode?: string }) {
   const isSignUp = mode === "signup";
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export function AuthForm({ mode, next, open = false }: { mode: Mode; next?: stri
     startTransition(async () => {
       setError(null);
       // On success the action redirects, so a returned value is always an error.
-      const res = isSignUp ? await signUp(values, next) : await signIn(values, next);
+      const res = isSignUp ? await signUp(values, next, refCode) : await signIn(values, next);
       if (res) setError(res.error);
     }),
   );
