@@ -48,7 +48,7 @@ export const toolbar = "filter-toolbar flex min-w-0 items-start gap-2";
  * (FiltersPanel; `clear` its Reset), and on phones `total` results (`noun`). Without `active`: the fields in a card
  * laid out by `cols`, with Apply.
  */
-export function FilterBar({ action, params, children, cols = "md:grid-cols-4", search, active, clear, total, noun = "results" }: {
+export function FilterBar({ action, params, children, cols = "md:grid-cols-4", search, active, clear, total, noun = "results", recount }: {
   action: string;
   params: URLSearchParams;
   children: React.ReactNode;
@@ -58,6 +58,8 @@ export function FilterBar({ action, params, children, cols = "md:grid-cols-4", s
   clear?: string;
   total?: number;
   noun?: string;
+  /** The Filters sheet's count after a change (FiltersPanel `recount`); without it, the page fetched with the fields. */
+  recount?: (query: string) => Promise<number | null>;
 }) {
   if (active != null)
     return (
@@ -65,7 +67,7 @@ export function FilterBar({ action, params, children, cols = "md:grid-cols-4", s
         {[...keepProfileParams(params)].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
         <ViewField />
         {search && <ToolbarSearch><Fragment key={`q${params}`}>{search}</Fragment></ToolbarSearch>}
-        <FiltersPanel count={active} clear={clear} total={total}>
+        <FiltersPanel count={active} clear={clear} total={total} recount={recount}>
           <Fragment key={params.toString()}>{children}</Fragment>
         </FiltersPanel>
         {total != null && <ToolbarCount total={total} noun={noun} />}

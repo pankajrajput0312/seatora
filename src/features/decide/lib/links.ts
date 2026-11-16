@@ -70,3 +70,23 @@ export function decideLinks(params: URLSearchParams | string = "") {
   };
 }
 export type DecideLinks = ReturnType<typeof decideLinks>;
+
+/**
+ * A page's own filters to remember (the bottom bar and sidebar bring them back, lib/links `withFilters`): every param
+ * but the profile's (links carry those), the page number and one-off flags.
+ */
+export function pageFilters(params: URLSearchParams | string) {
+  const p = new URLSearchParams(params);
+  for (const k of [...profileParamKeys, "page", "editProfile"]) p.delete(k);
+  return p.toString();
+}
+
+/** `href` (a nav link: a path and the profile params) with the filters remembered for its page added. */
+export function withFilters(href: string, saved: string | null | undefined) {
+  if (!saved) return href;
+  const [path, qs = ""] = href.split("?");
+  const p = new URLSearchParams(qs);
+  const own = new Set(p.keys());
+  for (const [k, v] of new URLSearchParams(saved)) if (!own.has(k)) p.append(k, v);
+  return `${path}?${p}`;
+}

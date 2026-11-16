@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { profileParamKeys } from "../profile";
-import { decideLinks } from "./links";
+import { decideLinks, pageFilters, withFilters } from "./links";
 
 it("keeps profile params, drops page-only params, and builds related links", () => {
   const L = decideLinks("rank=42284&cat=OBC&q=pune&reach=within-10");
@@ -38,4 +38,13 @@ it("without() takes one value out of a filter, the others and the rest kept", ()
   expect(q(L.without("/decide/options", "st", "Bihar"))).toEqual({ rank: ["1"], st: ["Kerala"], ctype: ["govt", "esic"] });
   expect(q(L.without("/decide/options", "ctype", "esic"))).toEqual({ rank: ["1"], st: ["Bihar,Kerala"], ctype: ["govt"] });
   expect(decideLinks("rank=1&st=Bihar").without("/decide/options", "st", "Bihar")).toBe("/decide/options?rank=1");
+});
+
+it("remembers a page's own filters (not the profile, not the page number) and brings them back to a nav link", () => {
+  const saved = pageFilters("rank=1&sp=A,B&st=Kerala&ctype=govt&ctype=central&maxfee=5&page=3&editProfile=1");
+  expect(saved).toBe("ctype=govt&ctype=central&maxfee=5");
+  expect(withFilters("/decide/options?rank=1&sp=A%2CB", saved)).toBe("/decide/options?rank=1&sp=A%2CB&ctype=govt&ctype=central&maxfee=5");
+  expect(withFilters("/decide/options", saved)).toBe("/decide/options?ctype=govt&ctype=central&maxfee=5");
+  expect(withFilters("/decide/options?rank=1", "")).toBe("/decide/options?rank=1");
+  expect(withFilters("/decide/options?rank=1", null)).toBe("/decide/options?rank=1");
 });

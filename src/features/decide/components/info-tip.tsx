@@ -46,8 +46,36 @@ const CSS = `@layer components{
 }`;
 
 /**
+ * The tap outside an open (i) that closes it does only that: the click it would make on what is under it (a card's
+ * link, the Filters sheet's backdrop) is dropped. Decided at pointerdown (the UA hides the panel at pointerup, before
+ * the click), so a scroll gesture (cancelled, no click) or a key press drops nothing. One pair of listeners per page.
+ */
+let swallow = false;
+let guarded = false;
+export function outsideTip(target: Element, open: HTMLElement | null) {
+  return !!open && !open.contains(target) && !target.closest(`[popovertarget="${open.id}"]`);
+}
+function guardOutsideTaps() {
+  if (guarded) return;
+  guarded = true;
+  document.addEventListener("pointerdown", (e) => (swallow = e.target instanceof Element && outsideTip(e.target, document.querySelector<HTMLElement>(".tip-p:popover-open"))), true);
+  for (const reset of ["pointercancel", "keydown"]) document.addEventListener(reset, () => (swallow = false), true);
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!swallow) return;
+      swallow = false;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true,
+  );
+}
+
+/**
  * An (i) button with the longer words behind it: a real button named "About <label>". Click, tap, Enter and Space open
- * it (a native popover, so it works before hydration too); Escape, a click outside or Tab out of it closes it. Focus
+ * it (a native popover, so it works before hydration too); Escape, a click outside (only closing it: guardOutsideTaps)
+ * or Tab out of it closes it. Focus
  * moves into the panel on open and back to the button on close. Never hover-only. The panel sits in the top layer (a
  * scrolling table never clips it), under the button or above it when there is no room, inside the window at 390px.
  * 44px hit area (`::before`; never on paper, where it would reach past a table box's last row) round a 20px icon. The
@@ -60,6 +88,7 @@ export function InfoTip({ label, children, className }: { label: string; childre
   const pop = useRef<HTMLSpanElement>(null);
   // Feeds aria-expanded and the scroll/resize follow; the popover itself is the source of truth.
   const [open, setOpen] = useState(false);
+  useEffect(guardOutsideTaps, []);
 
   // While open, follow the button when the page or a table scrolls, or the window resizes.
   useEffect(() => {

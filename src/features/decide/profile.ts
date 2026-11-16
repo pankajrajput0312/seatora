@@ -181,3 +181,32 @@ export function keepProfileParams(src: URLSearchParams): URLSearchParams {
   }
   return p;
 }
+
+/**
+ * Her profile with a Filters sheet's choices that have a profile field ("Save as my defaults"): courses (c, or sp and
+ * deg), quotas, states, the fee cap (maxfee, lakh a year) and the bond cap (bondyrs, years; 0 = no bond); "any" lifts a
+ * cap, "" (Your cap) keeps hers. `fields`: the names the form has (a field it lacks leaves hers as it is; one with
+ * nothing ticked is "all"). College type and the other filters have no profile field: they stay page filters.
+ */
+export function profileWithFilters(p: Profile, q: URLSearchParams, fields: Set<string>): Profile {
+  const next: Profile = { ...p };
+  const ticked = (k: string) => list(q, k);
+  if (fields.has("c")) {
+    const pairs = ticked("c").filter((x) => pairSchema.safeParse(x).success);
+    if (pairs.length) next.pairs = pairs;
+    else delete next.pairs;
+  }
+  if (fields.has("sp")) next.specialties = ticked("sp");
+  if (fields.has("deg")) next.degrees = ticked("deg");
+  if (fields.has("quota")) next.quotas = ticked("quota");
+  if (fields.has("st")) next.states = ticked("st");
+  const cap = (k: string, current: number | null, ok: (n: number) => boolean) => {
+    const v = q.get(k)?.trim();
+    if (v === "any") return null;
+    const n = v ? Number(v) : NaN;
+    return Number.isFinite(n) && ok(n) ? n : current;
+  };
+  if (fields.has("maxfee")) next.maxFeeLakh = cap("maxfee", p.maxFeeLakh, (n) => n > 0);
+  if (fields.has("bondyrs")) next.maxBondYears = cap("bondyrs", p.maxBondYears, (n) => n >= 0);
+  return next;
+}

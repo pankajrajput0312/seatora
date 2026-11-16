@@ -1,7 +1,7 @@
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   coursesFromPicks, feeChoices, keepProfileParams, pairChoices, picksOf, profileCourseFilter, profileFromParams, profileHasCourse, profileInput, profileQuotas,
-  profileSchema, profileToParams, toURLSearchParams, type Profile,
+  profileSchema, profileToParams, profileWithFilters, toURLSearchParams, type Profile,
 } from "./profile";
 
 const her: Profile = {
@@ -115,4 +115,28 @@ it("dialog ticks save in the old form when it can say it, else as pairs, and rea
   const every = { specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"], degrees: ["MD", "DNB", "NBEMS Diploma", "Diploma"] };
   expect(coursesFromPicks(picksOf(every, courses), every.degrees, courses)).toEqual(every);
   expect(pairChoices(courses).slice(0, 2)).toEqual([{ value: "Diploma~ANAESTHESIOLOGY", label: "Diploma Anaesthesiology" }, { value: "DNB~ANAESTHESIOLOGY", label: "DNB Anaesthesiology" }]);
+});
+
+describe("profileWithFilters (Save as my defaults)", () => {
+  const base: Profile = { rank: 5000, category: "Open", pwd: false, specialties: ["PAEDIATRICS"], degrees: ["MD"], quotas: [], states: ["Delhi"], maxFeeLakh: 10, maxBondYears: null };
+  const all = new Set(["sp", "deg", "quota", "st", "maxfee", "bondyrs", "ctype"]);
+  it("takes the sheet's states, quotas, courses and caps into her profile", () => {
+    const q = new URLSearchParams("st=Uttar+Pradesh&st=Madhya+Pradesh&quota=All+India&sp=PAEDIATRICS&sp=PSYCHIATRY&deg=MD&maxfee=5&bondyrs=0&ctype=govt");
+    expect(profileWithFilters(base, q, all)).toEqual({ ...base, states: ["Uttar Pradesh", "Madhya Pradesh"], quotas: ["All India"], specialties: ["PAEDIATRICS", "PSYCHIATRY"], maxFeeLakh: 5, maxBondYears: 0 });
+  });
+  it("nothing ticked is all; 'any' lifts a cap; '' (Your cap) keeps hers", () => {
+    const q = new URLSearchParams("maxfee=any&bondyrs=");
+    const p = profileWithFilters({ ...base, maxBondYears: 2 }, q, all);
+    expect(p.states).toEqual([]);
+    expect(p.maxFeeLakh).toBeNull();
+    expect(p.maxBondYears).toBe(2);
+  });
+  it("leaves a field the form does not have as it is, and never adds a profile field (college type)", () => {
+    const p = profileWithFilters(base, new URLSearchParams("ctype=govt"), new Set(["ctype"]));
+    expect(p).toEqual(base);
+  });
+  it("exact courses replace specialty x degree; none ticked drops them", () => {
+    expect(profileWithFilters(base, new URLSearchParams("c=DNB~FAMILYMEDICINE"), new Set(["c"])).pairs).toEqual(["DNB~FAMILYMEDICINE"]);
+    expect("pairs" in profileWithFilters({ ...base, pairs: ["MD~PAEDIATRICS"] }, new URLSearchParams(), new Set(["c"]))).toBe(false);
+  });
 });

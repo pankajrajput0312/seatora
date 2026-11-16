@@ -15,6 +15,7 @@ import { cn } from "@/lib/cn";
 import { LogOutButton } from "@/features/auth/components/log-out-button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { MAX_COMPARE } from "../lib/choices";
+import { pageFilters, withFilters } from "../lib/links";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
 import { AccountSync } from "./account-sync";
@@ -51,13 +52,14 @@ const sections = [
   // Seatora home: phones only (the top bar's "Back to site" is hidden there).
   { title: "Help", items: [{ href: "/decide/requests", label: "Help & feedback", icon: MessageCircle }, { href: "/", label: "Seatora home", icon: Globe }] },
 ];
-// Phones: Home, Residents (the main feature), then the round's working screens; the fifth slot is the Compare tray when it
-// has items, else Seats. Five columns fit every label at 360 px; Rank scan (and Seats while comparing) are in the menu.
+// Phones: Home, Residents (the main feature), then the round's working screens. Five columns fit every label at 360 px;
+// Rank scan is in the menu. The Compare tray, when it has items, is a pill above the bar (never in place of a tab).
 const bottom = [
   { href: "/decide", label: "Home", icon: House },
   { href: "/decide/residents", label: "Residents", icon: Users },
   { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
   { href: "/decide/choices", label: "Choice list", icon: ListOrdered },
+  { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
 ];
 
 /** `phone`: the server's guess from the user agent (layout.tsx), so the first paint has the right layout. */
@@ -173,6 +175,19 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
     return () => window.removeEventListener(NAV_EVENT, on);
   }, []);
 
+  // Each page's own filters, kept for this tab (sessionStorage), so the bottom bar and the sidebar bring her back to the
+  // page as she left it; a link that carries its own params (a chip, "See them on Seats") is followed as it is.
+  const [last, setLast] = useState<Record<string, string>>({});
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`decide:filters:${pathname}`, pageFilters(sp));
+      setLast(Object.fromEntries([...sections.flatMap((x) => x.items), ...bottom].map(({ href }) => [href, sessionStorage.getItem(`decide:filters:${href}`) ?? ""])));
+    } catch {
+      // storage blocked: nav links without them
+    }
+  }, [pathname, sp]);
+  const navHref = (href: string) => withFilters(L.to(href), last[href]);
+
   const isCurrent = (href: string) => (href === "/decide" || href === "/" ? pathname === href : pathname.startsWith(href));
   // The sidebar: the Plan … Research groups, then Account (Refer & earn), then Help with Ask and Admin for those who have
   // them. Her name, plan and "Upgrade" are the footer (AccountFooter), pinned to the sidebar's and the menu's bottom.
@@ -194,15 +209,17 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
             label="App"
             heading={<TopNavHeading logo={<LogoMark className="size-6" />} heading="Seatora Decide" headingHref={L.to("/decide")} />}
             endContent={
-              <span className="flex items-center gap-2.5">
+              // Phones: the chips drop words by the bar's width in rem (a container query, so a larger text size drops them
+              // sooner), then shrink (globals.css): never over the logo.
+              <span data-topbar-end className="flex min-w-0 items-center gap-2.5">
                 {account && (
-                  <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className="hit inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap">
+                  <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className="hit inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap">
                     <span className="sr-only">Your plan: </span>
-                    <span className={cn("font-semibold", account.upgrade && "max-[25rem]:hidden")}>{account.upgrade ? "Free" : account.plan.split(" · ")[0]}</span>
+                    <span className={cn("truncate font-semibold", account.upgrade && "@max-[25rem]/topbar:hidden")}>{account.upgrade ? "Free" : account.plan.split(" · ")[0]}</span>
                     {account.upgrade && <span className="-mr-1.5 rounded-full bg-[#5ccfe6] px-2 py-0.5 font-semibold text-[#0b0e12]">Upgrade</span>}
                   </Link>
                 )}
-                {/* Compare tray: in the sticky header (phones: the bottom bar), never floating over the page and the focused control. */}
+                {/* Compare tray: in the sticky header (phones: a pill above the bottom bar; scroll-padding keeps focus clear of it). */}
                 {compare.length > 0 && (
                   <span className="hidden md:block" data-print-hide>
                     <Button asChild variant="secondary">
@@ -215,9 +232,9 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
                 )}
                 {/* Phones: the rank and its edit button as one chip here (the sidebar, with its rank card, is in the drawer). */}
                 <button type="button" data-profile-edit aria-label={shown ? `AIR ${formatRank(shown.rank)} ${categoryName(shown.category)}${shown.pwd ? " PwD" : ""}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(true)}
-                  className="hit inline-flex h-8 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
-                  {shown ? <><span className="numeric font-semibold"><span className="max-[23.75rem]:hidden">AIR </span>{formatRank(shown.rank)}</span><span className="text-muted-foreground max-[25rem]:hidden">· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</span></> : hydrated ? <>Set <span className="max-[23.75rem]:hidden">your </span>rank</> : "Loading…"}
-                  <Pencil className="size-3 text-muted-foreground" aria-hidden />
+                  className="hit inline-flex h-8 min-w-0 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
+                  {shown ? <><span className="numeric truncate font-semibold"><span className="@max-[23.75rem]/topbar:hidden">AIR </span>{formatRank(shown.rank)}</span><span className="truncate text-muted-foreground @max-[25rem]/topbar:hidden">· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</span></> : <span className="truncate">{hydrated ? <>Set <span className="@max-[23.75rem]/topbar:hidden">your </span>rank</> : "Loading…"}</span>}
+                  <Pencil className="size-3 shrink-0 text-muted-foreground" aria-hidden />
                 </button>
                 <Link href="/" className="hidden min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground md:inline-flex">Back to site</Link>
               </span>
@@ -249,7 +266,7 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
             {nav.map((sec) => (
               <SideNavSection key={sec.title} title={sec.title}>
                 {sec.items.map(({ href, label, icon }) => (
-                  <SideNavItem key={href} label={label} icon={icon} href={href.startsWith("/decide") ? L.to(href) : href} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className={newBadge}>New</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 text-xs font-bold text-white">BETA</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-full bg-foreground px-1.5 text-xs font-bold text-background">20%</span> })} {...(href === "/" && { className: "md:hidden" })} />
+                  <SideNavItem key={href} label={label} icon={icon} href={href.startsWith("/decide") ? navHref(href) : href} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className={newBadge}>New</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 text-xs font-bold text-white">BETA</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-full bg-foreground px-1.5 text-xs font-bold text-background">20%</span> })} {...(href === "/" && { className: "md:hidden" })} />
                 ))}
               </SideNavSection>
             ))}
@@ -257,7 +274,7 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
         }
       >
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
-        <div aria-busy={loading || undefined} className={cn("isolate pb-[calc(6rem+env(safe-area-inset-bottom))] transition-opacity md:pb-0", loading && "opacity-60")}>
+        <div aria-busy={loading || undefined} className={cn("isolate transition-opacity md:pb-0", compare.length ? "pb-[calc(9rem+env(safe-area-inset-bottom))]" : "pb-[calc(6rem+env(safe-area-inset-bottom))]", loading && "opacity-60")}>
           <RenamedSaved listName={listName} />
           <AccountSync />
           {children}
@@ -271,9 +288,15 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
       </p>
 
       <BackToTop />
+      {/* Phones: the Compare tray, a one-line pill above the bottom bar's left end (Top sits at its right end). */}
+      {compare.length > 0 && !isCurrent("/decide/compare") && (
+        <Link href={L.compare(compare)} data-compare-pill className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.75rem)] left-3 z-30 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-sm font-semibold whitespace-nowrap shadow-overlay md:hidden print:hidden">
+          <GitCompareArrows className="size-4" aria-hidden />Compare <span className="numeric">{compare.length}/{MAX_COMPARE}</span><span className="sr-only"> selected</span>
+        </Link>
+      )}
       <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
-        {[...bottom, compare.length ? { href: "/decide/compare", label: `Compare ${compare.length}/${MAX_COMPARE}`, icon: GitCompareArrows } : { href: "/decide/seats", label: "Seats", icon: LayoutGrid }].map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href === "/decide/compare" ? L.compare(compare) : L.to(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", href === "/decide/residents" ? cn("font-semibold text-[#6d28d9]", isCurrent(href) ? "border-[#6d28d9]" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
+        {bottom.map(({ href, label, icon: Icon }) => (
+          <Link key={href} href={navHref(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", href === "/decide/residents" ? cn("font-semibold text-[#6d28d9]", isCurrent(href) ? "border-[#6d28d9]" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <span className="relative">
               <Icon className="size-[1.25rem]" strokeWidth={1.75} aria-hidden />
               {href === "/decide/residents" && <span className={cn(newBadge, "absolute -top-2 left-1/2 ml-2.5 bg-background")}>New</span>}

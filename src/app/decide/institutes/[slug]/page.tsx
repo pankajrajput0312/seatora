@@ -140,6 +140,14 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const rYears = sp.getAll("ryear").map(Number).filter(Number.isFinite);
   const residentRows = residents ? residents.rows.filter((r) => (!rCourses.length || rCourses.includes(r.course.slug)) && (!rYears.length || rYears.includes(r.year))) : [];
   const residentGroups = residents ? groupResidents(residentRows, profile) : [];
+  // The sheet's count as she ticks: every row is here, so by course and year (no second read of the names).
+  const tallied = new Map<string, { values: { rcourse: string; ryear: string }; n: number }>();
+  for (const r of residents?.rows ?? []) {
+    const k = `${r.course.slug}|${r.year}`;
+    const t = tallied.get(k) ?? tallied.set(k, { values: { rcourse: r.course.slug, ryear: String(r.year) }, n: 0 }).get(k)!;
+    t.n++;
+  }
+  const residentTally = [...tallied.values()];
   const residentCourseOptions = residents ? [...new Map(residents.rows.map((r) => [r.course.slug, `${r.course.degree} ${r.course.name}`])).entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)) : [];
   const residentYearOptions = residents ? [...new Set(residents.rows.map((r) => r.year))].sort((a, b) => b - a).map((y) => ({ value: String(y), label: String(y) })) : [];
   // Seats here with no past allotments: not in the lists below; Seats shows them, and while Options opens in the round
@@ -634,7 +642,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <FilterForm action={`/decide/institutes/${slug}`} className={toolbar}>
               {[...sp.entries()].filter(([k]) => !["rcourse", "ryear", "tab"].includes(k)).map(([k, v], i) => <input key={`${k}-${i}`} type="hidden" name={k} value={v} />)}
               <input type="hidden" name="tab" value="residents" />
-              <FiltersPanel count={(rCourses.length > 0 ? 1 : 0) + (rYears.length > 0 ? 1 : 0)} clear={L.to(`/decide/institutes/${slug}`, { tab: "residents" })} total={residentRows.length}>
+              <FiltersPanel count={(rCourses.length > 0 ? 1 : 0) + (rYears.length > 0 ? 1 : 0)} clear={L.to(`/decide/institutes/${slug}`, { tab: "residents" })} total={residentRows.length} counts={residentTally}>
                 <FilterDropdown label="Course" name="rcourse" search options={residentCourseOptions} selected={rCourses} none="All courses" />
                 <FilterDropdown label="Year" name="ryear" options={residentYearOptions} selected={rYears.map(String)} none="All years" />
               </FiltersPanel>

@@ -292,6 +292,7 @@
 /* Keep focused elements clear of the sticky Astryx header (TopNav, about 4rem; it holds the Compare button, nothing floats
    over the page) and, on phones, the 3.5rem bottom bar. Values sit above the real heights. */
 html:has(.app) { scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
+html:has(.app [data-compare-pill]) { scroll-padding-bottom: 8rem; }
 @media (min-width: 48rem) { html:has(.app) { scroll-padding-bottom: 1rem; } }
 
 @media print {
@@ -439,6 +440,11 @@ html:has(.app dialog[data-filters][open]) { overflow: hidden; }
 .filter-sheet .field > select { border-color: transparent; background-color: transparent; padding-inline-end: 0; text-align: right; text-align-last: right; color: var(--color-muted-foreground); }
 .filter-sheet .field > select:not(:has(option[value=""]:checked)) { color: var(--color-sky); font-weight: 600; }
 .filter-sheet .field > select:focus-visible { border-color: var(--color-sky); }
+/* Phones: a select keeps its 16px font (iOS zooms into anything smaller) but is drawn at the section summaries' size
+   (text-sm: 13/16), from its right edge, at the same visible width and height; the browser clips a long value. */
+@media (width < 48rem) {
+  .app .filter-sheet .field > select { transform: scale(0.8125); transform-origin: right center; width: calc(min(62%, 17rem) / 0.8125); height: calc(2.75rem / 0.8125); margin-block: calc(2.75rem * -0.1154); flex-shrink: 1; min-width: 0; }
+}
 /* Paragraphs take the size of their text-xs / text-sm block: Astryx's reset gives every <p> the body size (its own
    layer, below base), which made source lines and captions body-sized. */
 @layer base {
@@ -518,6 +524,11 @@ html:has(.app dialog[data-filters][open]) { overflow: hidden; }
   .app .astryx-top-nav-heading { min-height: 2.5rem; }
   .app header:has(.astryx-top-nav-heading) > * { padding-block: 0.25rem; }
 }
+/* The top bar is a container (the header chips drop words by its width in rem: decide-shell.tsx). Phones: its end (the
+   chips and the menu button) shrinks before the logo does, so a large text size never puts a chip over the logo. */
+.app .astryx-app-shell-header { container: topbar / inline-size; }
+.app nav > div:has(> [data-topbar-end]) { flex-shrink: 1; min-width: 0; }
+.app nav:has(> div > [data-topbar-end]) > div:first-child { flex-shrink: 0; }
 /* Phones: "Seatora" beside the logo, the chips shortened to fit (decide-shell). */
 @media (width < 30rem) {
   /* Phones: the brand reads "Seatora" beside the logo (the owner's call); "Seatora Decide" stays its accessible name. */
@@ -534,6 +545,9 @@ html:has(.app dialog[data-filters][open]) { overflow: hidden; }
 /* The tools take a line of their own rather than squeeze beside a search box. */
 .filter-row > .toolbar { min-width: min(100%, max-content); }
 .toolbar-search input { padding-right: 2.75rem; }
+/* With its clear (×) beside the magnifier; the browser's own clear button would be a second one. */
+.toolbar-search:has([data-search-clear]) input { padding-right: 5rem; }
+.toolbar-search input::-webkit-search-cancel-button { display: none; }
 /* Phones: the toolbar (ui.tsx `toolbar`: search, Filters, the count) stays pinned under the app's top bar (--app-top,
    its height: FiltersPanel measures it) while the results scroll, edge to edge on the chart paper, its controls 44px.
    Its row (.filter-row) dissolves, so the toolbar sticks in the page's own box, and the chips and the tools row under

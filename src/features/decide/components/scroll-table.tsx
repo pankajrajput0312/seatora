@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { useLocal } from "../lib/local-store";
 
@@ -45,6 +45,20 @@ export function ScrollTable({ label, id, scope, className = FRAME, scrollClassNa
   const headBox = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const [seen, setSeen] = useLocal("medpath.swipe-seen", false);
+  // "Swipe for more" over the header row, gone at her first swipe or 3 s after the table comes into view.
+  const [hint, setHint] = useState(true);
+  useEffect(() => {
+    if (seen) return;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !t) t = setTimeout(() => setHint(false), 3000);
+    });
+    io.observe(outer.current!);
+    return () => {
+      io.disconnect();
+      clearTimeout(t);
+    };
+  }, [seen]);
 
   useEffect(() => {
     const o = outer.current!, p = pin.current!, hb = headBox.current!, b = body.current!;
@@ -186,8 +200,8 @@ export function ScrollTable({ label, id, scope, className = FRAME, scrollClassNa
       {/* More columns off to a side: a soft shadow on that edge (the left one at the sticky column's edge). */}
       <span aria-hidden className="pointer-events-none absolute inset-y-0 left-[var(--stick-w,0px)] z-[6] w-4 bg-linear-to-r from-foreground/12 to-transparent opacity-0 group-data-[more-left]/st:opacity-100 motion-safe:transition-opacity print:hidden" />
       <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 z-[6] w-5 rounded-r-xl bg-linear-to-l from-foreground/12 to-transparent opacity-0 group-data-[more-right]/st:opacity-100 motion-safe:transition-opacity print:hidden" />
-      {!seen && (
-        <span aria-hidden className="pointer-events-none absolute top-[calc(var(--head-h,2.5rem)+0.5rem)] right-2 z-[6] hidden rounded-full bg-foreground px-2.5 py-1 text-xs font-semibold text-background shadow-overlay group-data-[more-right]/st:block print:hidden">
+      {!seen && hint && (
+        <span aria-hidden className="pointer-events-none absolute top-[calc(var(--head-h,2.5rem)/2)] right-2 z-[6] hidden -translate-y-1/2 rounded-full bg-foreground px-2.5 py-1 text-xs font-semibold text-background shadow-overlay group-data-[more-right]/st:block print:hidden">
           <span className="pointer-coarse:hidden">Scroll sideways for more →</span>
           <span className="pointer-fine:hidden">Swipe for more →</span>
         </span>
