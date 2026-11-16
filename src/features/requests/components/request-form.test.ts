@@ -18,22 +18,29 @@ describe("RequestForm", () => {
     const h = html(createElement(RequestForm, { page: "/contact" }));
     expect(h.match(/type="radio"/g)).toHaveLength(4);
     for (const label of ["New feature", "Customization for me", "Data correction or missing data", "Something else"]) expect(h).toContain(label);
-    expect(input(h, 'id="rq-email"')).not.toContain("readonly");
+    expect(input(h, 'type="email"')).not.toContain("readonly");
     expect(h).toContain('href="/privacy"');
     expect(input(h, 'type="hidden"')).toContain('value="/contact"');
     expect(input(h, 'name="website"')).toContain('tabindex="-1"');
     expect(h).toContain("0 / 2,000 characters");
     expect(h).toContain('aria-live="polite"');
-    expect(input(h, 'id="rq-email"')).toContain('aria-required="true"');
+    expect(input(h, 'type="email"')).toContain('aria-required="true"');
     expect(h).toMatch(/<textarea[^>]*aria-required="true"/);
     expect(h).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/); // until hydrated: a send would lose the message
   });
 
   it("signed in: the account email, read-only, and no privacy link", () => {
     const h = html(createElement(RequestForm, { email: "doc@seatora.test", page: "/decide/requests" }));
-    expect(input(h, 'id="rq-email"')).toMatch(/readonly="".*value="doc@seatora.test"|value="doc@seatora.test".*readonly=""/);
+    expect(input(h, 'type="email"')).toMatch(/readonly="".*value="doc@seatora.test"|value="doc@seatora.test".*readonly=""/);
     expect(h).toContain("Your account email.");
     expect(h).not.toContain('href="/privacy"');
+  });
+
+  it("Help's Report wrong data: one kind (no choice shown) and the college's name already in the box", () => {
+    const h = html(createElement(RequestForm, { email: "doc@seatora.test", page: "/decide/requests", kinds: ["data"], message: "AIIMS Delhi: " }));
+    expect(h).toMatch(/<fieldset hidden="">/);
+    expect(h.match(/type="radio"/g)).toHaveLength(1);
+    expect(h).toMatch(/<textarea[^>]*>AIIMS Delhi: <\/textarea>/);
   });
 });
 

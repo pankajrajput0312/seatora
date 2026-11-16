@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, House, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { CircleArrowUp, Gift, LogOut, MessageCircle, Pencil, ShieldCheck, Sparkles } from "lucide-react";
+import { CircleArrowUp, Gift, Globe, LogOut, MessageCircle, Pencil, ShieldCheck, Sparkles } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -48,7 +48,8 @@ const sections = [
       { href: "/decide/fees", label: "Fees & bond", icon: IndianRupee },
     ],
   },
-  { title: "Help", items: [{ href: "/decide/requests", label: "Request a feature", icon: MessageCircle }] },
+  // Seatora home: phones only (the top bar's "Back to site" is hidden there).
+  { title: "Help", items: [{ href: "/decide/requests", label: "Help & feedback", icon: MessageCircle }, { href: "/", label: "Seatora home", icon: Globe }] },
 ];
 // Phones: Home, Residents (the main feature), then the round's working screens; the fifth slot is the Compare tray when it
 // has items, else Seats. Five columns fit every label at 360 px; Rank scan (and Seats while comparing) are in the menu.
@@ -171,7 +172,7 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
     return () => window.removeEventListener(NAV_EVENT, on);
   }, []);
 
-  const isCurrent = (href: string) => (href === "/decide" ? pathname === href : pathname.startsWith(href));
+  const isCurrent = (href: string) => (href === "/decide" || href === "/" ? pathname === href : pathname.startsWith(href));
   // The sidebar: the Plan … Research groups, then Account (Refer & earn), then Help with Ask and Admin for those who have
   // them. Her name, plan and "Upgrade" are the footer (AccountFooter), pinned to the sidebar's and the menu's bottom.
   const help = sections.at(-1)!;
@@ -247,7 +248,7 @@ export function DecideShell({ meta, phone, ask, admin, account, children }: { me
             {nav.map((sec) => (
               <SideNavSection key={sec.title} title={sec.title}>
                 {sec.items.map(({ href, label, icon }) => (
-                  <SideNavItem key={href} label={label} icon={icon} href={href.startsWith("/decide") ? L.to(href) : href} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className={newBadge}>New</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 text-xs font-bold text-white">BETA</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-full bg-foreground px-1.5 text-xs font-bold text-background">20%</span> })} />
+                  <SideNavItem key={href} label={label} icon={icon} href={href.startsWith("/decide") ? L.to(href) : href} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className={newBadge}>New</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 text-xs font-bold text-white">BETA</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-full bg-foreground px-1.5 text-xs font-bold text-background">20%</span> })} {...(href === "/" && { className: "md:hidden" })} />
                 ))}
               </SideNavSection>
             ))}

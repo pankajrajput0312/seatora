@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore, useTransition } from "react";
+import { useId, useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -25,9 +25,11 @@ const noop = () => () => {};
 
 /**
  * "Request a feature": a feature, a customization, a data correction or anything else. `email`: the signed-in account's,
- * shown read-only (replies go there); without it the visitor types one. `page`: where it was sent from.
+ * shown read-only (replies go there); without it the visitor types one. `page`: where it was sent from. `kinds`: the
+ * kinds offered (one: no choice shown, e.g. Help's "Report wrong data"); `message`: the box's first words (a college's name).
  */
-export function RequestForm({ email, page }: { email?: string; page: string }) {
+export function RequestForm({ email, page, kinds = REQUEST_KINDS, message = "" }: { email?: string; page: string; kinds?: readonly FeatureRequestInput["kind"][]; message?: string }) {
+  const id = useId(); // Help has two of these forms
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; message: string; at: number } | null>(null);
@@ -37,7 +39,7 @@ export function RequestForm({ email, page }: { email?: string; page: string }) {
   // the DOM instead of setting it on reset(values), and leave no kind ticked after a send.
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FeatureRequestInput>({
     resolver: zodResolver(email ? featureRequestSchema : publicSchema),
-    defaultValues: { kind: "feature", message: "", email: email ?? "", page, website: "" },
+    defaultValues: { kind: kinds[0], message, email: email ?? "", page, website: "" },
   });
   const length = watch("message")?.length ?? 0;
 
@@ -50,7 +52,7 @@ export function RequestForm({ email, page }: { email?: string; page: string }) {
         error: "We couldn't send your request. Check your connection and try again.",
       }));
       if (res.ok) {
-        reset({ kind: "feature", message: "", email: values.email, page, website: "" }); // her email stays for the next one
+        reset({ kind: kinds[0], message: "", email: values.email, page, website: "" }); // her email stays for the next one
         setResult({ ok: true, message: "Thanks — we reply within 2 working days.", at: Date.now() });
         if (email) {
           navigating(true); // inside Decide: the shell keeps the refresh moving (decide-shell.tsx)
@@ -64,10 +66,10 @@ export function RequestForm({ email, page }: { email?: string; page: string }) {
 
   return (
     <form method="post" onSubmit={onSubmit} noValidate className="relative grid gap-5">
-      <fieldset>
+      <fieldset hidden={kinds.length < 2}>
         <legend className="text-sm font-medium">What is it about?</legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          {REQUEST_KINDS.map((k) => (
+          {kinds.map((k) => (
             <label key={k} className={pill}>
               <input type="radio" value={k} className="size-4 shrink-0 accent-sky" {...register("kind")} />
               {requestKindLabel[k]}
@@ -77,29 +79,30 @@ export function RequestForm({ email, page }: { email?: string; page: string }) {
       </fieldset>
 
       <div>
-        <label htmlFor="rq-message" className="text-sm font-medium">Your message</label>
+        <label htmlFor={`${id}-message`} className="text-sm font-medium">Your message</label>
         <textarea
-          id="rq-message"
+          id={`${id}-message`}
           rows={6}
           className="mt-1.5 block min-h-36 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-sky aria-invalid:border-ember"
           aria-required
           aria-invalid={!!errors.message}
-          aria-describedby={`rq-message-hint rq-message-count${errors.message ? " rq-message-error" : ""}`}
+          aria-describedby={`${id}-message-hint ${id}-message-count${errors.message ? ` ${id}-message-error` : ""}`}
+          defaultValue={message} // in the server HTML too (RHF fills it only on mount)
           {...register("message")}
         />
         <div className="mt-1.5 flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs">
-          <p id="rq-message-hint" className="text-muted-foreground">What you need, and the page or college it&apos;s about. At least 10 characters.</p>
-          <p id="rq-message-count" className={cn("numeric", length > MAX ? "text-ember" : "text-muted-foreground")}>
+          <p id={`${id}-message-hint`} className="text-muted-foreground">What you need, and the page or college it&apos;s about. At least 10 characters.</p>
+          <p id={`${id}-message-count`} className={cn("numeric", length > MAX ? "text-ember" : "text-muted-foreground")}>
             {length.toLocaleString("en-IN")} / {MAX.toLocaleString("en-IN")} characters
           </p>
         </div>
-        {errors.message && <p id="rq-message-error" className="mt-1.5 text-xs text-ember">{errors.message.message}</p>}
+        {errors.message && <p id={`${id}-message-error`} className="mt-1.5 text-xs text-ember">{errors.message.message}</p>}
       </div>
 
       <div>
-        <label htmlFor="rq-email" className="text-sm font-medium">Email</label>
+        <label htmlFor={`${id}-email`} className="text-sm font-medium">Email</label>
         <Input
-          id="rq-email"
+          id={`${id}-email`}
           type="email"
           autoComplete="email"
           readOnly={!!email}
@@ -108,11 +111,11 @@ export function RequestForm({ email, page }: { email?: string; page: string }) {
           className={cn("mt-1.5 h-11", email && "text-muted-foreground")}
           aria-required={!email || undefined}
           aria-invalid={!!errors.email}
-          aria-describedby={errors.email ? "rq-email-error rq-email-note" : "rq-email-note"}
+          aria-describedby={errors.email ? `${id}-email-error ${id}-email-note` : `${id}-email-note`}
           {...register("email")}
         />
-        {errors.email && <p id="rq-email-error" className="mt-1.5 text-xs text-ember">{errors.email.message}</p>}
-        <p id="rq-email-note" className={hint}>
+        {errors.email && <p id={`${id}-email-error`} className="mt-1.5 text-xs text-ember">{errors.email.message}</p>}
+        <p id={`${id}-email-note`} className={hint}>
           {email ? "Your account email. We reply here." : <>We use it only to reply to this request. See our <Link href="/privacy" className="underline hover:text-foreground">privacy notice</Link>.</>}
         </p>
       </div>

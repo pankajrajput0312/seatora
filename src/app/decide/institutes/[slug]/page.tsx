@@ -677,6 +677,10 @@ export default async function InstitutePage({ params, searchParams }: Props) {
           {/* No rank shown, so the NBEMS results it came from are not cited. */}
         </section>
       )}
+      {/* Every tab: a wrong figure here goes to Help's Report wrong data with the college named. */}
+      <p className="text-xs" data-print-hide>
+        <Link href={L.to("/decide/requests", { about: college.name }, "#report")} className={`${smallLink} text-muted-foreground underline hover:text-foreground`}>Report wrong data</Link>
+      </p>
     </AppPage>
   );
 }

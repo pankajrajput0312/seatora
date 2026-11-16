@@ -1,6 +1,6 @@
 import { LoadingPage, SkHead, SkPanel, Skeleton } from "@/features/decide/components/skeleton";
 
-// Request a feature: the form, then her requests.
+// Help & feedback: the forms, then her requests.
 export default function Loading() {
   return (
     <LoadingPage className="grid grid-cols-1 gap-8">

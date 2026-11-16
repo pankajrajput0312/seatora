@@ -17,7 +17,7 @@ description: Which Seatora page answers what, with link formats (/decide/options
 - Score & rank `/decide/rank-tools`: score ↔ rank in NBEMS results.
 - Fees & bond `/decide/fees`: fees, stipend, bond and leaving penalty per institute and programme.
 - Residents `/decide/residents`: names from MCC admitted lists, across colleges.
-- Request a feature `/decide/requests`.
+- Help & feedback (report wrong data, request a feature, contact) `/decide/requests`.
 - Ask Seatora `/decide/ask`; saved reports `/decide/ask/report/<id>`.
 
 Use links from tool results when given; otherwise build them with these formats. Write them as markdown links: [Last ranks](/decide/last-ranks?course=dnb-anaesthesiology).

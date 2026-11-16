@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { expect, freshIp, hasInvite, invited, test } from "./auth";
 
-// "Request a feature": the in-app page (signed in, e2e/auth.ts) and the public form on /contact (signed out). Writes to the
+// Help & feedback's "Request a feature": the in-app page (signed in, e2e/auth.ts) and the public form on /contact (signed out). Writes to the
 // database: every request made here is deleted afterwards, found by its unique message.
 const db = new PrismaClient();
 const made: string[] = [];
@@ -23,8 +23,8 @@ const fields = { kind: true, email: true, userId: true, page: true, status: true
 test("in-app: a signed-in request goes out with the account email and shows under Your requests", async ({ page }) => {
   test.skip(!process.env.DATABASE_URL || !hasInvite, "needs DATABASE_URL, E2E_EMAIL and E2E_PASSWORD");
   await page.goto("/decide/requests");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Request a feature");
-  const form = page.locator("section[aria-label='New request'] form");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Help & feedback");
+  const form = page.locator("section[aria-labelledby=feature-h] form");
   const email = form.getByLabel("Email");
   await expect(email).toHaveValue(invited.email);
   await expect(email).toHaveAttribute("readonly", "");

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { z } from "zod";
+import { siteConfig } from "@/config/site";
 import { getCurrentUser, requireDecideAccess } from "@/features/auth/lib/session";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
@@ -13,10 +14,10 @@ import { RequestStatusSelect } from "@/features/requests/components/request-stat
 import { listAllRequests, listMyRequests } from "@/features/requests/server";
 import { REQUEST_KINDS, REQUEST_STATUSES, requestKindLabel } from "@/features/requests/validations";
 
-export const metadata: Metadata = { title: "Request a feature", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Help & feedback", robots: { index: false, follow: false } };
 const PATH = "/decide/requests";
-// Own keys (status, kind): never a profile key.
-const schema = z.object({ status: z.enum(REQUEST_STATUSES).optional(), kind: z.enum(REQUEST_KINDS).optional(), page: pageValue.default(1) });
+// Own keys (status, kind, about): never a profile key. `about`: a college page's "Report wrong data" (its name).
+const schema = z.object({ status: z.enum(REQUEST_STATUSES).optional(), kind: z.enum(REQUEST_KINDS).optional(), page: pageValue.default(1), about: z.string().trim().max(200).optional() });
 
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireDecideAccess(PATH);
@@ -25,25 +26,42 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   const f = parseSearchParams(schema, params);
   // listAllRequests is null for anyone but the owner.
   const [user, mine, all] = await Promise.all([getCurrentUser(), listMyRequests(), listAllRequests(f)]);
+  const whatsapp = process.env.NEXT_PUBLIC_CONTACT_WHATSAPP?.replace(/[^\d+]/g, "");
 
   return (
     <AppPage className="grid grid-cols-1 gap-4">
       <PageHead
-        title="Request a feature"
+        title="Help & feedback"
         about={
           <>
-            A new feature, a change for your own use, a data correction or anything else. We read every request and reply by email
-            to your account&apos;s address within 2 working days. Your requests are listed below with their status: new,
-            planned, done or declined.
+            Wrong data, a feature you need, or anything else. We read every message and reply by email to your account&apos;s address
+            within 2 working days. What you send is listed below with its status: new, planned, done or declined.
           </>
         }
       >
-        Ask for a feature, a change or a data fix.
+        Report wrong data, ask for a feature, or contact us.
       </PageHead>
 
-      <section aria-label="New request" className="max-w-2xl rounded-xl border border-border bg-card p-4 sm:p-6">
-        <RequestForm email={user?.email} page={PATH} />
+      <section id="report" aria-labelledby="report-h" className="grid max-w-2xl scroll-mt-24 gap-3 rounded-xl border border-border bg-card p-4 sm:p-6">
+        <div>
+          <h2 id="report-h" className="text-lg font-semibold">Report wrong data</h2>
+          <p className="text-sm text-muted-foreground">A fee, bond, seat, closing rank or name that doesn&apos;t match the official document: name the college and what&apos;s wrong. We check it against the source and fix it.</p>
+        </div>
+        <RequestForm email={user?.email} page={PATH} kinds={["data"]} message={f.about ? `${f.about}: ` : ""} />
       </section>
+
+      <section aria-labelledby="feature-h" className="grid max-w-2xl gap-3 rounded-xl border border-border bg-card p-4 sm:p-6">
+        <h2 id="feature-h" className="text-lg font-semibold">Request a feature</h2>
+        <RequestForm email={user?.email} page={PATH} kinds={["feature", "customization", "other"]} />
+      </section>
+
+      {(siteConfig.contactEmail || whatsapp) && (
+        <section aria-labelledby="contact-h" className="grid max-w-2xl gap-1 text-sm">
+          <h2 id="contact-h" className="text-lg font-semibold">Contact us</h2>
+          {siteConfig.contactEmail && <p>Email: <a href={`mailto:${siteConfig.contactEmail}`} className="break-all text-sky underline">{siteConfig.contactEmail}</a></p>}
+          {whatsapp && <p>WhatsApp: <a href={`https://wa.me/${whatsapp.replace("+", "")}`} target="_blank" rel="noopener noreferrer" className="numeric text-sky underline">{whatsapp}</a></p>}
+        </section>
+      )}
 
       <section aria-labelledby="mine-h" className="grid max-w-2xl grid-cols-1 gap-3">
         <h2 id="mine-h" className="text-lg font-semibold">Your requests</h2>
