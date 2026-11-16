@@ -20,7 +20,8 @@ describe("PlanCardsView", () => {
     // One price now and one after, never a struck "was" price beside ₹0.
     expect(pass).toContain("₹0now");
     expect(pass).not.toContain("₹499");
-    expect(pass).toContain("Free till 20 Nov. Then ₹199 once — no auto-renew, no card now. Valid till 31 Mar 2027.");
+    expect(pass).toContain("Free till 20 Nov. Then ₹199 once — no auto-renew, no card now.");
+    expect(pass).not.toContain("Valid till"); // the free upgrade ends with the free period
     expect(pass).toContain("CTA");
   });
 
@@ -39,6 +40,10 @@ describe("PlanCardsView", () => {
     const pass = text(card(render("PREMIUM", null, { got: "₹0 · code DRTARAL · till 31 Mar 2027" }), "PREMIUM"));
     expect(pass).toContain("₹0 · code DRTARAL · till 31 Mar 2027");
     expect(pass).not.toMatch(/₹499|₹199/);
+    // The free claim: when it ends and what happens then, never the paid pass's end date.
+    const claimed = text(card(render("PREMIUM", new Date("2026-11-20T18:29:59Z"), { got: "Free till 20 Nov (free period)" }), "PREMIUM"));
+    expect(claimed).toContain("Your free pass ends 20 Nov. After that you return to the Free plan (your list stays) unless you pay ₹199 once. We never charge automatically.");
+    expect(claimed).not.toContain("31 Mar 2027");
     const sneha = { name: "Sneha", amount: 15900 };
     expect(text(card(render("FREE", new Date("2026-11-20T18:29:59Z"), { invite: sneha }), "PREMIUM"))).toContain("Sneha's invite: ₹159 after 20 Nov (instead of ₹199)");
     expect(text(card(render("FREE", null, { invite: sneha }), "PREMIUM"))).toContain("Was ₹499, now ₹159₹499₹159with Sneha's invite");

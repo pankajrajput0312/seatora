@@ -121,9 +121,8 @@ export async function ResidentsPromo({ L }: { L: DecideLinks }) {
               {invite && <span className="text-caption text-[#f1f4f7]">with {invite.name}&apos;s invite</span>}
             </p>
           )}
-          {free && state !== "pass" && state !== "staff" && (
-            <p className="text-caption text-[#f1f4f7]">{invite ? inviteLine(invite.name, invite.amount, list, free) : `Then ${formatPaise(list)} once.`}</p>
-          )}
+          {free && invite && state !== "pass" && state !== "staff" && <p className="text-caption text-[#f1f4f7]">{inviteLine(invite.name, invite.amount, list, free)}</p>}
+          {free && !invite && state !== "pass" && state !== "staff" && state !== "claimed" && <p className="text-caption text-[#f1f4f7]">Then {formatPaise(list)} once.</p>}
           {after && <p className="text-caption text-[#f1f4f7]">{after}</p>}
           <div className="mt-3">
             <SeasonPassButton

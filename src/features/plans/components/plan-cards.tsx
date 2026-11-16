@@ -71,10 +71,11 @@ export function PlanCardsView({ current, free, got, invite, cta, freeCta, classN
 }) {
   const { amount: list, wasAmount: was } = PLANS.season_pass;
   const season = longDate(SEASON_PASS_UNTIL);
+  // "Valid till 31 Mar 2027" only where she pays (or has paid): the free upgrade ends with the free period.
   const line = got
-    ? free && !invite && `Then ${formatPaise(list)} once for the season, till ${season}.` // the free claim; a pass says it all
+    ? free && `Your free pass ends ${shortDate(free)}. After that you return to the Free plan (your list stays) unless you pay ${formatPaise(invite?.amount ?? list)} once. We never charge automatically.` // the free claim; a pass says it all
     : free
-      ? invite ? `No card now, no auto-renew. Valid till ${season}.` : `${freeLine(free)} Valid till ${season}.`
+      ? invite ? "No card now, no auto-renew." : freeLine(free)
       : invite ? `Once, no auto-renew, valid till ${season}.` : `${formatPaise(discountedPrice(list))} with an invite, valid till ${season}.`;
   const yours = <span className="rounded-full bg-[#5ccfe6] px-2 py-0.5 text-xs font-bold text-[#0b0e12]">Your plan</span>;
   return (
