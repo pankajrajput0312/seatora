@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Fragment } from "react";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { Button } from "@/components/ui/button";
@@ -12,10 +13,11 @@ import { RoundStatusBanner } from "@/features/decide/components/round-status";
 import { ResidentsPromo, ToolGroups } from "@/features/decide/components/home-hub";
 import { EmptyState, smallLink, StatStrip } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
-import { fmtIST, nextDate, nextFilling, roundName, stepName, stepsNow } from "@/features/decide/lib/round-status";
+import { fmtIST, nextChoiceFilling, nextDate, nextFilling, roundName, stepName, stepsNow } from "@/features/decide/lib/round-status";
+import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { roundStatus } from "@/features/decide/server/notices";
 import { termValueLabel } from "@/features/decide/lib/term-filters";
-import { eligibleCategories, reachLabel, reachOrder, reachWindow } from "@/features/decide/lib/reach";
+import { eligibleCategories, reachLabel, reachOrder, reachWindow, type Reach } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { dashboard, getMeta, LATEST_YEAR, listOptions, PAST_YEARS, type StripPoint } from "@/features/decide/service";
 import { roundLabel } from "@/features/decide/types";
@@ -31,6 +33,17 @@ function At({ p }: { p: StripPoint | null }) {
       <span className="block text-xs text-muted-foreground">{p.category}, {roundLabel[p.round]}, {p.quota}</span>
     </>
   );
+}
+
+/** "5 in 2026 R1, 12 in 2024 and 2025, 10 in 2024 or 2025": the reached total as Options' own label tabs, each a link to it. */
+function ReachedParts({ L, counts }: { L: ReturnType<typeof decideLinks>; counts: Record<Reach, number> }) {
+  const parts = (["reached-latest", "reached-both", "reached-one"] as const).filter((x) => counts[x] > 0);
+  return parts.map((x, i) => (
+    <Fragment key={x}>
+      {i > 0 && ", "}
+      <Link href={L.options({ reach: x })} className={smallLink}><span className="numeric">{formatRank(counts[x])}</span> {reachLabel(x, LATEST_YEAR, PAST_YEARS).replace(/^Reached /, "")}</Link>
+    </Fragment>
+  ));
 }
 
 /** The page's h1: the sidebar already says where she is, so it is for screen readers (and focus) only. */
@@ -73,7 +86,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const caps = [profile.maxFeeLakh != null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && termValueLabel.bondyrs(profile.maxBondYears)].flatMap((c) => (c ? [c[0].toLowerCase() + c.slice(1)] : [])).join(", ");
   const leftOut = r.unknownTerms > 0 ? ` Your caps (${caps}) leave out ${formatRank(r.unknownTerms)} more without a published figure (in words only, or none published).` : "";
   // The next-step card names a round only from MCC's schedule: the choice filling open now, else the next one scheduled.
-  const filling = rs && nextFilling(stepsNow(rs, new Date()));
+  const steps = rs && stepsNow(rs, new Date());
+  const filling = steps && nextFilling(steps);
+  // Her choice list is named for the choice filling she fills next (MCC's schedule), as Choices names it.
+  const fill = steps && nextChoiceFilling(steps);
+  const fillName = fill ? `${roundName[fill.round]} · ${rs.year}` : null;
+  // MCC's seat lists of the round Options lists, said as such (never "Round 2 seats in your courses").
+  const lists = list && `MCC's ${roundWords} seat lists`;
   const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} without a published figure</Link></>;
 
   return (
@@ -95,7 +114,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             )}
             <p className="mt-1 text-body text-muted-foreground">
               <span className="numeric">{formatRank(total)}</span> {list ? "options with seats in MCC's latest seat lists, in your courses" : "options in your profile"};{" "}
-              <span className="numeric">{formatRank(reached)}</span> reached your rank in a past round.
+              {/* The parts are Options' own label tabs, so each number is one she can open there. */}
+              <span className="numeric">{formatRank(reached)}</span> reached your rank in a past round
+              {reached > 0 && <>{" "}(<ReachedParts L={L} counts={r.counts} />)</>}.
             </p>
             <Button asChild size="lg" className="mt-3 min-h-11 max-sm:w-full"><Link href={L.options()}>Open Options</Link></Button>
           </>
@@ -112,8 +133,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       <section aria-labelledby="numbers-h" className="grid gap-2">
         <div className="flex items-center gap-1">
-          <h2 id="numbers-h" className="text-h2 font-bold">{list ? `${roundWords} seats in your courses` : "Your options"}</h2>
-          <InfoTip label={list ? `${roundWords} seats in your courses` : "your options"}>
+          <h2 id="numbers-h" className="text-h2 font-bold">{list ? `Your courses in ${lists}` : "Your options"}</h2>
+          <InfoTip label={list ? `your courses in ${lists}` : "your options"}>
             {list
               ? `Options with seats in MCC's ${list.year} ${roundWords} lists, in your courses, quotas and ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`
               : `Every option in your profile with past allotments, on ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`}
@@ -123,7 +144,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           items={[
             sum && list
               ? {
-                  label: `Options with ${roundWords} seats`,
+                  label: `Options in ${lists}`,
                   value: <span className="font-mono">{formatRank(total)}</span>,
                   info: `${formatRank(sum.clear)} in the clear vacancy list, ${formatRank(sum.virtualOnly)} virtual only${sum.newOnly > 0 ? `, ${formatRank(sum.newOnly)} only newly added` : ""}.${leftOut}`,
                   note: <><Link href={L.options()} className={smallLink}>{formatRank(sum.clear)} clear, {formatRank(sum.virtualOnly)} virtual only</Link>{undeclared}</>,
@@ -153,34 +174,21 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             },
           ]}
         >
-          <ChoicesStat />
+          <ChoicesStat nextRound={fillName} />
         </StatStrip>
         {labelSources}
       </section>
 
       {reached === 0 && (
-        <section aria-labelledby="next-h" className="rounded-xl border border-border bg-card p-4">
-          <h2 id="next-h" className="text-title font-semibold">None of these reached your rank in {counted}: what you can still do</h2>
-          <ul className="mt-2 grid list-disc gap-1.5 pl-5 text-sm">
-            {list && sum && sum.fresh > 0 && (
-              <li><Link href={L.options({ reach: "new" })} className={smallLink}>{formatRank(sum.fresh)} {sum.fresh === 1 ? "option" : "options"} in the {roundWords} lists never allotted before</Link>: no closing rank to compare. Look at them.</li>
-            )}
-            {list && <li><Link href={L.to("/decide/options", { seats: "virtual" })} className={smallLink}>Virtual vacancy seats</Link>: seats held now that free up when someone upgrades this round. Fill them as choices too.</li>}
-            {r.counts["stray-only"] > 0 && <li><Link href={L.options({ reach: "stray-only" })} className={smallLink}>{formatRank(r.counts["stray-only"])} reached your rank only in a stray round</Link>, after R1 to R3 had closed far earlier.</li>}
-            {r.counts["within-10"] > 0 && <li><Link href={L.options({ reach: "within-10" })} className={smallLink}>{formatRank(r.counts["within-10"])} closed within 10% of your rank</Link> in a past round.</li>}
-            <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>Widen your courses, quotas or states</Link>: add DNB and Diploma courses of your specialties, or more specialties, and the fee or bond caps.</li>
-            <li>The stray vacancy round comes after Round 3: see the <Link href={L.to("/decide/counselling")} className={smallLink}>schedule and notices</Link>.</li>
-            <li><Link href={L.rankScan(profile.rank)} className={smallLink}>Rank scan</Link> shows what ranks near yours were allotted in past rounds.</li>
-          </ul>
-        </section>
+        <StillCanDo L={L} rank={profile.rank} list={list} fresh={sum?.fresh ?? 0} counts={r.counts} id="next-h" title={`None of these reached your rank in ${counted}: what you can still do`} />
       )}
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1.4fr_1fr]">
         {total ? (
           <ChartCard
             source={labelSources}
-            title={list ? `${roundWords} options by label` : "Options by label"}
-            subtitle={`${list ? `The ${formatRank(total)} options with ${roundWords} seats` : "Your options"}, by closing ranks in ${counted} only; older years are not counted. Select a label to see those options.`}
+            title={list ? `Options in ${lists}, by label` : "Options by label"}
+            subtitle={`${list ? `The ${formatRank(total)} options with seats in ${lists}` : "Your options"}, by closing ranks in ${counted} only; older years are not counted. Select a label to see those options.`}
             table={
               <table className="w-full text-sm">
                 <caption className="sr-only">Options by label</caption>
@@ -192,13 +200,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </ChartCard>
         ) : (
           <EmptyState
-            title={`No options${list ? ` with ${roundWords} seats` : ""} in your profile`}
+            title={`No options${list ? ` in ${lists}` : ""} in your profile`}
             description="Your courses, quotas, states, fee or bond limits leave none. Widen them, or add courses, with Edit beside your rank."
             href={L.to("/decide", { editProfile: 1 })}
             action="Edit your profile"
           />
         )}
-        <TopChoices />
+        <TopChoices nextRound={fillName} />
       </div>
 
       <ChartCard

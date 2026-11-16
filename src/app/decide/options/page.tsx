@@ -16,6 +16,7 @@ import { ViewField } from "@/features/decide/components/view-toggle";
 import { chosenView } from "@/features/decide/server/view";
 import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
+import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
 import { iniCetIn } from "@/features/decide/lib/college-aliases";
@@ -77,6 +78,9 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const other = roundView ? "all" : "round";
   const otherView = here({ view: optionsView(undefined, lists, meta.sources) === other ? null : other, seats: null, closed: null, ...(f.reach === "new" ? { reach: null } : {}) });
   const sum = r.summary;
+  // Every option labelled (closed-before ones too, shown or not), and those that reached her rank in R1 to R3 of a counted year.
+  const labelled = reachOrder.reduce((s, x) => s + r.counts[x], 0);
+  const reached = r.counts["reached-latest"] + r.counts["reached-both"] + r.counts["reached-one"];
   const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
   // The latest year's R1 is the only round that can be provisional (MCC's provisional result); the toggle exists only then.
   const latestProvisional = !!meta.sources.find((s) => s.year === LATEST_YEAR && s.round === "R1")?.provisional;
@@ -182,6 +186,15 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           </p>
           <p className="flex flex-wrap gap-x-4 max-md:hidden">{viewLinks}</p>
         </section>
+      )}
+      {/* None reached her rank: say so first, with what she can still do (Home's panel), not a list of dead ends. */}
+      {labelled > 0 && reached === 0 && (
+        <>
+          <p className="text-body font-semibold">
+            {n(0)} of {n(labelled)} options reached AIR {n(profile.rank)} in a past round ({counted}).
+          </p>
+          <StillCanDo L={L} rank={profile.rank} list={roundView ? lists[0] : undefined} fresh={sum?.fresh ?? 0} counts={r.counts} id="still-h" title="What you can still do" />
+        </>
       )}
       {!roundView && lists.length > 0 && (
         <p className="flex flex-wrap items-center gap-x-1 text-sm">
@@ -301,13 +314,27 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         <EmptyState title="No options match" description={`${formatRank(withoutSeats)} ${withoutSeats === 1 ? "matches" : "match"} without ${roundLabel[lists[0].round]} seats.`}>
           <Link href={here({ seats: "all" })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Show {withoutSeats === 1 ? "it" : "them"}</Link>
         </EmptyState>
+      ) : r.hiddenClosed > 0 && !f.q && !f.reach ? (
+        // Every option here closed before her rank and "hide closed" hides them: the toggle that brings them back, and her profile.
+        <EmptyState
+          title={`All ${formatRank(r.hiddenClosed)} closed before your rank, and they are hidden`}
+          description="“Closed before your rank: hidden” is on. Show them, or add courses, quotas or states in your profile (Edit beside your rank)."
+        >
+          <span className="flex flex-wrap justify-center gap-x-6">
+            <Link href={here({ closed: "1" })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Show the {formatRank(r.hiddenClosed)} closed ones</Link>
+            <Link href={L.to("/decide", { editProfile: 1 })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Edit your profile</Link>
+          </span>
+        </EmptyState>
       ) : (
         <EmptyState
           title="No options match"
-          description={iniCetIn(f.q) ? `${iniCetIn(f.q)} admits through INI-CET, not MCC's NEET PG counselling, so it is not in MCC's data.` : "Clear the search and page filters, or widen your courses, quotas or states above."}
-          href={here({ q: null, reach: null, closed: "1", seats: roundView ? "all" : null, ...Object.fromEntries(termKeys.map((k) => [k, null])) })}
-          action="Clear search and page filters"
-        />
+          description={iniCetIn(f.q) ? `${iniCetIn(f.q)} admits through INI-CET, not MCC's NEET PG counselling, so it is not in MCC's data.` : `${f.q ? `Nothing here matches “${f.q}”. ` : ""}Clear the search, the label and the Filters sheet's page filters, or add courses, quotas or states in your profile (Edit beside your rank).`}
+        >
+          <span className="flex flex-wrap justify-center gap-x-6">
+            <Link href={here({ q: null, reach: null, closed: "1", seats: roundView ? "all" : null, ...Object.fromEntries(termKeys.map((k) => [k, null])) })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Clear search and page filters</Link>
+            <Link href={L.to("/decide", { editProfile: 1 })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Edit your profile</Link>
+          </span>
+        </EmptyState>
       )}
       {!r.total && <SeatSource lists={lists} L={L} />}
 

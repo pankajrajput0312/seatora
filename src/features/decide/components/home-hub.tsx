@@ -20,7 +20,7 @@ const groups = [
     cols: "xl:grid-cols-4",
     tools: [
       { href: "/decide/options", label: "Options", note: "Where your rank got in before", icon: SlidersHorizontal },
-      { href: "/decide/seats", label: "Seats", note: "Clear, virtual and new seats", icon: LayoutGrid },
+      { href: "/decide/seats", label: "Seats", note: "Clear, virtual and newly added seats", icon: LayoutGrid },
       { href: "/decide/choices", label: "Choice list", note: "Order it, copy it into MCC", icon: ListOrdered },
       { href: "/decide/compare", label: "Compare", note: "Up to 4 side by side", icon: GitCompareArrows },
     ],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { PROFILE_KEY, profileSchema, type Profile } from "../profile";
 import { CHOICES_KEY, compareSchema, COMPARE_KEY, defaultChoices, parseChoices, type ChoicesState } from "./choices";
@@ -13,6 +13,21 @@ export function useChoices(): [ChoicesState, (fn: (s: ChoicesState) => ChoicesSt
   const state = useMemo(() => parseChoices(raw), [raw]);
   const update = useCallback((fn: (s: ChoicesState) => ChoicesState) => setRaw((prev: unknown) => fn(parseChoices(prev))), [setRaw]);
   return [state, update, hydrated];
+}
+
+/**
+ * useChoices, with the first list, still under its default name ("Round 2 · 2026"), renamed for the choice filling she
+ * fills next (`nextRound`, MCC's schedule: "Round 3 · 2026"). A list she named or duplicated keeps its own name, and no
+ * two lists end up with one. Choices and Home both read it, so the list never has two names.
+ */
+export function useChoicesFor(nextRound: string | null | undefined) {
+  const [state, setState, hydrated] = useChoices();
+  const first = defaultChoices.lists[0];
+  const rename = !!nextRound && nextRound !== first.name && !state.lists.some((l) => l.name === nextRound) && state.lists.some((l) => l.id === first.id && l.name === first.name);
+  useEffect(() => {
+    if (hydrated && rename) setState((s) => ({ ...s, lists: s.lists.map((l) => (l.id === first.id && l.name === first.name ? { ...l, name: nextRound! } : l)) }));
+  }, [hydrated, rename, nextRound, first, setState]);
+  return [state, setState, hydrated] as const;
 }
 
 /** Compare tray ids, validated and de-duplicated. */

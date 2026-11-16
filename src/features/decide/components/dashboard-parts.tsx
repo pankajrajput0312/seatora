@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { typedPrefix } from "../lib/choices";
-import { useChoices, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
+import { useChoicesFor, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams } from "../profile";
 import { navigating } from "./nav-pending";
 import { EmptyState, smallLink, StatCell } from "./ui";
@@ -75,9 +75,12 @@ export function SetupCard() {
   );
 }
 
-/** StatStrip cell for her active choice list (synced with the account when signed in). Neutral until localStorage is read, never a false "0". */
-export function ChoicesStat() {
-  const [choices, , hydrated] = useChoices();
+/**
+ * StatStrip cell for her active choice list (synced with the account when signed in). Neutral until localStorage is read,
+ * never a false "0". `nextRound`: the choice filling she fills next ("Round 3 · 2026"), the list's name as Choices gives it.
+ */
+export function ChoicesStat({ nextRound }: { nextRound?: string | null }) {
+  const [choices, , hydrated] = useChoicesFor(nextRound);
   const L = useDecideLinks();
   const list = choices.lists.find((l) => l.id === choices.activeId) ?? choices.lists[0];
   const typed = typedPrefix(list);
@@ -90,8 +93,8 @@ export function ChoicesStat() {
   );
 }
 
-export function TopChoices() {
-  const [state, , hydrated] = useChoices();
+export function TopChoices({ nextRound }: { nextRound?: string | null }) {
+  const [state, , hydrated] = useChoicesFor(nextRound);
   const L = useDecideLinks();
   const list = state.lists.find((l) => l.id === state.activeId) ?? state.lists[0];
   const top = list.items.slice(0, 5);
