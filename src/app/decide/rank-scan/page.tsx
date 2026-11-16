@@ -5,6 +5,10 @@ import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
 import { toolbarRow } from "@/features/decide/components/csv-link";
 import { AboutData } from "@/features/decide/components/filter-form";
+import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
+import { seatCategories } from "@/features/decide/components/seats/find-seats";
+import { courseFilter } from "@/features/decide/lib/course-filter";
+import { eligibleCategories } from "@/features/decide/lib/reach";
 import { DataSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { PageHead, Provisional } from "@/features/decide/components/bits";
@@ -29,16 +33,21 @@ import { ScrollTable } from "@/features/decide/components/scroll-table";
 export const metadata: Metadata = { title: "Rank scan" };
 const VIEW = "rank-scan";
 // ponytail: 50 a page (rounds in order, ranks within a round): each card carries its five term cells and their (i)s,
-// and both views are in the page. ±500 is about 550 rows in a busy year.
+// and both views are in the page. ±500 is about 550 rows in a busy year; ±5,000 about ten times that, read and
+// filtered (course, degree, seat category) before the terms are attached.
 const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
-const windows = ["100", "250", "500"] as const;
+/** ± ranks, or ± a percentage of her rank; either way at most ±5,000 (MAX_WINDOW). */
+const windows = ["100", "250", "500", "1000", "2500", "5000", "1%", "2%", "5%", "10%"] as const;
+const MAX_WINDOW = 5000;
+const halfWindow = (w: (typeof windows)[number], rank: number) => Math.min(MAX_WINDOW, w.endsWith("%") ? Math.max(1, Math.round((rank * parseFloat(w)) / 100)) : Number(w));
 const schema = z.object({
   scan: rankValue.optional(),
   year: z.coerce.number().int().optional(),
-  w: z.enum(windows).default("250"),
+  w: z.enum(windows).default("500"),
   round: z.enum(rounds).optional(),
   page: pageValue.optional(),
 });
+const multi = (params: URLSearchParams, k: string) => params.getAll(k).flatMap((v) => v.split(",")).filter(Boolean);
 
 export default async function RankScanPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
@@ -53,9 +62,22 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const rank = invalid ? null : (f.scan ?? profile?.rank ?? null);
   // Default: the newest year whose results are final.
   const year = meta.years.find((y) => y.year === f.year) ?? meta.years.find((y) => !y.provisional) ?? meta.years[0];
-  const window = Number(f.w);
+  const window = halfWindow(f.w, rank ?? 0);
   const round = f.round && year?.rounds.includes(f.round) ? f.round : undefined;
-  const scanned = rank && year ? await withRowInfo((await rankScan(rank, year.year, window)).flatMap((g) => g.rows).filter((a) => !round || a.round === round)) : [];
+  // Her courses, and the seat categories she can take, unless she picks others ("all" lifts one): what is near her rank for her.
+  const cf = courseFilter(params, profile, meta.courses);
+  const degrees = multi(params, "degree").filter((d) => meta.degrees.includes(d));
+  const scatPicked = multi(params, "scat");
+  const mineCats = profile ? eligibleCategories(profile.category, profile.pwd) : [];
+  const allCats = scatPicked.includes("all");
+  const cats = allCats ? null : scatPicked.length ? scatPicked : mineCats.length ? mineCats : null;
+  const courseSlug = new Map(meta.courses.map((c) => [`${c.degree}|${c.specialty}`, c.slug]));
+  const wanted = (a: { degree: string; specialty: string; category: string; round: string }) =>
+    (!round || a.round === round) &&
+    (!cf.slugs || cf.slugs.has(courseSlug.get(`${a.degree}|${a.specialty}`) ?? "")) &&
+    (!degrees.length || degrees.includes(a.degree)) &&
+    (!cats || cats.includes(a.category));
+  const scanned = rank && year ? await withRowInfo((await rankScan(rank, year.year, window)).flatMap((g) => g.rows).filter(wanted)) : [];
   // Fee, stipend, bond, leaving and type filters on each allotment's course and quota (lib/term-filters.ts).
   const { kept, unknown } = splitByTerms(scanned, tp.filters, (a) => a.fees, (a) => a.hospital?.type?.value);
   type Row = (typeof kept)[number];
@@ -65,13 +87,17 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const groups = rounds.map((rd) => ({ round: rd, rows: rows.filter((a) => a.round === rd) })).filter((g) => g.rows.length);
   const courseOf = new Map(meta.courses.map((c) => [`${c.degree}|${c.specialty}`, c]));
   const provisional = (rd: string) => meta.sources.some((s) => s.year === year?.year && s.round === rd && s.provisional);
+  const R = "/decide/rank-scan";
   const chips = [
+    ...cf.chips((v) => L.with(R, { course: v, page: null }), (s) => L.without(R, "course", s)),
+    ...degrees.map((d) => ({ label: d, param: "degree", href: L.without(R, "degree", d) })),
+    ...(allCats ? [{ label: "All seat categories", param: "scat", href: L.with(R, { scat: null, page: null }) }] : scatPicked.length ? scatPicked.map((c) => ({ label: `${c} seats`, param: "scat", href: L.without(R, "scat", c) })) : mineCats.length ? [{ label: `Your seat categories (${mineCats.join(", ")})`, param: "scat", href: L.with(R, { scat: "all", page: null }) }] : []),
     // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
     ...(profile?.maxFeeLakh != null && tp.params.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: L.with("/decide/rank-scan", { maxfee: "any", page: null }) }] : []),
     ...(profile?.maxBondYears != null && tp.params.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: L.with("/decide/rank-scan", { bondyrs: "any", page: null }) }] : []),
     ...termChips(tp.params).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/rank-scan", c.key, c.value) : L.with("/decide/rank-scan", { [c.key]: null, page: null }) })),
   ];
-  const clear = L.with("/decide/rank-scan", { ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
+  const clear = L.with("/decide/rank-scan", { course: "all", degree: null, scat: "all", ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
   const course = (a: Row) => courseOf.get(`${a.degree}|${a.specialty}`);
   const courseName = (a: Row) => `${a.degree} ${course(a)?.name ?? a.specialty}`;
   const youText = rank ? `Your rank, ${formatRank(rank)}, falls here` : "";
@@ -98,8 +124,19 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         }
       >
         <Field label="Year"><Select name="year" value={year ? String(year.year) : undefined} options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
-        <Field label="Range"><Select name="w" value={f.w} options={windows.map((w) => ({ value: w, label: `± ${formatRank(Number(w))}` }))} /></Field>
+        <Field label="Range"><Select name="w" value={f.w} options={windows.map((w) => ({ value: w, label: w.endsWith("%") ? `± ${w} of your rank${rank ? ` (± ${formatRank(halfWindow(w, rank))})` : ""}` : `± ${formatRank(Number(w))}` }))} /></Field>
         <Field label="Round"><Select name="round" value={round} all="All rounds" options={(year?.rounds ?? []).map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
+        {/* Her courses and seat categories by default (none ticked), as Residents; the shared searchable chips. */}
+        <FilterDropdown label="Course" name="course" search options={cf.choices} selected={cf.selected} none={cf.none} info={cf.mine.length ? "None ticked means your courses. Tick All courses for every one." : undefined} />
+        <FilterDropdown label="Degree" name="degree" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={degrees} none="Any degree" />
+        <FilterDropdown
+          label="Seat category"
+          name="scat"
+          options={[...(mineCats.length ? [{ value: "all", label: "All seat categories" }] : []), ...seatCategories.map((c) => ({ value: c, label: c }))]}
+          selected={allCats ? ["all"] : scatPicked}
+          none={mineCats.length ? `Yours (${mineCats.join(", ")})` : "All seat categories"}
+          info={mineCats.length ? "None ticked means the seat categories you can take. Tick All seat categories for every one." : undefined}
+        />
         <TermFilterControls f={tp.params} caps={profile} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
@@ -116,8 +153,9 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
               <p id="results" tabIndex={-1} aria-live="polite" className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
                 <span><span className="numeric font-semibold text-foreground">{rangeLabel({ rows, page, pageSize, total: kept.length })}</span> allotments: history, not a prediction</span>
                 <InfoTip label="these allotments">
-                  Ranks <span className="numeric">{formatRank(Math.max(1, rank - window))}–{formatRank(rank + window)}</span> in {year.label}, every course and seat
-                  category{round ? `, ${roundLabel[round]} only` : ""}. A “Your rank falls here” line marks where ranks pass yours. What happened then, not what will happen now.
+                  Ranks <span className="numeric">{formatRank(Math.max(1, rank - window))}–{formatRank(rank + window)}</span> in {year.label},{" "}
+                  {cf.slugs ? (cf.typed.length ? "the courses picked" : "your courses") : "every course"}{degrees.length ? ` (${degrees.join(", ")})` : ""},{" "}
+                  {cats ? `${cats.join(", ")} seats` : "every seat category"}{round ? `, ${roundLabel[round]} only` : ""}. A “Your rank falls here” line marks where ranks pass yours. What happened then, not what will happen now.
                 </InfoTip>
                 {unknown.length > 0 && (
                   <Link href={L.with("/decide/rank-scan", { nd: "keep", page: null })} className={`${smallLink} text-sky`}>

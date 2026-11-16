@@ -42,7 +42,7 @@ export const pairChoices = (courses: { degree: string; specialty: string; name: 
 export const feeChoices = (current: number | null | undefined) =>
   current != null && !FEE_LAKH_CHOICES.includes(current) ? [...FEE_LAKH_CHOICES, current].sort((a, b) => a - b) : FEE_LAKH_CHOICES;
 
-type ProfileCourses = Pick<Profile, "specialties" | "degrees" | "pairs">;
+export type ProfileCourses = Pick<Profile, "specialties" | "degrees" | "pairs">;
 
 /** The one course matcher: one of her exact pairs when she has any, else her specialties x degrees (empty = all). */
 export const profileHasCourse = (p: ProfileCourses, c: { degree: string; specialty: string }) =>
