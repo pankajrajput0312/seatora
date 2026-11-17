@@ -9,20 +9,39 @@ import { startWhatsAppLogin } from "../whatsapp-actions";
  * "Continue with WhatsApp" (shown only with WHATSAPP_LOGIN=1): opens WhatsApp with the code typed in, then polls
  * /api/auth/whatsapp/status every 2 s and goes to `next` (already made safe by the page) once she has sent it.
  */
+// Phones open WhatsApp in this tab and reload the page (or open a new one) on the way back: the wa_login cookie still
+// names this browser's challenge, so the page asks once on load and goes back to waiting, or straight in if she has
+// already sent the code. The code shown waits in sessionStorage.
+const STATUS = "/api/auth/whatsapp/status";
+const SAVED = "seatora_wa_login";
+
 export function WhatsAppLogin({ next }: { next: string }) {
   const [state, setState] = useState<{ code: string; url: string } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    fetch(STATUS, { cache: "no-store" })
+      .then((x) => x.json())
+      .then((r) => {
+        if (r.ok) return window.location.replace(next);
+        if (r.pending) setState(JSON.parse(sessionStorage.getItem(SAVED) ?? "null") ?? { code: "", url: `https://wa.me/917011488467` });
+        else sessionStorage.removeItem(SAVED);
+      })
+      .catch(() => {});
+  }, [next]);
+
+  useEffect(() => {
     if (!state) return;
     const t = setInterval(async () => {
-      const r = await fetch("/api/auth/whatsapp/status", { cache: "no-store" }).then((x) => x.json()).catch(() => ({ pending: true }));
+      const r = await fetch(STATUS, { cache: "no-store" }).then((x) => x.json()).catch(() => ({ pending: true }));
       if (r.ok) {
         clearInterval(t);
+        sessionStorage.removeItem(SAVED);
         window.location.replace(next);
       } else if (r.expired) {
         clearInterval(t);
+        sessionStorage.removeItem(SAVED);
         setState(null);
         setError(r.error ?? "That code has expired. Tap Continue with WhatsApp again.");
       }
@@ -38,6 +57,7 @@ export function WhatsAppLogin({ next }: { next: string }) {
     setBusy(false);
     if (!r.ok) return setError(r.error);
     setState({ code: r.code, url: r.url });
+    sessionStorage.setItem(SAVED, JSON.stringify({ code: r.code, url: r.url }));
     // Phones: WhatsApp opens over this page (same tab); desktops: a new tab, so this page keeps polling.
     if (window.matchMedia("(pointer: coarse)").matches) window.location.href = r.url;
     else window.open(r.url, "_blank", "noopener");
@@ -55,9 +75,11 @@ export function WhatsAppLogin({ next }: { next: string }) {
           <p className="flex items-center gap-2">
             <Loader2 className="size-4 animate-spin" /> Waiting for your WhatsApp message…
           </p>
-          <p>
-            Your code: <span className="numeric font-semibold tracking-widest">{state.code}</span>
-          </p>
+          {state.code && (
+            <p>
+              Your code: <span className="numeric font-semibold tracking-widest">{state.code}</span>
+            </p>
+          )}
           <p className="text-muted-foreground">
             Didn&apos;t open? <a href={state.url} target="_blank" rel="noopener" className="text-foreground underline hover:text-sky">Open WhatsApp</a>, or send this code to +91 70114 88467.
           </p>
