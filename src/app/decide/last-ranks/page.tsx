@@ -263,7 +263,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         about={about}
         note={
           <>
-            The last All India Rank that got each seat on a {category} seat, by year and round, newest first. (2) = seats given that round.
+            The last All India Rank that got each seat on {category} seats, by year and round, newest first. (2) = seats given that round.
             {profile?.rank != null && <> <span className={GOT}>Highlighted</span>: your AIR <span className="numeric">{formatRank(profile.rank)}</span> would have got it.</>}
           </>
         }
