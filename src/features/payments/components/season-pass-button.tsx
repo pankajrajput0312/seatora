@@ -18,8 +18,8 @@ import { ApplyCoupon, CouponForm } from "./coupon-form";
  * state on the server (plans.ts passState):
  * - a Season Pass beyond the free period, or staff: "Season Pass active till 31 Mar 2027";
  * - in the free period: "Upgrade free till 20 Nov" (the free claim; or "Season Pass · free till 20 Nov" once done), and
- *   under it the paid pass for the whole season, "Buy Season Pass for ~~₹499~~ ₹199" (its own "Have a coupon?"), or
- *   CouponForm while payments are off;
+ *   under it, as a link, the paid pass for the whole season: "Or get it till 31 Mar 2027 for ~~₹499~~ ₹199" ("Keep it…"
+ *   once claimed; its own "Have a coupon?"), or CouponForm while payments are off;
  * - after it: "Upgrade for ~~₹499~~ ₹199" ("Upgrade for ~~₹499~~ ₹159 with Rahul's invite" with a referrer: her own, or the /r/
  *   cookie's code; "… with coupon X" with a coupon), or "Payments open soon" and "Have a coupon?";
  * - signed out: the same words, to /signup?next=/pricing#buy;
@@ -84,7 +84,8 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
         </div>
       )
     );
-  const pay = buy("Buy Season Pass", className);
+  // One Season Pass, one button (the free upgrade); paying is a line that says what it buys: the whole season.
+  const pay = buy(`${s.state === "claimed" ? "Keep it" : "Or get it"} till ${season}`, "min-h-11 justify-start text-left text-sm font-semibold underline underline-offset-4 hover:opacity-80");
 
   return (
     <div>
@@ -93,14 +94,7 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
       ) : (
         <ClaimFreePass label={claimLabel} done={`Season Pass active till ${shortDate(free)}`} className={className} noteClassName={noteClassName} />
       )}
-      {pay ? (
-        <div className="mt-4">
-          <p className={cn(text, "mb-2")}>Want it till {season}? Pay once:</p>
-          {pay}
-        </div>
-      ) : (
-        couponForm
-      )}
+      {pay ? <div className="mt-1">{pay}</div> : couponForm}
     </div>
   );
 }
