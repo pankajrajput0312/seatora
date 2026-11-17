@@ -499,6 +499,8 @@ model User {
   loginChallenges LoginChallenge[]
   funnelEvents FunnelEvent[]
   couponRedemptions CouponRedemption[]
+  /// Coupons she shares (Refer & earn shows her their links), e.g. DRTARAL.
+  ownedCoupons Coupon[]          @relation("CouponOwner")
 
   @@index([referredById])
   @@index([signupAid])
@@ -799,9 +801,14 @@ model Coupon {
   allowedEmail String?
   validUntil   DateTime?
   note         String?
+  /// Whose coupon it is to share: Refer & earn shows her its link (seatora.co.in/r/CODE). Null: nobody's.
+  ownerId      String?
+  owner        User?              @relation("CouponOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   createdAt    DateTime           @default(now())
   redemptions  CouponRedemption[]
   payments     Payment[]
+
+  @@index([ownerId])
 }
 
 /// One account's use of a coupon (once each), made when its payment is paid.

@@ -116,6 +116,10 @@ export async function redeemFreeCoupon(userId: string, couponId: string, listAmo
 class CouponTaken extends Error {}
 
 /** /decide/admin: every coupon, newest first, with who redeemed it. */
+/** The active coupons she shares (Coupon.ownerId): Refer & earn shows her each one's link. */
+export const ownedCoupons = (userId: string) =>
+  db.coupon.findMany({ where: { ownerId: userId, active: true }, orderBy: { createdAt: "asc" }, select: { code: true, percentOff: true, uses: true } });
+
 export async function couponAdmin() {
   return db.coupon.findMany({
     orderBy: { createdAt: "desc" },

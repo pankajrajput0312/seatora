@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({ signedIn: false }));
 vi.mock("@/features/auth/lib/session", () => ({ getCurrentUser: async () => (m.signedIn ? { id: "u_b" } : null) }));
 vi.mock("@/lib/db", () => ({
-  db: { user: { findUnique: async ({ where }: { where: { referralCode: string } }) => (where.referralCode === "RHUX234" ? { id: "u_a", name: "Rahul Sharma" } : null) } },
+  db: {
+    user: { findUnique: async ({ where }: { where: { referralCode: string } }) => (where.referralCode === "RHUX234" ? { id: "u_a", name: "Rahul Sharma" } : null) },
+    coupon: { findUnique: async ({ where }: { where: { code: string } }) => ({ DRTARAL: { code: "DRTARAL", active: true }, OLDONE: { code: "OLDONE", active: false } })[where.code] ?? null },
+  },
 }));
 const { GET } = await import("./route");
 
@@ -31,6 +34,15 @@ describe("GET /r/[code]", () => {
     m.signedIn = false;
     const res = await open("ZZZZ999");
     expect([res.headers.get("location"), res.headers.get("set-cookie")]).toEqual(["/signup?invite=bad", null]);
+  });
+
+  it("a coupon code goes to sign-up (or Pricing) with ?coupon=, no cookie; an inactive one is a bad link", async () => {
+    const res = await open("drtaral");
+    expect([res.headers.get("location"), res.headers.get("set-cookie")]).toEqual(["/signup?coupon=DRTARAL", null]);
+    m.signedIn = true;
+    expect((await open("DRTARAL")).headers.get("location")).toBe("/pricing?coupon=DRTARAL");
+    m.signedIn = false;
+    expect((await open("OLDONE")).headers.get("location")).toBe("/signup?invite=bad");
   });
 
   it("limits lookups to 30 a minute per IP", async () => {

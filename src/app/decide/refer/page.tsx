@@ -7,8 +7,10 @@ import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead } from "@/features/decide/components/bits";
 import { StatStrip } from "@/features/decide/components/ui";
 import { TrackView } from "@/features/funnel/components/beacon";
+import { SEASON_PASS_UNTIL } from "@/features/payments/grant";
 import { PLANS, paymentsOn } from "@/features/payments/plans";
-import { freeNow, shortDate } from "@/features/plans/plans";
+import { ownedCoupons } from "@/features/payments/service";
+import { freeNow, longDate, shortDate } from "@/features/plans/plans";
 import { ShareLink } from "@/features/referrals/components/share-link";
 import { UpiForm } from "@/features/referrals/components/upi-form";
 import { discountedPrice, earningFor, formatPaise, REFERRAL_PERCENT } from "@/features/referrals/lib";
@@ -23,7 +25,7 @@ export default async function ReferPage() {
   await requireDecideAccess(PATH);
   const user = await getCurrentUser();
   if (!user) redirect(`/login?${new URLSearchParams({ next: PATH })}`);
-  const { code, payoutUpi, ...stats } = await myReferrals(user.id);
+  const [{ code, payoutUpi, ...stats }, coupons] = await Promise.all([myReferrals(user.id), ownedCoupons(user.id)]);
   const list = PLANS.season_pass.amount;
   const price = discountedPrice(list);
   const free = freeNow();
@@ -45,7 +47,21 @@ export default async function ReferPage() {
         </p>
       )}
 
+      {/* Her own coupons (Coupon.ownerId, e.g. DRTARAL): each one's link, as the referral link is shared. */}
+      {coupons.map((c) => (
+        <section key={c.code} aria-labelledby={`coupon-${c.code}-h`} className="rounded-xl border border-sky/40 bg-sky/5 p-4 sm:p-6">
+          <h2 id={`coupon-${c.code}-h`} className="text-lg font-semibold">Your {c.percentOff}% off link</h2>
+          <p className="mt-1 mb-3 text-sm text-muted-foreground">
+            {c.percentOff >= 100 ? `Anyone who signs up with it gets the Season Pass free till ${longDate(SEASON_PASS_UNTIL)}.` : `Anyone who signs up with it gets ${c.percentOff}% off the Season Pass.`}{" "}
+            Used <span className="numeric">{c.uses}</span> {c.uses === 1 ? "time" : "times"} so far.
+          </p>
+          <ShareLink url={`${siteConfig.url}/r/${c.code}`} message={c.percentOff >= 100 ? `Get Seatora's NEET PG Season Pass free with my link (code ${c.code}):` : `${c.percentOff}% off Seatora's NEET PG Season Pass with my link (code ${c.code}):`} />
+          <p className="mt-2 text-xs text-muted-foreground">Code: <span className="numeric font-semibold text-foreground">{c.code}</span></p>
+        </section>
+      ))}
+
       <section aria-label="Your link" className="rounded-xl border border-border bg-card p-4 sm:p-6">
+        {coupons.length > 0 && <h2 className="mb-3 text-lg font-semibold">Your {REFERRAL_PERCENT}% off link</h2>}
         <ShareLink url={url} message={message} />
         <p className="mt-2 text-xs text-muted-foreground">Your code: <span className="numeric font-semibold text-foreground">{code}</span></p>
       </section>

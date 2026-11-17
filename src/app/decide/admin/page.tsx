@@ -203,7 +203,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <tbody>
                 {coupons.map((c) => (
                   <tr key={c.id} className={tbl.row}>
-                    <td className={`${tbl.td} font-semibold`}>{c.code}</td>
+                    <td className={`${tbl.td} font-semibold`}>
+                      {c.code}
+                      {/* The share link, as a referral link: sign-up (or Pricing) with the code applied. */}
+                      <a href={`/r/${c.code}`} className={`${smallLink} block text-xs font-normal text-sky`}>seatora.co.in/r/{c.code}</a>
+                    </td>
                     <td data-label="% off" className={tbl.num}>{c.percentOff}%</td>
                     <td data-label="Uses / max" className={tbl.num}>{n(c.uses)} / {c.maxUses == null ? "∞" : n(c.maxUses)}</td>
                     <td data-label="Active" className={tbl.td}>{c.active ? "Yes" : "No"}</td>

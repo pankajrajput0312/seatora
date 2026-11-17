@@ -34,7 +34,7 @@ export function couponBanner(code: string, c: { percentOff: number; error: strin
   if (!c) return { ok: false, free: false, text: `${code} isn't a valid coupon code.` };
   if (c.error) return { ok: false, free: false, text: `Code ${code}: ${c.error}` };
   const free = c.percentOff >= 100;
-  return { ok: true, free, text: `Code ${code}: ${free ? `Season Pass free till ${longDate(seasonEnd)}` : `${c.percentOff}% off the Season Pass`}` };
+  return { ok: true, free, text: `Code ${code}: ${free ? `100% off, Season Pass free till ${longDate(seasonEnd)}` : `${c.percentOff}% off the Season Pass`}` };
 }
 export type CouponBannerInfo = ReturnType<typeof couponBanner>;
 
