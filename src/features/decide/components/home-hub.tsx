@@ -80,7 +80,7 @@ export async function ResidentsPromo({ L }: { L: DecideLinks }) {
   const list = PLANS.season_pass.amount;
   // What the Free plan keeps once the free period ends: not said to a paid pass or staff, whom it doesn't concern.
   const keeps = planLimits("FREE");
-  const after = free && state !== "pass" && state !== "staff" && `Free until ${shortDate(free)}. After that: ${limitLine("institutes", keeps.institutes).replace(/ a day$/, "")} and ${limitLine("residents", keeps.residents)}.`;
+  const after = free && state !== "pass" && state !== "staff" && `After ${shortDate(free)}, Free plan limits: ${limitLine("institutes", keeps.institutes).replace(/ a day$/, "")} and ${limitLine("residents", keeps.residents)}.`;
   return (
     <section aria-labelledby="residents-h" className="rounded-xl border border-[#1f2a33] bg-[#0b0e12] text-[#f1f4f7]">
       <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-start">

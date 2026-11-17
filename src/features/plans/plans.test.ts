@@ -65,7 +65,7 @@ describe("gotLine and inviteLine", () => {
     expect(gotLine(pass, { amount: 9900, coupon: "HALF" })).toBe("Paid ₹99 · code HALF · till 31 Mar 2027");
     expect(gotLine(pass, null)).toBe("Season Pass · till 31 Mar 2027");
     expect(gotLine({ state: "pass", until: null }, null)).toBe("Season Pass");
-    expect(gotLine({ state: "claimed", until: freeEnd }, null)).toBe("Free till 20 Nov (free period)");
+    expect(gotLine({ state: "claimed", until: freeEnd }, null)).toBe("Active · free till 20 Nov");
     expect(gotLine({ state: "claimable", until: freeEnd }, null)).toBeNull();
     expect(gotLine({ state: "free", until: null }, null)).toBeNull();
   });

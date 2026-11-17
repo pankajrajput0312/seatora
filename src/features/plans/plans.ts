@@ -121,7 +121,7 @@ export function planLine(a: Account, now = new Date(), env: Record<string, strin
  * (free period)" (the free claim); "Season Pass · till …" when granted without a payment. Null without a pass.
  */
 export function gotLine(s: { state: PassState; until: Date | null }, paid: { amount: number; coupon: string | null } | null) {
-  if (s.state === "claimed") return `Free till ${shortDate(s.until!)} (free period)`;
+  if (s.state === "claimed") return `Active · free till ${shortDate(s.until!)}`;
   if (s.state === "staff") return "Staff account: no limits";
   if (s.state !== "pass") return null;
   const till = s.until ? ` · till ${longDate(s.until)}` : "";
