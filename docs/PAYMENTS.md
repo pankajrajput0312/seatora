@@ -6,7 +6,7 @@ A signed-in user buys the Season Pass (₹199, ₹159 with a referral: docs/REFE
 | She is | Shows |
 |---|---|
 | Season Pass beyond the free period (paid, PREMIUM, granted), or staff | "Season Pass active till 31 Mar 2027" |
-| In the free period (FREE_FOR_ALL_UNTIL ahead), not upgraded | "Upgrade free till 20 Nov" (the free upgrade, docs/PLANS_AND_ROLES.md), and under it a link "Or upgrade till 31 Mar 2027 for ~~₹499~~ ₹199" (Razorpay; its "Have a coupon or invite code?"; a 100% coupon gives the whole season) |
+| In the free period (FREE_FOR_ALL_UNTIL ahead), not upgraded | "Upgrade free till 20 Nov" (the free upgrade, docs/PLANS_AND_ROLES.md), and under it "Or keep it till 31 Mar 2027, paid once:" with an outlined "Upgrade for ~~₹499~~ ₹199" (Razorpay; its "Have a coupon or invite code?"; a 100% coupon gives the whole season) |
 | In the free period, upgraded free | The card says "Active · free till 20 Nov"; the button: "Keep it till 31 Mar 2027, paid once:" "Upgrade for ~~₹499~~ ₹199" |
 | Free plan after the free period | "Upgrade for ~~₹499~~ ₹199" ("~~₹499~~ ₹159 with Rahul's invite", "~~₹499~~ ₹99 with coupon HALF") and "Have a coupon or invite code?"; "Payments open soon" and "Have a coupon?" while payments are off |
 | Signed out | the same words, linking to `/signup?next=/pricing#buy` |

@@ -17,8 +17,8 @@ import { ApplyCoupon, CouponForm } from "./coupon-form";
  * The Season Pass call to action everywhere (Pricing #buy, the planner's home, the paywall, the account page), from her
  * state on the server (plans.ts passState):
  * - a Season Pass beyond the free period, or staff: "Season Pass active till 31 Mar 2027";
- * - in the free period, not upgraded: "Upgrade free till 20 Nov" (the free claim), and under it, as a link, the paid pass
- *   for the whole season, "Or upgrade till 31 Mar 2027 for ~~₹499~~ ₹199" (its own "Have a coupon?");
+ * - in the free period, not upgraded: "Upgrade free till 20 Nov" (the free claim), and under it "Or keep it till 31 Mar
+ *   2027, paid once:" with an outlined "Upgrade for ~~₹499~~ ₹199" (its own "Have a coupon?");
  * - in the free period, upgraded free (the card above says "Active · free till 20 Nov"): "Keep it till 31 Mar 2027, paid
  *   once:" and "Upgrade for ~~₹499~~ ₹199". CouponForm in place of a paid button while payments are off;
  * - after it: "Upgrade for ~~₹499~~ ₹199" ("Upgrade for ~~₹499~~ ₹159 with Rahul's invite" with a referrer: her own, or the /r/
@@ -97,12 +97,19 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
       couponForm
     );
   }
-  // Not yet: the free upgrade is the button; paying for the whole season a line under it.
-  const pay = buy(`Or upgrade till ${season}`, "min-h-11 justify-start text-left text-sm font-semibold underline underline-offset-4 hover:opacity-80");
+  // Not yet: the free upgrade is the main button; paying for the whole season an outlined one under it, said the same way.
+  const pay = buy("Upgrade", "min-h-11 rounded-md border border-current px-4 text-sm font-semibold hover:opacity-80");
   return (
     <div>
       <ClaimFreePass label={claimLabel} done={`Season Pass active till ${shortDate(free)}`} className={className} noteClassName={noteClassName} />
-      {pay ? <div className="mt-1">{pay}</div> : couponForm}
+      {pay ? (
+        <div className="mt-4">
+          <p className={cn(text, "mb-2")}>Or keep it till {season}, paid once:</p>
+          {pay}
+        </div>
+      ) : (
+        couponForm
+      )}
     </div>
   );
 }
