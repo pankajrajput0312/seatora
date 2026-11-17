@@ -81,8 +81,9 @@ export async function ResidentsPromo({ L }: { L: DecideLinks }) {
   // What the Free plan keeps once the free period ends: not said to a paid pass or staff, whom it doesn't concern.
   const keeps = planLimits("FREE");
   const after = free && state !== "pass" && state !== "staff" && `After ${shortDate(free)}, Free plan limits: ${limitLine("institutes", keeps.institutes).replace(/ a day$/, "")} and ${limitLine("residents", keeps.residents)}.`;
+  // Light-on-dark theme tokens inside this black card, so shared parts (the coupon field and its Apply) stay readable.
   return (
-    <section aria-labelledby="residents-h" className="rounded-xl border border-[#1f2a33] bg-[#0b0e12] text-[#f1f4f7]">
+    <section aria-labelledby="residents-h" className="rounded-xl border border-[#1f2a33] bg-[#0b0e12] text-[#f1f4f7] [--color-foreground:#f1f4f7] [--color-input:#5b6b78] [--color-muted-foreground:#a3abb3]">
       <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-start">
         <div>
           <p className="flex items-center gap-2 text-[#5ccfe6]">
