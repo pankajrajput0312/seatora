@@ -113,6 +113,10 @@ export async function sendText(to: string, text: string) {
   return ok;
 }
 
+/** Text with one link button (cta_url; the label up to 20 characters). */
+export const sendLink = (to: string, text: string, label: string, url: string) =>
+  post({ to, type: "interactive", interactive: { type: "cta_url", body: { text: text.slice(0, 1024) }, action: { name: "cta_url", parameters: { display_text: label.slice(0, 20), url } } } });
+
 export type Choice = { title: string; description?: string };
 
 /** Up to 3 short options as reply buttons (titles ≤ 20), else a list (≤ 10 rows, titles ≤ 24, descriptions ≤ 72). */

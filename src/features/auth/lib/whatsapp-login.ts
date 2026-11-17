@@ -49,6 +49,17 @@ export async function linkChallenge(code: string, userId: string, phone: string,
   return "linked";
 }
 
+/**
+ * After the webhook links her code: a one-time token (10 min) for the "Open Seatora" button in the reply, which signs in
+ * whichever browser WhatsApp opens (/api/auth/whatsapp/open). A challenge already linked to her, so finishChallenge takes
+ * it once; its code is random and never shown.
+ */
+export async function openToken(userId: string, phone: string, now = new Date()) {
+  const token = randomBytes(32).toString("base64url");
+  await db.loginChallenge.create({ data: { codeHash: sha(randomBytes(32).toString("hex")), browserHash: sha(token), userId, phone, expiresAt: new Date(now.getTime() + WA_LOGIN_TTL_MS) } });
+  return token;
+}
+
 /** From the browser's poll: its challenge's state; "ok" consumes it (one sign-in per challenge). */
 export async function finishChallenge(token: string, now = new Date()): Promise<{ state: "pending" | "expired" } | { state: "ok"; userId: string }> {
   const c = await db.loginChallenge.findUnique({ where: { browserHash: sha(token) } });

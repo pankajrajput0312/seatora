@@ -15,9 +15,10 @@ import { getDecideData, getMeta } from "@/features/decide/service";
 import { baseCategories } from "@/features/decide/types";
 import { checkAndCount } from "@/features/plans/usage";
 import { db } from "@/lib/db";
-import { linkChallenge, parseLoginCode } from "@/features/auth/lib/whatsapp-login";
+import { linkChallenge, openToken, parseLoginCode } from "@/features/auth/lib/whatsapp-login";
+import { siteConfig } from "@/config/site";
 import { accountOf } from "./account";
-import { sendChoices, sendText, toWhatsApp, typing, type Choice, type Incoming } from "./cloud-api";
+import { sendChoices, sendLink, sendText, toWhatsApp, typing, type Choice, type Incoming } from "./cloud-api";
 
 // Ask Seatora on WhatsApp: the same assistant, tools, memory and plan limits as the Ask page, with two tools of its own
 // (offer_choices: buttons and lists; update_profile: her rank, category and courses) and rules for short chat messages.
@@ -96,7 +97,12 @@ export async function handleMessage(m: Incoming) {
   if (login) {
     const account = await accountOf(m.phone, m.name);
     const r = await linkChallenge(login.code, account.id, m.phone);
-    if (r === "linked") return sendText(m.phone, "You're logged in to Seatora. Go back to your browser.");
+    if (r === "linked") {
+      // "Open Seatora": signs in the browser WhatsApp opens too (a one-time link), in case it isn't the one she started in.
+      const url = `${siteConfig.url}/api/auth/whatsapp/open?t=${await openToken(account.id, m.phone)}`;
+      const sent = await sendLink(m.phone, "You're logged in to Seatora. Go back to your browser, or open Seatora here.", "Open Seatora", url);
+      return sent || sendText(m.phone, "You're logged in to Seatora. Go back to your browser.");
+    }
     if (r === "expired" || login.full) return sendText(m.phone, "That code has expired. Tap Continue with WhatsApp again.");
   }
   const cfg = askConfig();

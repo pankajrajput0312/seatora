@@ -10,7 +10,7 @@ vi.mock("@/lib/db", () => {
   return {
     db: {
       loginChallenge: {
-        create: async ({ data }: { data: Omit<Row, "id" | "userId" | "phone" | "consumedAt"> }) => rows.push({ ...data, id: `c${rows.length}`, userId: null, phone: null, consumedAt: null }),
+        create: async ({ data }: { data: Omit<Row, "id" | "userId" | "phone" | "consumedAt"> }) => rows.push({ userId: null, phone: null, consumedAt: null, ...data, id: `c${rows.length}` }),
         deleteMany: async () => ({ count: 0 }),
         findUnique: async ({ where }: { where: Partial<Row> }) => find(where),
         update: async ({ where, data }: { where: { id: string }; data: Partial<Row> }) => Object.assign(find(where)!, data),
@@ -23,7 +23,7 @@ vi.mock("@/lib/db", () => {
     },
   };
 });
-const { finishChallenge, linkChallenge, loginMessage, newCode, parseLoginCode, startChallenge, waLink, WA_LOGIN_TTL_MS } = await import("./whatsapp-login");
+const { finishChallenge, linkChallenge, loginMessage, newCode, openToken, parseLoginCode, startChallenge, waLink, WA_LOGIN_TTL_MS } = await import("./whatsapp-login");
 
 beforeEach(() => void rows.splice(0));
 
@@ -67,5 +67,15 @@ describe("WhatsApp sign-in", () => {
     expect(await linkChallenge(b.code, "u1", "91981")).toBe("linked");
     expect(await linkChallenge(b.code, "u2", "91982")).toBe("expired");
     expect(await linkChallenge("ZZZZZZZZ", "u1", "91981")).toBe("none");
+  });
+
+  it("gives the reply's Open Seatora link: her account, once, for 10 minutes", async () => {
+    const t = await openToken("u1", "91981");
+    expect(JSON.stringify(rows)).not.toContain(t);
+    expect(await finishChallenge(t)).toEqual({ state: "ok", userId: "u1" });
+    expect(await finishChallenge(t)).toEqual({ state: "expired" });
+    const t0 = new Date("2026-11-17T10:00:00Z");
+    const late = await openToken("u1", "91981", t0);
+    expect(await finishChallenge(late, new Date(t0.getTime() + WA_LOGIN_TTL_MS + 1))).toEqual({ state: "expired" });
   });
 });
