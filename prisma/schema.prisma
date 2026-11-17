@@ -496,6 +496,7 @@ model User {
   /// WhatsApp number, digits with country code (91…), proven by a message from it (features/whatsapp). An account made
   /// on WhatsApp has a placeholder email and an unusable password until she sets them.
   phone        String?           @unique
+  loginChallenges LoginChallenge[]
   funnelEvents FunnelEvent[]
   couponRedemptions CouponRedemption[]
 
@@ -816,4 +817,22 @@ model CouponRedemption {
 
   @@unique([couponId, userId])
   @@index([userId])
+}
+
+/// "Continue with WhatsApp" (features/auth/lib/whatsapp-login.ts): she sends the code from WhatsApp, the webhook sets
+/// userId, and the browser holding the cookie (only its hash here) signs in once. 10 minutes; only hashes are stored.
+model LoginChallenge {
+  id          String    @id @default(cuid())
+  /// sha256 of the 8-character code she sends.
+  codeHash    String    @unique
+  /// sha256 of the wa_login cookie: only that browser can finish the sign-in.
+  browserHash String    @unique
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone       String?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  consumedAt  DateTime?
+
+  @@index([expiresAt])
 }

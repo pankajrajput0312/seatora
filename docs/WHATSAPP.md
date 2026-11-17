@@ -36,3 +36,10 @@ Header `x-notify-secret: $WHATSAPP_NOTIFY_SECRET` (Vercel env, 32+ characters; t
 `{ "to": "9198…", "text": "…" }` inside the recipient's 24-hour window, else `{ "to", "template", "params": ["…"] }` with
 an approved template. 200 `{ ok: true }` when Meta accepted it; 502 when not (the reason is in the function log). The
 secret for local scripts is in `~/.config/seatora/whatsapp-notify.env` (`WHATSAPP_NOTIFY_SECRET`, `WHATSAPP_NOTIFY_URL`).
+
+## Continue with WhatsApp (sign-in)
+Off unless `WHATSAPP_LOGIN=1`. On /login and /signup the button makes a challenge (`LoginChallenge`, 10 minutes, hashes
+only) and a `wa_login` cookie, and opens WhatsApp with "Log in to Seatora · code XXXXXXXX" typed in. The webhook links the
+challenge to the sender's account (made as on a first message) and replies; the page polls
+`/api/auth/whatsapp/status` every 2 s, and the browser holding the cookie signs in once (`createSession`). Code:
+`src/features/auth/lib/whatsapp-login.ts`. A WhatsApp-made account has a placeholder email until she adds one.

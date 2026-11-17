@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/features/auth/components/auth-form";
 import { AuthShell } from "@/features/auth/components/auth-shell";
+import { WhatsAppLogin } from "@/features/auth/components/whatsapp-login";
 import { hasSiteAccess } from "@/features/auth/lib/session";
+import { whatsappLoginOn } from "@/features/auth/lib/whatsapp-login";
 import { openAccess, safeNext } from "@/lib/site-access";
 
 export const metadata: Metadata = { title: "Sign in", robots: { index: false } };
@@ -22,6 +24,7 @@ export default async function LoginPage({ searchParams }: Props) {
         </p>
       )}
       <AuthForm mode="signin" next={to} open={openAccess()} />
+      {whatsappLoginOn() && <WhatsAppLogin next={safeNext(to)} />}
     </AuthShell>
   );
 }

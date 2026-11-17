@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { freeLine } from "@/components/marketing/free-price";
 import { AuthForm } from "@/features/auth/components/auth-form";
 import { AuthShell } from "@/features/auth/components/auth-shell";
+import { WhatsAppLogin } from "@/features/auth/components/whatsapp-login";
 import { hasSiteAccess } from "@/features/auth/lib/session";
+import { whatsappLoginOn } from "@/features/auth/lib/whatsapp-login";
 import { TrackView } from "@/features/funnel/components/beacon";
 import { couponCodeSchema } from "@/features/payments/coupons";
 import { CouponBanner } from "@/features/payments/components/season-pass-button";
@@ -55,6 +57,7 @@ export default async function SignupPage({ searchParams }: Props) {
           <a href="/login" className="text-sky underline">Sign in</a>.
         </p>
         <AuthForm mode="signup" next={to} open refCode={refCode} />
+        {whatsappLoginOn() && <WhatsAppLogin next={safeNext(to)} />}
       </AuthShell>
     );
   }

@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -10,12 +10,13 @@ import { ASK_MAX_TURNS, askConfig } from "@/features/ask/config";
 import { resolveCourses } from "@/features/ask/lookup";
 import { finishTurn, getPreferences, RETENTION_DAYS, startTurn } from "@/features/ask/memory";
 import type { ToolContext, ToolResult } from "@/features/ask/tools";
-import { hashPassword } from "@/features/auth/lib/password";
 import { profileSchema, type Profile } from "@/features/decide/profile";
 import { getDecideData, getMeta } from "@/features/decide/service";
 import { baseCategories } from "@/features/decide/types";
 import { checkAndCount } from "@/features/plans/usage";
 import { db } from "@/lib/db";
+import { linkChallenge, parseLoginCode } from "@/features/auth/lib/whatsapp-login";
+import { accountOf } from "./account";
 import { sendChoices, sendText, toWhatsApp, typing, type Choice, type Incoming } from "./cloud-api";
 
 // Ask Seatora on WhatsApp: the same assistant, tools, memory and plan limits as the Ask page, with two tools of its own
@@ -59,21 +60,6 @@ async function chatOf(userId: string) {
   return c?.id ?? (await db.askConversation.create({ data: { userId, title: "WhatsApp" }, select: { id: true } })).id;
 }
 
-/** The account of this number, made on its first message (placeholder email, a password nobody knows). */
-async function accountOf(phone: string, name: string | null) {
-  const found = await db.user.findUnique({ where: { phone } });
-  if (found) return found;
-  try {
-    return await db.user.create({
-      data: { phone, email: `wa-${phone}@whatsapp.seatora.co.in`, name: name?.slice(0, 80) || "Doctor", passwordHash: await hashPassword(randomBytes(32).toString("hex")), createdVia: "whatsapp" },
-    });
-  } catch (e) {
-    // Two first messages at once: the other made it.
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return db.user.findUniqueOrThrow({ where: { phone } });
-    throw e;
-  }
-}
-
 async function saveProfile(userId: string, current: Profile | null, input: z.infer<typeof profileInput>): Promise<Profile> {
   let pairs = current?.pairs;
   if (input.courses?.length) {
@@ -105,6 +91,14 @@ async function saveProfile(userId: string, current: Profile | null, input: z.inf
 export async function handleMessage(m: Incoming) {
   if (!m.text) return sendText(m.phone, "I can read text messages only for now. Please type your question.");
   void typing(m.id);
+  // "Continue with WhatsApp": the login message (or its bare code) signs her in on the website; it is not a question.
+  const login = parseLoginCode(m.text);
+  if (login) {
+    const account = await accountOf(m.phone, m.name);
+    const r = await linkChallenge(login.code, account.id, m.phone);
+    if (r === "linked") return sendText(m.phone, "You're logged in to Seatora. Go back to your browser.");
+    if (r === "expired" || login.full) return sendText(m.phone, "That code has expired. Tap Continue with WhatsApp again.");
+  }
   const cfg = askConfig();
   // Speed over depth on a chat (the voice agent's bot runs a fast model with no thinking): low effort always, and
   // WHATSAPP_MODEL can name a faster model than the Ask page's.
