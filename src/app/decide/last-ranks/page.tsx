@@ -52,13 +52,16 @@ const schema = z.object({
 type Col = { year: number; rounds: Round[]; provisional: boolean };
 
 /** A closing with the allotments made that round in brackets: "11,842 (20)". `stack`: the count on its own line (cards). */
-function Cell({ c, stack }: { c: OptionRow["grid"][number][Round]; stack?: boolean }) {
+/** Her rank would have got this seat: it closed at or after her AIR (the page's note says so beside the same mark). */
+const GOT = "rounded bg-sky/15 px-1 font-semibold text-foreground";
+
+function Cell({ c, stack, rank }: { c: OptionRow["grid"][number][Round]; stack?: boolean; rank?: number }) {
   if (!c) return <Dash />;
-  return <>{formatRank(c.closing)} <span className={`${stack ? "block text-xs" : "text-xs"} text-muted-foreground`}>({formatRank(c.n)})</span></>;
+  return <><span className={rank != null && c.closing >= rank ? GOT : undefined}>{formatRank(c.closing)}</span> <span className={`${stack ? "block text-xs" : "text-xs"} text-muted-foreground`}>({formatRank(c.n)})</span></>;
 }
 
 /** A card's year × round grid, newest year first, rounds R1 → special stray. */
-function YearGrid({ r, cols, rds, caption }: { r: OptionRow; cols: Col[]; rds: Round[]; caption: string }) {
+function YearGrid({ r, cols, rds, caption, rank }: { r: OptionRow; cols: Col[]; rds: Round[]; caption: string; rank?: number }) {
   return (
     <div className="overflow-x-auto overflow-y-hidden px-2 pb-1">
       <table className="w-full text-xs">
@@ -77,7 +80,7 @@ function YearGrid({ r, cols, rds, caption }: { r: OptionRow; cols: Col[]; rds: R
                 {Object.values(r.grid[c.year] ?? {}).some((x) => x?.provisional) && <span className="block"><Provisional when /></span>}
               </th>
               {/* A round that year never had: a blank cell, not "—" (no allotment). */}
-              {rds.map((rd) => (c.rounds.includes(rd) ? <td key={rd} className="numeric px-1.5 py-1.5 text-right align-top"><Cell c={r.grid[c.year]?.[rd]} stack /></td> : <td key={rd} />))}
+              {rds.map((rd) => (c.rounds.includes(rd) ? <td key={rd} className="numeric px-1.5 py-1.5 text-right align-top"><Cell c={r.grid[c.year]?.[rd]} stack rank={rank} /></td> : <td key={rd} />))}
             </tr>
           ))}
         </tbody>
@@ -86,7 +89,7 @@ function YearGrid({ r, cols, rds, caption }: { r: OptionRow; cols: Col[]; rds: R
   );
 }
 
-function LastRankCard({ r, cols, rds, stat, mcc, L, mine }: {
+function LastRankCard({ r, cols, rds, stat, mcc, L, mine, rank }: {
   r: OptionRow;
   cols: Col[];
   rds: Round[];
@@ -95,6 +98,7 @@ function LastRankCard({ r, cols, rds, stat, mcc, L, mine }: {
   mcc: string | null | undefined;
   L: DecideLinks;
   mine?: boolean;
+  rank?: number;
 }) {
   const course = { slug: r.course.slug, label: courseName(r) };
   const of = `${r.college.name}, ${course.label}, ${r.quota}`;
@@ -112,7 +116,7 @@ function LastRankCard({ r, cols, rds, stat, mcc, L, mine }: {
       meta={cardMeta({ state: r.college.state, hospital: r.hospital }, r.college.name)}
       footer={
         <>
-          <YearGrid r={r} cols={cols} rds={rds} caption={`${of}: closing rank (allotments) by year and round, newest year first`} />
+          <YearGrid r={r} cols={cols} rds={rds} caption={`${of}: closing rank (allotments) by year and round, newest year first`} rank={rank} />
           <TermStatCells t={r.fees} of={`${r.college.name}, ${course.label}`} />
         </>
       }
@@ -227,7 +231,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
             const here = inst?.slug === r.college.slug;
             return (
               <tr key={r.id} className={`border-b border-border last:border-0 hover:bg-muted/50 ${here ? "bg-sky/10" : ""}`}>
-                <th scope="row" className={`sticky left-0 z-[1] max-w-64 px-3 py-2 text-left font-normal ${here ? "bg-mist" : "bg-card"} ${tbl.pin}`}>
+                <th scope="row" className={`sticky left-0 z-[1] max-w-64 min-w-[8.5rem] px-3 py-2 text-left font-normal md:min-w-60 ${here ? "bg-mist" : "bg-card"} ${tbl.pin}`}>
                   <Link href={L.institute(r.college.slug)} title={r.college.name} className="font-medium hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
                   <span className="block text-xs">{courseName(r)}</span>
                   <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
@@ -239,7 +243,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                 {cols.flatMap((c) =>
                   c.rounds.map((round, i) => (
                     <td key={`${c.year}-${round}`} className={`numeric px-2 py-2 text-right ${i === 0 ? "border-l border-border" : ""}`}>
-                      <Cell c={r.grid[c.year]?.[round]} />
+                      <Cell c={r.grid[c.year]?.[round]} rank={profile?.rank} />
                     </td>
                   )),
                 )}
@@ -254,7 +258,18 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
 
   return (
     <AppPage className="grid grid-cols-1 gap-3">
-      <PageHead title="Last ranks" about={about}>Newest year first. {LATER_ROUNDS_NOTE}</PageHead>
+      <PageHead
+        title="Last ranks"
+        about={about}
+        note={
+          <>
+            The last All India Rank that got each seat on a {category} seat, by year and round, newest first. (2) = seats given that round.
+            {profile?.rank != null && <> <span className={GOT}>Highlighted</span>: your AIR <span className="numeric">{formatRank(profile.rank)}</span> would have got it.</>}
+          </>
+        }
+      >
+        {LATER_ROUNDS_NOTE}
+      </PageHead>
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
       <div className="filter-row">
@@ -323,7 +338,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       {/* Her institute (a link from it, #inst-…) in view in either view: its card above the list. */}
       {pinned && (
         <div id={`inst-${pinned.college.slug}`} tabIndex={-1} className="scroll-mt-24">
-          <LastRankCard r={pinned} cols={cols} rds={rds} stat={stat} mcc={mcc(pinned)} L={L} mine />
+          <LastRankCard r={pinned} cols={cols} rds={rds} stat={stat} mcc={mcc(pinned)} L={L} mine rank={profile?.rank} />
         </div>
       )}
 
@@ -335,7 +350,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
           view={view}
           cards={
             <ResultCards title={caption} hideTitle>
-              {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} mine={inst?.slug === r.college.slug} />)}
+              {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} mine={inst?.slug === r.college.slug} rank={profile?.rank} />)}
             </ResultCards>
           }
           table={table}

@@ -101,7 +101,7 @@ export async function ResidentsPromo({ L }: { L: DecideLinks }) {
             ))}
           </dl>
           <p className="mt-1 text-caption text-[#a3abb3]">From MCC&apos;s official admitted lists, 2023–25.</p>
-          <Link href={L.to("/decide/residents")} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-md bg-[#5ccfe6] px-4 text-body font-semibold text-[#0b0e12] hover:bg-[#7fdcef]">
+          <Link href={L.to("/decide/residents")} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-md border border-[#5ccfe6] px-4 text-body font-semibold text-[#5ccfe6] hover:bg-[#5ccfe6]/10">
             Search residents <ArrowRight className="size-4" aria-hidden />
           </Link>
         </div>

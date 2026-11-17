@@ -99,7 +99,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     <AppPage className="grid grid-cols-1 gap-4">
       {title}
       <ResidentsPromo L={L} />
-      <section aria-labelledby="next-step-h" className="rounded-xl border border-border bg-card p-4 sm:p-5">
+      {/* Desktop: the box above holds the only two buttons (the Season Pass, Search residents) and the tools follow; Options
+          is a tool there and its numbers are below, so this card is for phones (and always when nothing is left to show). */}
+      <section aria-labelledby="next-step-h" className={`rounded-xl border border-border bg-card p-4 sm:p-5 ${total ? "md:hidden" : ""}`}>
         <p className="section-label text-muted-foreground">Next recommended step</p>
         {total ? (
           <>
@@ -128,8 +130,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </>
         )}
       </section>
-      <RoundStatusBanner params={params} />
       <ToolGroups L={L} />
+      <RoundStatusBanner params={params} />
 
       <section aria-labelledby="numbers-h" className="grid gap-2">
         <div className="flex items-center gap-1">
