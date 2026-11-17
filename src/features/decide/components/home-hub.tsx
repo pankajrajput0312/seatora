@@ -73,7 +73,7 @@ export function ToolGroups({ L }: { L: DecideLinks }) {
   );
 }
 
-/** The Residents card, compact, with the Season Pass box beside it (under it on phones): the Upgrade button's cyan, dark text. */
+/** The Residents card, compact, with the Season Pass box beside it (under it on phones). */
 export async function ResidentsPromo({ L }: { L: DecideLinks }) {
   const free = freeNow();
   const { state, got, invite } = await passView(); // what the plan cards say: her pass, or her invite's price
@@ -82,59 +82,59 @@ export async function ResidentsPromo({ L }: { L: DecideLinks }) {
   const keeps = planLimits("FREE");
   const after = free && state !== "pass" && state !== "staff" && `Free until ${shortDate(free)}. After that: ${limitLine("institutes", keeps.institutes).replace(/ a day$/, "")} and ${limitLine("residents", keeps.residents)}.`;
   return (
-    <section aria-labelledby="residents-h" className="rounded-xl bg-[#5ccfe6] text-[#0b0e12] [--color-foreground:#0b0e12] [--color-input:rgb(11_14_18/0.45)] [--color-muted-foreground:rgb(11_14_18/0.75)]">
+    <section aria-labelledby="residents-h" className="rounded-xl border border-[#1f2a33] bg-[#0b0e12] text-[#f1f4f7]">
       <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-start">
         <div>
-          <p className="flex items-center gap-2">
+          <p className="flex items-center gap-2 text-[#5ccfe6]">
             <span className="section-label">Residents</span>
             <span className="rounded-full border border-current px-1.5 text-caption font-semibold">New</span>
           </p>
-          <h2 id="residents-h" className="mt-1 text-h2 font-semibold" style={{ color: "#0b0e12" }}>Know who&apos;s already there.</h2>
-          <p className="mt-1 max-w-xl text-body text-[#0b0e12]/75">The residents at every PG hospital, by course and year.</p>
+          <h2 id="residents-h" className="mt-1 text-h2 font-semibold" style={{ color: "#f1f4f7" }}>Know who&apos;s already there.</h2>
+          <p className="mt-1 max-w-xl text-body text-[#a3abb3]">The residents at every PG hospital, by course and year.</p>
           <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1">
             {[["77K+", "residents"], ["1,800+", "hospitals"], ["2023–25", "batches"]].map(([n, l]) => (
               // The number reads first on screen; the term (dt) comes first in the markup, as a <dl> needs.
               <div key={l} className="flex flex-row-reverse items-baseline justify-end gap-1.5">
-                <dt className="text-caption text-[#0b0e12]/75">{l}</dt>
-                <dd className="font-mono text-lg font-semibold text-[#0b0e12]">{n}</dd>
+                <dt className="text-caption text-[#a3abb3]">{l}</dt>
+                <dd className="font-mono text-lg font-semibold text-[#5fd36f]">{n}</dd>
               </div>
             ))}
           </dl>
-          <p className="mt-1 text-caption text-[#0b0e12]/75">From MCC&apos;s official admitted lists, 2023–25.</p>
-          <Link href={L.to("/decide/residents")} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0b0e12] px-4 text-body font-semibold text-[#f1f4f7] hover:bg-[#1f2a33]">
+          <p className="mt-1 text-caption text-[#a3abb3]">From MCC&apos;s official admitted lists, 2023–25.</p>
+          <Link href={L.to("/decide/residents")} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-md bg-[#5ccfe6] px-4 text-body font-semibold text-[#0b0e12] hover:bg-[#7fdcef]">
             Search residents <ArrowRight className="size-4" aria-hidden />
           </Link>
         </div>
-        <div data-placement="home_card" className="rounded-lg border border-dashed border-[#0b0e12]/30 px-4 py-3 md:max-w-72">
-          <p className="section-label text-[#0b0e12]/75">Season Pass</p>
+        <div data-placement="home_card" className="rounded-lg border border-dashed border-[#2b3a45] px-4 py-3 md:max-w-72">
+          <p className="section-label text-[#a3abb3]">Season Pass</p>
           {got ? (
-            <p className="mt-1 text-body font-bold text-[#0b0e12]">{got}</p>
+            <p className="mt-1 text-body font-bold text-[#5fd36f]">{got}</p>
           ) : free ? (
             // As the plan card: ₹0 now, never a struck "was" price beside it.
             <p className="mt-1 flex items-baseline gap-2">
-              <span className="font-mono text-h2 font-bold text-[#0b0e12]">₹0</span>
-              <span className="text-caption text-[#0b0e12]/75">now</span>
+              <span className="font-mono text-h2 font-bold text-[#5fd36f]">₹0</span>
+              <span className="text-caption text-[#a3abb3]">now</span>
             </p>
           ) : (
             <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
-              <s className="font-mono text-body text-[#0b0e12]/60" aria-label={`Was ${formatPaise(PLANS.season_pass.wasAmount)}`}>{formatPaise(PLANS.season_pass.wasAmount)}</s>
-              <span className="font-mono text-h2 font-bold text-[#0b0e12]">{formatPaise(invite?.amount ?? list)}</span>
-              {invite && <span className="text-caption text-[#0b0e12]">with {invite.name}&apos;s invite</span>}
+              <s className="font-mono text-body text-[#6b7480]" aria-label={`Was ${formatPaise(PLANS.season_pass.wasAmount)}`}>{formatPaise(PLANS.season_pass.wasAmount)}</s>
+              <span className="font-mono text-h2 font-bold text-[#5fd36f]">{formatPaise(invite?.amount ?? list)}</span>
+              {invite && <span className="text-caption text-[#f1f4f7]">with {invite.name}&apos;s invite</span>}
             </p>
           )}
-          {free && invite && state !== "pass" && state !== "staff" && <p className="text-caption text-[#0b0e12]">{inviteLine(invite.name, invite.amount, list, free)}</p>}
-          {free && !invite && state !== "pass" && state !== "staff" && state !== "claimed" && <p className="text-caption text-[#0b0e12]">Then {formatPaise(list)} once.</p>}
-          {after && <p className="text-caption text-[#0b0e12]">{after}</p>}
+          {free && invite && state !== "pass" && state !== "staff" && <p className="text-caption text-[#f1f4f7]">{inviteLine(invite.name, invite.amount, list, free)}</p>}
+          {free && !invite && state !== "pass" && state !== "staff" && state !== "claimed" && <p className="text-caption text-[#f1f4f7]">Then {formatPaise(list)} once.</p>}
+          {after && <p className="text-caption text-[#f1f4f7]">{after}</p>}
           <div className="mt-3">
             <SeasonPassButton
               freeLabel="Get free Season Pass"
-              className="min-h-11 rounded-md bg-[#0b0e12] px-4 text-body font-semibold text-[#f1f4f7] hover:bg-[#1f2a33]"
-              noteClassName="text-[#0b0e12]/75"
+              className="min-h-11 rounded-md bg-[#5fd36f] px-4 text-body font-semibold text-[#0b0e12] hover:bg-[#7fe08b]"
+              noteClassName="text-[#a3abb3]"
             />
           </div>
           {/* The referral line only once there is a price to take 20% off. */}
           {!free && (
-            <Link href={L.to("/decide/refer")} className="mt-1 inline-flex min-h-11 items-center text-caption text-[#0b0e12] underline">
+            <Link href={L.to("/decide/refer")} className="mt-1 inline-flex min-h-11 items-center text-caption text-[#5ccfe6] underline">
               Refer a friend: {REFERRAL_PERCENT}% off for them, {REFERRAL_PERCENT}% for you
             </Link>
           )}
