@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { after } from "next/server";
 import { db } from "@/lib/db";
 import { ALERT_AT, AID_COOKIE, fingerprintInput, isAid, routeOf, scrub, type EventName, type Placement } from "./lib";
+import { alertOwner, OWNER_ALERTS } from "./owner-alert";
 
 // Funnel events, the device and network of a request, and error groups with alerts (docs/FUNNEL.md). Server only.
 
@@ -47,6 +48,8 @@ type Meta = Record<string, string | number | boolean>;
 export async function track(name: EventName, e: { userId?: string | null; aid?: string | null; placement?: Placement | null; meta?: Meta } = {}) {
   const aid = e.aid !== undefined ? e.aid : await deviceAid().catch(() => null);
   later(() => db.funnelEvent.create({ data: { name, aid, userId: e.userId ?? null, placement: e.placement ?? null, meta: e.meta ?? {} } }));
+  // Sign-ups and upgrades also go to the owner's WhatsApp (owner-alert.ts), after the response like the event.
+  if (OWNER_ALERTS.has(name)) later(() => alertOwner(name, e.userId, e.meta));
 }
 
 /** sha1 of kind, route and message with ids and numbers stripped (lib.ts fingerprintInput). */
