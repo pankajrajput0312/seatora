@@ -296,7 +296,7 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
       )}
       <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {bottom.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={navHref(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", href === "/decide/residents" ? cn("font-semibold text-[#6d28d9]", isCurrent(href) ? "border-[#6d28d9]" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
+          <Link key={href} href={navHref(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", href === "/decide/residents" ? cn("font-semibold text-residents", isCurrent(href) ? "border-residents" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <span className="relative">
               <Icon className="size-[1.25rem]" strokeWidth={1.75} aria-hidden />
               {href === "/decide/residents" && <span className={cn(newBadge, "absolute -top-2 left-1/2 ml-2.5 bg-background")}>New</span>}
