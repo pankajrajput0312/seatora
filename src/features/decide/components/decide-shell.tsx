@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, House, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { CircleArrowUp, Gift, Globe, LogOut, MessageCircle, Pencil, ShieldCheck, Sparkles } from "lucide-react";
+import { CircleArrowUp, Gift, Globe, LogOut, Menu, MessageCircle, Pencil, ShieldCheck, Sparkles } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -52,14 +52,14 @@ const sections = [
   // Seatora home: phones only (the top bar's "Back to site" is hidden there).
   { title: "Help", items: [{ href: "/decide/requests", label: "Help & feedback", icon: MessageCircle }, { href: "/", label: "Seatora home", icon: Globe }] },
 ];
-// Phones: Home, Residents (the main feature), then the round's working screens. Five columns fit every label at 360 px;
-// Rank scan is in the menu. The Compare tray, when it has items, is a pill above the bar (never in place of a tab).
+// Phones: Home, Residents (the main feature), the research she comes for, then More: the whole menu (the drawer), where
+// Options, Seats, Choice list and the rest are. Five columns fit every label at 360 px. The Compare tray, when it has
+// items, is a pill above the bar (never in place of a tab).
 const bottom = [
   { href: "/decide", label: "Home", icon: House },
   { href: "/decide/residents", label: "Residents", icon: Users },
-  { href: "/decide/options", label: "Options", icon: SlidersHorizontal },
-  { href: "/decide/choices", label: "Choice list", icon: ListOrdered },
-  { href: "/decide/seats", label: "Seats", icon: LayoutGrid },
+  { href: "/decide/institutes", label: "Institutes", icon: Building2 },
+  { href: "/decide/last-ranks", label: "Last ranks", icon: TrendingUp },
 ];
 
 /** `phone`: the server's guess from the user agent (layout.tsx), so the first paint has the right layout. */
@@ -73,6 +73,7 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
   const router = useRouter();
   const L = useDecideLinks(); // every link keeps the profile params, repeated values included
   const [profile, setStored, hydrated] = useSavedProfile();
+  const [menuOpen, setMenuOpen] = useState(false); // the phone menu (drawer): its ☰ and the bottom bar's More
   // What the page is actually using: URL params override the saved profile.
   const shown = profileFromParams(new URLSearchParams(sp.toString())) ?? profile;
   const [compare] = useCompare(); // Zod-validated tray: a malformed value is an empty tray, never a crash
@@ -203,7 +204,7 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
       <AppShell
         height="auto"
         variant="section"
-        mobileNav={{ defaultIsMobile: phone }}
+        mobileNav={{ defaultIsMobile: phone, isOpen: menuOpen, onOpenChange: setMenuOpen }}
         topNav={
           <TopNav
             label="App"
@@ -304,6 +305,11 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
             <span className="numeric">{label}</span>
           </Link>
         ))}
+        {/* More: the menu, marked current on any page that isn't one of the tabs. */}
+        <button type="button" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", bottom.some(({ href }) => isCurrent(href)) ? "border-transparent text-muted-foreground" : "border-foreground font-semibold text-foreground")}>
+          <Menu className="size-[1.25rem]" strokeWidth={1.75} aria-hidden />
+          <span>More</span>
+        </button>
       </nav>
 
       {editing && (
