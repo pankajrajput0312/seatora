@@ -18,7 +18,7 @@ const { alertOwner, ownerLine } = await import("./owner-alert");
 beforeEach(() => {
   m.sent = [];
   m.textOk = true;
-  vi.stubEnv("OWNER_WHATSAPP", "919315630275");
+  vi.stubEnv("OWNER_WHATSAPP", "919800000001");
 });
 
 describe("owner alerts", () => {
