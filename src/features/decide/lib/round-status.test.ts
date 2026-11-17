@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoundStepInfo } from "../types";
-import { badgeOf, currentSteps, dueToday, fillWindow, fmtIST, fmtNote, nextChoiceFilling, nextFilling, statusNow, stepsNow } from "./round-status";
+import { alertOf, badgeOf, currentSteps, dueToday, fillWindow, fmtIST, fmtNote, nextChoiceFilling, nextFilling, statusNow, stepsNow } from "./round-status";
 
 // 2026 R2 as round_status.json gives it (as of 14 Nov 2026 17:27 IST).
 const choice = { status: "open", scheduled: { from: "2026-11-10T13:00:00+05:30", to: "2026-11-15T23:55:00+05:30", on: null, tentative: false } } as const;
@@ -74,5 +74,16 @@ describe("badgeOf", () => {
     expect(badgeOf({ step: "final_result", now: "suspended" }).text).toBe("On hold");
     expect(badgeOf({ step: "choice_filling", now: "suspended" }).text).toBe("Suspended");
     expect(badgeOf({ step: "final_result", now: "upcoming" }).text).toBe("Upcoming");
+  });
+});
+
+describe("alertOf", () => {
+  const held = (step: RoundStepInfo["step"], url = "https://x/202611171047091852.pdf"): RoundStepInfo =>
+    ({ step, status: "suspended", date: "2026-11-17", url, title: "Notice for result of Round-2", note: null, scheduled: null, scheduledBy: null, events: [] });
+  const r2 = (...steps: RoundStepInfo[]) => stepsNow({ rounds: [{ round: "R2", steps }] }, new Date("2026-11-17T20:00:00+05:30"));
+  it("one strip for a round's held results, a suspended step by name, nothing when none is held", () => {
+    expect(alertOf(r2(held("provisional_result"), held("final_result")))).toEqual({ id: "202611171047091852.pdf", url: "https://x/202611171047091852.pdf", text: "Round 2 result on hold" });
+    expect(alertOf(r2(held("choice_filling", "https://x/n9.pdf")))?.text).toBe("Round 2 choice filling suspended");
+    expect(alertOf(r2({ ...held("final_result"), status: "upcoming" }))).toBeNull();
   });
 });

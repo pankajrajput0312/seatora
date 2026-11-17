@@ -86,3 +86,17 @@ export function fillWindow(s: StepNow) {
   const d = from ?? on;
   return d ? `${from ? "from" : "on"} ${fmtIST(d)}${t}` : "dates not announced";
 }
+
+/** The cookie the alert strip's ✕ sets: the closed notice's id, so it stays closed until MCC posts another. */
+export const NOTICE_CLOSED_COOKIE = "seatora_notice_closed";
+
+/**
+ * Home's alert strip: the first step MCC has held or suspended (a result "on hold", choice filling "suspended"), with its
+ * notice; both of a round's results held by one notice say "Round 2 result". Null when nothing is held.
+ */
+export function alertOf(steps: StepNow[]) {
+  const s = steps.find((x) => x.now === "suspended" && x.url);
+  if (!s) return null;
+  const both = s.step.endsWith("_result") && steps.some((o) => o !== s && o.round === s.round && o.now === "suspended" && o.step.endsWith("_result") && o.url === s.url);
+  return { id: s.url!.split("/").pop()!, url: s.url!, text: `${roundName[s.round]} ${both ? "result" : stepName[s.step].toLowerCase()} ${badgeOf(s).text.toLowerCase()}` };
+}

@@ -1,10 +1,12 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { decideLinks } from "../lib/links";
 import { LATEST_YEAR } from "../lib/reach";
-import { badgeOf, currentSteps, dueToday, fmtIST, fmtNote, nextDate, roundName, stepName, stepsNow, type StepNow } from "../lib/round-status";
+import { alertOf, badgeOf, currentSteps, NOTICE_CLOSED_COOKIE, dueToday, fmtIST, fmtNote, nextDate, roundName, stepName, stepsNow, type StepNow } from "../lib/round-status";
 import { roundStatus } from "../server/notices";
 import { InfoTip } from "./info-tip";
+import { NoticeStrip } from "./notice-strip";
 import { MCC_PG } from "./pages/mcc-link";
 import { smallLink } from "./ui";
 
@@ -97,4 +99,12 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
       </p>
     </section>
   );
+}
+
+/** Home's top strip while MCC holds a step (alertOf: "Round 2 result on hold"), unless she closed this notice's strip. */
+export async function HeldStrip() {
+  const rs = await roundStatus(LATEST_YEAR);
+  const a = rs && alertOf(stepsNow(rs, new Date()));
+  if (!a || decodeURIComponent((await cookies()).get(NOTICE_CLOSED_COOKIE)?.value ?? "") === a.id) return null;
+  return <NoticeStrip id={a.id} text={a.text} href={a.url} />;
 }

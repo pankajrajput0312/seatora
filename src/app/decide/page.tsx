@@ -9,7 +9,7 @@ import { ChartCard, LabelBars, RankStrip, RoundTrend } from "@/features/decide/c
 import { ChoicesStat, SetupCard, TopChoices } from "@/features/decide/components/dashboard-parts";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { InfoTip } from "@/features/decide/components/info-tip";
-import { RoundStatusBanner } from "@/features/decide/components/round-status";
+import { HeldStrip, RoundStatusBanner } from "@/features/decide/components/round-status";
 import { ResidentsPromo, ToolGroups } from "@/features/decide/components/home-hub";
 import { EmptyState, smallLink, StatStrip } from "@/features/decide/components/ui";
 import { decideLinks } from "@/features/decide/lib/links";
@@ -62,6 +62,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     return (
       <AppPage className="grid grid-cols-1 gap-4">
         {title}
+        <HeldStrip />
         <ResidentsPromo L={decideLinks(params)} />
         <SetupCard />
         <RoundStatusBanner params={params} />
@@ -98,6 +99,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <AppPage className="grid grid-cols-1 gap-4">
       {title}
+      <HeldStrip />
       <ResidentsPromo L={L} />
       {/* Desktop: the box above holds the only two buttons (the Season Pass, Search residents) and the tools follow; Options
           is a tool there and its numbers are below, so this card is for phones (and always when nothing is left to show). */}
