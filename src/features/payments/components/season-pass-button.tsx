@@ -17,8 +17,9 @@ import { ApplyCoupon, CouponForm } from "./coupon-form";
  * The Season Pass call to action everywhere (Pricing #buy, the planner's home, the paywall, the account page), from her
  * state on the server (plans.ts passState):
  * - a Season Pass beyond the free period, or staff: "Season Pass active till 31 Mar 2027";
- * - in the free period: one button, "Upgrade free till 20 Nov" (the free claim; or "Season Pass · free till 20 Nov" once
- *   done), and "Have a coupon?" (CouponForm: a 100% coupon gives the whole season). No paid option while it is free;
+ * - in the free period: "Upgrade free till 20 Nov" (the free claim; or "Season Pass · free till 20 Nov" once done), and
+ *   under it the paid pass for the whole season, "Buy Season Pass for ~~₹499~~ ₹199" (its own "Have a coupon?"), or
+ *   CouponForm while payments are off;
  * - after it: "Upgrade for ~~₹499~~ ₹199" ("Upgrade for ~~₹499~~ ₹159 with Rahul's invite" with a referrer: her own, or the /r/
  *   cookie's code; "… with coupon X" with a coupon), or "Payments open soon" and "Have a coupon?";
  * - signed out: the same words, to /signup?next=/pricing#buy;
@@ -66,19 +67,24 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
 
   if (freeCoupon) return <ApplyCoupon code={freeCoupon} label={`Apply ${freeCoupon}: free till ${season}`} done={`Season Pass till ${season}`} className={className} noteClassName={noteClassName} />;
   const couponForm = <CouponForm initialCode={coupon} done={`Season Pass till ${season}`} noteClassName={noteClassName} />;
-  if (!free || !s || s.state === "free") {
-    if (!q)
-      return (
+  // The paid pass through Razorpay (null while payments are off).
+  const buy = (verb: string, buttonClass?: string) => {
+    if (!q) return null;
+    const p = ok ?? q;
+    const offer = { amount: p.amount, listAmount: p.listAmount, inviter: p.inviter, coupon: ok?.coupon ?? null, code: ok ? (coupon ?? null) : q.referrerId ? code : null };
+    const initial = coupon ? { code: coupon, error: c?.error ?? null } : undefined;
+    return <BuySeasonPass offer={offer} initial={initial} verb={verb} className={buttonClass} noteClassName={noteClassName} />;
+  };
+  if (!free || !s || s.state === "free")
+    return (
+      buy("Upgrade", className) ?? (
         <div>
           <p className={cn(text, "font-semibold")}>Payments open soon</p>
           {couponForm}
         </div>
-      );
-    const p = ok ?? q;
-    const offer = { amount: p.amount, listAmount: p.listAmount, inviter: p.inviter, coupon: ok?.coupon ?? null, code: ok ? (coupon ?? null) : q.referrerId ? code : null };
-    const initial = coupon ? { code: coupon, error: c?.error ?? null } : undefined;
-    return <BuySeasonPass offer={offer} initial={initial} verb="Upgrade" className={className} noteClassName={noteClassName} />;
-  }
+      )
+    );
+  const pay = buy("Buy Season Pass", className);
 
   return (
     <div>
@@ -87,7 +93,14 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
       ) : (
         <ClaimFreePass label={claimLabel} done={`Season Pass active till ${shortDate(free)}`} className={className} noteClassName={noteClassName} />
       )}
-      {couponForm}
+      {pay ? (
+        <div className="mt-4">
+          <p className={cn(text, "mb-2")}>Want it till {season}? Pay once:</p>
+          {pay}
+        </div>
+      ) : (
+        couponForm
+      )}
     </div>
   );
 }

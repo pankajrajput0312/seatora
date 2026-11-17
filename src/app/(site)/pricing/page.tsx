@@ -62,7 +62,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
             <h2>What you pay</h2>
             {paying ? (
               <p className="mt-2">
-                {free ? `Till ${shortDate(free)} the Season Pass is free: upgrade with no payment and no card. After that it costs ` : <>The Season Pass costs <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> </>}
+                {free ? `Till ${shortDate(free)} the Season Pass is free: upgrade with no payment and no card, or pay now to keep it all season. After that it costs ` : <>The Season Pass costs <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> </>}
                 {formatPaise(q.listAmount)} {business.period}, paid once by card or UPI through Razorpay ({formatPaise(discountedPrice(q.listAmount))} with a friend&apos;s
                 referral link), and runs till {longDate(SEASON_PASS_UNTIL)}. There is no subscription and nothing renews automatically. Prices are in Indian Rupees (INR).
               </p>
