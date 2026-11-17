@@ -105,7 +105,8 @@ export function BuySeasonPass({ offer: initialOffer, verb, initial, className, n
         name: "Seatora",
         image: `${window.location.origin}/icons/icon-192.png`,
         description: body.discount ? `Season Pass · ${formatPaise(body.discount)} off with ${body.coupon ? `coupon ${body.coupon}` : `${body.inviter}'s invite`}` : "Season Pass",
-        prefill: { email: body.email },
+        // WhatsApp accounts: their number, so Razorpay doesn't ask for it.
+        prefill: { email: body.email, ...(body.contact && { contact: `+${body.contact}` }) },
         theme: { color: "#0b0e12" },
         handler: (r: RazorpayResponse) => void confirm(r),
         modal: {

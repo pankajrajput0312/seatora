@@ -23,7 +23,8 @@ export default async function AccountPage() {
     <Container className="py-16 md:py-24">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-8">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{user.email}</p>
+          {/* WhatsApp accounts sign in with their number; their email is only a placeholder (whatsapp/account.ts). */}
+          <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{user.phone && user.email.endsWith("@whatsapp.seatora.co.in") ? `+${user.phone}` : user.email}</p>
           <h1 className="glow mt-3 font-pixel text-4xl leading-none md:text-5xl">Hi, {displayName(user.name) || user.email.split("@")[0]}.</h1>
         </div>
         <LogOutButton className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-secondary px-4 text-sm font-medium text-foreground hover:bg-raised aria-disabled:opacity-60" />

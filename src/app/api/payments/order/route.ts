@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     const order = await createOrder(amount, currency, id, { plan, userId: user.id, ...(referrerId && { referrerId }), ...(coupon && { coupon }) });
     await db.payment.create({ data: { id, userId: user.id, plan, amount, listAmount, discount, referrerId, couponId, currency, razorpayOrderId: order.id } });
     await track("checkout_opened", { userId: user.id, meta: { amount, referred: !!referrerId, coupon: !!couponId } });
-    return Response.json({ orderId: order.id, amount, listAmount, discount, inviter, coupon, currency, keyId: order.keyId, email: user.email }, { headers });
+    return Response.json({ orderId: order.id, amount, listAmount, discount, inviter, coupon, currency, keyId: order.keyId, email: user.email, contact: user.phone }, { headers });
   } catch (e) {
     if (e instanceof RazorpayError && e.status === 401) {
       console.error("Razorpay rejected the API keys (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET).");
