@@ -52,13 +52,14 @@ const sections = [
   // Seatora home: phones only (the top bar's "Back to site" is hidden there).
   { title: "Help", items: [{ href: "/decide/requests", label: "Help & feedback", icon: MessageCircle }, { href: "/", label: "Seatora home", icon: Globe }] },
 ];
-// Phones: Home, Residents (the main feature), Institutes, then More: the whole menu (the drawer), where Options, Seats,
-// Choice list, Last ranks and the rest are. The Compare tray, when it has items, is a pill above the bar (never in place
-// of a tab).
+// Phones: Home, Residents (the main feature), the research she comes for, then More: the whole menu (the drawer), where
+// Options, Seats, Choice list and the rest are. Five columns fit every label at 360 px. The Compare tray, when it has
+// items, is a pill above the bar (never in place of a tab).
 const bottom = [
   { href: "/decide", label: "Home", icon: House },
   { href: "/decide/residents", label: "Residents", icon: Users },
   { href: "/decide/institutes", label: "Institutes", icon: Building2 },
+  { href: "/decide/last-ranks", label: "Last ranks", icon: TrendingUp },
 ];
 
 /** `phone`: the server's guess from the user agent (layout.tsx), so the first paint has the right layout. */
@@ -294,7 +295,7 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
           <GitCompareArrows className="size-4" aria-hidden />Compare <span className="numeric">{compare.length}/{MAX_COMPARE}</span><span className="sr-only"> selected</span>
         </Link>
       )}
-      <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
+      <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {bottom.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={navHref(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", href === "/decide/residents" ? cn("font-semibold text-residents", isCurrent(href) ? "border-residents" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <span className="relative">
