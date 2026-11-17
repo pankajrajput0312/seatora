@@ -30,3 +30,9 @@ No template is needed: she writes first, and every reply is inside WhatsApp's 24
 - Text only; voice notes and images get a "please type" reply.
 - Two messages sent within seconds run as two turns side by side.
 - Speed: every turn runs at low effort; `WHATSAPP_MODEL` (optional) picks a faster model than `ASK_MODEL`. "typing…" shows while it works (re-sent on each lookup), and the first lookup sends a one-line note of what it is doing.
+
+## Owner alerts: POST /api/whatsapp/notify
+Header `x-notify-secret: $WHATSAPP_NOTIFY_SECRET` (Vercel env, 32+ characters; the route is 404 without it). Body
+`{ "to": "9198…", "text": "…" }` inside the recipient's 24-hour window, else `{ "to", "template", "params": ["…"] }` with
+an approved template. 200 `{ ok: true }` when Meta accepted it; 502 when not (the reason is in the function log). The
+secret for local scripts is in `~/.config/seatora/whatsapp-notify.env` (`WHATSAPP_NOTIFY_SECRET`, `WHATSAPP_NOTIFY_URL`).

@@ -60,14 +60,19 @@ export function incoming(body: unknown): Incoming[] {
   );
 }
 
-async function post(payload: object) {
+async function post(payload: object): Promise<boolean> {
   const r = await fetch(`https://graph.facebook.com/v21.0/${process.env.WHATSAPP_PHONE_ID}/messages`, {
     method: "POST",
     headers: { authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`, "content-type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", ...payload }),
   });
   if (!r.ok) console.error("[whatsapp] send failed", r.status, (await r.text()).slice(0, 300));
+  return r.ok;
 }
+
+/** An approved template (needed outside the 24-hour window), its body's {{1}}, {{2}}… filled in order. */
+export const sendTemplate = (to: string, name: string, params: string[], language = "en") =>
+  post({ to, type: "template", template: { name, language: { code: language }, components: params.length ? [{ type: "body", parameters: params.map((text) => ({ type: "text", text })) }] : [] } });
 
 /**
  * Markdown (the assistant's) → WhatsApp: *bold*, headings as bold lines, Seatora links as "text: full URL". WhatsApp
@@ -103,7 +108,9 @@ export async function sendText(to: string, text: string) {
     if (last !== undefined && last.length + para.length + 2 <= 4000) parts[parts.length - 1] = `${last}\n\n${para}`;
     else parts.push(para.slice(0, 4000));
   }
-  for (const body of parts) if (body.trim()) await post({ to, type: "text", text: { body, preview_url: false } });
+  let ok = true;
+  for (const body of parts) if (body.trim()) ok = (await post({ to, type: "text", text: { body, preview_url: false } })) && ok;
+  return ok;
 }
 
 export type Choice = { title: string; description?: string };
