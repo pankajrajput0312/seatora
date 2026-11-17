@@ -24,7 +24,7 @@ import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, Pager, rangeLabel, smallLink, tbl, toolbar } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
-import { reachWindow } from "@/features/decide/lib/reach";
+import { latestRound, reachWindow } from "@/features/decide/lib/reach";
 import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, type Profile } from "@/features/decide/profile";
 import { allotmentTrends, getMeta, LATEST_YEAR, PAST_YEARS, YEARS } from "@/features/decide/service";
@@ -104,6 +104,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
     ? `Seat matrix, ${round}${allRounds ? " and every other round" : ""}: seats per list, terms${profile ? ", your chances" : ""} and closing ranks by year and round, ${sortLabels[sort].toLowerCase()}, page ${r.page}`
     : `${compare ? `Seats in every ${round} list side by side` : `Seats in the ${title} list`} (MCC PDF${compare ? "s" : ""}), ${sortLabels[sort].toLowerCase()}, page ${r.page}`;
   const years: ClosingYear[] = meta.years.map((y, i) => ({ year: y.year, rounds: i === 0 ? y.rounds : [...rounds] }));
+  const latest = latestRound(meta.sources);
   // Chips for what narrows the rows beyond the courses (the Course pill shows those); inst / course / nohist have their own lines below.
   const hasWords = { clear: "Has clear vacancy", virtual: "Has virtual vacancy", new: "Has newly added" } as const;
   const active = [
@@ -142,15 +143,15 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
     <>
       Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category, as rank (allotments made in that round, not seats); &quot;—&quot; means no allotment there in that
       round, or no MCC result for it in the data.
-      {profile && <> Your chances is Options&apos; label on that one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round); &quot;Never allotted before&quot; when MCC never allotted the course and quota; no label on a row whose PDF prints no quota.</>}
-      {" "}A card&apos;s deepest closing is the deepest of every round of {reachWindow(LATEST_YEAR, PAST_YEARS)}, Stray included, with its year and round (as Options and Compare).
+      {profile && <> Your chances is Options&apos; label on that one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round); &quot;Never allotted before&quot; when MCC never allotted the course and quota; no label on a row whose PDF prints no quota.</>}
+      {" "}A card&apos;s deepest closing is the deepest of every round of {reachWindow(latest, PAST_YEARS)}, Stray included, with its year and round (as Options and Compare).
     </>
   ) : (
     <>
-      Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category: the deepest of every round of {reachWindow(LATEST_YEAR, PAST_YEARS)}, Stray included, in the row,
+      Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category: the deepest of every round of {reachWindow(latest, PAST_YEARS)}, Stray included, in the row,
       every round behind &quot;Every round&quot;.
       {profile && (
-        <> Reach is Options&apos; label on that one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round). Options labels an option on all your seat categories together, and notes when a list&apos;s seats there are all on a seat category with another label: the label these rows show.</>
+        <> Reach is Options&apos; label on that one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round). Options labels an option on all your seat categories together, and notes when a list&apos;s seats there are all on a seat category with another label: the label these rows show.</>
       )}
     </>
   );
@@ -323,10 +324,10 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
           <ViewPanes
             page="seats"
             view={view}
-            cards={<SeatCards rows={r.rows} list={list} lists={several ? roundLists : [list]} ranked={!!profile} L={L} title={caption} />}
-            table={<SeatTable rows={r.rows} lists={r.lists} current={list.key} sort={sort} ranked={!!profile} L={L} caption={caption} />}
+            cards={<SeatCards rows={r.rows} list={list} lists={several ? roundLists : [list]} ranked={!!profile} L={L} title={caption} latest={latest} />}
+            table={<SeatTable rows={r.rows} lists={r.lists} current={list.key} sort={sort} ranked={!!profile} L={L} caption={caption} latest={latest} />}
           />
-          <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: LATEST_YEAR, round: "R1" }]} terms={termDocs(r.rows.map((x) => x.fees))} />
+          <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: LATEST_YEAR }]} terms={termDocs(r.rows.map((x) => x.fees))} />
         </>
       )}
       <Pager page={r.page} pageSize={r.pageSize} total={r.total} href={(n) => L.page("/decide/seats", n)} focusId="results" label="Seats" />

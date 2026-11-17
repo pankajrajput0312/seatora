@@ -23,6 +23,7 @@ import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
+import { latestRound } from "@/features/decide/lib/reach";
 import { getMeta, LATEST_YEAR, listInstitutes, PAST_YEARS } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 
@@ -51,6 +52,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const { params: tp, filters: tf } = readTermFilters(params, profile);
   const pg = { page: f.page, pageSize: PAGE_SIZE };
   const [meta, info, byTerms, view] = await Promise.all([getMeta(), hospitalInfo(), institutesByTerms(tf, f.course), chosenView(params, "institutes")]);
+  const latest = latestRound(meta.sources);
   // Term filters and the beds sort narrow and order the list before it is paged, so reach is read for one page only.
   const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort, only: byTerms?.pass, bedsOf: (key: string) => info.get(key)?.beds?.n };
   const [res, unknown] = await Promise.all([
@@ -76,7 +78,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const bestOf = (r: (typeof res.rows)[number]) =>
     r.best && (
       <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-        <ReachBadge reach={r.bestReach} provisional={r.best.provisional} />
+        <ReachBadge reach={r.bestReach} provisional={r.best.provisional} latest={latest} />
         <span className="text-xs text-muted-foreground">{r.best.course.degree} {r.best.course.name}, {r.best.quota}</span>
       </span>
     );
@@ -226,7 +228,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
             College type is inferred from the institute&apos;s name and quotas, or comes from Seatora&apos;s research on the hospital (its badge says which); never an official field. Beds are what the hospital itself published ({SELF_REPORTED.toLowerCase()}); its Hospital facts tab gives the period, the source and the date Seatora checked it.
           </InfoTip>
         </p>
-        <DataSource used={profile ? [{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR, round: "R1" }] : [{ year: PAST_YEARS[1] }]} />
+        <DataSource used={profile ? [{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR }] : [{ year: PAST_YEARS[1] }]} />
       </div>
     </AppPage>
   );

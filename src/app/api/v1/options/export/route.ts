@@ -1,9 +1,9 @@
 import { CSV_MAX_ROWS, gridRounds, handle, invalid, sourcesFor, tooManyRows } from "@/features/decide/api";
 import { HISTORY_CAPTION } from "@/features/decide/components/bits";
-import { eligibleCategories, resultsSpan } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestRound, latestText, resultsSpan } from "@/features/decide/lib/reach";
 import { listNotices } from "@/features/decide/server/notices";
 import { seatChanges, seatLists } from "@/features/decide/server/seats";
-import { getMeta, LATEST_YEAR, listOptions } from "@/features/decide/service";
+import { getMeta, listOptions } from "@/features/decide/service";
 import { parseOptionsQuery } from "../query";
 import { optionsCsv, roundViewNote } from "./csv";
 import { planCap, planRequired } from "@/features/plans/usage";
@@ -30,6 +30,7 @@ export async function GET(req: Request) {
         ...c.sameDay.map((n) => ({ name: n.title, url: n.url, note: `MCC notice dated ${n.date}, the day of the ${l.kind} list: it may already include it` })),
       ];
     });
+    const latest = latestRound(meta.sources);
     const sources = [
       ...sourcesFor(meta.sources, gridRounds(r.rows)).map((s) => ({ name: s.name, url: s.url, note: s.provisional ? "Provisional" : undefined })),
       ...r.seatLists.map((l) => ({ name: l.name, url: l.url, note: l.publishedAt ? `MCC notice dated ${l.publishedAt}` : undefined })),
@@ -37,13 +38,13 @@ export async function GET(req: Request) {
     ];
     const notes = [
       HISTORY_CAPTION,
-      `Closing = the highest All India Rank allotted in that round on a seat of that category; here ${eligibleCategories(q.profile.category, q.profile.pwd).join(" or ")} seats. ${LATEST_YEAR} R1 is that round alone; deepest = the deepest round of that year. "—" = not available.`,
+      `Closing = the highest All India Rank allotted in that round on a seat of that category; here ${eligibleCategories(q.profile.category, q.profile.pwd).join(" or ")} seats. ${latestText(latest)} is ${latest.round === "R1" ? "that round alone" : "the deepest of those rounds"}; deepest = the deepest round of that year. "—" = not available.`,
       ...(r.seatLists.length
         ? ["Seat columns: separate MCC lists of one round, each in the option's quota and your seat categories. They overlap (a newly added seat is usually in the clear vacancy list too), so never add them. Each list is as its PDF printed it: later MCC seat notices are not applied (see Counselling, announcements)."]
         : []),
       ...(r.summary && l0 ? [roundViewNote(l0, r.summary, r.seats, resultsSpan(meta.years), r.noState)] : []),
     ];
-    const csv = optionsCsv(r.rows, { lists: r.seatLists, includeLatest: q.filters.includeProvisional !== false, notes, sources });
+    const csv = optionsCsv(r.rows, { lists: r.seatLists, latest, includeLatest: q.filters.includeProvisional !== false, notes, sources });
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",

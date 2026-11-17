@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import type { DecideLinks } from "../../lib/links";
+import type { Latest } from "../../lib/reach";
 import { openQuotas, roundLabel, seatKindLabel, type SeatKind, type SeatList } from "../../types";
 import { Dash, Provisional, ReachBadge } from "../bits";
 import { Beds } from "../pages/beds";
@@ -26,9 +27,9 @@ const shortKind: Record<SeatKind, string> = { clear: "Clear", virtual: "Virtual"
  * `list`: the picked list (its seats are the big number); `lists`: the lists shown with it, newest first (its round's in
  * compare and the matrix, every round's with All rounds; just `list` in one-list view). A row with no seats in the picked
  * round (All rounds) shows its newest list with seats instead, its round in the chip. `onDetails`: the matrix's drawer,
- * by row key (a Details button per card).
+ * by row key (a Details button per card). `latest`: lib/reach.ts latestRound.
  */
-export function SeatCards({ rows, list, lists, ranked, L, title, onDetails }: {
+export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, latest }: {
   rows: CardRow[];
   list: SeatList;
   lists: SeatList[];
@@ -36,6 +37,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails }: {
   L: DecideLinks;
   title: string;
   onDetails?: (key: string) => void;
+  latest: Latest;
 }) {
   const sameRound = (a: SeatList, b: SeatList) => a.year === b.year && a.round === b.round;
   return (
@@ -86,7 +88,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails }: {
                   ) : (
                     <span>No past closing</span>
                   )}
-                  {ranked && (r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : r.noLabel && <span>{r.noLabel}</span>)}
+                  {ranked && (r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} on={r.category} /> : r.noLabel && <span>{r.noLabel}</span>)}
                 </span>
               </>
             }

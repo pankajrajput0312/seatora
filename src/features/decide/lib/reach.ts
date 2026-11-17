@@ -1,10 +1,32 @@
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { roundLabel, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind } from "../types";
+import { roundLabel, rounds, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind, type Source } from "../types";
 
 /** The years the labels compare (client-safe; service.ts re-exports them). They match the imported MCC results. */
 export const LATEST_YEAR = 2026;
 export const PAST_YEARS: [number, number] = [2024, 2025];
 export const YEARS = [2024, 2025, 2026];
+
+/** The latest year and its newest round with an MCC result in the data (latestRound). */
+export type Latest = { year: number; round: Round };
+
+/**
+ * THE latest round (one source of truth for every label, note, filter and export): the latest year's newest round with
+ * a result PDF in the data (`rounds` order; R1 before any), provisional while MCC's result for it is.
+ */
+export function latestRound(sources: Pick<Source, "year" | "round" | "provisional">[]): Latest & { provisional: boolean } {
+  const mine = sources.filter((s) => s.year === LATEST_YEAR);
+  const round = rounds.filter((r) => mine.some((s) => s.round === r)).at(-1) ?? "R1";
+  return { year: LATEST_YEAR, round, provisional: mine.some((s) => s.round === round && s.provisional) };
+}
+
+/** Index in `rounds` of the latest year's last round the labels count: its newest, the one before without it (-1: none). */
+const lastCounted = ({ round }: Latest, includeLatest: boolean) => rounds.indexOf(round) - (includeLatest ? 0 : 1);
+
+/** "2026 R1", or "2026 R1 to R2" once R2 is in: the latest year's rounds the labels count (R1 when none is). */
+export function latestText(latest: Latest, includeLatest = true) {
+  const last = rounds[Math.max(0, lastCounted(latest, includeLatest))];
+  return `${latest.year} ${last === "R1" ? "R1" : `R1 to ${roundLabel[last]}`}`;
+}
 
 /** Seat categories a candidate can be allotted: Open always, their own category, and PwD seats if PwD. */
 export function eligibleCategories(category: BaseCategory, pwd: boolean): Category[] {
@@ -88,10 +110,11 @@ export function resultsSpan(years: { year: number; rounds: readonly Round[] }[])
   return first.year === last.year ? end : `${first.year} to ${end}`;
 }
 
-type Window = { latestYear: number; pastYears: [number, number]; includeLatest: boolean };
-/** Only the years and rounds the labels talk about: the two past years, plus the latest year's R1. */
-const inWindow = <T extends ReachInput>(cutoffs: T[], { latestYear, pastYears, includeLatest }: Window) =>
-  cutoffs.filter((c) => pastYears.includes(c.year) || (includeLatest && c.year === latestYear && c.round === "R1"));
+/** `includeLatest` false: without the latest round (Options' "leave out provisional"). */
+type Window = { latest: Latest; pastYears: [number, number]; includeLatest: boolean };
+/** Only the years and rounds the labels talk about: the two past years, plus the latest year's R1 to its newest round. */
+const inWindow = <T extends ReachInput>(cutoffs: T[], { latest, pastYears, includeLatest }: Window) =>
+  cutoffs.filter((c) => pastYears.includes(c.year) || (c.year === latest.year && !!c.round && rounds.indexOf(c.round) <= lastCounted(latest, includeLatest)));
 
 /**
  * The closing a label rests on, so a second label can say it with its year and round ("2025 R3 closed at 38,120").
@@ -114,18 +137,15 @@ export function reachEvidence(cutoffs: ReachInput[], reach: Reach, window: Windo
 
 /**
  * History-only label for how a rank compares with past closing ranks. "Reached" means the rank was within the
- * closing rank of that round, R1 to R3 only (isStrayRound). Never a chance or prediction.
+ * closing rank of that round, R1 to R3 only (isStrayRound). "reached-latest": in any round of the latest year so far
+ * (R1 up to its newest, latestText), as a past year counts every round. Never a chance or prediction.
  */
-export function classifyReach(
-  rank: number,
-  cutoffs: ReachInput[],
-  { latestYear, pastYears, includeLatest }: { latestYear: number; pastYears: [number, number]; includeLatest: boolean },
-): Reach {
-  const used = inWindow(cutoffs, { latestYear, pastYears, includeLatest });
+export function classifyReach(rank: number, cutoffs: ReachInput[], { latest, pastYears, includeLatest }: Window): Reach {
+  const used = inWindow(cutoffs, { latest, pastYears, includeLatest });
   if (used.length === 0) return "no-data";
   const main = used.filter((c) => !isStrayRound(c.round));
   const reachedIn = (y: number) => main.some((c) => c.year === y && c.closing >= rank);
-  if (includeLatest && main.some((c) => c.year === latestYear && c.round === "R1" && c.closing >= rank)) return "reached-latest";
+  if (main.some((c) => c.year === latest.year && c.closing >= rank)) return "reached-latest";
   const [a, b] = pastYears;
   if (reachedIn(a) && reachedIn(b)) return "reached-both";
   if (reachedIn(a) || reachedIn(b)) return "reached-one";
@@ -142,22 +162,22 @@ export function classifyReach(
 export const NEVER_ALLOTTED = "Never allotted before";
 
 /** The rounds the labels count, e.g. "2024, 2025 and 2026 R1" (older years show in the grids but are not counted). */
-export const reachWindow = (latestYear: number, [a, b]: [number, number], includeLatest = true, or = false) =>
-  includeLatest ? `${a}, ${b} ${or ? "or" : "and"} ${latestYear} R1` : `${a} ${or ? "or" : "and"} ${b}`;
+export const reachWindow = (latest: Latest, [a, b]: [number, number], includeLatest = true, or = false) =>
+  lastCounted(latest, includeLatest) >= 0 ? `${a}, ${b} ${or ? "or" : "and"} ${latestText(latest, includeLatest)}` : `${a} ${or ? "or" : "and"} ${b}`;
 
 /**
- * `includeLatest` false: the labels were made without the latest year's R1 (Options' "leave out provisional"). `on`: the
+ * `includeLatest` false: the labels were made without the latest round (Options' "leave out provisional"). `on`: the
  * label is on that one seat category (a Seats row), not on all of hers together.
  */
-export function reachLabel(reach: Reach, latestYear: number, pastYears: [number, number], includeLatest = true, on?: string): string {
+export function reachLabel(reach: Reach, latest: Latest, pastYears: [number, number], includeLatest = true, on?: string): string {
   return {
-    "reached-latest": `Reached in ${latestYear} R1`,
+    "reached-latest": `Reached in ${latestText(latest, includeLatest)}`,
     "reached-both": `Reached in ${pastYears[0]} and ${pastYears[1]}`,
     "reached-one": `Reached in ${pastYears[0]} or ${pastYears[1]}`,
     "within-10": "Within 10% in a past round",
     "stray-only": "Reached only in stray rounds",
     "closed-before": "Closed before your rank",
-    "no-data": `No allotment ${on ? `on ${on} seats` : "in your categories"} in ${reachWindow(latestYear, pastYears, includeLatest, true)}`,
+    "no-data": `No allotment ${on ? `on ${on} seats` : "in your categories"} in ${reachWindow(latest, pastYears, includeLatest, true)}`,
     new: NEVER_ALLOTTED,
   }[reach];
 }
@@ -196,7 +216,7 @@ const atVerdict: Partial<Record<Reach, string>> = {
  * and round, so they never read against the label: "In the clear and virtual vacancy lists, the seats here you can take
  * are Open seats only. On Open seats: deepest closing 38,120 in 2025 R3, before your rank."
  */
-export function seatsBelowNotes(ns: SeatsBelow[], latestYear: number, pastYears: [number, number], includeLatest = true): string[] {
+export function seatsBelowNotes(ns: SeatsBelow[], latest: Latest, pastYears: [number, number], includeLatest = true): string[] {
   const groups = new Map<string, SeatsBelow[]>();
   for (const n of ns) {
     const k = JSON.stringify(n.on);
@@ -211,8 +231,8 @@ export function seatsBelowNotes(ns: SeatsBelow[], latestYear: number, pastYears:
       // Stray left out of the label's closing: say so, and give Stray as its own number.
       const stray = at?.stray ? ` Stray: ${formatRank(at.stray.closing)} in ${at.stray.year}.` : "";
       if (at && verdict) return `On ${category} seats: deepest ${at.stray ? "before Stray " : "closing "}${formatRank(at.closing)} in ${at.year}${at.round ? ` ${roundLabel[at.round]}` : ""}, ${verdict}.${stray}`;
-      if (verdict) return `On ${category} seats alone: ${reachLabel(reach, latestYear, pastYears, includeLatest, category)}.`;
-      return `On ${category} seats: no allotment in ${reachWindow(latestYear, pastYears, includeLatest, true)}.`;
+      if (verdict) return `On ${category} seats alone: ${reachLabel(reach, latest, pastYears, includeLatest, category)}.`;
+      return `On ${category} seats: no allotment in ${reachWindow(latest, pastYears, includeLatest, true)}.`;
     });
     return `In the ${lists}, the seats here you can take are ${on.map((x) => x.category).join(" and ")} seats only. ${facts.join(" ")}`;
   });

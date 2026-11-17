@@ -6,7 +6,7 @@ import { optionsCsv, roundViewNote } from "@/app/api/v1/options/export/csv";
 import { GET as collegeApi } from "@/app/api/v1/colleges/[slug]/route";
 import { GET as optionsApi } from "@/app/api/v1/options/route";
 import { db } from "@/lib/db";
-import { eligibleCategories, reachOrder, resultsSpan, roundReachOrder } from "./lib/reach";
+import { eligibleCategories, latestRound, reachOrder, resultsSpan, roundReachOrder } from "./lib/reach";
 import { profileHasCourse, profileQuotas, profileToParams, type Profile } from "./profile";
 import { clinicalFactsFor, feesFor } from "./server/facts";
 import { listSeats, seatLists } from "./server/seats";
@@ -228,7 +228,7 @@ describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "seats.ndjson
       expect((await api("&hasSeats=1&showClosed=1")).page.total).toBe(summary.clear);
       expect((await api("&view=all")).data.view).toBe("all");
       // (the export route itself renders JSX-free code but imports a page caption; checked on the build) its rows and note:
-      const csv = optionsCsv(r.rows, { lists: r.seatLists, includeLatest: true, notes: [roundViewNote(lists[0], r.summary!, r.seats, resultsSpan((await svc.getMeta()).years))], sources: [] });
+      const csv = optionsCsv(r.rows, { lists: r.seatLists, latest: latestRound((await svc.getMeta()).sources), includeLatest: true, notes: [roundViewNote(lists[0], r.summary!, r.seats, resultsSpan((await svc.getMeta()).years))], sources: [] });
       const lines = csv.slice(1).split("\r\n");
       expect(lines.indexOf("")).toBe(r.total + 1);
       expect(lines.slice(1, 4).map((l) => l.split(",")[1])).toEqual(r.rows.slice(0, 3).map((x) => `"${x.college.name.replace(/"/g, '""')}"`));

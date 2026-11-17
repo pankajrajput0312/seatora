@@ -30,7 +30,7 @@ import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { fmtDay } from "@/features/decide/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { eligibleCategories } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestRound, latestText } from "@/features/decide/lib/reach";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, optionsView, PAST_YEARS, renamedCollege } from "@/features/decide/service";
@@ -104,6 +104,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   }
   const tab = f.tab;
   const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
+  const latest = latestRound(meta.sources);
   const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n ?? 0));
   const courses = [...new Map(options.map((o) => [o.course.slug, o.course])).values()];
   const listed = profile ? yours : options;
@@ -308,7 +309,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       </span>
                     </span>
                     <span className="flex items-center gap-4">
-                      {profile && <ReachBadge reach={o.reach} provisional={o.reachProvisional} />}
+                      {profile && <ReachBadge reach={o.reach} provisional={o.reachProvisional} latest={latest} />}
                       <span className="text-right"><span className="block text-xs text-muted-foreground">{PAST_YEARS[1]} deepest</span><Closing d={o.byYear[PAST_YEARS[1]]} /></span>
                     </span>
                   </li>
@@ -401,16 +402,16 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     return (
                       <li key={r.id} className="grid min-w-0">
                         <ResultCard
-                          chips={[r.quota, profile && <ReachBadge reach={r.reach} provisional={r.reachProvisional} />]}
-                          actions={<>{profile && <ChoiceStar item={toChoiceItem(r)} />}<CompareToggle id={r.id} label={name} /></>}
+                          chips={[r.quota, profile && <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} />]}
+                          actions={<>{profile && <ChoiceStar item={toChoiceItem(r, latest)} />}<CompareToggle id={r.id} label={name} /></>}
                           stat={{ label: `${PAST_YEARS[1]} deepest`, value: d ? <span className="numeric">{formatRank(d.closing)}</span> : <Dash /> }}
                           title={courseName(r)}
                           href={L.lastRanks(r.course.slug, { inst: slug })}
                           subtitle={d && <span className="text-xs text-muted-foreground">{roundLabel[d.round]}, {d.category} seat</span>}
                           meta={[
-                            <span key="r1">{LATEST_YEAR} R1: {r.latest ? <span className="numeric font-semibold text-foreground">{formatRank(r.latest.closing)}</span> : "—"} <Provisional when={r.latest?.provisional && !(profile && r.reachProvisional)} /></span>,
+                            <span key="r1">{latestText(latest)}: {r.latest ? <span className="numeric font-semibold text-foreground">{formatRank(r.latest.closing)}</span> : "—"} <Provisional when={r.latest?.provisional && !(profile && r.reachProvisional)} /></span>,
                             ...seatLinks(r),
-                            r.seatsBelow?.length ? <SeatsBelowNote key="below" r={r} /> : null,
+                            r.seatsBelow?.length ? <SeatsBelowNote key="below" r={r} latest={latest} /> : null,
                           ]}
                           footer={<TermStatCells t={r.fees} of={name} />}
                         />
@@ -429,7 +430,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                         {/* Sticky: scrolled sideways to the fee columns, the course stays in view (the star scrolls under it).
                             Reach and the round's seats sit under the course, so every fee and bond cell fits a 1366px screen. */}
                         <th scope="col" className={`${thTight} ${stick} z-[3]`}>Course</th>
-                        <th scope="col" className={`${thTight} text-right`}>{LATEST_YEAR} R1</th>
+                        <th scope="col" className={`${thTight} text-right`}>{latestText(latest)}</th>
                         <th scope="col" className={`${thTight} text-right`}>{PAST_YEARS[1]} deepest</th>
                         {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={`${tbl.th} text-right`}>{statLabel[k]}</th>)}
                       </tr>
@@ -438,11 +439,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       {options.flatMap((r) => [
                         <tr key={r.id} className={`expand-host ${tbl.row}`}>
                           {/* Without a rank the reach is unknown, so nothing would be saved with the choice: star only with a profile. */}
-                          <td className="px-1 py-2"><div className="grid justify-items-center">{profile && <ChoiceStar item={toChoiceItem(r)} />}<CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}, ${r.quota}`} /></div></td>
+                          <td className="px-1 py-2"><div className="grid justify-items-center">{profile && <ChoiceStar item={toChoiceItem(r, latest)} />}<CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}, ${r.quota}`} /></div></td>
                           <th scope="row" className={`${stick} min-w-48 px-3 py-3 text-left align-top font-medium`}>
                             <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link>
                             <span className="block text-xs font-normal text-muted-foreground">{r.quota}</span>
-                            {profile && <span className="mt-1 block font-normal"><ReachBadge reach={r.reach} provisional={r.reachProvisional} /><SeatsBelowNote r={r} /></span>}
+                            {profile && <span className="mt-1 block font-normal"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} /><SeatsBelowNote r={r} latest={latest} /></span>}
                             {round.length > 0 && <span className="mt-1 flex flex-wrap gap-x-3 text-xs font-normal">{seatLinks(r).length ? seatLinks(r) : <span className="text-muted-foreground">No {roundLabel[round[0].list.round]} seats</span>}</span>}
                             <div className="flex flex-wrap items-center gap-x-3 text-xs font-normal">
                               <details className="w-fit"><summary className="cursor-pointer py-3 text-sky">Rounds by year</summary></details>
@@ -451,7 +452,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                           </th>
                           <td className={numTight}>
                             <Closing d={r.latest} />
-                            {/* ReachBadge already carries the marker for "Reached in R1". */}
+                            {/* ReachBadge already carries the marker for the latest round's label. */}
                             <Provisional when={r.latest?.provisional && !(profile && r.reachProvisional)} />
                           </td>
                           <td className={numTight}><Closing d={r.byYear[PAST_YEARS[1]]} /></td>

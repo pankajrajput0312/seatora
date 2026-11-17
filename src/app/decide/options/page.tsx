@@ -23,10 +23,10 @@ import { iniCetIn } from "@/features/decide/lib/college-aliases";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { eligibleCategories, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestRound, latestText, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
 import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
-import { getMeta, LATEST_YEAR, listOptions, optionsView, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
+import { getMeta, listOptions, optionsView, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
 import { openQuotas, openQuotasNote, quotaScopeNote, optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 
 export const metadata: Metadata = { title: "Options" };
@@ -79,7 +79,11 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const here = (changes: Record<string, string | null>) => L.with("/decide/options", { page: null, ...changes });
   // The All chip counts what it lists: closed-before options only while they are shown.
   const all = reachOrder.reduce((s, x) => s + r.counts[x], 0) - (r.showClosed ? 0 : r.counts["closed-before"]);
-  const counted = reachWindow(LATEST_YEAR, PAST_YEARS, !f.prov);
+  // The latest year's newest round (lib/reach.ts latestRound): the only one that can be provisional (MCC's provisional
+  // result); the toggle exists only then.
+  const latest = latestRound(meta.sources);
+  const latestName = `${latest.year} ${roundLabel[latest.round]}`;
+  const counted = reachWindow(latest, PAST_YEARS, !f.prov);
   const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
   const roundWords = lists[0] && roundName[lists[0].round];
   // Switching views drops the filters whose default differs by view (seats, closed), so each view opens as itself, and
@@ -91,8 +95,6 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const labelled = reachOrder.reduce((s, x) => s + r.counts[x], 0);
   const reached = r.counts["reached-latest"] + r.counts["reached-both"] + r.counts["reached-one"];
   const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
-  // The latest year's R1 is the only round that can be provisional (MCC's provisional result); the toggle exists only then.
-  const latestProvisional = !!meta.sources.find((s) => s.year === LATEST_YEAR && s.round === "R1")?.provisional;
   const keep = keepProfileParams(params);
   // Same profile and filters for /api/v1/options, where "Show more" reads the next pages (and the CSV).
   const api = profileToParams(profile);
@@ -106,12 +108,12 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const termKeys = ["ctype", "maxfee", "minstip", "bondyrs", "maxbond", "maxleave", "nd"] as const;
   const active = [
     f.q && { label: `Search: “${f.q}”`, param: "q", href: here({ q: null }) },
-    f.reach && { label: reachLabel(f.reach, LATEST_YEAR, PAST_YEARS, !f.prov), href: here({ reach: null, closed: null }) },
+    f.reach && { label: reachLabel(f.reach, latest, PAST_YEARS, !f.prov), href: here({ reach: null, closed: null }) },
     // The seats filter, the round view's default too ("Only with R2 seats"): × shows the options with or without seats.
     lists.length > 0 && r.seats && { label: r.seats === "any" ? `Only with ${roundLabel[lists[0].round]} seats` : seatsWords(r.seats), param: "seats", href: here({ seats: roundView ? "all" : null }) },
     lists.length > 0 && !r.seats && f.seats && { label: `With or without ${round} seats`, param: "seats", href: here({ seats: null }) },
     f.closed && f.closed !== closedDefault && !f.reach && { label: f.closed === "1" ? "Closed before your rank: shown" : "Closed before your rank: hidden", href: here({ closed: null }) },
-    f.prov && { label: `Without ${LATEST_YEAR} R1 (provisional)`, param: "prov", href: here({ prov: null }) },
+    f.prov && { label: `Without ${latestName} (provisional)`, param: "prov", href: here({ prov: null }) },
     f.sort && f.sort !== "label" && { label: `Sorted: ${sortLabel[f.sort]}`, param: "sort", href: here({ sort: null }) },
     // One chip per course (or specialty and degree), quota and state, her profile's for this visit: the × takes that one out.
     ...(profile.pairs?.length
@@ -265,13 +267,13 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
               </select>
             </Field>
             <TermFilterControls f={tp} caps={profile} />
-            {latestProvisional && (
+            {latest.provisional && (
               <span className="flex min-h-12 items-center gap-1 border-b border-border text-sm">
                 <label className="flex min-h-11 cursor-pointer items-center gap-3">
                   <input type="checkbox" name="prov" value="0" defaultChecked={!!f.prov} className="size-5 accent-sky" />
-                  Without {LATEST_YEAR} R1 (provisional)
+                  Without {latestName} (provisional)
                 </label>
-                <InfoTip label={`${LATEST_YEAR} R1 (provisional)`}>Leaves MCC&apos;s provisional {LATEST_YEAR} R1 result out of the labels.</InfoTip>
+                <InfoTip label={`${latestName} (provisional)`}>Leaves MCC&apos;s provisional {latestName} result out of the labels.</InfoTip>
               </span>
             )}
           </Fragment>
@@ -287,8 +289,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         </Link>
         {reachOrder.filter((x) => r.counts[x] > 0).map((x) => (
           <Link key={x} href={here({ reach: x, closed: x === "closed-before" ? "1" : null })} aria-current={f.reach === x ? "true" : undefined} className={chip(f.reach === x)}>
-            {reachLabel(x, LATEST_YEAR, PAST_YEARS, !f.prov)} <span className="numeric font-semibold">{formatRank(r.counts[x])}</span><span className="sr-only"> options</span>
-            {x === "reached-latest" && <Provisional when={latestProvisional && !f.prov} />}
+            {reachLabel(x, latest, PAST_YEARS, !f.prov)} <span className="numeric font-semibold">{formatRank(r.counts[x])}</span><span className="sr-only"> options</span>
+            {x === "reached-latest" && <Provisional when={latest.provisional && !f.prov} />}
           </Link>
         ))}
         {(r.hiddenClosed > 0 || (r.showClosed && !f.reach && r.counts["closed-before"] > 0)) && (
@@ -299,7 +301,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             </Link>
             <InfoTip label="closed before your rank">
               Options whose closing rank came before yours in every round of {counted}
-              {r.hiddenProvisional > 0 && ` (${formatRank(r.hiddenProvisional)} of the hidden ones only in the provisional ${LATEST_YEAR} R1)`}.
+              {r.hiddenProvisional > 0 && ` (${formatRank(r.hiddenProvisional)} of the hidden ones only in the provisional ${latestName})`}.
             </InfoTip>
           </span>
         )}
@@ -319,15 +321,15 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           firstPageHref={r.page > 1 ? here({}) : undefined}
           notes={<SeatSource lists={lists} L={L} />}
           tools={<CsvLink href={`/api/v1/options/export?${api}`} what={`these ${formatRank(r.total)} options`} total={r.total} />}
-          latestYear={LATEST_YEAR}
+          latest={latest}
           pastYears={PAST_YEARS}
           includeLatest={!f.prov}
           seatLists={lists}
           view={view}
           historyMore={
             <>
-              Closing = the highest All India Rank allotted in that round on a seat of that category; here {seats} seats, the ones you can take. {LATEST_YEAR} R1 is that round alone. Labels
-              count every round of {PAST_YEARS[0]} and {PAST_YEARS[1]}{!f.prov && `, and ${LATEST_YEAR} R1`}; Rounds by year shows every round of every year (R2 and R3 included), older years
+              Closing = the highest All India Rank allotted in that round on a seat of that category; here {seats} seats, the ones you can take. {latestText(latest)} is {latest.round === "R1" ? "that round alone" : "the deepest of those rounds"}. Labels
+              count every round of {PAST_YEARS[0]} and {PAST_YEARS[1]}{(!f.prov || latest.round !== "R1") && `, and ${latestText(latest, !f.prov)}`}; Rounds by year shows every round of every year (R2 and R3 included), older years
               too, which the labels do not count; its bracketed numbers are allotments made that round in every category, not the seat matrix.
             </>
           }

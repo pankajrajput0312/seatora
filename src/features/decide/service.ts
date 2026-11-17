@@ -5,7 +5,7 @@ import { hospitalInfo, type HospitalInfo } from "./components/institute/institut
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
 import { searchMatcher } from "./lib/college-aliases";
 import { anyTermFilter, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
-import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
+import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, latestRound, PAST_YEARS, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Latest, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { pairKey, profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
@@ -78,13 +78,13 @@ export type OptionRow = {
   course: Course;
   quota: string;
   reach: Reach;
-  /** The label rests on the provisional latest-year R1: without that round it would be another label. */
+  /** The label rests on the provisional latest round (latestRound): without that round it would be another label. */
   reachProvisional: boolean;
   /** With a profile: the label on each of her seat categories alone (`reach` is on all of them together). */
   reachBy?: Partial<Record<Category, Reach>>;
   /** Beside `reachBy`: the closing each of those labels rests on (lib/reach.ts reachEvidence), null without one. */
   reachAt?: Partial<Record<Category, ReachAt | null>>;
-  latest: Deepest | null; // latest year's R1 (provisional while its source is)
+  latest: Deepest | null; // latest year's deepest, R1 up to its newest round (provisional while its source is)
   byYear: Record<number, Deepest | null>;
   /** year → round → deepest closing among eligible categories (with its seat category); n = allotments, all categories */
   grid: Record<number, Partial<Record<Round, GridCell>>>;
@@ -191,16 +191,15 @@ function termsFor(cat: Catalog, college: string, degree: string): OptionTerms {
 export { feeValue };
 
 const provisionalKeys = (cat: Catalog) => new Set(cat.sources.filter((s) => s.provisional).map((s) => s.key));
-const latestR1Provisional = (cat: Catalog) => cat.sources.some((s) => s.year === LATEST_YEAR && s.round === "R1" && s.provisional);
 
 /**
- * Her label, and whether it rests on the provisional latest-year R1 (`prov`: that round is in and provisional): the
- * label it would be without that round differs.
+ * Her label, and whether it rests on the provisional latest round (`latest.provisional`, latestRound): the label it
+ * would be without that round differs.
  */
-function labelOf(rank: number, list: ReachInput[], includeLatest: boolean, prov: boolean): { reach: Reach; provisional: boolean } {
-  const opt = { latestYear: LATEST_YEAR, pastYears: PAST_YEARS };
+function labelOf(rank: number, list: ReachInput[], includeLatest: boolean, latest: Latest & { provisional: boolean }): { reach: Reach; provisional: boolean } {
+  const opt = { latest, pastYears: PAST_YEARS };
   const reach = classifyReach(rank, list, { ...opt, includeLatest });
-  return { reach, provisional: includeLatest && prov && classifyReach(rank, list, { ...opt, includeLatest: false }) !== reach };
+  return { reach, provisional: includeLatest && latest.provisional && classifyReach(rank, list, { ...opt, includeLatest: false }) !== reach };
 }
 
 function sumByYear(list: Cutoff[]) {
@@ -220,10 +219,11 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], profile: Profile | null,
   const deepest = deepestByYear(mine, provisional);
   const t = termsFor(cat, college.key, course.degree);
   const fees = courseTerms(cat, college.key, course.degree, course.specialty, o.quota);
+  const latest = latestRound(cat.sources);
   const label: { reach: Reach; provisional: boolean } = o.fresh
     ? { reach: "new", provisional: false }
-    : profile ? labelOf(profile.rank, mine, includeProvisional, latestR1Provisional(cat)) : { reach: "no-data", provisional: false };
-  const opt = { latestYear: LATEST_YEAR, pastYears: PAST_YEARS, includeLatest: includeProvisional };
+    : profile ? labelOf(profile.rank, mine, includeProvisional, latest) : { reach: "no-data", provisional: false };
+  const opt = { latest, pastYears: PAST_YEARS, includeLatest: includeProvisional };
   const reachBy = profile && !eligibleOverride && !o.fresh ? Object.fromEntries([...eligible!].map((c) => [c, classifyReach(profile.rank, mine.filter((x) => x.category === c), opt)])) : undefined;
   // The closing each of those labels rests on, for the notes that say them beside the option's own (seatsBelowNotes).
   const reachAt = reachBy && Object.fromEntries(Object.entries(reachBy).map(([c, r]) => [c, reachEvidence(mine.filter((x) => x.category === c), r!, opt)]));
@@ -235,7 +235,7 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], profile: Profile | null,
     reach: label.reach,
     reachProvisional: label.provisional,
     ...(reachBy && { reachBy, reachAt }),
-    latest: deepestByYear(mine.filter((c) => c.year === LATEST_YEAR && c.round === "R1"), provisional).get(LATEST_YEAR) ?? null,
+    latest: deepest.get(LATEST_YEAR) ?? null,
     byYear: Object.fromEntries(YEARS.map((y) => [y, deepest.get(y) ?? null])),
     grid: buildGrid(list, eligible, provisional),
     allotmentsByYear: sumByYear(list),
@@ -308,10 +308,10 @@ async function rankOptions(cat: Catalog, opts: Opt[], profile: Profile | null, i
     pastYears: PAST_YEARS,
     latestYear: LATEST_YEAR,
   });
-  const prov = latestR1Provisional(cat);
+  const latest = latestRound(cat.sources);
   const ranked = opts.map((o) => {
     const list = inputs.get(o.id) ?? [];
-    const label = profile ? labelOf(profile.rank, list, includeProvisional, prov) : { reach: "no-data" as const, provisional: false };
+    const label = profile ? labelOf(profile.rank, list, includeProvisional, latest) : { reach: "no-data" as const, provisional: false };
     const deepest = list.filter((c) => c.year === PAST_YEARS[1]).reduce<ReachInput | undefined>((a, c) => (!a || c.closing > a.closing ? c : a), undefined);
     return { o, ...label, deepest };
   });
@@ -516,7 +516,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     /** Options this view would show but for a filtered fee, stipend, bond or leaving value that is not declared (nd=keep adds them). */
     unknownTerms: open(inView([...labelledUnknown, ...freshUnknown.filter(text).map(asNew)]).filter(inReach)).length,
     hiddenClosed: hidden.length,
-    /** Of the hidden ones, those whose label rests on the provisional latest-year R1 alone. */
+    /** Of the hidden ones, those whose label rests on the provisional latest round alone. */
     hiddenProvisional: hidden.filter((r) => r.provisional).length,
     counts: countsOf(every),
     seatList: lists[0] ?? null,
@@ -794,8 +794,8 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
       pastYears: PAST_YEARS,
       latestYear: LATEST_YEAR,
     });
-    const prov = latestR1Provisional(cat);
-    reachOf = new Map([...inputs].map(([id, list]) => [id, labelOf(profile.rank, list, true, prov)]));
+    const latest = latestRound(cat.sources);
+    reachOf = new Map([...inputs].map(([id, list]) => [id, labelOf(profile.rank, list, true, latest)]));
   }
   const rows = page.rows.map(({ college, allotments2025 }) => {
     const opts = byCollege.get(college.key) ?? [];
@@ -808,7 +808,7 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
       quotas: [...new Set(opts.map((o) => o.quota))],
       allotments2025,
       bestReach: (profile && best ? best.reach : "no-data") as Reach,
-      /** The option the best label comes from; provisional when that label rests on a provisional latest-year R1. */
+      /** The option the best label comes from; provisional when that label rests on the provisional latest round. */
       best: profile && best && best.reach !== "no-data" ? { course: cat.courseOf.get(`${best.o.degree}|${best.o.specialty}`)!, quota: best.o.quota, provisional: best.provisional } : null,
     };
   });

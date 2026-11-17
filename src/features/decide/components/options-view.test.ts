@@ -38,7 +38,7 @@ describe("RoundGrid", () => {
 
 describe("'never allotted before' vs 'newly added': two meanings, two words", () => {
   it("an option with no past allotment is 'Never allotted before'; 'newly added' is only MCC's newly added seat list", () => {
-    expect(reachLabel("new", 2026, [2024, 2025])).toBe("Never allotted before");
+    expect(reachLabel("new", { year: 2026, round: "R1" }, [2024, 2025])).toBe("Never allotted before");
     expect(seatKindShort("new")).toBe("newly added");
     expect([seatKindShort("clear"), seatKindShort("virtual")]).toEqual(["clear", "virtual"]);
     const html = renderToStaticMarkup(createElement(RoundGrid, { row: { grid: {}, reach: "new" }, caption: "x" }));

@@ -5,7 +5,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { fmtDay, listDay } from "../../lib/format";
 import type { DecideLinks } from "../../lib/links";
-import { LATEST_YEAR, PAST_YEARS, reachWindow } from "../../lib/reach";
+import { PAST_YEARS, reachWindow, type Latest } from "../../lib/reach";
 import { statKeys, statLabel } from "../../lib/stat-format";
 import { openQuotas, roundLabel, rounds, seatKindLabel, type Round, type SeatKind, type SeatList } from "../../types";
 import { Dash, InstName, Provisional, ReachBadge } from "../bits";
@@ -135,9 +135,9 @@ function PastClosings({ r, name }: { r: SeatLine; name: string }) {
  * Seat rows: institute (with course, quota and state; sticky, so a phone scrolls the rest beside it), seat category,
  * the course's terms as number cells, seats in each of `lists` (one list, or every list of a round side by side: never
  * added; `current` orders the seats sort), the deepest past closing on the row's quota and seat category, and her reach
- * label on it (`ranked`).
+ * label on it (`ranked`; `latest`: lib/reach.ts latestRound).
  */
-export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { rows: SeatLine[]; lists: SeatList[]; current: string; sort: SeatSort; caption: string; ranked: boolean; L: DecideLinks }) {
+export function SeatTable({ rows, lists, current, sort, caption, ranked, L, latest }: { rows: SeatLine[]; lists: SeatList[]; current: string; sort: SeatSort; caption: string; ranked: boolean; L: DecideLinks; latest: Latest }) {
   const td = "px-3 py-3 align-top md:px-4";
   const th = cn(tbl.th, "px-3 align-bottom md:px-4");
   const sticky = "sticky left-0 z-[1] w-40 min-w-40 border-r border-border bg-card md:w-72 md:min-w-72";
@@ -161,7 +161,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
             ))}
             <th scope="col" className={cn(th, "text-right whitespace-nowrap")} aria-sort={sort === "closing" ? "descending" : undefined}>
               Deepest past closing
-              <InfoTip label="deepest past closing">The deepest closing rank on the row&apos;s quota and seat category in {reachWindow(LATEST_YEAR, PAST_YEARS)}, every round, Stray included, with its year and round; each round behind &quot;Every round&quot;.</InfoTip>
+              <InfoTip label="deepest past closing">The deepest closing rank on the row&apos;s quota and seat category in {reachWindow(latest, PAST_YEARS)}, every round, Stray included, with its year and round; each round behind &quot;Every round&quot;.</InfoTip>
             </th>
             {ranked && <th scope="col" className={cn(th, "min-w-36")}>Reach</th>}
           </tr>
@@ -189,7 +189,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L }: { 
                 <td className={td}><PastClosings r={r} name={name} /></td>
                 {ranked && (
                   <td className={td}>
-                    {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : <span className="text-xs text-muted-foreground">{r.noLabel}</span>}
+                    {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} on={r.category} /> : <span className="text-xs text-muted-foreground">{r.noLabel}</span>}
                   </td>
                 )}
               </tr>

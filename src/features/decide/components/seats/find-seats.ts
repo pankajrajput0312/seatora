@@ -3,7 +3,7 @@ import { z } from "zod";
 import { listDay } from "../../lib/format";
 import { pageValue, parseSearchParams } from "../../lib/params";
 import { splitByTerms, termFilterLists, termFilters, termFilterShape, type TermFilters } from "../../lib/term-filters";
-import { classifyReach, deepestOf, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachLabel, reachOrder, type Reach } from "../../lib/reach";
+import { classifyReach, deepestOf, eligibleCategories, LATEST_YEAR, latestRound, PAST_YEARS, reachLabel, reachOrder, type Reach } from "../../lib/reach";
 import { pairSchema, profileCourseFilter, profileQuotas, type Profile } from "../../profile";
 import { getCatalog, type Catalog } from "../../server/catalog";
 import { listNotices } from "../../server/notices";
@@ -20,7 +20,7 @@ export const seatSorts = ["reach", "closing", "seats", "college", "state", "fee"
 export type SeatSort = (typeof seatSorts)[number];
 export const seatCategories: Category[] = [...baseCategories, ...baseCategories.map((c) => `${c} PwD` as const)];
 
-/** The past rounds every seat row shows, on its own quota and seat category: the latest R1, and R2 and R3 of the two past years (newest year first, as every list of rounds shows them). */
+/** The past rounds every seat row shows, on its own quota and seat category: the latest R1 (that year's later rounds go with the other rounds the label counts), and R2 and R3 of the two past years (newest year first, as every list of rounds shows them). */
 export const PAST_ROUNDS: { year: number; round: Round }[] = [
   { year: LATEST_YEAR, round: "R1" },
   ...[...PAST_YEARS].sort((a, b) => b - a).flatMap((year) => (["R2", "R3"] as const).map((round) => ({ year, round }))),
@@ -29,7 +29,7 @@ export const PAST_ROUNDS: { year: number; round: Round }[] = [
 /** `n`: allotments MCC made in that round on the row's quota and seat category (not seats). */
 export type PastClosing = { year: number; round: Round; closing: number; n: number; provisional: boolean };
 export type SeatHistory = {
-  /** Closing ranks on the row's quota and seat category in every round the reach label counts (both past years, the latest R1), oldest first. */
+  /** Closing ranks on the row's quota and seat category in every round the reach label counts (both past years, the latest year's), oldest first. */
   rounds: PastClosing[];
   /** Every closing on the row's quota and seat category in every result in the data (all years and rounds), oldest first. */
   closings: PastClosing[];
@@ -42,7 +42,7 @@ export type SeatHistory = {
   reach: Reach | null;
   /** With a rank, why the row has no label: a seat category she can't take, no quota printed, or a data gap (`NO_LABEL`). */
   noLabel: string | null;
-  /** The label rests on a provisional latest-year R1 (as OptionRow.reachProvisional). */
+  /** The label rests on the provisional latest round (as OptionRow.reachProvisional). */
   reachProvisional: boolean;
   /** Fee, stipend, bond and penalty terms as published for the row's institute and program, each with its source (CSV). */
   terms: OptionTerms;
@@ -159,18 +159,18 @@ async function withHistory<T extends SeatRow & Pick<SeatHistory, "terms" | "fees
   const years = cat.meta.years.map((y) => y.year);
   const cutoffs = await findCutoffs(cat, { cs: uniq(opts.map((r) => r.cs!)), quotas: uniq(opts.map((r) => r.quota!)), categories: uniq(opts.map((r) => r.category)), years });
   const provisional = new Set(cat.sources.filter((s) => s.provisional).map((s) => s.key));
-  const latestProvisional = cat.sources.some((s) => s.year === LATEST_YEAR && s.round === "R1" && s.provisional);
+  const latest = latestRound(cat.sources);
   const by = new Map<string, Cutoff[]>();
   for (const c of cutoffs) {
     const k = `${optionId(c)}|${c.category}`;
     (by.get(k) ?? by.set(k, []).get(k)!).push(c);
   }
-  const opt = { latestYear: LATEST_YEAR, pastYears: PAST_YEARS };
-  const counted = (c: { year: number; round: Round }) => PAST_YEARS.includes(c.year) || (c.year === LATEST_YEAR && c.round === "R1");
+  const opt = { latest, pastYears: PAST_YEARS };
+  const counted = (c: { year: number; round: Round }) => PAST_YEARS.includes(c.year) || c.year === LATEST_YEAR;
   return rows.map((r) => {
     const all = (r.quota != null && by.get(`${optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota })}|${r.category}`)) || [];
     const closings = all.map((c) => ({ year: c.year, round: c.round, closing: c.closing, n: c.n, provisional: provisional.has(c.src) }));
-    // The rounds the label counts (as classifyReach): both past years, every round, and the latest year's R1.
+    // The rounds the label counts (as classifyReach): both past years and the latest year, every round in the data.
     const used = all.filter(counted);
     const rounds = closings.filter(counted);
     const deepest = deepestOf(rounds);
@@ -188,7 +188,7 @@ async function withHistory<T extends SeatRow & Pick<SeatHistory, "terms" | "fees
             ? NO_LABEL.unlinked
             : null;
     const reach = !reachFor || noLabel ? null : fresh ? "new" : classifyReach(reachFor.rank, used, { ...opt, includeLatest: true });
-    const reachProvisional = !!reach && !fresh && latestProvisional && classifyReach(reachFor!.rank, used, { ...opt, includeLatest: false }) !== reach;
+    const reachProvisional = !!reach && !fresh && latest.provisional && classifyReach(reachFor!.rank, used, { ...opt, includeLatest: false }) !== reach;
     return { ...r, closings, rounds, deepest, reach, noLabel, reachProvisional };
   });
 }
@@ -371,6 +371,7 @@ function bedsNote(b: ReportedBeds) {
 export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }, notes: string[] = []) {
   const { r, profile, meta } = v;
   const matrix = v.f.view === "matrix";
+  const latest = latestRound(meta.sources);
   // The matrix's closing columns: every year with results, newest first (the latest year's rounds with a result, every round of the others).
   const closingCols = matrix ? meta.years.flatMap((y, i) => (i === 0 ? y.rounds : rounds).map((round) => ({ year: y.year, round }))) : [];
   // MCC seat notices of each round the lists are from (one round, but every round with "All rounds").
@@ -404,7 +405,7 @@ export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }
           x.rounds.filter((c) => !PAST_ROUNDS.some((p) => p.year === c.year && p.round === c.round)).map((c) => `${prov(c)}: ${c.closing}`).join("; "),
         ]),
     feeValue.fee1(x.fees), feeValue.stip1(x.fees), feeValue.bondyrs(x.fees), feeValue.bond(x.fees), feeValue.leave(x.fees), x.hospital?.beds?.n, x.hospital?.beds && bedsNote(x.hospital.beds), x.hospital?.type && collegeTypeLabel[x.hospital.type.value],
-    ...(profile ? [x.reach ? `${reachLabel(x.reach, LATEST_YEAR, PAST_YEARS, true, x.category)}${x.reachProvisional ? " (provisional)" : ""}` : x.noLabel] : []),
+    ...(profile ? [x.reach ? `${reachLabel(x.reach, latest, PAST_YEARS, true, x.category)}${x.reachProvisional ? " (provisional)" : ""}` : x.noLabel] : []),
     ...kinds.flatMap((k) => [x.terms[k]?.text, docOf(x.terms[k]?.source)]),
   ]);
   const used = new Set(r.rows.flatMap((x) => (matrix ? x.closings : x.rounds).map(label)));

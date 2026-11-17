@@ -28,10 +28,11 @@ const row: CardRow = {
   fees: normalizeProgramme("MD/MS", []),
   hospital: { type: { value: "govt", basis: "inferred_name" }, beds: null, mccProfileUrl: "https://mcc.example/x" },
 };
+const latest = { year: 2026, round: "R1" } as const;
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
 it("a seat card: the picked list's seats big, the round's other lists beside the course (never added), type, terms cells", () => {
-  const html = renderToStaticMarkup(h(SeatCards, { rows: [row], list: clear, lists: [clear, virtual, added], ranked: false, L: decideLinks(), title: "Seats" }));
+  const html = renderToStaticMarkup(h(SeatCards, { rows: [row], list: clear, lists: [clear, virtual, added], ranked: false, L: decideLinks(), title: "Seats", latest }));
   const t = text(html);
   expect(t).toMatch(/Clear 3 /);
   expect(t).toContain("Virtual 2");
@@ -42,25 +43,25 @@ it("a seat card: the picked list's seats big, the round's other lists beside the
   expect(html).toContain('href="https://mcc.example/x"');
   expect(html).not.toContain("data-row"); // no drawer, no Details button
   // One list: just "Seats"; a row missing from the picked list shows "—", never 0.
-  expect(text(renderToStaticMarkup(h(SeatCards, { rows: [{ ...row, byList: {} }], list: clear, lists: [clear], ranked: false, L: decideLinks(), title: "Seats" })))).toMatch(/Seats — /);
+  expect(text(renderToStaticMarkup(h(SeatCards, { rows: [{ ...row, byList: {} }], list: clear, lists: [clear], ranked: false, L: decideLinks(), title: "Seats", latest })))).toMatch(/Seats — /);
 });
 
 it("All rounds: a row with no seats in the picked round shows its newest list with seats, that round in the chip", () => {
   const old = { ...clear, key: "2025-R3-clear", year: 2025, round: "R3" } as SeatList;
-  const html = renderToStaticMarkup(h(SeatCards, { rows: [{ ...row, byList: { [old.key]: 1 } }], list: clear, lists: [clear, virtual, added, old], ranked: false, L: decideLinks(), title: "Seats" }));
+  const html = renderToStaticMarkup(h(SeatCards, { rows: [{ ...row, byList: { [old.key]: 1 } }], list: clear, lists: [clear, virtual, added, old], ranked: false, L: decideLinks(), title: "Seats", latest }));
   const t = text(html);
   expect(t).toContain("2025 · R3");
   expect(t).not.toContain("2026 · R2");
   expect(t).toMatch(/Clear 1 /);
   // Seats in the picked round: that round stays.
-  const same = text(renderToStaticMarkup(h(SeatCards, { rows: [{ ...row, byList: { [virtual.key]: 2, [old.key]: 1 } }], list: clear, lists: [clear, virtual, added, old], ranked: false, L: decideLinks(), title: "Seats" })));
+  const same = text(renderToStaticMarkup(h(SeatCards, { rows: [{ ...row, byList: { [virtual.key]: 2, [old.key]: 1 } }], list: clear, lists: [clear, virtual, added, old], ranked: false, L: decideLinks(), title: "Seats", latest })));
   for (const x of ["2026 · R2", "Clear —", "Virtual 2"]) expect(same).toContain(x);
   expect(same).not.toContain("2025 · R3");
 });
 
 it("beds: the one Beds, self-reported said behind its (i) (not a hover title)", () => {
   const beds = { n: 750, kind: null, meta: null, own: true };
-  const html = renderToStaticMarkup(h(SeatCards, { rows: [{ ...row, hospital: { ...row.hospital!, beds } }], list: clear, lists: [clear], ranked: false, L: decideLinks(), title: "Seats" }));
+  const html = renderToStaticMarkup(h(SeatCards, { rows: [{ ...row, hospital: { ...row.hospital!, beds } }], list: clear, lists: [clear], ranked: false, L: decideLinks(), title: "Seats", latest }));
   expect(text(html)).toContain("750 beds");
   expect(html).toContain('aria-label="About beds, GMC X, MD Anaesthesiology');
   expect(text(html)).toContain("Self-reported by the hospital, not verified by Seatora.");

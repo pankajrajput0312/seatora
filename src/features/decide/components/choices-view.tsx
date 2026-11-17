@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { duplicateList, markTypedUpTo, move, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
-import { LATEST_YEAR, PAST_YEARS, reachWindow, seatsBelowNotes, type Reach, type SeatsBelow } from "../lib/reach";
+import { PAST_YEARS, reachWindow, seatsBelowNotes, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
 import { useChoices, useDecideLinks } from "../lib/use-decide-store";
 import { keepProfileParams } from "../profile";
@@ -48,7 +48,8 @@ type ReachFor = (ids: string[], profile: string) => Promise<{ lists: SeatList[];
 /** `maxLists`: the plan's saved lists (features/plans); at it, "Duplicate" gives way to a Season Pass link. Unset: no cap (signed out). */
 /** `hasLists`: the server has the newest round's seat lists, so a card keeps room for its seats line while it loads. */
 /** `nextRound`: the choice filling she fills next (MCC's schedule): its list name ("Round 3 · 2026") and dates. */
-export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nextRound }: { reachFor?: ReachFor; view: View; maxLists?: number; hasLists?: boolean; nextRound?: { name: string; when: string } | null }) {
+/** `latest`: the round the reach labels name (lib/reach.ts latestRound). */
+export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nextRound, latest }: { reachFor?: ReachFor; view: View; maxLists?: number; hasLists?: boolean; nextRound?: { name: string; when: string } | null; latest: Latest }) {
   // Its first list takes the round's name on every Decide page (RenamedSaved, lib/choices.ts nameFirstList).
   const [state, setState, hydrated] = useChoices();
   const L = useDecideLinks();
@@ -220,10 +221,10 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     const closed = lr?.reach ? lr.reach === "closed-before" : item.closedEveryRound;
     const flags = [
       (counts.get(dupKey(item)) ?? 0) > 1 && "Same institute and course listed more than once",
-      closed && `Closed before your rank in every round of ${reachWindow(LATEST_YEAR, PAST_YEARS)}${lr?.reach ? "" : " (when added)"}`,
+      closed && `Closed before your rank in every round of ${reachWindow(latest, PAST_YEARS)}${lr?.reach ? "" : " (when added)"}`,
       // Seats are matched to the option by institute and course; say what was found, not what MCC printed.
       lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
-      ...seatsBelowNotes(lr?.below ?? [], LATEST_YEAR, PAST_YEARS),
+      ...seatsBelowNotes(lr?.below ?? [], latest, PAST_YEARS),
       fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
       typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
     ].filter(Boolean) as string[];
@@ -279,7 +280,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     </span>
   );
   const reachOf = (item: ChoiceItem, lr: Live[string] | undefined) =>
-    lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>;
+    lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} latest={latest} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>;
   const typedBadge = <Badge tone="success"><Check className="mr-1 size-3" aria-hidden />Typed into MCC</Badge>;
   const seatsOf = (item: ChoiceItem, lr: Live[string], l: SeatList) => (
     <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${item.quota}`} />

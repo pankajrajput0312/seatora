@@ -6,7 +6,7 @@ import { hospitalInfo } from "@/features/decide/components/institute/institute-d
 import { collegeTypeLabel, typesIn } from "@/features/decide/components/institute/college-type";
 import { courseName, toChoiceItem } from "@/features/decide/components/options-view";
 import { CHOICES_KEY, defaultChoices, parseChoices, pinOf, toMccText, type ChoiceItem, type ChoicesState } from "@/features/decide/lib/choices";
-import { LATEST_YEAR, PAST_YEARS, reachLabel, reachOrder } from "@/features/decide/lib/reach";
+import { LATEST_YEAR, latestRound, PAST_YEARS, reachLabel, reachOrder, type Latest } from "@/features/decide/lib/reach";
 import { clockNote, currentSteps, fmtIST, roundName, stepName, stepsNow } from "@/features/decide/lib/round-status";
 import { statCells } from "@/features/decide/lib/stat-format";
 import { typeValues, type TermFilters } from "@/features/decide/lib/term-filters";
@@ -249,8 +249,8 @@ const terms = (r: Pick<OptionRow, "fees">) => Object.fromEntries(statCells(r.fee
 const instLink = (slug: string, tab?: string) => `/decide/institutes/${slug}${tab ? `?tab=${tab}` : ""}`;
 const seatsOf = (r: OptionRow) => (r.seatsBy ? Object.fromEntries(Object.entries(r.seatsBy).map(([k, v]) => [k, v ?? 0])) : undefined);
 
-/** One option as the model sees it. */
-function optionFacts(r: OptionRow, profile: Profile | null) {
+/** One option as the model sees it. `latest`: lib/reach.ts latestRound. */
+function optionFacts(r: OptionRow, profile: Profile | null, latest: Latest) {
   return {
     id: r.id,
     college: r.college.name,
@@ -259,7 +259,7 @@ function optionFacts(r: OptionRow, profile: Profile | null) {
     type: r.hospital?.type ? collegeTypeLabel[r.hospital.type.value] : null,
     course: courseName(r),
     quota: r.quota,
-    ...(profile && { reach: reachLabel(r.reach, LATEST_YEAR, PAST_YEARS) + (r.reachProvisional ? " (provisional)" : "") }),
+    ...(profile && { reach: reachLabel(r.reach, latest, PAST_YEARS) + (r.reachProvisional ? " (provisional)" : "") }),
     lastClosing: lastClosing(r),
     closings: yearRounds(r),
     seatsThisRound: seatsOf(r),
@@ -411,7 +411,7 @@ const handlers: Handlers = {
       hiddenClosedBefore: r.hiddenClosed,
       leftOutNotPublished: r.unknownTerms,
       seatLists: listNames(r.seatLists),
-      rows: r.rows.map((x) => ({ ...optionFacts(x, p), closings: yearRounds(x).slice(0, 3) })),
+      rows: r.rows.map((x) => ({ ...optionFacts(x, p, latestRound(m.sources)), closings: yearRounds(x).slice(0, 3) })),
       link: "/decide/options" + (r.view === "all" ? "?view=all" : ""),
       sources: ["MCC PG allotment results 2024-2026 (Seatora's import)", ...listNames(r.seatLists)],
     };
@@ -423,6 +423,7 @@ const handlers: Handlers = {
     if (!inst) fail("College not found.");
     const h = info.get(c.key);
     const pairs = i.course ? await coursesOf([i.course]) : null;
+    const latest = latestRound((await meta()).sources);
     const rows = pairs ? inst!.options.filter((o) => pairs.includes(`${o.course.degree}~${o.course.specialty}`)) : inst!.yours.length ? inst!.yours : inst!.options;
     return {
       college: c.name,
@@ -433,7 +434,7 @@ const handlers: Handlers = {
       beds: h?.beds ? `${h.beds.n}${h.beds.kind ? ` ${h.beds.kind}` : ""} (self-reported)` : null,
       allotmentsByYear: inst!.allotmentsByYear,
       coursesShown: pairs ? "asked course" : inst!.yours.length ? "her profile's courses" : "all courses",
-      options: rows.slice(0, MAX_ROWS).map((r) => optionFacts(r, profile)),
+      options: rows.slice(0, MAX_ROWS).map((r) => optionFacts(r, profile, latest)),
       moreOptions: Math.max(0, rows.length - MAX_ROWS),
       programmes: inst!.fees.map((t) => ({ programme: t.programme, ...terms({ fees: t }), sources: t.sources.map((s) => s.label) })),
       seatList: inst!.seatList?.name ?? null,
@@ -472,7 +473,7 @@ const handlers: Handlers = {
       seatLists: listNames(r.seatLists),
       optionsWithSeats: r.total,
       summary: r.summary,
-      rows: r.rows.map((x) => ({ id: x.id, college: x.college.name, state: x.college.state, course: courseName(x), quota: x.quota, seats: seatsOf(x), reach: reachLabel(x.reach, LATEST_YEAR, PAST_YEARS), lastClosing: lastClosing(x), link: instLink(x.college.slug, "seats") })),
+      rows: r.rows.map((x) => ({ id: x.id, college: x.college.name, state: x.college.state, course: courseName(x), quota: x.quota, seats: seatsOf(x), reach: reachLabel(x.reach, latestRound(m.sources), PAST_YEARS), lastClosing: lastClosing(x), link: instLink(x.college.slug, "seats") })),
       note: "Seat kinds overlap (a newly added seat is also in the clear vacancy list): never add them. Lists as MCC published them.",
       link: "/decide/seats",
     };
@@ -499,12 +500,13 @@ const handlers: Handlers = {
 
   async compare(i, { profile }) {
     const pairs = await coursesOf([i.course]);
+    const latest = latestRound((await meta()).sources);
     const out = await Promise.all(
       i.colleges.map(async (q) => {
         const c = await oneCollege(q);
         const inst = await getInstitute(c.slug, profile);
         const rows = (inst?.options ?? []).filter((o) => pairs.includes(`${o.course.degree}~${o.course.specialty}`));
-        return { college: c.name, slug: c.slug, state: c.state, options: rows.slice(0, 6).map((r) => optionFacts(r, profile)), note: rows.length ? undefined : "No option for this course here." };
+        return { college: c.name, slug: c.slug, state: c.state, options: rows.slice(0, 6).map((r) => optionFacts(r, profile, latest)), note: rows.length ? undefined : "No option for this course here." };
       }),
     );
     const ids = out.flatMap((x) => x.options.map((o) => o.id)).slice(0, 4);
@@ -737,7 +739,7 @@ const handlers: Handlers = {
         .filter((y) => y.b === b)
         .sort((a, z) => prio(a.x) - prio(z.x) || (b === "safe" ? deepest(a.x) - deepest(z.x) : deepest(z.x) - deepest(a.x)))
         .slice(0, caps[b])
-        .map((y) => ({ ...optionFacts(y.x, p), ref: refFor(known, y.x.id), id: undefined, closings: yearRounds(y.x).slice(0, 2), coursePriority: prio(y.x) + 1, link: undefined }));
+        .map((y) => ({ ...optionFacts(y.x, p, latestRound(m.sources)), ref: refFor(known, y.x.id), id: undefined, closings: yearRounds(y.x).slice(0, 2), coursePriority: prio(y.x) + 1, link: undefined }));
     return {
       for: { rank: p.rank, category: p.category, courses: i.courses, quotas: profileQuotas(p) },
       view: r.view,
@@ -761,7 +763,8 @@ const handlers: Handlers = {
     const { rows } = await choiceOptions(wanted, profile);
     const byId = new Map(rows.map((r) => [r.id, r]));
     const missing = [...refs.missing, ...wanted.filter((id) => !byId.has(id))];
-    const items: ChoiceItem[] = wanted.flatMap((id) => (byId.has(id) ? [toChoiceItem(byId.get(id)!)] : []));
+    const latest = latestRound((await meta()).sources);
+    const items: ChoiceItem[] = wanted.flatMap((id) => (byId.has(id) ? [toChoiceItem(byId.get(id)!, latest)] : []));
     if (!items.length) fail(`None of these name an option in the data: ${missing.slice(0, 5).join("; ")}. Use ids from draft_choice_list or exact college, course and quota.`);
     const name = i.listName?.trim() || "Ask Seatora plan";
     const listId = `ask-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "plan"}`;
@@ -791,11 +794,12 @@ const handlers: Handlers = {
     const refs = await refIds(i.choices, known);
     const { rows } = await choiceOptions([...new Set(refs.ids.filter((x): x is string => !!x))], p);
     const byId = new Map(rows.map((r) => [r.id, r]));
+    const latest = latestRound((await meta()).sources);
     const choices = i.choices.flatMap((c, n) => {
       const r = byId.get(refs.ids[n] ?? "");
       if (!r) return [];
       const t = terms(r);
-      return [{ college: r.college.name, state: r.college.state, slug: r.college.slug, course: courseName(r), quota: r.quota, reach: reachLabel(r.reach, LATEST_YEAR, PAST_YEARS), lastClosing: lastClosing(r), seats: seatsOf(r) ?? null, fee: t.fee, stipend: t.stipend, bond: t.bond, bondInr: t.bondInr, leaving: t.leaving, reason: c.reason }];
+      return [{ college: r.college.name, state: r.college.state, slug: r.college.slug, course: courseName(r), quota: r.quota, reach: reachLabel(r.reach, latest, PAST_YEARS), lastClosing: lastClosing(r), seats: seatsOf(r) ?? null, fee: t.fee, stipend: t.stipend, bond: t.bond, bondInr: t.bondInr, leaving: t.leaving, reason: c.reason }];
     });
     if (!choices.length && i.choices.length) fail("None of the choices name an option in the data. Use ids from draft_choice_list or exact college, course and quota.");
     const top = [...new Map(choices.map((c) => [c.slug, c])).values()].slice(0, 5);

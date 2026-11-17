@@ -61,8 +61,9 @@ export async function findCutoffs(cat: Catalog, q: CutoffQuery): Promise<Cutoff[
 
 /**
  * Reach-label inputs per option id: in her seat categories (all when omitted), the deepest closing of each past year
- * (the later one with its round and seat category) and of the latest year's R1. One row per option from SQL instead
- * of every cutoff (Options, Overview and Institutes label every option in her profile; only a page is built in full).
+ * (the later one with its round and seat category) and of each round of the latest year. One row per option from SQL
+ * instead of every cutoff (Options, Overview and Institutes label every option in her profile; only a page is built in
+ * full).
  */
 export async function findReachInputs(
   cat: Catalog,
@@ -78,15 +79,17 @@ export async function findReachInputs(
   if (q.cs?.length === 0) return new Map();
   // bx: the later year's deepest row as "closing|9-round position|round|category", so a plain MAX picks it (ties: the
   // earliest round, as deepestByYear does) without a sort (array_agg ORDER BY spilled to disk: 300 ms vs 50 ms).
-  // a, b: R1 to R3; as, bs: the stray rounds, which never make a label "reached" on their own (isStrayRound).
-  const rows = await db.$queryRaw<{ cs: string; q: string; a: number | null; b: number | null; as: number | null; bs: number | null; bx: string | null; c: number | null }[]>`
+  // a, b: R1 to R3; as, bs: the stray rounds, which never make a label "reached" on their own (isStrayRound). c0, c1…:
+  // the latest year's rounds (`rounds` order), each its own entry, so a label can leave its newest out (lib/reach.ts).
+  const latestCols = rounds.map((r, i) => Prisma.sql`MAX("closingRank") FILTER (WHERE "counsellingYear" = ${q.latestYear} AND round = ${r}) AS ${Prisma.raw(`c${i}`)}`);
+  const rows = await db.$queryRaw<({ cs: string; q: string; a: number | null; b: number | null; as: number | null; bs: number | null; bx: string | null } & Record<`c${number}`, number | null>)[]>`
     SELECT "collegeSpecialtyId" AS cs, quota AS q,
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y1} AND round <> ALL(${strayRounds})) AS a,
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y2} AND round <> ALL(${strayRounds})) AS b,
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y1} AND round = ANY(${strayRounds})) AS "as",
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y2} AND round = ANY(${strayRounds})) AS bs,
       MAX(lpad("closingRank"::text, 7, '0') || '|' || (9 - array_position(${sqlRounds}::text[], round)) || '|' || round || '|' || category) FILTER (WHERE "counsellingYear" = ${y2}) AS bx,
-      MAX("closingRank") FILTER (WHERE "counsellingYear" = ${q.latestYear} AND round = 'R1') AS c
+      ${Prisma.join(latestCols)}
     FROM "Cutoff"
     WHERE "counsellingYear" = ANY(${[y1, y2, q.latestYear]})
       ${q.categories ? Prisma.sql`AND category = ANY(${q.categories})` : Prisma.empty}
@@ -105,7 +108,7 @@ export async function findReachInputs(
     const at = { round: round as Round, category: category as Category };
     if (r.b != null) list.push({ year: y2, closing: r.b, ...(bx === r.b && !isStrayRound(at.round) && at) });
     if (r.bs != null) list.push({ year: y2, closing: r.bs, round: "stray", ...(bx === r.bs && isStrayRound(at.round) && at) });
-    if (r.c != null) list.push({ year: q.latestYear, round: "R1", closing: r.c });
+    for (const [i, x] of rounds.entries()) if (r[`c${i}`] != null) list.push({ year: q.latestYear, round: x, closing: r[`c${i}`]! });
     out.set(optionId({ ...pair, quota: r.q }), list);
   }
   return out;

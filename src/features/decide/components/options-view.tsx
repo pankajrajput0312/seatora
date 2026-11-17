@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { formatInrShort } from "../lib/format";
 import type { DecideLinks } from "../lib/links";
-import { LATER_ROUNDS_NOTE, LATEST_YEAR, PAST_YEARS, reachLabel, seatsBelowNotes, type Deepest } from "../lib/reach";
+import { LATER_ROUNDS_NOTE, PAST_YEARS, reachLabel, seatsBelowNotes, type Deepest, type Latest } from "../lib/reach";
 import type { ChoiceItem } from "../lib/choices";
 import type { OptionRow } from "../service";
 import { roundLabel, rounds, seatKindLabel, type Round, type SeatList, type Term } from "../types";
@@ -19,7 +19,7 @@ const notListed = ["terms", "feeText", "stipendText", "bondText", "penaltyText",
 export type ListRow = Omit<OptionRow, (typeof notListed)[number]>;
 export const listRow = (r: OptionRow) => Object.fromEntries(Object.entries(r).filter(([k]) => !(notListed as readonly string[]).includes(k))) as ListRow;
 
-/** The closing a card shows big: the newest with data (the latest R1 while the labels count it, else the later past year's deepest, then the older's, then a latest R1 the labels leave out); null when none. */
+/** The closing a card shows big: the newest with data (the latest year's while the labels count it, else the later past year's deepest, then the older's, then a latest year's the labels leave out); null when none. */
 export function cardClosing(r: Pick<OptionRow, "latest" | "byYear">, latestYear: number, [older, last]: [number, number], includeLatest: boolean): { d: Deepest; year: number } | null {
   if (includeLatest && r.latest) return { d: r.latest, year: latestYear };
   for (const year of [last, older]) if (r.byYear[year]) return { d: r.byYear[year]!, year };
@@ -27,10 +27,10 @@ export function cardClosing(r: Pick<OptionRow, "latest" | "byYear">, latestYear:
 }
 
 /** A snapshot for the choice list; Choices relabels it from the current data when her rank is known. */
-export function toChoiceItem(r: ListRow): ChoiceItem {
+export function toChoiceItem(r: ListRow, latest: Latest): ChoiceItem {
   return {
     id: r.id, institute: r.college.name, slug: r.college.slug, state: r.college.state, course: courseName(r), courseSlug: r.course.slug, quota: r.quota,
-    reachLabel: reachLabel(r.reach, LATEST_YEAR, PAST_YEARS), closedEveryRound: r.reach === "closed-before",
+    reachLabel: reachLabel(r.reach, latest, PAST_YEARS), closedEveryRound: r.reach === "closed-before",
   };
 }
 
@@ -65,8 +65,8 @@ export function SeatsCell({ r, list, L, n = r.seats, end = true }: { r: ListRow;
 }
 
 /** Under an option's label: the lists whose seats here are all on seat categories with another label (OptionRow.seatsBelow). */
-export function SeatsBelowNote({ r, includeLatest = true }: { r: Pick<OptionRow, "seatsBelow">; includeLatest?: boolean }) {
-  return seatsBelowNotes(r.seatsBelow ?? [], LATEST_YEAR, PAST_YEARS, includeLatest).map((t) => <span key={t} className="mt-1 block max-w-xs text-xs text-sun">{t}</span>);
+export function SeatsBelowNote({ r, latest, includeLatest = true }: { r: Pick<OptionRow, "seatsBelow">; latest: Latest; includeLatest?: boolean }) {
+  return seatsBelowNotes(r.seatsBelow ?? [], latest, PAST_YEARS, includeLatest).map((t) => <span key={t} className="mt-1 block max-w-xs text-xs text-sun">{t}</span>);
 }
 
 /** A closing rank with its round and seat category, marked Provisional when its MCC result is. */

@@ -11,7 +11,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { fmtDay, listDay } from "../../lib/format";
 import { useLocal } from "../../lib/local-store";
-import { LATER_ROUNDS_NOTE, LATEST_YEAR, PAST_YEARS, reachWindow } from "../../lib/reach";
+import { LATER_ROUNDS_NOTE, latestRound, PAST_YEARS, reachWindow } from "../../lib/reach";
 import { useDecideLinks } from "../../lib/use-decide-store";
 import { statKeys, statLabel } from "../../lib/stat-format";
 import { openQuotas, roundLabel, seatKindLabel, type Round, type SeatList, type Source } from "../../types";
@@ -164,6 +164,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   view: View;
 }) {
   const L = useDecideLinks();
+  const latest = latestRound(results);
   const cols = useMemo(() => matrixCols(groups, ranked, years), [groups, ranked, years]);
   const [hidden] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   const [open, setOpen] = useState<string | null>(null);
@@ -192,7 +193,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
       <ViewPanes
         page="seats"
         view={view}
-        cards={<SeatCards rows={rows} list={list} lists={lists} ranked={ranked} L={L} title={caption} onDetails={show} />}
+        cards={<SeatCards rows={rows} list={list} lists={lists} ranked={ranked} L={L} title={caption} onDetails={show} latest={latest} />}
         table={
           <ScrollTable id="seat-matrix" scope="seat-matrix" label={caption} scrollClassName="scroll-pl-44 md:scroll-pl-68">
             <table className={tbl.table}>
@@ -279,7 +280,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                       </td>
                       {ranked && (
                         <td data-col="chances" className={td}>
-                          {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : <span className="text-xs text-muted-foreground">{r.noLabel}</span>}
+                          {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} on={r.category} /> : <span className="text-xs text-muted-foreground">{r.noLabel}</span>}
                         </td>
                       )}
                       {years.map((y) =>
@@ -314,6 +315,7 @@ function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }
 }) {
   const L = useDecideLinks();
   const pdf = (year: number, round: Round) => results.find((s) => s.year === year && s.round === round);
+  const latest = latestRound(results);
   const lists = groups.flatMap((g) => [g.clear, g.virtual, ...g.added].filter((l): l is SeatList => !!l));
   const link = "underline hover:text-sky";
   return (
@@ -393,8 +395,8 @@ function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }
               {ranked && (
                 <section aria-labelledby="row-chances" className="grid gap-2">
                   <h3 id="row-chances" className="font-semibold">Your chances</h3>
-                  {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} on={r.category} /> : <p className="text-sm">{r.noLabel}.</p>}
-                  <p className="text-xs text-muted-foreground">Options&apos; label on this one seat category, counting {reachWindow(LATEST_YEAR, PAST_YEARS)} (every round). {HISTORY_CAPTION}</p>
+                  {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} on={r.category} /> : <p className="text-sm">{r.noLabel}.</p>}
+                  <p className="text-xs text-muted-foreground">Options&apos; label on this one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round). {HISTORY_CAPTION}</p>
                 </section>
               )}
 

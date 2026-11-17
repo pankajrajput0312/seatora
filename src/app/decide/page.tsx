@@ -17,7 +17,7 @@ import { fmtIST, nextChoiceFilling, nextDate, nextFilling, roundName, stepName, 
 import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { roundStatus } from "@/features/decide/server/notices";
 import { termValueLabel } from "@/features/decide/lib/term-filters";
-import { eligibleCategories, reachLabel, reachOrder, reachWindow, type Reach } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestRound, latestText, reachLabel, reachOrder, reachWindow, type Latest, type Reach } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { dashboard, getMeta, LATEST_YEAR, listOptions, PAST_YEARS, type StripPoint } from "@/features/decide/service";
 import { roundLabel } from "@/features/decide/types";
@@ -36,12 +36,12 @@ function At({ p }: { p: StripPoint | null }) {
 }
 
 /** "5 in 2026 R1, 12 in 2024 and 2025, 10 in 2024 or 2025": the reached total as Options' own label tabs, each a link to it. */
-function ReachedParts({ L, counts }: { L: ReturnType<typeof decideLinks>; counts: Record<Reach, number> }) {
+function ReachedParts({ L, counts, latest }: { L: ReturnType<typeof decideLinks>; counts: Record<Reach, number>; latest: Latest }) {
   const parts = (["reached-latest", "reached-both", "reached-one"] as const).filter((x) => counts[x] > 0);
   return parts.map((x, i) => (
     <Fragment key={x}>
       {i > 0 && ", "}
-      <Link href={L.options({ reach: x })} className={smallLink}><span className="numeric">{formatRank(counts[x])}</span> {reachLabel(x, LATEST_YEAR, PAST_YEARS).replace(/^Reached /, "")}</Link>
+      <Link href={L.options({ reach: x })} className={smallLink}><span className="numeric">{formatRank(counts[x])}</span> {reachLabel(x, latest, PAST_YEARS).replace(/^Reached /, "")}</Link>
     </Fragment>
   ));
 }
@@ -78,10 +78,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const labels = reachOrder.filter((x) => r.counts[x] > 0);
   const total = reachOrder.reduce((n, x) => n + r.counts[x], 0);
   const reached = r.counts["reached-latest"] + r.counts["reached-both"] + r.counts["reached-one"];
-  const latestR1 = meta.sources.find((s) => s.year === LATEST_YEAR && s.round === "R1");
+  const latest = latestRound(meta.sources);
   const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
-  const counted = reachWindow(LATEST_YEAR, PAST_YEARS);
-  const labelSources = <DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR, round: "R1" }]} />;
+  const counted = reachWindow(latest, PAST_YEARS);
+  const labelSources = <DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR }]} />;
   // Her fee / bond caps leave out options whose figure is not declared (in words only, or missing): say so, with the way back.
   const caps = [profile.maxFeeLakh != null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && termValueLabel.bondyrs(profile.maxBondYears)].flatMap((c) => (c ? [c[0].toLowerCase() + c.slice(1)] : [])).join(", ");
   const leftOut = r.unknownTerms > 0 ? ` Your caps (${caps}) leave out ${formatRank(r.unknownTerms)} more without a published figure (in words only, or none published).` : "";
@@ -118,7 +118,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               <span className="numeric">{formatRank(total)}</span> {list ? "options with seats in MCC's latest seat lists, in your courses" : "options in your profile"};{" "}
               {/* The parts are Options' own label tabs, so each number is one she can open there. */}
               <span className="numeric">{formatRank(reached)}</span> reached your rank in a past round
-              {reached > 0 && <>{" "}(<ReachedParts L={L} counts={r.counts} />)</>}.
+              {reached > 0 && <>{" "}(<ReachedParts L={L} counts={r.counts} latest={latest} />)</>}.
             </p>
             <Button asChild size="lg" className="mt-3 min-h-11 max-sm:w-full"><Link href={L.options()}>Open Options</Link></Button>
           </>
@@ -159,12 +159,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 },
             {
               label: "Reached your rank in a past round",
-              info: `Options whose closing rank reached yours in at least one of R1 to R3 of ${counted}. Stray rounds don't count here: an option reached only there is labelled "${reachLabel("stray-only", LATEST_YEAR, PAST_YEARS)}".`,
+              info: `Options whose closing rank reached yours in at least one of R1 to R3 of ${counted}. Stray rounds don't count here: an option reached only there is labelled "${reachLabel("stray-only", latest, PAST_YEARS)}".`,
               value: <span className="font-mono">{formatRank(reached)}</span>,
               note: (
                 <span className="inline-flex flex-wrap items-center gap-x-1.5">
-                  <Link href={L.options({ reach: "reached-latest" })} className={smallLink}>{formatRank(r.counts["reached-latest"])} in {LATEST_YEAR} R1</Link>
-                  <Provisional when={latestR1?.provisional} />
+                  <Link href={L.options({ reach: "reached-latest" })} className={smallLink}>{formatRank(r.counts["reached-latest"])} in {latestText(latest)}</Link>
+                  <Provisional when={latest.provisional} />
                 </span>
               ),
             },
@@ -194,11 +194,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             table={
               <table className="w-full text-sm">
                 <caption className="sr-only">Options by label</caption>
-                <tbody>{labels.map((x) => <tr key={x} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{reachLabel(x, LATEST_YEAR, PAST_YEARS)}</th><td className="numeric text-right">{formatRank(r.counts[x])}</td></tr>)}</tbody>
+                <tbody>{labels.map((x) => <tr key={x} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{reachLabel(x, latest, PAST_YEARS)}</th><td className="numeric text-right">{formatRank(r.counts[x])}</td></tr>)}</tbody>
               </table>
             }
           >
-            <LabelBars rows={labels.map((x) => ({ label: reachLabel(x, LATEST_YEAR, PAST_YEARS), count: r.counts[x], href: L.options({ reach: x }), accent: x.startsWith("reached") }))} />
+            <LabelBars rows={labels.map((x) => ({ label: reachLabel(x, latest, PAST_YEARS), count: r.counts[x], href: L.options({ reach: x }), accent: x.startsWith("reached") }))} />
           </ChartCard>
         ) : (
           <EmptyState

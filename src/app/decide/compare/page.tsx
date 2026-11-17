@@ -16,7 +16,7 @@ import { EmptyState, smallLink, tbl } from "@/features/decide/components/ui";
 import { MAX_COMPARE } from "@/features/decide/lib/choices";
 import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams } from "@/features/decide/lib/params";
-import { deepestOf, eligibleCategories, LATER_ROUNDS_NOTE } from "@/features/decide/lib/reach";
+import { deepestOf, eligibleCategories, LATER_ROUNDS_NOTE, latestRound, latestText } from "@/features/decide/lib/reach";
 import { inrFull } from "@/features/decide/lib/stat-format";
 import { lowestRisk } from "@/features/decide/lib/term-filters";
 import { roundLabel, rounds, seatKindLabel, type SeatList } from "@/features/decide/types";
@@ -24,7 +24,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { statCells, statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { Paywall } from "@/features/plans/components/paywall";
 import { currentPlan } from "@/features/plans/usage";
-import { currentOptionIds, currentSeatLists, getMeta, getOptionsByIds, LATEST_YEAR, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
+import { currentOptionIds, currentSeatLists, getMeta, getOptionsByIds, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 
 export const metadata: Metadata = { title: "Compare" };
@@ -99,6 +99,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
   const risk = options.length > 1 && lowestRisk(options.map((r) => ({ name: r.college.name, t: r.fees })));
   const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
+  const latest = latestRound(meta.sources);
   const [older, last] = PAST_YEARS;
   // Each option's stat cells (statKeys order), one per row.
   const terms = new Map(options.map((r) => [r.id, statCells(r.fees)]));
@@ -111,7 +112,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       label: "Your reach",
       cell: (r) =>
         profile ? (
-          <ReachBadge reach={r.reach} provisional={r.reachProvisional} />
+          <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} />
         ) : (
           <Link href={L.with("/decide/compare", { editProfile: "1" })} className={`${smallLink} text-sky`}>Set your rank to see</Link>
         ),
@@ -131,7 +132,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       : []),
     ...statKeys.map((k, i) => ({ label: statLabel[k], cell: (r: OptionRow) => <StatCellView c={terms.get(r.id)![i]} t={r.fees} of={`${r.college.name}, ${courseName(r)}, ${r.quota}`} wrap /> })),
     { label: "If you leave", cell: (r: OptionRow) => <IfYouLeave r={r} leaving={terms.get(r.id)!.find((c) => c.key === "leaving")!.full} /> },
-    { label: `${LATEST_YEAR} R1 closing`, cell: (r) => <ClosingCell d={r.latest} /> },
+    { label: `${latestText(latest)} closing`, cell: (r) => <ClosingCell d={r.latest} /> },
     { label: `${last} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[last]} /> },
     { label: `${older} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[older]} /> },
     { label: "Closing by year and round", cell: (r) => <YearLines r={r} /> },

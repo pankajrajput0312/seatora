@@ -18,7 +18,7 @@ const row = {
 } as unknown as OptionRow;
 
 it("one seats column per list (never added) and the seat category note, quoted text, formulas defused, — for missing, BOM and sources", () => {
-  const csv = optionsCsv([row], { lists: [list("clear"), list("virtual"), list("new")], includeLatest: true, notes: ["History, not a prediction."], sources: [{ name: "Result", url: null }] });
+  const csv = optionsCsv([row], { lists: [list("clear"), list("virtual"), list("new")], latest: { year: 2026, round: "R1" }, includeLatest: true, notes: ["History, not a prediction."], sources: [{ name: "Result", url: null }] });
   expect(csv.startsWith("\uFEFF")).toBe(true);
   const [head, line, blank, ...rest] = csv.slice(1).split("\r\n");
   expect(head).toContain('"2026 R2 clear vacancy seats","2026 R2 virtual vacancy seats","2026 R2 newly added seats","Seat category note"');

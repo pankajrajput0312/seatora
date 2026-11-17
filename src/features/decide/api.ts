@@ -22,7 +22,7 @@ export const optionsQuerySchema = pageSchema.extend({
   reach: z.array(z.enum(reachOrder)).default([]),
   /** Options that closed before her rank: shown (1) or hidden (0); absent = the view's default (round: shown, all: hidden). */
   showClosed: bool.optional(),
-  /** "0" leaves the provisional 2026 R1 out of the reach labels. */
+  /** "0" leaves the provisional latest round (lib/reach.ts latestRound) out of the reach labels. */
   prov: bool.default(true),
   /**
    * Seats in the newest round's lists: 1/true (the clear vacancy list) or one kind (clear, virtual, new), "any" list, or
