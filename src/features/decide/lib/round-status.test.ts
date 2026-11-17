@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoundStepInfo } from "../types";
-import { currentSteps, dueToday, fillWindow, fmtIST, fmtNote, nextChoiceFilling, nextFilling, statusNow, stepsNow } from "./round-status";
+import { badgeOf, currentSteps, dueToday, fillWindow, fmtIST, fmtNote, nextChoiceFilling, nextFilling, statusNow, stepsNow } from "./round-status";
 
 // 2026 R2 as round_status.json gives it (as of 14 Nov 2026 17:27 IST).
 const choice = { status: "open", scheduled: { from: "2026-11-10T13:00:00+05:30", to: "2026-11-15T23:55:00+05:30", on: null, tentative: false } } as const;
@@ -67,4 +67,12 @@ it("banner: open steps now, then the earliest upcoming date", () => {
   // The next-step card's round: R2 filling while open, then R3's once R2 closed, never a closed one.
   const filling = (now: string) => { const s = nextFilling(stepsNow(rs, at(now))); return s && `${s.round} ${s.now}`; };
   expect([filling("2026-11-14T17:27:28+05:30"), filling("2026-11-16T09:00:00+05:30"), filling("2026-11-28T09:00:00+05:30"), filling("2026-12-03T09:00:00+05:30")]).toEqual(["R2 open", "R3 upcoming", "R3 open", null]);
+});
+
+describe("badgeOf", () => {
+  it("a held result is On hold; suspended choice filling stays Suspended", () => {
+    expect(badgeOf({ step: "final_result", now: "suspended" }).text).toBe("On hold");
+    expect(badgeOf({ step: "choice_filling", now: "suspended" }).text).toBe("Suspended");
+    expect(badgeOf({ step: "final_result", now: "upcoming" }).text).toBe("Upcoming");
+  });
 });

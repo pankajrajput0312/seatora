@@ -16,7 +16,7 @@ import { ActiveFilters, EmptyState, Field, FilterBar, Pager, rangeLabel, Select,
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { LATEST_YEAR } from "@/features/decide/lib/reach";
-import { clockNote, fmtIST, fmtNote, roundName, statusBadge, stepName, stepsNow, type StepNow } from "@/features/decide/lib/round-status";
+import { badgeOf, clockNote, fmtIST, fmtNote, roundName, stepName, stepsNow, type StepNow } from "@/features/decide/lib/round-status";
 import { toURLSearchParams } from "@/features/decide/profile";
 import { meritLists } from "@/features/decide/server/merit";
 import { listNotices, roundStatus } from "@/features/decide/server/notices";
@@ -114,7 +114,7 @@ function Step({ s }: { s: StepNow }) {
   return (
     <li className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 border-b border-border px-4 py-3 last:border-0 md:grid-cols-[11rem_8rem_1fr]">
       <span className="font-medium">{stepName[s.step]}</span>
-      <span><Badge tone={statusBadge[s.now].tone}>{statusBadge[s.now].text}</Badge></span>
+      <span><Badge tone={badgeOf(s).tone}>{badgeOf(s).text}</Badge></span>
       <div className="col-span-2 grid gap-0.5 text-sm md:col-span-1">
         {(dates || s.now !== "done") && (
           <p>

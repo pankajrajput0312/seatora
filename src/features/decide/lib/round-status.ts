@@ -13,6 +13,10 @@ export const statusBadge: Record<StepStatus, { text: string; tone: "neutral" | "
   unknown: { text: "Not confirmed", tone: "warning" },
 };
 
+/** A step's badge: MCC suspends choice filling but holds a result (17 Nov 2026: the Round 2 result, by court order). */
+export const badgeOf = (s: { step: RoundStepName; now: StepStatus }) =>
+  s.now === "suspended" && s.step.endsWith("_result") ? { text: "On hold", tone: statusBadge.suspended.tone } : statusBadge[s.now];
+
 /** A schedule value as printed: an IST date-time, or a bare date (its start, or with `end` its last second, in IST). */
 export const instant = (v: string, end = false) => new Date(v.length === 10 ? `${v}T${end ? "23:59:59" : "00:00:00"}+05:30` : v);
 const fmt = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", ...o });
