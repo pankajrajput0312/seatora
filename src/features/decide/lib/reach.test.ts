@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cutoff, Round } from "../types";
-import { buildGrid, classifyReach, deepestByYear, deepestOf, deepestText, eligibleCategories, reachEvidence, reachLabel, resultsSpan, seatsBelow, seatsBelowNotes } from "./reach";
+import { bestClosing, buildGrid, classifyReach, deepestByYear, deepestOf, deepestText, eligibleCategories, reachEvidence, reachLabel, resultsSpan, seatsBelow, seatsBelowNotes } from "./reach";
 
 const c = (year: number, round: Round, closing: number, category: Cutoff["category"] = "Open"): Cutoff => ({
   college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY", year, round, quota: "All India", category,
@@ -134,5 +134,16 @@ describe("deepest closing: one definition on every screen", () => {
   });
   it("ties keep the earliest round", () => {
     expect(deepestOf([c(2025, "R2", 500), c(2025, "R3", 500)])).toMatchObject({ round: "R2" });
+  });
+});
+
+describe("bestClosing (Last ranks' closing-rank filter)", () => {
+  const grid = { 2024: { R1: { closing: 30_000 }, R3: { closing: 47_000 } }, 2025: { R1: { closing: 41_000 }, R2: undefined } };
+  it("gives the deepest closing in range, from a year, or -1", () => {
+    expect(bestClosing(grid, { min: 44_238 })).toBe(47_000); // her rank would have got it in 2024 R3
+    expect(bestClosing(grid, { min: 44_238, since: 2025 })).toBe(-1);
+    expect(bestClosing(grid, { min: 39_814, max: 48_662 })).toBe(47_000);
+    expect(bestClosing(grid, { max: 35_000 })).toBe(30_000);
+    expect(bestClosing(grid, {})).toBe(47_000);
   });
 });

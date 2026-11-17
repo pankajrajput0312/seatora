@@ -46,8 +46,18 @@ const schema = z.object({
   sort: z.string().regex(new RegExp(`^\\d{4}-(${rounds.join("|")})$`)).optional(),
   dir: z.enum(["asc", "desc"]).default("desc"),
   since: z.coerce.number().int().optional(),
+  /** Closing rank against her AIR: "reached" (at or after it), "near" (within 10% either side). */
+  rk: z.enum(["reached", "near"]).optional(),
+  /** A closing-rank range typed in ("40,000"); either end may be open. Wins over rk. */
+  rmin: z.string().max(12).optional(),
+  rmax: z.string().max(12).optional(),
   page: pageValue.optional(),
 });
+
+const rankNumber = (v?: string) => {
+  const n = Number((v ?? "").replace(/[^\d]/g, ""));
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+};
 
 type Col = { year: number; rounds: Round[]; provisional: boolean };
 
@@ -144,7 +154,14 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const [sortYear, sortRound] = f.sort?.split("-") ?? [];
   const sort = f.sort ? { year: Number(sortYear), round: sortRound as Round, dir: f.dir } : undefined;
   const filtered = anyTermFilter(tp.filters);
-  const base = { courses: courses.map((c) => ({ degree: c.degree, specialty: c.specialty })), category, quotas, search: f.q, sort };
+  // The closing-rank filter: a typed range, else her rank's preset (the profile's AIR).
+  const myRank = profile?.rank;
+  const rmin = rankNumber(f.rmin), rmax = rankNumber(f.rmax);
+  const closing = rmin || rmax ? { min: rmin, max: rmax } : myRank && f.rk === "reached" ? { min: myRank } : myRank && f.rk === "near" ? { min: Math.round(myRank * 0.9), max: Math.round(myRank * 1.1) } : undefined;
+  const closingLabel = !closing ? null
+    : rmin || rmax ? `Closing ${rmin && rmax ? `${formatRank(rmin)}–${formatRank(rmax)}` : rmin ? `${formatRank(rmin)} or later` : `up to ${formatRank(rmax!)}`}`
+    : f.rk === "reached" ? `Would have got AIR ${formatRank(myRank!)}` : `Near AIR ${formatRank(myRank!)} (±10%)`;
+  const base = { courses: courses.map((c) => ({ degree: c.degree, specialty: c.specialty })), category, quotas, search: f.q, sort, closing: closing && { ...closing, since: f.since } };
   const [lr, all, inst, info, view] = await Promise.all([
     lastRanks({ ...base, terms: tp.filters }),
     // A term filter set: every row as well, to count those left out only for a value not declared (as Rank scan), and
@@ -177,6 +194,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const mcc = (r: OptionRow) => info.get(r.college.key)?.mccProfileUrl;
   const chips = [
     ...(f.q ? [{ label: `Search: “${f.q}”`, param: "q", href: L.with(LR, { q: null, page: null }) }] : []),
+    ...(closingLabel ? [{ label: closingLabel, param: "rk", href: L.with(LR, { rk: null, rmin: null, rmax: null, page: null }) }] : []),
     ...cf.chips((v) => L.with(LR, { course: v, page: null }), (s) => L.without(LR, "course", s)).filter((c) => c.label !== "All courses"),
     ...(quota ? [{ label: quota, param: "lquota", href: L.with(LR, { lquota: null, page: null }) }] : allQuotas ? [{ label: "All quotas", param: "lquota", href: L.with(LR, { lquota: null, page: null }) }] : quotas ? [{ label: `Your quotas (${quotas.join(", ")})`, param: "lquota", href: L.with(LR, { lquota: "all", page: null }) }] : []),
     // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
@@ -184,7 +202,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
     ...(profile?.maxBondYears != null && tp.params.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: L.with("/decide/last-ranks", { bondyrs: "any", page: null }) }] : []),
     ...termChips(tp.params).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/last-ranks", c.key, c.value) : L.with("/decide/last-ranks", { [c.key]: null, page: null }) })),
   ];
-  const clear = L.with("/decide/last-ranks", { q: null, course: null, lquota: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
+  const clear = L.with("/decide/last-ranks", { q: null, rk: null, rmin: null, rmax: null, course: null, lquota: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
   const about = (
     <>
       Closing = the highest All India Rank allotted that round on a {category} seat. Brackets = allotments made that round
@@ -292,6 +310,13 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         <FilterDropdown label="Course" name="course" search options={cf.choices.filter((c) => c.value !== "all")} selected={cf.typed} none={cf.mine.length ? `Your courses (${cf.mine.length})` : `${course.degree} ${course.name}`} info={cf.mine.length ? "None ticked means your courses." : undefined} />
         <Field label="Seat category"><Select name="lcat" value={category} options={categories.map((c) => ({ value: c, label: c }))} /></Field>
         <Field label="Quota"><Select name="lquota" value={f.lquota} all={profile ? `Your quotas (${profileQuotas(profile).join(", ")})` : "All quotas"} options={[...(profile ? [{ value: "all", label: "All quotas" }] : []), ...meta.quotas.map((q) => ({ value: q, label: q }))]} /></Field>
+        {myRank != null && (
+          <Field label="Your rank">
+            <Select name="rk" value={f.rk} all="Any closing rank" options={[{ value: "reached", label: `Would have got AIR ${formatRank(myRank)}` }, { value: "near", label: `Near AIR ${formatRank(myRank)} (±10%)` }]} />
+          </Field>
+        )}
+        <Field label="Closing rank from"><input name="rmin" inputMode="numeric" defaultValue={f.rmin ?? ""} placeholder="e.g. 40,000" className={`${control} numeric`} /></Field>
+        <Field label="Closing rank to"><input name="rmax" inputMode="numeric" defaultValue={f.rmax ?? ""} placeholder="e.g. 60,000" className={`${control} numeric`} /></Field>
         <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
         <TermFilterControls f={tp.params} caps={profile} />
       </FilterBar>
@@ -343,7 +368,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       )}
 
       {lr.total === 0 ? (
-        <EmptyState title={filtered && all?.total ? "No options match these filters" : `No ${category}-seat closings for ${courseLabel}, ${quotaLabel}${f.q ? `, “${f.q}”` : ""}`} description="Try another seat category, quota, search or filter." href={L.to("/decide/last-ranks", { lquota: "all", maxfee: "any", bondyrs: "any" })} />
+        <EmptyState title={closing ? "No seats closed in this rank range" : filtered && all?.total ? "No options match these filters" : `No ${category}-seat closings for ${courseLabel}, ${quotaLabel}${f.q ? `, “${f.q}”` : ""}`} description="Try another seat category, quota, search or filter." href={L.to("/decide/last-ranks", { lquota: "all", maxfee: "any", bondyrs: "any" })} />
       ) : (
         <ViewPanes
           page={VIEW}

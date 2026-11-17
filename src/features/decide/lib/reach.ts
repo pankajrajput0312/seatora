@@ -228,3 +228,15 @@ export const reachTone: Record<Reach, "info" | "neutral" | "warning"> = {
   "no-data": "neutral",
   new: "neutral",
 };
+
+/**
+ * Last ranks' closing-rank filter: a row's deepest closing between `min` and `max` (either open), counting rounds from
+ * year `since`; -1 when none is in range.
+ */
+export function bestClosing(grid: Record<number, Partial<Record<Round, { closing: number } | undefined>>>, cl: { min?: number; max?: number; since?: number }) {
+  const inRange = Object.entries(grid)
+    .filter(([y]) => !cl.since || Number(y) >= cl.since)
+    .flatMap(([, g]) => Object.values(g).map((c) => c?.closing ?? -1))
+    .filter((x) => x >= 0 && (!cl.min || x >= cl.min) && (!cl.max || x <= cl.max));
+  return Math.max(-1, ...inRange);
+}

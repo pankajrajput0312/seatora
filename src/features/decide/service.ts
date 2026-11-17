@@ -5,7 +5,7 @@ import { hospitalInfo, type HospitalInfo } from "./components/institute/institut
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
 import { searchMatcher } from "./lib/college-aliases";
 import { anyTermFilter, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
-import { buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
+import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { pairKey, profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
@@ -599,6 +599,8 @@ const namedPrev = (cat: Catalog, p: Allotment["prev"]) => p && { ...p, ...seatNa
 export type LastRanksFilters = {
   degree?: string; specialty?: string; courses?: { degree: string; specialty: string }[]; category?: string; quota?: string; quotas?: string[]; search?: string;
   years?: number[]; sort?: { year: number; round: Round; dir: "asc" | "desc" }; terms?: TermFilters;
+  /** Only options with some round (from year `since`) closing between `min` and `max` (either may be open). */
+  closing?: { min?: number; max?: number; since?: number };
 };
 
 /**
@@ -628,12 +630,19 @@ export async function lastRanks(f: LastRanksFilters, pg?: PageQuery) {
     rounds: rounds.filter((rd) => rows.some((r) => r.grid[year]?.[rd])),
     provisional: rows.some((r) => Object.values(r.grid[year] ?? {}).some((c) => c?.provisional)),
   }));
+  const empty = built.length - rows.length;
+  // The closing-rank filter: a row's best closing in the range (-1: none), so the best chances come first unless sorted.
+  const cl = f.closing;
+  const ranged = !!(cl?.min || cl?.max);
+  const best = (r: OptionRow) => bestClosing(r.grid, cl ?? {});
+  if (ranged) rows = rows.filter((r) => best(r) >= 0);
   const s = f.sort;
   if (s) {
     const v = (x: OptionRow) => x.grid[s.year]?.[s.round]?.closing ?? (s.dir === "asc" ? Infinity : -1);
     rows = rows.sort((a, b) => (s.dir === "asc" ? v(a) - v(b) : v(b) - v(a)));
-  } else rows = rows.sort((a, b) => a.college.name.localeCompare(b.college.name));
-  return { ...paged(rows, pg), empty: built.length - rows.length, columns };
+  } else if (ranged) rows = rows.sort((a, b) => best(b) - best(a));
+  else rows = rows.sort((a, b) => a.college.name.localeCompare(b.college.name));
+  return { ...paged(rows, pg), empty, columns };
 }
 
 /**
