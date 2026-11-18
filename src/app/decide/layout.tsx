@@ -19,6 +19,7 @@ import { deviceView } from "@/features/decide/components/view-toggle";
 import { nextChoiceFilling, roundName, stepsNow } from "@/features/decide/lib/round-status";
 import { roundStatus } from "@/features/decide/server/notices";
 import { getMeta, LATEST_YEAR } from "@/features/decide/service";
+import { activeExam } from "@/features/exams/active";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { PlanPrompt } from "@/features/plans/components/plan-prompt";
 import { freeNow, passState, planLine, shortDate } from "@/features/plans/plans";
@@ -42,8 +43,10 @@ export const viewport: Viewport = { themeColor: "#f3f6f9", viewportFit: "cover" 
 export default async function DecideLayout({ children }: { children: React.ReactNode }) {
   // No database (or it is down): an honest "Data unavailable" inside the app shell, never stand-in data.
   let meta: ProfileMeta | null = null;
+  // NEET PG for everyone but staff, who may pick another exam (features/exams/active.tsx).
+  const exam = await activeExam();
   try {
-    const m = await getMeta();
+    const m = await getMeta(exam);
     meta = { courses: m.courses, specialties: m.specialties, degrees: m.degrees, quotas: m.quotas, states: m.states };
   } catch (e) {
     unstable_rethrow(e); // the sign-in redirect when access is gone
@@ -55,7 +58,7 @@ export default async function DecideLayout({ children }: { children: React.React
   // Ask Seatora's nav entry: only for the owner while ASK_ENABLED=1 (no database read otherwise).
   const ask = !!meta && (await askUser().catch(() => null)) != null;
   // Her first choice list's name: the round she fills next (MCC's schedule, as Choices names it).
-  const rs = meta ? await roundStatus(LATEST_YEAR).catch(() => null) : null;
+  const rs = meta ? await roundStatus(LATEST_YEAR, exam).catch(() => null) : null;
   const fill = rs && nextChoiceFilling(stepsNow(rs, new Date()));
   const listName = fill ? `${roundName[fill.round]} · ${rs.year}` : null;
   // Admin's nav entry: only for an owner or admin.
@@ -74,7 +77,7 @@ export default async function DecideLayout({ children }: { children: React.React
   return (
     <div className={`app ${app.variable} ${mono.variable} min-h-screen`}>
       <AstryxProvider>
-        <DecideShell phone={phone} ask={ask} admin={admin} account={account} listName={listName} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
+        <DecideShell phone={phone} ask={ask} admin={admin} exam={admin ? exam : undefined} account={account} listName={listName} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (
             <NavPending>{children}</NavPending>
           ) : (

@@ -21,6 +21,7 @@ import { eligibleCategories, latestRound, latestText, reachLabel, reachOrder, re
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { dashboard, getMeta, LATEST_YEAR, listOptions, PAST_YEARS, type StripPoint } from "@/features/decide/service";
 import { roundLabel } from "@/features/decide/types";
+import { activeExam } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -71,7 +72,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     );
 
   // pageSize 1: only the counts and the round summary are used, not the rows.
-  const [d, meta, r, rs] = await Promise.all([dashboard(profile), getMeta(), listOptions(profile, {}, { page: 1, pageSize: 1 }), roundStatus(LATEST_YEAR)]);
+  const exam = await activeExam();
+  const [d, meta, r, rs] = await Promise.all([dashboard(profile, exam), getMeta(exam), listOptions(profile, {}, { page: 1, pageSize: 1 }, exam), roundStatus(LATEST_YEAR, exam)]);
   const L = decideLinks(params);
   const list = r.view === "round" ? r.seatLists[0] : undefined;
   const roundWords = list && roundName[list.round];

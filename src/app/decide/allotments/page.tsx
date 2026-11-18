@@ -26,6 +26,8 @@ import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { roundLabel, rounds } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
+import { examGate } from "@/features/exams/active";
+import { activeExam } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Allotments" };
 const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
@@ -58,10 +60,12 @@ const about = (
 );
 
 export default async function AllotmentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const gated = await examGate("/decide/allotments");
+  if (gated) return gated;
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
   const pageSize = await pageSizeFor(PAGE_SIZE);
-  const [v, view] = await Promise.all([allotmentsView(params, pageSize), chosenView(params, "allotments")]);
+  const [v, view] = await Promise.all([allotmentsView(params, pageSize, await activeExam()), chosenView(params, "allotments")]);
   if (!v) notFound();
   const { f, meta, inst, typed, rankError, latest, fromProfile, filters } = v;
   const { rows, total, page, unknownTerms } = v.r;

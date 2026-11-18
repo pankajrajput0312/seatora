@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Building2, ChevronRight, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
+import { activeExam } from "@/features/exams/active";
+import { exams } from "@/features/exams/registry";
 import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import { PLANS } from "@/features/payments/plans";
 import { limitLine, passView } from "@/features/plans/components/plan-cards";
@@ -75,6 +77,7 @@ export function ToolGroups({ L }: { L: DecideLinks }) {
 
 /** The Residents card, compact, with the Season Pass box beside it (under it on phones). */
 export async function ResidentsPromo({ L }: { L: DecideLinks }) {
+  if (!exams[await activeExam()].has.residents) return null;
   const free = freeNow();
   const { state, got, invite } = await passView(); // what the plan cards say: her pass, or her invite's price
   const list = PLANS.season_pass.amount;

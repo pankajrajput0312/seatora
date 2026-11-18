@@ -26,6 +26,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { latestRound } from "@/features/decide/lib/reach";
 import { getMeta, LATEST_YEAR, listInstitutes, PAST_YEARS } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
+import { activeExam } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Institutes" };
 const PAGE_SIZE = 24; // splits evenly into 2, 3 and 4 columns; small enough for a phone to paint fast
@@ -51,13 +52,14 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const f = parseSearchParams(schema, params, ["state", "course"]);
   const { params: tp, filters: tf } = readTermFilters(params, profile);
   const pg = { page: f.page, pageSize: PAGE_SIZE };
-  const [meta, info, byTerms, view] = await Promise.all([getMeta(), hospitalInfo(), institutesByTerms(tf, f.course), chosenView(params, "institutes")]);
+  const exam = await activeExam();
+  const [meta, info, byTerms, view] = await Promise.all([getMeta(exam), hospitalInfo(exam), institutesByTerms(tf, f.course, exam), chosenView(params, "institutes")]);
   const latest = latestRound(meta.sources);
   // Term filters and the beds sort narrow and order the list before it is paged, so reach is read for one page only.
   const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort, only: byTerms?.pass, bedsOf: (key: string) => info.get(key)?.beds?.n };
   const [res, unknown] = await Promise.all([
-    listInstitutes(profile, filters, pg),
-    byTerms ? listInstitutes(null, { ...filters, only: byTerms.unknown }, { page: 1, pageSize: 1 }).then((r) => r.total) : 0,
+    listInstitutes(profile, filters, pg, exam),
+    byTerms ? listInstitutes(null, { ...filters, only: byTerms.unknown }, { page: 1, pageSize: 1 }, exam).then((r) => r.total) : 0,
   ]);
 
   const courseLabel = (slug: string) => {

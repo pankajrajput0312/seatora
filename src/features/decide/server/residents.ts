@@ -1,6 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import { getCurrentUser, hasSiteAccess } from "@/features/auth/lib/session";
+import { DEFAULT_EXAM } from "@/features/exams/keys";
 import { deviceAid } from "@/features/funnel/service";
 import { checkAndCount } from "@/features/plans/usage";
 import { db } from "@/lib/db";
@@ -45,7 +46,7 @@ export async function listResidents(collegeKey: string, f: { course?: string; ye
   ]);
   const rows: Resident[] = found.map(({ specialty: s, ...r }) => ({ ...r, course: { degree: s.degree, specialty: s.code ?? "", name: s.name, slug: s.slug } }));
   const sources = await db.dataSource.findMany({
-    where: { key: { in: [...new Set(rows.flatMap((r) => (r.rankBasis ? [r.sourceKey, r.rankBasis] : [r.sourceKey])))] } },
+    where: { exam: DEFAULT_EXAM, key: { in: [...new Set(rows.flatMap((r) => (r.rankBasis ? [r.sourceKey, r.rankBasis] : [r.sourceKey])))] } },
     select: { key: true, name: true, url: true, counsellingYear: true },
     orderBy: { key: "desc" },
   });

@@ -23,6 +23,7 @@ import { currentPlan } from "@/features/plans/usage";
 import { getDecideData, getMeta } from "@/features/decide/service";
 import { hideResidentAction } from "../institutes/[slug]/actions";
 import { iniCetIn } from "@/features/decide/lib/college-aliases";
+import { examGate } from "@/features/exams/active";
 import { countResidents, findResidentColleges, findResidentNames, listResidentColleges } from "./actions";
 
 // People's names: never indexed.
@@ -35,6 +36,8 @@ const sorts = [
 ] satisfies { value: ResidentsQuery["sort"]; label: string }[];
 
 export default async function ResidentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const gated = await examGate("/decide/residents");
+  if (gated) return gated;
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
   const here = (changes: Record<string, string | null>) => L.with("/decide/residents", { page: null, ...changes });

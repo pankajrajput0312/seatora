@@ -1,0 +1,14 @@
+[
+ {
+  "degree": "DM",
+  "specialty": "CARDIOLOGY",
+  "name": "Cardiology",
+  "slug": "dm-cardiology"
+ },
+ {
+  "degree": "MCh",
+  "specialty": "NEUROSURGERY",
+  "name": "Neuro Surgery",
+  "slug": "mch-neuro-surgery"
+ }
+]

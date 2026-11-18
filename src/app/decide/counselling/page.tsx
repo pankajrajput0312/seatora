@@ -21,6 +21,7 @@ import { toURLSearchParams } from "@/features/decide/profile";
 import { meritLists } from "@/features/decide/server/merit";
 import { listNotices, roundStatus } from "@/features/decide/server/notices";
 import { noticeKinds, type NoticeKind } from "@/features/decide/types";
+import { examGate } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Counselling" };
 const PAGE_SIZE = 50;
@@ -46,6 +47,8 @@ const mccSite = (text: string) => (
 );
 
 export default async function CounsellingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const gated = await examGate("/decide/counselling");
+  if (gated) return gated;
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);

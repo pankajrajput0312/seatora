@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import { pageValue, parseSearchParams, rankValue } from "../../lib/params";
 import { anyTermFilter, feeValue, termFilterLists, termFilters, termFilterShape } from "../../lib/term-filters";
 import { profileFromParams, profileHasCourse } from "../../profile";
@@ -48,9 +49,9 @@ export const rankWindow = (rank: number) => ({ from: Math.max(1, Math.round(rank
  * ranks within 25% of hers (`fromProfile`, as if those were the params; mine=0 drops it), else the latest year's latest
  * round (`latest`). null: an unknown `inst` (a 404).
  */
-export async function allotmentsView(params: URLSearchParams, pageSize: number) {
+export async function allotmentsView(params: URLSearchParams, pageSize: number, exam: ExamKey = DEFAULT_EXAM) {
   const f = parseSearchParams(schema, params, [...termFilterLists, "course"]);
-  const [meta, inst] = await Promise.all([getMeta(), f.inst ? getCollege(f.inst) : null]);
+  const [meta, inst] = await Promise.all([getMeta(exam), f.inst ? getCollege(f.inst, exam) : null]);
   if (f.inst && !inst) return null;
   // A rank typed with commas ("30,000") is fine; anything else that isn't a rank is reported, not silently dropped.
   const typed = (k: "from" | "to") => params.get(k)?.trim() || null;
@@ -83,9 +84,9 @@ export async function allotmentsView(params: URLSearchParams, pageSize: number) 
   // not declared (keep is a superset: it only lets unknown values through). Counted only when that box is unticked.
   const keep = anyTermFilter(filters.terms) && !filters.terms.keepUnknown ? { ...filters, terms: { ...filters.terms, keepUnknown: true } } : null;
   const [r, info, all] = await Promise.all([
-    listAllotments(filters, { page: f.page, pageSize }, inst?.key),
-    hospitalInfo(),
-    keep && listAllotments(keep, { page: 1, pageSize: 1 }, inst?.key),
+    listAllotments(filters, { page: f.page, pageSize }, inst?.key, exam),
+    hospitalInfo(exam),
+    keep && listAllotments(keep, { page: 1, pageSize: 1 }, inst?.key, exam),
   ]);
   // Each row's MCC institute profile (the card's external link); null when the import has none.
   const rows = r.rows.map((a) => ({ ...a, mccProfileUrl: info.get(a.college.key)?.mccProfileUrl ?? null }));

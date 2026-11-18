@@ -28,6 +28,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { getDecideData, getMeta, listFees, type FeeSort } from "@/features/decide/service";
 import { programmeNames, programmes } from "@/features/decide/server/terms";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
+import { examGate } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Fees & bond" };
 const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
@@ -40,6 +41,8 @@ const natural = (k: FeeSort) => (k === "stip1" ? "desc" : "asc");
 const arrow = (on: boolean, dir: string) => (on ? <span aria-hidden="true">{dir === "asc" ? " ↑" : " ↓"}</span> : null);
 
 export default async function FeesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const gated = await examGate("/decide/fees");
+  if (gated) return gated;
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params, termFilterLists);

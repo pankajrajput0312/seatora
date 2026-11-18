@@ -1,4 +1,5 @@
 import "server-only";
+import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import { db } from "@/lib/db";
 import { websiteUrl } from "../../lib/stat-format";
 import { anyTermFilter, termVerdict, type TermFilters, type TermVerdict } from "../../lib/term-filters";
@@ -15,7 +16,8 @@ import type { ValueMeta } from "./hospital-bits";
 export type { ValueMeta };
 
 // Institute page data (src/app/decide/institutes/[slug]) that the service does not return: the newest round's seat
-// lists at this college, its allotments by quota and seat category, and the bundle schema 2 college fields.
+// lists at this college, its allotments by quota and seat category, and the bundle schema 2 college fields. One exam's
+// (default NEET PG).
 
 export type RoundSeats = { list: SeatList; rows: SeatRow[] }[];
 
@@ -23,10 +25,10 @@ export type RoundSeats = { list: SeatList; rows: SeatRow[] }[];
  * The newest round's seat lists (clear, virtual, newly added: seatLists() order; a kind can have two PDFs), each with its
  * rows at this college, every course. Empty when no list is imported. Each list stays separate: they overlap.
  */
-export async function roundSeatsAt(collegeKey: string): Promise<RoundSeats> {
-  const all = await seatLists();
+export async function roundSeatsAt(collegeKey: string, exam: ExamKey = DEFAULT_EXAM): Promise<RoundSeats> {
+  const all = await seatLists(exam);
   const lists = all.filter((l) => l.year === all[0]?.year && l.round === all[0]?.round);
-  return Promise.all(lists.map(async (list) => ({ list, rows: (await listSeats({ list: list.key, college: collegeKey })).rows })));
+  return Promise.all(lists.map(async (list) => ({ list, rows: (await listSeats({ list: list.key, college: collegeKey }, undefined, exam)).rows })));
 }
 
 /** The college header's lists: the newest PDF of the clear and of the virtual vacancy list, of `round` (seatLists() order). */
@@ -34,14 +36,14 @@ export const headerLists = (round: SeatList[]) =>
   (["clear", "virtual"] as const).flatMap((kind) => round.filter((l) => l.kind === kind).slice(0, 1));
 
 /** The header's numbers without the rows (tabs other than Courses and Seats): Σ seats here in each headerLists list. */
-export async function roundSeatTotals(collegeKey: string): Promise<{ list: SeatList; n: number }[]> {
-  const all = await seatLists();
+export async function roundSeatTotals(collegeKey: string, exam: ExamKey = DEFAULT_EXAM): Promise<{ list: SeatList; n: number }[]> {
+  const all = await seatLists(exam);
   const lists = headerLists(all.filter((l) => l.year === all[0]?.year && l.round === all[0]?.round));
   if (!lists.length) return [];
   const sums = await db.$queryRaw<{ key: string; n: number }[]>`
     SELECT d.key, SUM(x.seats)::int AS n
     FROM "SeatCount" x JOIN "DataSource" d ON d.id = x."seatSourceId" JOIN "College" c ON c.id = x."collegeId"
-    WHERE d.key = ANY(${lists.map((l) => l.key)}) AND c.key = ${collegeKey}
+    WHERE d.exam = ${exam} AND d.key = ANY(${lists.map((l) => l.key)}) AND c.key = ${collegeKey}
     GROUP BY 1`;
   return lists.map((list) => ({ list, n: sums.find((s) => s.key === list.key)?.n ?? 0 }));
 }
@@ -87,8 +89,8 @@ export function allotmentMix(rows: AllotmentCount[], years: YearInfo[], sources:
 }
 
 /** allotmentMix of every course at this college, from the Allotment table. */
-export async function allotmentMixAt(collegeKey: string) {
-  const cat = await getCatalog();
+export async function allotmentMixAt(collegeKey: string, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const cs = [...cat.pairs.values()].filter((p) => p.college === collegeKey).map((p) => p.cs);
   return allotmentMix(await countAllotments(cat, cs), cat.meta.years, cat.sources);
 }
@@ -103,14 +105,14 @@ export type HospitalInfo = { mccIds: string[]; mccProfileUrl: string | null; web
 
 const infoMemo = new WeakMap<Catalog, Promise<Map<string, HospitalInfo>>>();
 /** HospitalInfo of every college by College.key: one read per catalog (a new import is a new catalog). Empty in tests (memory catalog). */
-export async function hospitalInfo(): Promise<Map<string, HospitalInfo>> {
-  const cat = await getCatalog();
+export async function hospitalInfo(exam: ExamKey = DEFAULT_EXAM): Promise<Map<string, HospitalInfo>> {
+  const cat = await getCatalog(exam);
   if (cat.mem) return new Map();
   let m = infoMemo.get(cat);
   if (!m) {
-    // The build's snapshot while no import has committed since, else Postgres (server/snapshot.ts).
-    m = dataVersion()
-      .then(async (v) => (await snapshotAt(v))?.info ?? (await infoRows(db)))
+    // NEET PG: the build's snapshot while no import has committed since, else Postgres (server/snapshot.ts).
+    m = dataVersion(exam)
+      .then(async (v) => (exam === DEFAULT_EXAM ? (await snapshotAt(v))?.info : null) ?? (await infoRows(db, exam)))
       .then((rows) =>
         new Map(
           rows.map((r) => [
@@ -138,8 +140,8 @@ export { websiteUrl };
  * A college's clinical facts (server/facts.ts) with its course rows in her profile first (`mine`; only when she ticked
  * courses), each keeping its index `i` (its values_meta key, "courses[i]"). Null when the import has none.
  */
-export async function clinicalAt(collegeKey: string, profile: Profile | null) {
-  const [facts, cat] = await Promise.all([clinicalFactsFor(collegeKey), getCatalog()]);
+export async function clinicalAt(collegeKey: string, profile: Profile | null, exam: ExamKey = DEFAULT_EXAM) {
+  const [facts, cat] = await Promise.all([clinicalFactsFor(collegeKey, exam), getCatalog(exam)]);
   if (!facts) return null;
   const ticked = !!profile && (profile.specialties.length > 0 || profile.degrees.length > 0 || !!profile.pairs?.length);
   // The row names a course as "DNB Anaesthesiology": degree and name.
@@ -158,9 +160,9 @@ const rank: Record<TermVerdict, number> = { pass: 2, unknown: 1, fail: 0 };
  * with `course`, that course's only) passes. `unknown`: institutes left out only because a filtered value is not
  * declared (what "Include not declared", nd=keep, would add; none when it is ticked). Null when no filter is set.
  */
-export async function institutesByTerms(tf: TermFilters, course?: string | string[]): Promise<{ pass: Set<string>; unknown: Set<string> } | null> {
+export async function institutesByTerms(tf: TermFilters, course?: string | string[], exam: ExamKey = DEFAULT_EXAM): Promise<{ pass: Set<string>; unknown: Set<string> } | null> {
   if (!anyTermFilter(tf)) return null;
-  const [cat, info] = await Promise.all([getCatalog(), hospitalInfo()]);
+  const [cat, info] = await Promise.all([getCatalog(exam), hospitalInfo(exam)]);
   const best = new Map<string, TermVerdict>();
   for (const o of cat.options) {
     if (best.get(o.college) === "pass" || (course?.length && ![course].flat().includes(cat.courseOf.get(`${o.degree}|${o.specialty}`)?.slug ?? ""))) continue;

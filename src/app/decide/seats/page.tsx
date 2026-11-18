@@ -30,6 +30,7 @@ import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, t
 import { allotmentTrends, getMeta, LATEST_YEAR, PAST_YEARS, YEARS } from "@/features/decide/service";
 import { fmtDay, listDay } from "@/features/decide/lib/format";
 import { openQuotas, openQuotasNote, quotaScopeNote, roundLabel, rounds, seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
+import { examGate } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Seats" };
 const PAGE_SIZE = 50;
@@ -59,6 +60,8 @@ const seatGroups = (lists: SeatList[]): SeatGroup[] =>
   });
 
 export default async function SeatsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const gated = await examGate("/decide/seats");
+  if (gated) return gated;
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
   const L = decideLinks(params);

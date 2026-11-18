@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
+import { DEFAULT_EXAM } from "../src/features/exams/keys.ts";
 
 const dir = resolve(process.argv[2] ?? process.env.RESIDENTS_BUNDLE ?? "../neetpg-planner/data/medpath-private");
 // Official URLs of the list PDFs: the planner's source map next to the bundle (data/official_sources.json).
@@ -100,19 +101,22 @@ if (errors.length) {
 const db = new PrismaClient();
 const keyOf = (place: string, name: string) => `${place}|${name}`;
 
+// Residents are NEET PG's: its colleges, courses, quotas and sources.
+const exam = DEFAULT_EXAM;
+
 async function main() {
-  const colleges = await db.college.findMany({ select: { id: true, key: true, pincode: true } });
+  const colleges = await db.college.findMany({ where: { exams: { some: { exam } } }, select: { id: true, key: true, pincode: true } });
   const collegeId = new Map(colleges.map((c) => [c.key, c.id]));
   // HiddenResident.place, as src/features/decide/server/residents.ts hideResident writes it.
   const placeOf = new Map(colleges.map((c) => [c.key, c.pincode ?? c.key]));
   const specialtyId = new Map<string, string>();
-  for (const s of await db.specialty.findMany({ where: { code: { not: null } }, select: { id: true, degree: true, code: true } })) {
+  for (const s of await db.specialty.findMany({ where: { exam, code: { not: null } }, select: { id: true, degree: true, code: true } })) {
     const k = `${s.degree}|${s.code}`;
     if (specialtyId.has(k)) throw new Error(`two Specialty rows for ${k}: re-run npm run db:import first`);
     specialtyId.set(k, s.id);
   }
   // Quota labels as the MCC import stored them, so a matched quota is one the allotments (and their filters) use.
-  const quotas = new Set((await db.allotment.findMany({ distinct: ["quota"], select: { quota: true } })).map((a) => a.quota));
+  const quotas = new Set((await db.allotment.findMany({ where: { exam }, distinct: ["quota"], select: { quota: true } })).map((a) => a.quota));
   const why = (r: (typeof rows)[number]) =>
     !collegeId.has(r.ikey)
       ? `unknown college ${r.ikey}`
@@ -148,7 +152,7 @@ async function main() {
   for (const [key, r] of lists) {
     const d = { name: `MCC admitted candidates list (${r.list_label})`, url: urls[key] ?? null, type: "OFFICIAL" as const, counsellingYear: r.year, round: null };
     if (!d.url) console.warn(`${key}: no official URL in ${urlsFile}`);
-    await db.dataSource.upsert({ where: { key }, create: { key, ...d }, update: d });
+    await db.dataSource.upsert({ where: { exam_key: { exam, key } }, create: { exam, key, ...d }, update: d });
   }
 
   // Replace all; a name someone asked to hide stays hidden.
@@ -160,7 +164,7 @@ async function main() {
       // The NBEMS results behind the ranks (the Residents Sources link them). No round: never an allotment result.
       for (const s of rankSources.values()) {
         const d = { name: s.name, url: s.url, type: "OFFICIAL" as const, counsellingYear: s.year, round: null, provisional: false };
-        await tx.dataSource.upsert({ where: { key: s.key }, create: { key: s.key, ...d }, update: d });
+        await tx.dataSource.upsert({ where: { exam_key: { exam, key: s.key } }, create: { exam, key: s.key, ...d }, update: d });
       }
       await tx.resident.deleteMany({});
       // One JSON parameter per 2,000 rows (as tools/backup_medpath_db.mjs restores): the local prisma dev database

@@ -29,6 +29,8 @@ import { getMeta, rankScan } from "@/features/decide/service";
 import { statKeys } from "@/features/decide/lib/stat-format";
 import { roundLabel, rounds } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
+import { examGate } from "@/features/exams/active";
+import { activeExam } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Rank scan" };
 const VIEW = "rank-scan";
@@ -50,13 +52,16 @@ const schema = z.object({
 const multi = (params: URLSearchParams, k: string) => params.getAll(k).flatMap((v) => v.split(",")).filter(Boolean);
 
 export default async function RankScanPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const gated = await examGate("/decide/rank-scan");
+  if (gated) return gated;
   const params = toURLSearchParams(await searchParams);
   const [view, pageSize] = await Promise.all([chosenView(params, VIEW), pageSizeFor(PAGE_SIZE)]);
   const profile = profileFromParams(params);
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
   const tp = readTermFilters(params, profile);
-  const meta = await getMeta();
+  const exam = await activeExam();
+  const meta = await getMeta(exam);
   const typed = params.get("scan")?.trim() || null;
   const invalid = typed != null && f.scan == null;
   const rank = invalid ? null : (f.scan ?? profile?.rank ?? null);
@@ -77,7 +82,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
     (!cf.slugs || cf.slugs.has(courseSlug.get(`${a.degree}|${a.specialty}`) ?? "")) &&
     (!degrees.length || degrees.includes(a.degree)) &&
     (!cats || cats.includes(a.category));
-  const scanned = rank && year ? await withRowInfo((await rankScan(rank, year.year, window)).flatMap((g) => g.rows).filter(wanted)) : [];
+  const scanned = rank && year ? await withRowInfo((await rankScan(rank, year.year, window, exam)).flatMap((g) => g.rows).filter(wanted), exam) : [];
   // Fee, stipend, bond, leaving and type filters on each allotment's course and quota (lib/term-filters.ts).
   const { kept, unknown } = splitByTerms(scanned, tp.filters, (a) => a.fees, (a) => a.hospital?.type?.value);
   type Row = (typeof kept)[number];

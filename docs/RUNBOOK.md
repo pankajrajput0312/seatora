@@ -145,6 +145,7 @@ cd "$D" && DATABASE_URL="$DIRECT_URL" npm run db:import -- "$PLANNER/data/medpat
 DATABASE_URL="$DIRECT_URL" npm run db:import-residents -- "$PLANNER/data/medpath-private"
 rm -rf "$D"
 ```
+- Another exam's bundle: `npm run db:import -- --exam neet-ss "$PLANNER/data/exams/neet-ss/bundle"` (staff only until it opens; NEET PG's rows are not touched). It ends with `Committed neet-ss. Spot checks passed (…)`.
 - `db:import` must end with `Committed. Spot checks passed (…)`. `db:import-residents` must end with `2 spot checks passed` and `rejected: 0`. Locally each takes under a minute. Supabase is slower, and the transaction allows 30 minutes.
 - The importers use the Prisma client in the shared `node_modules`. If the import fails on an unknown model or field, the client is older than the schema. `npx prisma generate` in the snapshot fixes it, and it rewrites the client for every tree that shares those modules.
 

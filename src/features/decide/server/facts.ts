@@ -1,4 +1,5 @@
 import "server-only";
+import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import { db } from "@/lib/db";
 import { seatGroups, type MccClinicalFacts, type MccFeesStructured } from "@/features/cutoffs/lib/import-schema";
 import { getCatalog } from "./catalog";
@@ -13,12 +14,12 @@ export type ClinicalFacts = Omit<MccClinicalFacts, "key" | "nbems_disclosure"> &
   disclosure: { status: MccClinicalFacts["nbems_disclosure"]["status"]; url: string | null; checked: string | null };
 };
 
-/** Clinical facts of a college (College.key); null when the import has none. */
-export async function clinicalFactsFor(collegeKey: string): Promise<ClinicalFacts | null> {
-  await getCatalog(); // same availability and access as the rest of Decide
+/** Clinical facts of a college (College.key) in the exam's import; null when it has none. */
+export async function clinicalFactsFor(collegeKey: string, exam: ExamKey = DEFAULT_EXAM): Promise<ClinicalFacts | null> {
+  await getCatalog(exam); // same availability and access as the rest of Decide
   const [row] = await db.$queryRaw<{ data: Omit<ClinicalFacts, "disclosure">; status: ClinicalFacts["disclosure"]["status"]; url: string | null; checked: string | null }[]>`
     SELECT f.data, f."disclosureStatus" AS status, f."disclosureUrl" AS url, to_char(f."checkedAt", 'YYYY-MM-DD') AS checked
-    FROM "ClinicalFacts" f JOIN "College" c ON c.id = f."collegeId" WHERE c.key = ${collegeKey}`;
+    FROM "ClinicalFacts" f JOIN "College" c ON c.id = f."collegeId" WHERE f.exam = ${exam} AND c.key = ${collegeKey}`;
   return row ? { ...row.data, disclosure: { status: row.status, url: row.url, checked: row.checked } } : null;
 }
 
@@ -94,10 +95,10 @@ export function feeGroup(quotaGroup: string, d: FeeRecord): FeeQuotaGroup {
 const groupPos = (g: string) => seatGroups.indexOf(g.split("+")[0] as (typeof seatGroups)[number]);
 
 /** Fee, stipend, bond and penalties of a college's programme by seat-type group (All India, Deemed/Paid, NRI, DNB Quota order); [] when none (MCh, MPH). */
-export async function feesFor(collegeKey: string, programme: Programme): Promise<FeeQuotaGroup[]> {
-  await getCatalog();
+export async function feesFor(collegeKey: string, programme: Programme, exam: ExamKey = DEFAULT_EXAM): Promise<FeeQuotaGroup[]> {
+  await getCatalog(exam);
   const rows = await db.$queryRaw<{ g: string; data: FeeRecord }[]>`
     SELECT f."quotaGroup" AS g, f.data FROM "FeesStructured" f JOIN "College" c ON c.id = f."collegeId"
-    WHERE c.key = ${collegeKey} AND f.programme = ${programme}`;
+    WHERE f.exam = ${exam} AND c.key = ${collegeKey} AND f.programme = ${programme}`;
   return rows.map((r) => feeGroup(r.g, r.data)).sort((a, b) => groupPos(a.quotaGroup) - groupPos(b.quotaGroup));
 }

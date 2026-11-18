@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { cache } from "react";
+import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import { hospitalInfo, type HospitalInfo } from "./components/institute/institute-data";
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
 import { searchMatcher } from "./lib/college-aliases";
@@ -16,40 +17,41 @@ import { optionId, rounds, seatKinds, type OptionSort, type Allotment, type Cate
 // Data comes from Postgres (MCC import, prisma/import-mcc.ts) through ./server; the small, slow-changing part (colleges,
 // courses, sources, terms, option list) is a per-process catalog, cutoffs and allotments are filtered in SQL per call.
 // Without a database every call throws DataUnavailableError and Decide shows "Data unavailable": never stand-in data.
+// Every call reads one exam (`exam`, default NEET PG; Decide pages pass features/exams/active.tsx activeExam()).
 
 export { DataUnavailableError } from "./server/catalog";
 export type { YearInfo } from "./server/catalog";
 
 /** Colleges, courses and sources only. Cutoffs and allotments are queried per call, never loaded whole. */
-export async function getDecideData() {
-  const cat = await getCatalog();
+export async function getDecideData(exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   return { colleges: cat.colleges, courses: cat.courses, sources: cat.sources };
 }
 
 /** By slug; an old slug (its college key was retired) gives the college it became (its `slug` is the new one). */
-export async function getCollege(slug: string): Promise<College | null> {
-  return (await getCatalog()).collegeBySlug.get(slug) ?? (await renamedCollege(slug));
+export async function getCollege(slug: string, exam: ExamKey = DEFAULT_EXAM): Promise<College | null> {
+  return (await getCatalog(exam)).collegeBySlug.get(slug) ?? (await renamedCollege(slug, exam));
 }
 
 /** A retired key's entry: by the key, or by its hash (a key that held a person's name is stored only as its hash). */
 const retiredGet = (m: Map<string, string>, k: string) => m.get(k) ?? m.get(`sha256:${createHash("sha256").update(k).digest("hex")}`);
 
 /** The college an old institute slug leads to (its college key was retired: merged, or given a neutral name); else null. */
-export async function renamedCollege(slug: string): Promise<College | null> {
-  const cat = await getCatalog();
+export async function renamedCollege(slug: string, exam: ExamKey = DEFAULT_EXAM): Promise<College | null> {
+  const cat = await getCatalog(exam);
   const key = retiredGet(cat.retiredSlug, slug);
   return (key && cat.collegeByKey.get(key)) || null;
 }
 
 /** Option ids under the college key each college has now (an old compare link); other ids unchanged. */
-export async function currentOptionIds(ids: string[]): Promise<string[]> {
-  const cat = await getCatalog();
+export async function currentOptionIds(ids: string[], exam: ExamKey = DEFAULT_EXAM): Promise<string[]> {
+  const cat = await getCatalog(exam);
   return ids.map((id) => renameOptionId(id, (k) => cat.collegeByKey.get(retiredGet(cat.retired, k) ?? "")));
 }
 
 /** Retired college keys (or "sha256:<hex>" of them) → the college each is now: the browser renames saved ids with it. */
-export async function retiredKeys(): Promise<Record<string, RenamedCollege>> {
-  const cat = await getCatalog();
+export async function retiredKeys(exam: ExamKey = DEFAULT_EXAM): Promise<Record<string, RenamedCollege>> {
+  const cat = await getCatalog(exam);
   return Object.fromEntries(
     [...cat.retired].map(([old, key]) => {
       const c = cat.collegeByKey.get(key)!; // catalog.ts keeps only keys of colleges it has
@@ -118,8 +120,8 @@ export type OptionRow = {
 
 export type RowHospital = Pick<HospitalInfo, "type" | "beds" | "mccProfileUrl"> | null;
 /** Rows with their institute's type, beds and MCC profile (hospitalInfo, read once per catalog; empty in tests). */
-async function withHospital<T extends { college: { key: string } }>(rows: T[]): Promise<(T & { hospital: RowHospital })[]> {
-  const info = await hospitalInfo();
+async function withHospital<T extends { college: { key: string } }>(rows: T[], exam: ExamKey): Promise<(T & { hospital: RowHospital })[]> {
+  const info = await hospitalInfo(exam);
   return rows.map((r) => {
     const h = info.get(r.college.key);
     return { ...r, hospital: h && (h.type || h.beds || h.mccProfileUrl) ? { type: h.type, beds: h.beds, mccProfileUrl: h.mccProfileUrl } : null };
@@ -273,7 +275,7 @@ async function rowsFor(cat: Catalog, opts: Opt[], profile: Profile | null, inclu
   const query: CutoffQuery = narrow ? { cs: [...new Set(old.map((o) => o.cs))], quotas: quotas.length < cat.meta.quotas.length ? quotas : undefined } : {};
   const cutoffs = await cutoffsOnce(cat, JSON.stringify(query));
   const groups = groupByOption(cutoffs);
-  return withHospital(opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], profile, includeProvisional)));
+  return withHospital(opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], profile, includeProvisional)), cat.exam);
 }
 
 /** Her profile's course, degree, quota (none ticked: the open quotas only) and state on one option (any without a profile). */
@@ -292,7 +294,7 @@ function optMatches(cat: Catalog, o: Pick<Opt, "college" | "degree" | "specialty
   return inProfile(cat, o, p) && (!anyTermFilter(tf) || termsPass(optTerms(cat, o), types?.get(o.college)?.type?.value, tf!));
 }
 /** College types, read only when a type filter needs them. */
-const typesFor = (tf: TermFilters | null | undefined) => (tf?.types?.length ? hospitalInfo() : Promise.resolve(undefined));
+const typesFor = (tf: TermFilters | null | undefined, exam: ExamKey) => (tf?.types?.length ? hospitalInfo(exam) : Promise.resolve(undefined));
 
 type Ranked = { o: Opt; reach: Reach; provisional: boolean; deepest: ReachInput | undefined };
 
@@ -328,20 +330,24 @@ const countsOf = (xs: { reach: Reach }[]) => Object.fromEntries(reachOrder.map((
 async function unlistedOf(cat: Catalog, list: SeatList | null, profile: Profile | null, college?: string) {
   if (!list) return null;
   const p = profile && { ...profile, maxFeeLakh: null, maxBondYears: null };
-  const { rows } = await listSeats({
-    list: list.key,
-    college,
-    ...(p && profileCourseFilter(p)),
-    categories: p ? eligibleCategories(p.category, p.pwd) : undefined,
-  });
+  const { rows } = await listSeats(
+    {
+      list: list.key,
+      college,
+      ...(p && profileCourseFilter(p)),
+      categories: p ? eligibleCategories(p.category, p.pwd) : undefined,
+    },
+    undefined,
+    cat.exam,
+  );
   const out = rows.filter((r) => !hasOption(cat, r) && optMatches(cat, { college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota }, p));
   const options = new Set(out.map((r) => [r.college.key, r.degree, r.specialty, r.quota].join("~"))).size;
   return { list, options, seats: out.reduce((a, r) => a + r.seats, 0) };
 }
 
 /** Options page: seats in her profile with no option, in the newest clear vacancy list or that round's `kind` list (see unlistedOf). */
-export async function unlistedSeats(profile: Profile, kind: SeatKind = "clear") {
-  const cat = await getCatalog();
+export async function unlistedSeats(profile: Profile, kind: SeatKind = "clear", exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   return unlistedOf(cat, (await roundLists(cat)).find((l) => l.kind === kind) ?? null, profile);
 }
 
@@ -350,20 +356,20 @@ export async function unlistedSeats(profile: Profile, kind: SeatKind = "clear") 
  * ponytail: a round with two PDFs of one kind (2025 R2 newly added) gives the newest; list both if a current round has two.
  */
 async function roundLists(cat: Catalog): Promise<SeatList[]> {
-  const all = cat.mem ? [] : await seatLists();
+  const all = cat.mem ? [] : await seatLists(cat.exam);
   const [clear] = pickLists(all, {});
   return !clear ? [] : seatKinds.flatMap((kind) => pickLists(all, { kind, year: clear.year, round: clear.round }).slice(0, 1));
 }
 
 /** The seat lists behind the R2 seats columns (Options, Choices). */
-export const currentSeatLists = async () => roundLists(await getCatalog());
+export const currentSeatLists = async (exam: ExamKey = DEFAULT_EXAM) => roundLists(await getCatalog(exam));
 
 /** Her seat categories; null (every category) without a profile. */
 const seatCats = (profile: Profile | null) => (profile ? eligibleCategories(profile.category, profile.pwd) : undefined);
 
 /** The seats of these options in each list: one read for their colleges and courses. */
-const seatsOfOpts = async (lists: SeatList[], opts: Pick<Opt, "college" | "degree" | "specialty">[]) =>
-  opts.length ? optionSeats(lists, { colleges: [...new Set(opts.map((o) => o.college))], pairs: [...new Set(opts.map(pairKey))] }) : new Map<string, OptionSeats>();
+const seatsOfOpts = async (cat: Catalog, lists: SeatList[], opts: Pick<Opt, "college" | "degree" | "specialty">[]) =>
+  opts.length ? optionSeats(lists, { colleges: [...new Set(opts.map((o) => o.college))], pairs: [...new Set(opts.map(pairKey))] }, cat.exam) : new Map<string, OptionSeats>();
 
 /**
  * Options with no past allotment (not in the catalog) whose course and quota the lists of `seats` print seats for, in
@@ -392,7 +398,7 @@ const parseOptionId = (id: string) => {
 async function optionsByIds(cat: Catalog, lists: SeatList[], ids: string[], withSeats: boolean) {
   const unknown = ids.filter((id) => !cat.optionById.has(id)).flatMap((id) => parseOptionId(id) ?? []);
   const known = ids.flatMap((id) => cat.optionById.get(id) ?? []);
-  const seats = withSeats || unknown.length ? await seatsOfOpts(lists, [...known, ...unknown]) : new Map<string, OptionSeats>();
+  const seats = withSeats || unknown.length ? await seatsOfOpts(cat, lists, [...known, ...unknown]) : new Map<string, OptionSeats>();
   const fresh = new Map(newOptions(cat, seats, null).map((o) => [o.id, o]));
   return { opts: ids.flatMap((id) => cat.optionById.get(id) ?? fresh.get(id) ?? []), seats };
 }
@@ -411,8 +417,8 @@ function withSeats(rows: OptionRow[], lists: SeatList[], seats: Map<string, Opti
 }
 
 /** Choices: saved options (ids, new ones too), labelled, with their seats in each list of the newest round, as on Options. Unknown ids are left out. */
-export async function choiceOptions(ids: string[], profile: Profile | null) {
-  const cat = await getCatalog();
+export async function choiceOptions(ids: string[], profile: Profile | null, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const lists = await roundLists(cat);
   const { opts, seats } = await optionsByIds(cat, lists, ids, true);
   return { lists, rows: withSeats(await rowsFor(cat, opts, profile, true), lists, seats, profile) };
@@ -428,8 +434,8 @@ export async function choiceOptions(ids: string[], profile: Profile | null) {
  * `f.terms` (else her fee and bond caps): the term filters on each option's course and quota (lib/term-filters.ts).
  * Round view order: roundReachOrder, then clear vacancy seats, then deepest closing.
  */
-export async function listOptions(profile: Profile | null, f: OptionFilters = {}, pg?: PageQuery) {
-  const cat = await getCatalog();
+export async function listOptions(profile: Profile | null, f: OptionFilters = {}, pg?: PageQuery, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const includeProvisional = f.includeProvisional ?? true;
   const lists = await roundLists(cat);
   const view = optionsView(f.view, lists, cat.sources);
@@ -445,7 +451,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     return match(`${college.name} ${college.state ?? ""} ${college.address ?? ""} ${course.name} ${course.degree}`);
   };
   const tf = f.terms ?? (profile && profileTermFilters(profile));
-  const types = await typesFor(tf);
+  const types = await typesFor(tf, cat.exam);
   const matches = (o: Parameters<typeof optMatches>[1]) => optMatches(cat, o, profile, tf, types);
   const split = splitByTerms(cat.options.filter((o) => inProfile(cat, o, profile)), tf, (o) => optTerms(cat, o), (o) => types?.get(o.college)?.type?.value);
   const mine = split.kept;
@@ -455,7 +461,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   // Seats of every option in her profile (courses, quotas, seat categories) when the view or a seats filter needs them,
   // in one read beside the labels; else just the page's, below.
   const [profileSeats, labelled, labelledUnknown] = await Promise.all([
-    round || kind ? optionSeats(lists, profile ? { ...profileCourseFilter(profile), quotas: profileQuotas(profile), categories: seatCats(profile) } : {}) : null,
+    round || kind ? optionSeats(lists, profile ? { ...profileCourseFilter(profile), quotas: profileQuotas(profile), categories: seatCats(profile) } : {}, cat.exam) : null,
     rankOptions(cat, opts, profile, includeProvisional),
     unknownOpts.length ? rankOptions(cat, unknownOpts, profile, includeProvisional) : [],
   ]);
@@ -493,7 +499,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   const pageOpts = page.rows.map((x) => x.o);
   const [built, seats] = await Promise.all([
     rowsFor(cat, pageOpts, profile, includeProvisional, pageOpts.length < cat.options.length / 2),
-    profileSeats ?? seatsOfOpts(lists, pageOpts),
+    profileSeats ?? seatsOfOpts(cat, lists, pageOpts),
   ]);
   const hidden = all.filter((r) => !showClosed && r.reach === "closed-before");
   // Round view with a state filter: options with seats in the round left out only because their institute has no state
@@ -528,8 +534,8 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
 
 /** Compare: options by id (new ones too), labelled; unknown ids are left out. */
 /** Compare: the ids as rows (unknown ones left out), with their seats in each list of the newest round (`seatsBy`, as Choices). */
-export async function getOptionsByIds(ids: string[], profile: Profile | null) {
-  const cat = await getCatalog();
+export async function getOptionsByIds(ids: string[], profile: Profile | null, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const lists = await roundLists(cat);
   const { opts, seats } = await optionsByIds(cat, lists, ids, ids.length > 0);
   return withSeats(await rowsFor(cat, opts, profile, true), lists, seats, profile); // no ids → no query (cs = [])
@@ -542,14 +548,14 @@ const sumYear = (opts: Opt[], year: number) => (opts.some((o) => o.byYear[year] 
  * in her profile (`yours`), the seats here in her profile that are no option (`unlisted`: in `seatList`; `unlistedBy`:
  * in each list of its round, never added), allotments per year, terms per program.
  */
-export async function getInstitute(slug: string, profile: Profile | null) {
-  const cat = await getCatalog();
+export async function getInstitute(slug: string, profile: Profile | null, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const college = cat.collegeBySlug.get(slug);
   if (!college) return null;
   const known = cat.options.filter((o) => o.college === college.key);
   const [built, lists] = await Promise.all([rowsFor(cat, known, profile, true), roundLists(cat)]);
   const seatList = lists[0] ?? null;
-  const [seats, unlistedBy] = await Promise.all([optionSeats(lists, { colleges: [college.key] }), Promise.all(lists.map((l) => unlistedOf(cat, l, profile, college.key)))]);
+  const [seats, unlistedBy] = await Promise.all([optionSeats(lists, { colleges: [college.key] }, cat.exam), Promise.all(lists.map((l) => unlistedOf(cat, l, profile, college.key)))]);
   // Courses and quotas with seats in the round's lists but no past allotment here: options too, labelled "new".
   const fresh = newOptions(cat, seats, null);
   const opts = [...known, ...fresh];
@@ -562,8 +568,8 @@ export async function getInstitute(slug: string, profile: Profile | null) {
   return { college, options, yours: options.filter((o) => mine.has(o.id)), allotmentsByYear, terms, fees, seatList, unlisted: unlistedBy[0] ?? null, unlistedBy: unlistedBy.filter((u) => !!u) };
 }
 
-export async function rankScan(rank: number, year: number, window = 500) {
-  const cat = await getCatalog();
+export async function rankScan(rank: number, year: number, window = 500, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const { rows } = await findAllotments(cat, { year, from: Math.max(1, rank - window), to: rank + window });
   const out = rows.map((a) => {
     const c = cat.collegeByKey.get(a.college);
@@ -577,8 +583,8 @@ export async function rankScan(rank: number, year: number, window = 500) {
  * (allotted / fresh / upgraded), the candidate's option number (R2 / R3) and own category, and the seat the PDF prints
  * one round back with its remark. Ranks and seats only, never a name; history, not a prediction.
  */
-export async function rankJourney(year: number, rank: number) {
-  const cat = await getCatalog();
+export async function rankJourney(year: number, rank: number, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const { rows } = await findAllotments(cat, { year, from: rank, to: rank });
   return rows.map((a) => ({ ...a, ...seatNames(cat, a), prev: namedPrev(cat, a.prev) }));
 }
@@ -609,9 +615,9 @@ export type LastRanksFilters = {
  * `rows` holds options with a closing on that category (sorted by name, or by one year/round column); `empty` counts
  * the rest; `columns` lists the years and rounds that have data.
  */
-export async function lastRanks(f: LastRanksFilters, pg?: PageQuery) {
-  const cat = await getCatalog();
-  const types = await typesFor(f.terms);
+export async function lastRanks(f: LastRanksFilters, pg?: PageQuery, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
+  const types = await typesFor(f.terms, cat.exam);
   const q = f.search?.trim().toLowerCase();
   const course = (o: Opt) => (f.courses ? f.courses.some((c) => c.degree === o.degree && c.specialty === o.specialty) : o.specialty === f.specialty && (!f.degree || o.degree === f.degree));
   const quotas = f.quotas?.length ? f.quotas : f.quota ? [f.quota] : undefined;
@@ -623,7 +629,7 @@ export async function lastRanks(f: LastRanksFilters, pg?: PageQuery) {
   const opts = cat.options.filter((o) => course(o) && (!quotas || quotas.includes(o.quota)) && text(o) && optMatches(cat, o, null, f.terms ?? null, types));
   const groups = groupByOption(await findCutoffs(cat, { cs: [...new Set(opts.map((o) => o.cs))], quotas, years: f.years?.length ? f.years : undefined }));
   const eligible = f.category ? new Set([f.category]) : undefined;
-  const built = await withHospital(opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], null, true, eligible)));
+  const built = await withHospital(opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], null, true, eligible)), cat.exam);
   let rows = built.filter((r) => Object.keys(r.grid).length > 0);
   const columns = [...new Set(rows.flatMap((r) => Object.keys(r.grid).map(Number)))].sort().map((year) => ({
     year,
@@ -649,8 +655,8 @@ export async function lastRanks(f: LastRanksFilters, pg?: PageQuery) {
  * Allotments made per option and year (Σ cutoff n, every round), from the catalog: no cutoff rows are read. `profile`:
  * only her courses (profileHasCourse).
  */
-export async function allotmentTrends(f: { specialty?: string; degree?: string; profile?: Pick<Profile, "specialties" | "degrees" | "pairs"> | null }, pg?: PageQuery) {
-  const cat = await getCatalog();
+export async function allotmentTrends(f: { specialty?: string; degree?: string; profile?: Pick<Profile, "specialties" | "degrees" | "pairs"> | null }, pg?: PageQuery, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const rows = cat.options
     .filter((o) => (!f.specialty || o.specialty === f.specialty) && (!f.degree || o.degree === f.degree) && (!f.profile || profileHasCourse(f.profile, o)))
     .map((o) => {
@@ -666,8 +672,8 @@ export async function allotmentTrends(f: { specialty?: string; degree?: string; 
   return paged(rows, pg);
 }
 
-export async function getMeta() {
-  return (await getCatalog()).meta;
+export async function getMeta(exam: ExamKey = DEFAULT_EXAM) {
+  return (await getCatalog(exam)).meta;
 }
 
 /** Counselling notices: none until announcements are imported from MCC with their official links. Never made up. */
@@ -699,8 +705,8 @@ const STRIP_DOTS = 1500;
  * shallowest closing; `strip` (one point per option with a closing in the later past year) and `trend` cover the
  * first courses of it (see STRIP_COURSES).
  */
-export async function dashboard(profile: Profile) {
-  const cat = await getCatalog();
+export async function dashboard(profile: Profile, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const ranked = await rankOptions(cat, cat.options.filter((o) => optMatches(cat, o, profile)), profile, true);
   const [, last] = PAST_YEARS;
   const byCourse = new Map<string, { course: Course; points: StripPoint[]; opts: Opt[] }>();
@@ -762,8 +768,8 @@ export type InstituteFilters = {
  * Institutes, sorted, one page at a time. With a profile, `bestReach` is the best label among the options here that
  * match her profile (course, degree, quota, state, fee, bond), and `best` names that option.
  */
-export async function listInstitutes(profile: Profile | null, f: InstituteFilters = {}, pg?: PageQuery) {
-  const cat = await getCatalog();
+export async function listInstitutes(profile: Profile | null, f: InstituteFilters = {}, pg?: PageQuery, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const match = searchMatcher(f.search);
   const byCollege = new Map<string, Opt[]>();
   for (const o of cat.options) (byCollege.get(o.college) ?? byCollege.set(o.college, []).get(o.college)!).push(o);
@@ -824,8 +830,8 @@ export type AllotmentFilters = { year?: number; round?: Round; course?: string; 
  * last page (as every list here does: `page` says which). Each row: `fees` (its course and quota's terms, courseTerms)
  * and `hospital` (type and beds, or null).
  */
-export async function listAllotments(f: AllotmentFilters, pg: PageQuery, collegeKey?: string) {
-  const cat = await getCatalog();
+export async function listAllotments(f: AllotmentFilters, pg: PageQuery, collegeKey?: string, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const course = f.course ? cat.courses.find((c) => c.slug === f.course) : undefined;
   const courses = f.courses?.length ? cat.courses.filter((c) => f.courses!.includes(c.slug)) : null;
   // College, course and state become a list of CollegeSpecialty ids for the SQL WHERE.
@@ -843,7 +849,7 @@ export async function listAllotments(f: AllotmentFilters, pg: PageQuery, college
     : undefined;
   // Term filters: the courses and quotas (options) whose terms pass, into the SQL WHERE as (course, quota) pairs.
   const tf = anyTermFilter(f.terms) ? f.terms! : null;
-  const types = await typesFor(tf);
+  const types = await typesFor(tf, cat.exam);
   const inCs = cs && new Set(cs);
   const csQuota = tf
     ? cat.options.filter((o) => (!inCs || inCs.has(o.cs)) && (!f.quota || o.quota === f.quota) && optMatches(cat, o, null, tf, types)).map((o) => [o.cs, o.quota] as [string, string])
@@ -881,7 +887,7 @@ export async function listAllotments(f: AllotmentFilters, pg: PageQuery, college
         bondText: t.bond?.text ?? null,
         penaltyText: t.penalty?.text ?? null,
       };
-    })),
+    }), cat.exam),
   };
 }
 
@@ -927,10 +933,10 @@ export const nothingDeclared = (t: ProgrammeTerms) => !t.years.some((y) => y.fee
  * last in both directions, then by name); `undeclared` counts the matching rows with nothing declared; `unknownTerms` the
  * rows left out only because a filtered value is not declared (`keepUnknown` adds them).
  */
-export async function listFees(f: FeeFilters, pg?: PageQuery) {
-  const cat = await getCatalog();
+export async function listFees(f: FeeFilters, pg?: PageQuery, exam: ExamKey = DEFAULT_EXAM) {
+  const cat = await getCatalog(exam);
   const q = f.search?.trim().toLowerCase();
-  const types = await typesFor(f);
+  const types = await typesFor(f, cat.exam);
   const { kept: rows, unknown } = splitByTerms(
     cat.colleges
       .filter((c) => (!f.states?.length || (c.state != null && f.states.includes(c.state))) && (!q || `${c.name} ${c.state ?? ""}`.toLowerCase().includes(q)))

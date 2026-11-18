@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { LogOutButton } from "@/features/auth/components/log-out-button";
 import { formatRank } from "@/features/cutoffs/lib/format";
+import { examKeys, exams, showsPage, type ExamKey } from "@/features/exams/registry";
 import { MAX_COMPARE } from "../lib/choices";
 import { pageFilters, withFilters } from "../lib/links";
 import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
@@ -67,7 +68,8 @@ const bottom = [
 /** `admin`: the server says she is an owner or admin (layout.tsx); only then is the Admin nav entry rendered. */
 /** `account`: the signed-in user (layout.tsx) for the sidebar's footer and the header's plan chip; null signed out. */
 /** `listName`: the round she fills next, for her first choice list's name (RenamedSaved). */
-export function DecideShell({ meta, phone, ask, admin, account, listName, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; account: ShellAccount | null; listName?: string | null; children: React.ReactNode }) {
+/** `exam`: staff only (layout.tsx): the exam shown, with a switcher in the header; the nav leaves out pages it has no data for. */
+export function DecideShell({ meta, phone, ask, admin, exam, account, listName, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; exam?: ExamKey; account: ShellAccount | null; listName?: string | null; children: React.ReactNode }) {
   const pathname = usePathname();
   const sp = useSearchParams();
   const router = useRouter();
@@ -193,11 +195,21 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
   // The sidebar: the Plan … Research groups, then Account (Refer & earn), then Help with Ask and Admin for those who have
   // them. Her name, plan and "Upgrade" are the footer (AccountFooter), pinned to the sidebar's and the menu's bottom.
   const help = sections.at(-1)!;
+  const shows = ({ href }: { href: string }) => !exam || showsPage(exam, href);
   const nav = [
     ...sections.slice(0, -1),
     { title: "Account", items: [{ href: "/decide/refer", label: "Refer & earn", icon: Gift }] },
     { ...help, items: [...help.items, ...(ask ? [{ href: "/decide/ask", label: "Ask Seatora", icon: Sparkles }] : []), ...(admin ? [{ href: "/decide/admin", label: "Admin", icon: ShieldCheck }] : [])] },
-  ];
+  ]
+    .map((sec) => ({ ...sec, items: sec.items.filter(shows) }))
+    .filter((sec) => sec.items.length);
+  // Staff's exam switcher: ?exam= becomes the seatora_exam cookie (src/middleware.ts), which only staff's pages heed.
+  const pickExam = (k: string) => {
+    const next = new URLSearchParams(sp.toString());
+    next.set("exam", k);
+    navigating();
+    router.replace(`${pathname}?${next}`, { scroll: false });
+  };
 
   return (
     <>
@@ -213,6 +225,11 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
               // Phones: the chips drop words by the bar's width in rem (a container query, so a larger text size drops them
               // sooner), then shrink (globals.css): never over the logo.
               <span data-topbar-end className="flex min-w-0 items-center gap-2.5">
+                {exam && (
+                  <select aria-label="Exam" value={exam} onChange={(e) => pickExam(e.target.value)} className="hit h-8 rounded-full border border-input bg-card px-2.5 text-xs font-semibold">
+                    {examKeys.map((k) => <option key={k} value={k}>{exams[k].label}</option>)}
+                  </select>
+                )}
                 {account && (
                   <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className="hit inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap">
                     <span className="sr-only">Your plan: </span>
@@ -296,7 +313,7 @@ export function DecideShell({ meta, phone, ask, admin, account, listName, childr
         </Link>
       )}
       <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
-        {bottom.map(({ href, label, icon: Icon }) => (
+        {bottom.filter(shows).map(({ href, label, icon: Icon }) => (
           <Link key={href} href={navHref(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", href === "/decide/residents" ? cn("font-semibold text-residents", isCurrent(href) ? "border-residents" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <span className="relative">
               <Icon className="size-[1.25rem]" strokeWidth={1.75} aria-hidden />

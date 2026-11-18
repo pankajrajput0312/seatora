@@ -4,12 +4,14 @@
 // removes any old snapshot and the app reads Postgres as before.
 // Egress: the snapshot is about 24 MB read from Postgres, so it is kept in the build cache (.next/cache, which Vercel
 // restores between deploys) with a fingerprint (the import marker and the newest College edit); a deploy whose data
-// did not change reuses it with two tiny queries instead of reading the catalog again.
+// did not change reuses it with two tiny queries instead of reading the catalog again. NEET PG's only: another exam's
+// import changes neither its marker nor its colleges, so it never costs a rebuild; other exams read Postgres.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { gzipSync } from "node:zlib";
 import { PrismaClient } from "@prisma/client";
-import { catalogRows, infoRows, markerOf, roundKey, seatRoundRows, SNAPSHOT_FILE, type Snapshot } from "../src/features/decide/server/snapshot.ts";
+import { catalogRows, fingerprint, infoRows, roundKey, seatRoundRows, SNAPSHOT_FILE, type Snapshot } from "../src/features/decide/server/snapshot.ts";
+import { DEFAULT_EXAM } from "../src/features/exams/keys.ts";
 import { rounds } from "../src/features/decide/types.ts";
 
 const CACHE = ".next/cache/seatora-snapshot.json.gz";
@@ -22,9 +24,7 @@ if (!process.env.DATABASE_URL) {
   const db = new PrismaClient();
   try {
     // Marker first: an import committing while this reads changes the marker, so the snapshot is then never used.
-    const marker = await markerOf(db);
-    const edited = (await db.college.aggregate({ _max: { updatedAt: true } }))._max.updatedAt?.toISOString() ?? "";
-    const fp = `${marker}|${edited}`;
+    const { marker, fp } = await fingerprint(db);
     if (marker && existsSync(CACHE) && existsSync(CACHE_FP) && readFileSync(CACHE_FP, "utf8") === fp) {
       mkdirSync(dirname(SNAPSHOT_FILE), { recursive: true });
       copyFileSync(CACHE, SNAPSHOT_FILE);
@@ -33,7 +33,7 @@ if (!process.env.DATABASE_URL) {
       process.exit(0);
     }
     // The newest seat list round (seatLists() order: year, then round): the one Seats and institute pages open on.
-    const [newest] = (await db.seatSource.findMany({ select: { year: true, round: true }, distinct: ["year", "round"] })).sort(
+    const [newest] = (await db.seatSource.findMany({ where: { source: { exam: DEFAULT_EXAM } }, select: { year: true, round: true }, distinct: ["year", "round"] })).sort(
       (a, b) => b.year - a.year || rounds.indexOf(b.round as never) - rounds.indexOf(a.round as never),
     );
     const [catalog, info, seatRows] = await Promise.all([catalogRows(db), infoRows(db), newest ? seatRoundRows(db, newest.year, newest.round) : null]);

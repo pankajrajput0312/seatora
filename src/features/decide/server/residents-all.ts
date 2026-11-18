@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
+import { DEFAULT_EXAM } from "@/features/exams/keys";
 import { db } from "@/lib/db";
 import { searchAlternatives } from "../lib/college-aliases";
 import { RESIDENTS_PAGE_SIZE, type ResidentRow, type ResidentsPage, type ResidentsQuery } from "../residents-search";
@@ -142,7 +143,7 @@ export async function listResidentsAll(q: ResidentsQuery): Promise<ResidentsPage
   }));
   const keys = [...new Set(rows.map((r) => r.sourceKey))];
   const sources = keys.length
-    ? await db.dataSource.findMany({ where: { key: { in: keys } }, select: { key: true, name: true, url: true, counsellingYear: true }, orderBy: { key: "desc" } })
+    ? await db.dataSource.findMany({ where: { exam: DEFAULT_EXAM, key: { in: keys } }, select: { key: true, name: true, url: true, counsellingYear: true }, orderBy: { key: "desc" } })
     : [];
   return {
     rows,

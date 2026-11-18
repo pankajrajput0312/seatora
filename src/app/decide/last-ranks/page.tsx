@@ -30,6 +30,7 @@ import { courseName } from "@/features/decide/components/options-view";
 import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
 import { baseCategories, roundLabel, rounds, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
+import { activeExam } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Last ranks" };
 // ponytail: 25 a page: each card carries its five term cells and their (i)s (both views are in the page).
@@ -140,7 +141,8 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
   const tp = readTermFilters(params, profile);
-  const meta = await getMeta();
+  const exam = await activeExam();
+  const meta = await getMeta(exam);
   // Every one of her courses by default (lib/course-filter.ts), the picked ones otherwise; no profile courses: the first course.
   const cf = courseFilter(params, profile, meta.courses);
   const picked = cf.slugs ? meta.courses.filter((c) => cf.slugs!.has(c.slug)) : [];
@@ -163,12 +165,12 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
     : f.rk === "reached" ? `Would have got AIR ${formatRank(myRank!)}` : `Near AIR ${formatRank(myRank!)} (±10%)`;
   const base = { courses: courses.map((c) => ({ degree: c.degree, specialty: c.specialty })), category, quotas, search: f.q, sort, closing: closing && { ...closing, since: f.since } };
   const [lr, all, inst, info, view] = await Promise.all([
-    lastRanks({ ...base, terms: tp.filters }),
+    lastRanks({ ...base, terms: tp.filters }, undefined, exam),
     // A term filter set: every row as well, to count those left out only for a value not declared (as Rank scan), and
     // to tell an institute the filters hide from one with no closing.
-    filtered ? lastRanks(base) : null,
-    f.inst ? getCollege(f.inst) : null,
-    hospitalInfo(),
+    filtered ? lastRanks(base, undefined, exam) : null,
+    f.inst ? getCollege(f.inst, exam) : null,
+    hospitalInfo(exam),
     chosenView(params, VIEW),
   ]);
 

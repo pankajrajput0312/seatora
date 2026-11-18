@@ -28,6 +28,7 @@ import { readTermFilters, termChips, termValueLabel } from "@/features/decide/li
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, listOptions, optionsView, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
 import { openQuotas, openQuotasNote, quotaScopeNote, optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
+import { activeExam } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
@@ -68,13 +69,14 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const { params: tp, filters: terms } = readTermFilters(params, profile);
   const hasSeats = f.seats === "1" ? "clear" : f.seats === "all" ? false : f.seats;
   const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms, sort: f.sort };
-  const [meta, r, view] = await Promise.all([getMeta(), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }), chosenView(params, "options")]);
+  const exam = await activeExam();
+  const [meta, r, view] = await Promise.all([getMeta(exam), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }, exam), chosenView(params, "options")]);
   const lists = r.seatLists;
   const roundView = r.view === "round";
   // The round view lists the seats with no past allotment as rows; the other view names them and links Seats.
-  const unlisted = roundView ? null : await unlistedSeats(profile, r.seats === "virtual" || r.seats === "new" ? r.seats : "clear");
+  const unlisted = roundView ? null : await unlistedSeats(profile, r.seats === "virtual" || r.seats === "new" ? r.seats : "clear", exam);
   // Nothing with the round's seats: how many match without that filter (the empty state offers them).
-  const withoutSeats = !r.total && r.seats ? (await listOptions(profile, { ...filters, hasSeats: false }, { page: 1, pageSize: 1 })).total : 0;
+  const withoutSeats = !r.total && r.seats ? (await listOptions(profile, { ...filters, hasSeats: false }, { page: 1, pageSize: 1 }, exam)).total : 0;
   const L = decideLinks(params);
   const here = (changes: Record<string, string | null>) => L.with("/decide/options", { page: null, ...changes });
   // The All chip counts what it lists: closed-before options only while they are shown.

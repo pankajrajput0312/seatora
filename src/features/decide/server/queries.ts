@@ -5,7 +5,7 @@ import { isStrayRound, type ReachInput } from "../lib/reach";
 import { optionId, rounds, type Allotment, type Category, type Cutoff, type PrevSeat, type Round } from "../types";
 import type { Catalog } from "./catalog";
 
-/** Filters pushed into SQL. `cs` = CollegeSpecialty ids; undefined means no restriction, [] means nothing. */
+/** Filters pushed into SQL, always with the catalog's exam. `cs` = CollegeSpecialty ids; undefined means no restriction, [] means nothing. */
 export type CutoffQuery = { cs?: string[]; quotas?: string[]; categories?: string[]; years?: number[] };
 /** `csQuota`: only these (CollegeSpecialty id, quota) pairs (the term filters' options); [] matches nothing. */
 export type AllotmentQuery = { cs?: string[]; csQuota?: [string, string][]; year?: number; round?: Round; quota?: string; category?: string; from?: number; to?: number };
@@ -41,6 +41,7 @@ export async function findCutoffs(cat: Catalog, q: CutoffQuery): Promise<Cutoff[
     );
   }
   const where = [
+    Prisma.sql`exam = ${cat.exam}`,
     q.cs && csIn(q.cs),
     q.quotas && Prisma.sql`quota = ANY(${q.quotas})`,
     q.categories && Prisma.sql`category = ANY(${q.categories})`,
@@ -48,7 +49,7 @@ export async function findCutoffs(cat: Catalog, q: CutoffQuery): Promise<Cutoff[
   ].filter((x): x is Prisma.Sql => !!x);
   const rows = await db.$queryRaw<{ cs: string; y: number; r: string; q: string; c: string; o: number; k: number; n: number; s: string }[]>`
     SELECT "collegeSpecialtyId" AS cs, "counsellingYear" AS y, round AS r, quota AS q, category AS c, "openingRank" AS o, "closingRank" AS k, n, "sourceId" AS s
-    FROM "Cutoff" ${where.length ? Prisma.sql`WHERE ${Prisma.join(where, " AND ")}` : Prisma.empty}`;
+    FROM "Cutoff" WHERE ${Prisma.join(where, " AND ")}`;
   return rows
     .flatMap((r) => {
       const pair = cat.pairs.get(r.cs);
@@ -91,7 +92,7 @@ export async function findReachInputs(
       MAX(lpad("closingRank"::text, 7, '0') || '|' || (9 - array_position(${sqlRounds}::text[], round)) || '|' || round || '|' || category) FILTER (WHERE "counsellingYear" = ${y2}) AS bx,
       ${Prisma.join(latestCols)}
     FROM "Cutoff"
-    WHERE "counsellingYear" = ANY(${[y1, y2, q.latestYear]})
+    WHERE exam = ${cat.exam} AND "counsellingYear" = ANY(${[y1, y2, q.latestYear]})
       ${q.categories ? Prisma.sql`AND category = ANY(${q.categories})` : Prisma.empty}
       ${q.cs ? Prisma.sql`AND ${csIn(q.cs)}` : Prisma.empty}
     GROUP BY 1, 2`;
@@ -137,6 +138,7 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
     return { total: all.length, rows: all.slice(offset, opts.limit == null ? undefined : offset + opts.limit) };
   }
   const where = [
+    Prisma.sql`exam = ${cat.exam}`,
     q.cs && csIn(q.cs),
     q.csQuota && Prisma.sql`("collegeSpecialtyId", quota) IN (SELECT * FROM unnest(${q.csQuota.map((x) => x[0])}::text[], ${q.csQuota.map((x) => x[1])}::text[]))`,
     q.year && Prisma.sql`"counsellingYear" = ${q.year}`,
@@ -146,7 +148,7 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
     q.from && Prisma.sql`rank >= ${q.from}`,
     q.to && Prisma.sql`rank <= ${q.to}`,
   ].filter((x): x is Prisma.Sql => !!x);
-  const whereSql = where.length ? Prisma.sql`WHERE ${Prisma.join(where, " AND ")}` : Prisma.empty;
+  const whereSql = Prisma.sql`WHERE ${Prisma.join(where, " AND ")}`;
   const [rows, total] = await Promise.all([
     // Previous seat's college key and course from the joins after the page is cut (the schema 2 columns: raw SQL).
     db.$queryRaw<
@@ -205,6 +207,6 @@ export async function countAllotments(cat: Catalog, cs: string[]): Promise<Allot
   }
   const rows = await db.$queryRaw<{ y: number; r: string; q: string; c: string; n: number }[]>`
     SELECT "counsellingYear" AS y, round AS r, quota AS q, category AS c, COUNT(*)::int AS n
-    FROM "Allotment" WHERE ${csIn(cs)} GROUP BY 1, 2, 3, 4`;
+    FROM "Allotment" WHERE exam = ${cat.exam} AND ${csIn(cs)} GROUP BY 1, 2, 3, 4`;
   return rows.map((r) => ({ year: r.y, round: r.r as Round, quota: r.q, category: r.c as Category, n: r.n }));
 }

@@ -10,6 +10,7 @@ import { toURLSearchParams } from "@/features/decide/profile";
 import { roundStatus } from "@/features/decide/server/notices";
 import { chosenView } from "@/features/decide/server/view";
 import { currentSeatLists, getMeta, LATEST_YEAR, PAST_YEARS } from "@/features/decide/service";
+import { activeExam } from "@/features/exams/active";
 import { currentPlan } from "@/features/plans/usage";
 import { liveReach } from "./actions";
 
@@ -18,7 +19,8 @@ export const metadata: Metadata = { title: "Choices" };
 export default async function ChoicesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
-  const [lists, view, me, rs, meta] = await Promise.all([currentSeatLists(), chosenView(params, "choices"), currentPlan(), roundStatus(LATEST_YEAR).catch(() => null), getMeta()]);
+  const exam = await activeExam();
+  const [lists, view, me, rs, meta] = await Promise.all([currentSeatLists(exam), chosenView(params, "choices"), currentPlan(), roundStatus(LATEST_YEAR, exam).catch(() => null), getMeta(exam)]);
   // Her list is for the choice filling she fills next (MCC's schedule), never a fixed round (the layout names it the same).
   const fill = rs && nextChoiceFilling(stepsNow(rs, new Date()));
   const nextRound = fill && { name: `${roundName[fill.round]} · ${rs.year}`, when: `${roundName[fill.round]} choice filling, ${fillWindow(fill)}` };

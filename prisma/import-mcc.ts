@@ -1,5 +1,13 @@
-// Imports the MCC export bundle (neetpg-planner `python3 -I tools/export_medpath.py` → data/medpath-r3/; schema 2, or 1).
-// Usage: npm run db:import [-- <bundle dir>]   (default ../neetpg-planner/data/medpath-r3, or MCC_BUNDLE)
+// Imports the MCC export bundle (neetpg-planner `python3 -I tools/export_medpath.py` → data/medpath-r3/; schema 2, or 1;
+// schema 3 = 2 plus manifest.exam).
+// Usage: npm run db:import [-- [--exam <key>] <bundle dir>]   (default ../neetpg-planner/data/medpath-r3, or MCC_BUNDLE;
+// exam: --exam, else manifest.exam, else neet-pg; src/features/exams/keys.ts)
+// One exam per run: everything below is that exam's rows only, so importing one exam leaves every other exam's as it was.
+// Colleges are shared (one row per institute): NEET PG's import writes its colleges' fields; another exam's only creates
+// a college it is first to have, never changes an existing row. An exam's colleges are its CollegeExam rows, and a
+// college goes only when no exam has it. Exams other than neet-pg may leave out the optional files (seats, terms, fees,
+// clinical facts, notices, round status, NBEMS aggregates, aliases), and leave a choice number or candidate category null
+// where their PDFs print none.
 // Validates everything first and aborts on any error; then, in one transaction, makes the database match the bundle:
 // upserts sources, colleges (incl. the seat-list-only ones) and specialties, replaces cutoffs, allotments, terms, seat
 // lists, notices, round steps, the NBEMS score/merit aggregates and (schema 2) clinical facts and the per-year fee table,
@@ -16,6 +24,7 @@ import {
   citedSources,
   clinicalValuePaths,
   mccAllotmentSchema,
+  mccAllotmentV2LooseSchema,
   mccAllotmentV2Schema,
   mccCategories,
   mccClinicalFactsSchema,
@@ -36,18 +45,29 @@ import {
   type MccCollegeV2,
 } from "../src/features/cutoffs/lib/import-schema.ts";
 import { noticeKinds, roundSteps, seatKinds, stepStatuses } from "../src/features/decide/types.ts";
+import { DEFAULT_EXAM, examKeys, isExam, markerKey, ranksPerGroup } from "../src/features/exams/keys.ts";
 
-const dir = resolve(process.argv[2] ?? process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
+const args = process.argv.slice(2);
+const examAt = args.indexOf("--exam");
+const examArg = examAt >= 0 ? args.splice(examAt, 2)[1] : undefined;
+const dir = resolve(args[0] ?? process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
 const errors: string[] = [];
 const fail = (msg: string) => errors.push(msg);
 
 // ---------- 1. verify and validate the whole bundle before touching the database ----------
 const manifestJson = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"));
 const manifest = mccManifestSchema.parse(manifestJson);
+const exam = examArg ?? manifest.exam ?? DEFAULT_EXAM;
+if (!isExam(exam)) throw new Error(`Unknown exam "${exam}": one of ${examKeys.join(", ")}`);
+if (examArg && manifest.exam && examArg !== manifest.exam) throw new Error(`--exam ${examArg}, but the bundle is ${manifest.exam}'s`);
+const pg = exam === DEFAULT_EXAM;
 /** Schema 2 adds college MCC ids / profile / type / website, allotment candidate category / option no / previous seat, clinical facts, the fee table. */
-const v2 = manifest.schema_version === 2;
+const v2 = manifest.schema_version >= 2;
 const fileEntry = z.object({ count: z.number().int().nonnegative(), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict();
-const summaryFiles = z.object({ "round_status.json": fileEntry, "score_rank.json": fileEntry, "merit_position.json": fileEntry }).strict().parse(manifestJson.summary_files);
+const summarySchema = z.object({ "round_status.json": fileEntry, "score_rank.json": fileEntry, "merit_position.json": fileEntry }).strict();
+// NEET PG's bundle has every file, as before; another exam's may leave the optional ones out (manifest and files alike).
+const summaryFiles = pg ? summarySchema.parse(manifestJson.summary_files) : summarySchema.partial().parse(manifestJson.summary_files ?? {});
+const REQUIRED = new Set(["sources.json", "colleges.ndjson", "courses.json", "cutoffs.ndjson", "allotments.ndjson"]);
 const raw: Record<string, Buffer> = {};
 for (const [file, { count, sha256 }] of Object.entries({ ...manifest.files, ...summaryFiles })) {
   raw[file] = readFileSync(join(dir, file));
@@ -60,7 +80,7 @@ for (const [file, { count, sha256 }] of Object.entries({ ...manifest.files, ...s
 function parse<S extends z.ZodType>(file: string, schema: S): z.infer<S>[] {
   const text = raw[file]?.toString("utf8");
   if (text == null) {
-    fail(`${file}: missing from manifest`);
+    if (pg || REQUIRED.has(file)) fail(`${file}: missing from manifest`);
     return [];
   }
   const items: { line: number; value: unknown }[] = file.endsWith(".ndjson")
@@ -85,7 +105,7 @@ const terms = parse("terms.ndjson", mccTermSchema);
 // A BOND whose status is unknown and has no document (src_url null): imported with its words (not checked yet, other
 // colleges' terms, ask the college), its source the bond check itself (no document, no URL).
 const BOND_CHECK = { key: "seatora/bond-check", name: "Seatora bond check (no document yet)", type: "THIRD_PARTY_RESEARCH" as const };
-const allotments: (MccAllotment | MccAllotmentV2)[] = v2 ? parse("allotments.ndjson", mccAllotmentV2Schema) : parse("allotments.ndjson", mccAllotmentSchema);
+const allotments: (MccAllotment | MccAllotmentV2)[] = v2 ? parse("allotments.ndjson", pg ? mccAllotmentV2Schema : mccAllotmentV2LooseSchema) : parse("allotments.ndjson", mccAllotmentSchema);
 const clinical = v2 ? parse("clinical_facts.ndjson", mccClinicalFactsSchema) : [];
 const feeTable = v2 ? parse("fees_structured.ndjson", mccFeesStructuredSchema) : [];
 
@@ -176,6 +196,7 @@ const meritPositionSchema = z
   })
   .strict();
 function parseOne<S extends z.ZodType>(file: string, schema: S): z.infer<S> | null {
+  if (!raw[file]) return null; // optional for this exam (summaryFiles)
   const r = schema.safeParse(JSON.parse(raw[file].toString("utf8")));
   if (!r.success) fail(`${file}: ${r.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
   return r.success ? r.data : null;
@@ -227,9 +248,14 @@ allotments.forEach((a, i) => {
 for (const [k, { n, min, max, want }] of cells)
   if (n !== want.n || min !== want.opening || max !== want.closing) fail(`cutoff ${k}: n/opening/closing ${want.n}/${want.opening}/${want.closing}, allotments give ${n}/${min}/${max}`);
 // Schema 2: one candidate per rank, year and round; a previous seat (R2: R1's, R3: R2's) is that round's allotment of the same rank.
+// NEET SS ranks are per question group (in the quota label): a candidate is a rank in a group, and one who moved to
+// another group's course held a rank of the old group, so the previous seat must then be one allotted a round back.
+const grouped = ranksPerGroup.includes(exam);
 const PREV_ROUND: Record<string, string> = { R2: "R1", R3: "R2" };
 const seatOf = (a: { ikey: string; degree: string; specialty: string; quota: string }) => [a.ikey, a.degree, a.specialty, a.quota].join("|");
-const byRank = new Map(allotments.map((a) => [`${a.year}|${a.round}|${a.rank}`, a]));
+const who = (a: { year: number; rank: number }, round: string, quota: string) => `${a.year}|${round}|${a.rank}${grouped ? `|${quota}` : ""}`;
+const byRank = new Map(allotments.map((a) => [who(a, a.round, a.quota), a]));
+const allottedSeats = new Set(grouped ? allotments.map((a) => `${a.year}|${a.round}|${seatOf(a)}`) : []);
 if (v2 && byRank.size !== allotments.length) fail(`allotments.ndjson: ${allotments.length - byRank.size} rank(s) allotted twice in one year and round`);
 allotments.forEach((a, i) => {
   if (!("prev_ikey" in a) || a.prev_ikey == null) return;
@@ -237,7 +263,8 @@ allotments.forEach((a, i) => {
   const prev = { ikey: a.prev_ikey, degree: a.prev_degree!, specialty: a.prev_specialty!, quota: a.prev_quota! };
   if (!collegeKeys.has(prev.ikey)) fail(`${at}: unknown previous college ${prev.ikey}`);
   if (!courseSlug.has(`${prev.degree}|${prev.specialty}`)) fail(`${at}: unknown previous course ${prev.degree} ${prev.specialty}`);
-  const held = byRank.get(`${a.year}|${PREV_ROUND[a.round]}|${a.rank}`);
+  const held = byRank.get(who(a, PREV_ROUND[a.round], prev.quota));
+  if (grouped && !held && allottedSeats.has(`${a.year}|${PREV_ROUND[a.round]}|${seatOf(prev)}`)) return; // moved group
   if (!held || seatOf(held) !== seatOf(prev)) fail(`${at}: previous seat ${seatOf(prev)} is not rank ${a.rank}'s ${a.year} ${PREV_ROUND[a.round]} allotment (${held ? seatOf(held) : "none"})`);
 });
 const termKeys = new Set<string>();
@@ -337,7 +364,7 @@ if (noticeByUrl.size !== notices.length) fail("notices.json: duplicate url");
 const steps = roundStatus
   ? Object.entries(roundStatus.rounds).flatMap(([round, st]) => roundSteps.map((step) => ({ round, step, ...st![step] })))
   : [];
-if (roundStatus && steps.length !== summaryFiles["round_status.json"].count) fail(`round_status.json: ${steps.length} steps, manifest says ${summaryFiles["round_status.json"].count}`);
+if (roundStatus && steps.length !== summaryFiles["round_status.json"]?.count) fail(`round_status.json: ${steps.length} steps, manifest says ${summaryFiles["round_status.json"]?.count}`);
 
 // NBEMS aggregates: ranks and counts consistent row by row; one result PDF per year behind both files
 type NbemsList = { year: number; key: string; url: string; noticeUrl: string; maxMarks: number; candidates: number; coverage: string; step: number | null; qualified: Record<string, number> | null };
@@ -358,7 +385,7 @@ for (const [y, v] of Object.entries(scoreRank?.years ?? {})) {
   const n = v.rows.reduce((a, r) => a + r[3], 0);
   if (n !== v.candidates) fail(`${at}: counts add up to ${n}, candidates ${v.candidates}`);
 }
-if (scoreRows.length !== summaryFiles["score_rank.json"].count) fail(`score_rank.json: ${scoreRows.length} rows, manifest says ${summaryFiles["score_rank.json"].count}`);
+if (scoreRows.length !== (summaryFiles["score_rank.json"]?.count ?? 0)) fail(`score_rank.json: ${scoreRows.length} rows, manifest says ${summaryFiles["score_rank.json"]?.count}`);
 const meritRows: { year: number; aiqRank: number; maxAir: number; category: string; count: number }[] = [];
 let meritRowCount = 0;
 for (const [y, v] of Object.entries(meritPosition?.years ?? {})) {
@@ -382,7 +409,7 @@ for (const [y, v] of Object.entries(meritPosition?.years ?? {})) {
   meritRowCount += v.rows.length;
   if (list) Object.assign(list, { step: v.step, qualified: v.qualified });
 }
-if (meritRowCount !== summaryFiles["merit_position.json"].count) fail(`merit_position.json: ${meritRowCount} rows, manifest says ${summaryFiles["merit_position.json"].count}`);
+if (meritRowCount !== (summaryFiles["merit_position.json"]?.count ?? 0)) fail(`merit_position.json: ${meritRowCount} rows, manifest says ${summaryFiles["merit_position.json"]?.count}`);
 
 if (errors.length) {
   console.error(`Import aborted: ${errors.length} error(s)\n${errors.slice(0, 200).join("\n")}`);
@@ -398,9 +425,11 @@ const sourceRank = (k: string) => {
   const s = sources.find((x) => x.key === k) ?? seatSourceOf.get(k)!;
   return s.year * 10 + roundOrder.indexOf(s.round);
 };
-// Written last in the transaction, so it changes only when an import commits: the data version that
+// Written last in the transaction, so it changes only when an import commits: the data version (one per exam) that
 // src/features/decide/server/catalog.ts checks on every request.
-const MARKER = "import/mcc";
+const MARKER = markerKey(exam);
+/** DataSource keys are unique per exam. */
+const sk = (key: string) => ({ exam_key: { exam, key } });
 
 async function main() {
   const result = await db.$transaction(
@@ -409,69 +438,81 @@ async function main() {
       const accounts = async () => (await Promise.all([tx.user.count(), tx.session.count(), tx.waitlistEntry.count()])).join("/");
       const accountsBefore = await accounts();
 
+      // Every college with the exams that have it. One another exam has stays whatever this bundle says (live).
+      const dbColleges = (await tx.college.findMany({ select: { id: true, key: true, slug: true, pincode: true, exams: { select: { exam: true } } } })).map((c) => ({
+        ...c,
+        exams: c.exams.map((e) => e.exam),
+      }));
+      const othersHave = (c: { exams: string[] }) => c.exams.some((e) => e !== exam);
+      const liveKeys = new Set([...allCollegeKeys, ...dbColleges.filter(othersHave).map((c) => c.key)]);
+      const liveHashed = [...liveKeys].map((k) => `sha256:${sha(k)}`);
+      // A key this bundle retires that another exam still has: that exam's bundle must retire it too (one key per institute).
+      const stillUsed = aliases.filter((a) => liveKeys.has(a.oldKey) || liveHashed.includes(a.oldKey)).map((a) => a.oldKey);
       // Colleges under a key this bundle retired, before their rows go: their slugs (old links redirect) and what the
       // bundle now has under the new key instead (cutoffs, allotments, seat lines, residents moved).
-      const dbColleges = await tx.college.findMany({ select: { id: true, key: true, slug: true, pincode: true } });
       const retiredNow = dbColleges.flatMap((c) => {
-        const oldKey = retiredAs(c.key);
+        const oldKey = !liveKeys.has(c.key) && retiredAs(c.key);
         return oldKey ? [{ ...c, oldKey }] : [];
       });
       const ofRetired = { collegeId: { in: retiredNow.map((c) => c.id) } };
       const moved = {
         colleges: retiredNow.length,
-        cutoffs: await tx.cutoff.count({ where: { collegeSpecialty: ofRetired } }),
-        allotments: await tx.allotment.count({ where: { collegeSpecialty: ofRetired } }),
+        cutoffs: await tx.cutoff.count({ where: { exam, collegeSpecialty: ofRetired } }),
+        allotments: await tx.allotment.count({ where: { exam, collegeSpecialty: ofRetired } }),
         seatCounts: await tx.seatCount.count({ where: ofRetired }),
         residents: await tx.resident.count({ where: ofRetired }),
       };
 
-      // remove what the bundle replaces or no longer has. Cutoffs, allotments, terms, seat lists, notices, round steps and
-      // the NBEMS aggregates have no other source.
+      // remove what the bundle replaces or no longer has, of this exam only. Cutoffs, allotments, terms, seat lists,
+      // notices, round steps and the NBEMS aggregates have no other source.
       // Key diffs are done here, not as NOT IN in SQL: that plan (NOT IN + nested NOT EXISTS over 133k cutoffs) can run for many minutes.
-      await tx.cutoff.deleteMany({});
-      await tx.allotment.deleteMany({});
-      await tx.collegeTerm.deleteMany({});
-      await tx.seatCount.deleteMany({});
-      await tx.announcement.deleteMany({});
-      await tx.roundStep.deleteMany({});
-      await tx.scoreRank.deleteMany({});
-      await tx.meritPosition.deleteMany({});
-      await tx.$executeRaw`DELETE FROM "ClinicalFacts"`;
-      await tx.$executeRaw`DELETE FROM "FeesStructured"`;
+      await tx.cutoff.deleteMany({ where: { exam } });
+      await tx.allotment.deleteMany({ where: { exam } });
+      await tx.collegeTerm.deleteMany({ where: { exam } });
+      await tx.$executeRaw`DELETE FROM "SeatCount" x USING "DataSource" d WHERE d.id = x."seatSourceId" AND d.exam = ${exam}`;
+      await tx.announcement.deleteMany({ where: { exam } });
+      await tx.roundStep.deleteMany({ where: { exam } });
+      await tx.scoreRank.deleteMany({ where: { exam } });
+      await tx.meritPosition.deleteMany({ where: { exam } });
+      await tx.$executeRaw`DELETE FROM "ClinicalFacts" WHERE exam = ${exam}`;
+      await tx.$executeRaw`DELETE FROM "FeesStructured" WHERE exam = ${exam}`;
       const slugs = new Set(courses.map((c) => c.slug));
       const pairKeys = new Set(cutoffs.map((c) => `${c.ikey}|${courseSlug.get(`${c.degree}|${c.specialty}`)}`));
-      const oldPairs = await tx.collegeSpecialty.findMany({ select: { id: true, college: { select: { key: true } }, specialty: { select: { slug: true } } } });
+      const oldPairs = await tx.collegeSpecialty.findMany({ where: { specialty: { exam } }, select: { id: true, college: { select: { key: true } }, specialty: { select: { slug: true } } } });
       const gonePairs = oldPairs.filter((p) => !pairKeys.has(`${p.college.key}|${p.specialty.slug}`)).map((p) => p.id);
-      const goneColleges = dbColleges.filter((c) => !allCollegeKeys.has(c.key)).map((c) => c.id);
-      const goneSpecialties = (await tx.specialty.findMany({ select: { id: true, slug: true } })).filter((s) => !slugs.has(s.slug)).map((s) => s.id);
-      // Residents of a removed college (cascade) or course go too; import-residents re-adds them under the new key or course,
-      // and their hides live on in HiddenResident.
-      const goneResidents = await tx.resident.count({ where: { OR: [{ collegeId: { in: goneColleges } }, { specialtyId: { in: goneSpecialties } }] } });
+      const goneColleges = dbColleges.filter((c) => !liveKeys.has(c.key)).map((c) => c.id);
+      // Colleges this exam had that only other exams keep now (their CollegeExam row of this exam goes below).
+      const leftColleges = dbColleges.filter((c) => c.exams.includes(exam) && !allCollegeKeys.has(c.key) && othersHave(c)).map((c) => c.id);
+      const goneSpecialties = (await tx.specialty.findMany({ where: { exam }, select: { id: true, slug: true } })).filter((s) => !slugs.has(s.slug)).map((s) => s.id);
+      // Residents (NEET PG's) of a removed college (cascade), of one NEET PG no longer has, or of a removed course go too;
+      // import-residents re-adds them under the new key or course, and their hides live on in HiddenResident.
+      const residentsOut = { OR: [{ collegeId: { in: pg ? [...goneColleges, ...leftColleges] : goneColleges } }, { specialtyId: { in: goneSpecialties } }] };
+      const goneResidents = await tx.resident.count({ where: residentsOut });
       await tx.collegeSpecialty.deleteMany({ where: { id: { in: gonePairs } } });
-      await tx.college.deleteMany({ where: { id: { in: goneColleges } } }); // their Resident rows cascade
-      await tx.resident.deleteMany({ where: { specialtyId: { in: goneSpecialties } } });
+      await tx.resident.deleteMany({ where: residentsOut });
+      await tx.college.deleteMany({ where: { id: { in: goneColleges } } });
       await tx.specialty.deleteMany({ where: { id: { in: goneSpecialties } } });
 
       // sources: allotment PDFs, plus one per distinct term URL
       const sourceId = new Map<string, string>();
       for (const s of sources) {
         const data = { name: s.name, url: s.url, type: "OFFICIAL" as const, counsellingYear: s.year, round: s.round, provisional: s.provisional };
-        const row = await tx.dataSource.upsert({ where: { key: s.key }, create: { key: s.key, ...data }, update: data, select: { id: true } });
+        const row = await tx.dataSource.upsert({ where: sk(s.key), create: { exam, key: s.key, ...data }, update: data, select: { id: true } });
         sourceId.set(s.key, row.id);
       }
       for (const url of termUrls) {
         const name = termSourceName(url);
-        const row = await tx.dataSource.upsert({ where: { key: url }, create: { key: url, name, url, type: "OFFICIAL" }, update: { name, url }, select: { id: true } });
+        const row = await tx.dataSource.upsert({ where: sk(url), create: { exam, key: url, name, url, type: "OFFICIAL" }, update: { name, url }, select: { id: true } });
         sourceId.set(url, row.id);
       }
-      const check = await tx.dataSource.upsert({ where: { key: BOND_CHECK.key }, create: BOND_CHECK, update: { name: BOND_CHECK.name, type: BOND_CHECK.type }, select: { id: true } });
+      const check = await tx.dataSource.upsert({ where: sk(BOND_CHECK.key), create: { exam, ...BOND_CHECK }, update: { name: BOND_CHECK.name, type: BOND_CHECK.type }, select: { id: true } });
       sourceId.set(BOND_CHECK.key, check.id);
       // seat list PDFs: round stays null on the DataSource (year, round, kind on SeatSource), so the catalog never takes
       // one for an allotment result. Dated by the MCC notice that links the PDF, else no date.
       for (const s of seatSources) {
         const date = noticeByUrl.get(s.url)?.date;
         const data = { name: s.name, url: s.url, type: "OFFICIAL" as const, counsellingYear: s.year, round: null, provisional: false, publishedAt: date ? new Date(`${date}T00:00:00Z`) : null };
-        const row = await tx.dataSource.upsert({ where: { key: s.key }, create: { key: s.key, ...data }, update: data, select: { id: true } });
+        const row = await tx.dataSource.upsert({ where: sk(s.key), create: { exam, key: s.key, ...data }, update: data, select: { id: true } });
         const list = { year: s.year, round: s.round, kind: s.kind, total: listTotal.get(s.key)! };
         await tx.seatSource.upsert({ where: { sourceId: row.id }, create: { sourceId: row.id, ...list }, update: list });
         sourceId.set(s.key, row.id);
@@ -479,20 +520,21 @@ async function main() {
       // notices: one DataSource per notice (key = its URL), as for term documents
       for (const n of notices) {
         const data = { name: n.title, url: n.url, type: "OFFICIAL" as const, counsellingYear: n.year, publishedAt: new Date(`${n.date}T00:00:00Z`) };
-        const row = await tx.dataSource.upsert({ where: { key: n.url }, create: { key: n.url, ...data }, update: data, select: { id: true } });
+        const row = await tx.dataSource.upsert({ where: sk(n.url), create: { exam, key: n.url, ...data }, update: data, select: { id: true } });
         sourceId.set(n.url, row.id);
       }
       // NBEMS result PDFs behind score→rank and merit position; name from the exporter's coverage note ("AIQ 50% merit list")
       for (const l of nbems.values()) {
         const data = { name: `NBEMS NEET PG ${l.year} ${l.coverage.split(",")[0]}`, url: l.url, type: "OFFICIAL" as const, counsellingYear: l.year };
-        const row = await tx.dataSource.upsert({ where: { key: l.key }, create: { key: l.key, ...data }, update: data, select: { id: true } });
-        const list = { year: l.year, maxMarks: l.maxMarks, candidates: l.candidates, coverage: l.coverage, noticeUrl: l.noticeUrl, step: l.step, qualified: l.qualified ?? Prisma.DbNull };
+        const row = await tx.dataSource.upsert({ where: sk(l.key), create: { exam, key: l.key, ...data }, update: data, select: { id: true } });
+        const list = { exam, year: l.year, maxMarks: l.maxMarks, candidates: l.candidates, coverage: l.coverage, noticeUrl: l.noticeUrl, step: l.step, qualified: l.qualified ?? Prisma.DbNull };
         await tx.meritList.upsert({ where: { sourceId: row.id }, create: { sourceId: row.id, ...list }, update: list });
         sourceId.set(l.key, row.id);
       }
 
       // colleges: slug is set once at creation and never changed, so URLs stay stable. Seat-list-only colleges get the
-      // earliest seat list they appear in as source.
+      // earliest seat list they appear in as source. Another exam than NEET PG only creates the colleges it is first to
+      // have: an existing row (NEET PG's above all) is never changed by it, only its id taken.
       const firstSource = new Map<string, string>();
       for (const c of [...cutoffs, ...seats.filter((s) => seatCollegeKeys.has(s.ikey))]) {
         const cur = firstSource.get(c.ikey);
@@ -505,7 +547,11 @@ async function main() {
       // renamed key with the same name and PIN keeps its URL)
       const slugOwner = new Map((await tx.college.findMany({ select: { slug: true, key: true } })).map((r) => [r.slug, r.key]));
       const collegeId = new Map<string, string>();
-      for (const c of [...colleges, ...seatColleges]) {
+      const byKey = new Map(dbColleges.map((c) => [c.key, c]));
+      const kept = (k: string) => !pg && byKey.has(k);
+      const written = [...colleges, ...seatColleges].filter((c) => !kept(c.key));
+      for (const c of [...colleges, ...seatColleges]) if (kept(c.key)) collegeId.set(c.key, byKey.get(c.key)!.id);
+      for (const c of written) {
         const taken = slugOwner.has(baseSlug(c)) && slugOwner.get(baseSlug(c)) !== c.key;
         const slug = taken || slugCount.get(baseSlug(c))! > 1 ? `${baseSlug(c)}-${shortHash(c.key)}` : baseSlug(c);
         const data = { name: c.name, state: c.state, pincode: c.pincode, address: c.address, sourceId: sourceId.get(firstSource.get(c.key)!)! };
@@ -513,7 +559,7 @@ async function main() {
         collegeId.set(c.key, row.id);
       }
       // Schema 2 college fields (a schema 1 bundle has none: cleared). Raw SQL: the shared generated client needn't know them.
-      const extras = [...colleges, ...seatColleges].map((c) => ({
+      const extras = written.map((c) => ({
         id: collegeId.get(c.key)!,
         mccIds: c.mcc_ids ?? [],
         mccProfileUrl: c.mcc_profile_url ?? null,
@@ -525,6 +571,18 @@ async function main() {
         UPDATE "College" c SET "mccIds" = d."mccIds", "mccProfileUrl" = d."mccProfileUrl", type = d.type, "typeBasis" = d."typeBasis", website = d.website
         FROM jsonb_to_recordset(${JSON.stringify(extras)}::jsonb) AS d(id text, "mccIds" text[], "mccProfileUrl" text, type text, "typeBasis" text, website text)
         WHERE c.id = d.id`;
+      // This exam's colleges (CollegeExam; College.updatedAt, the snapshot's fingerprint, stays as it is).
+      const ids = [...collegeId.values()];
+      await tx.collegeExam.deleteMany({ where: { exam, collegeId: { notIn: ids } } });
+      await tx.collegeExam.createMany({ data: ids.map((collegeId) => ({ exam, collegeId })), skipDuplicates: true });
+      // A college NEET PG no longer has that another exam keeps, whose source is NEET PG's: that source may go below, so it
+      // takes the other exam's earliest result PDF. Another exam's import never changes a college: its source stays (below).
+      if (pg && leftColleges.length)
+        await tx.$executeRaw`
+          UPDATE "College" c SET "sourceId" = (
+            SELECT d.id FROM "DataSource" d JOIN "CollegeExam" e ON e.exam = d.exam AND e."collegeId" = c.id
+            WHERE d.round IS NOT NULL ORDER BY d."counsellingYear", d.key LIMIT 1)
+          WHERE c.id = ANY(${leftColleges}) AND c."sourceId" IN (SELECT id FROM "DataSource" WHERE exam = ${exam})`;
 
       // Retired keys, kept across imports (raw SQL: the shared generated client needn't know the table). A slug is
       // recorded once, when its college goes; a slug recorded before for another key moves to this one.
@@ -534,11 +592,11 @@ async function main() {
         INSERT INTO "RetiredCollegeKey" ("oldKey", "oldSlug", "newKey")
         SELECT * FROM jsonb_to_recordset(${JSON.stringify(aliases.map((a) => ({ ...a, oldSlug: slugOf.get(a.oldKey) ?? null })))}::jsonb) AS d("oldKey" text, "oldSlug" text, "newKey" text)
         ON CONFLICT ("oldKey") DO UPDATE SET "newKey" = EXCLUDED."newKey", "oldSlug" = COALESCE(EXCLUDED."oldSlug", "RetiredCollegeKey"."oldSlug")`;
-      // Keys retired by earlier bundles: one that is a key again is not retired; the rest point at the key their college
-      // has now (it was retired too) or at none (gone).
-      await tx.$executeRaw`DELETE FROM "RetiredCollegeKey" WHERE "oldKey" = ANY(${[...allCollegeKeys, ...hashedKeys]})`;
+      // Keys retired by earlier bundles: one that is a key again (of any exam) is not retired; the rest point at the key
+      // their college has now (it was retired too) or at none (gone).
+      await tx.$executeRaw`DELETE FROM "RetiredCollegeKey" WHERE "oldKey" = ANY(${[...liveKeys, ...liveHashed]})`;
       const stale = (await tx.$queryRaw<{ oldKey: string; newKey: string }[]>`SELECT "oldKey", "newKey" FROM "RetiredCollegeKey" WHERE "newKey" IS NOT NULL`)
-        .filter((r) => !allCollegeKeys.has(r.newKey))
+        .filter((r) => !liveKeys.has(r.newKey))
         .map((r) => ({ oldKey: r.oldKey, newKey: retiredTo.get(retiredAs(r.newKey) ?? "") ?? null }));
       await tx.$executeRaw`
         UPDATE "RetiredCollegeKey" r SET "newKey" = d."newKey"
@@ -546,7 +604,7 @@ async function main() {
       // HiddenResident is by place (PIN code, or the key of a college without one): a hide at a college's old place also
       // covers its new one when that differs (a kept college given a PIN, or a retired college's successor elsewhere;
       // the old row stays: it may cover others too).
-      const placeOf = new Map([...colleges, ...seatColleges].map((c) => [c.key, c.pincode ?? c.key]));
+      const placeOf = new Map(written.map((c) => [c.key, c.pincode ?? c.key]));
       const moves = movedPlaces(dbColleges, placeOf, (k) => {
         const old = retiredAs(k);
         return old ? retiredTo.get(old) : k;
@@ -557,15 +615,16 @@ async function main() {
         ON CONFLICT DO NOTHING`;
 
       // result PDFs and term documents no longer in the bundle (e.g. a provisional result the final one replaced): nothing
-      // references them any more. Admitted-list sources (no round, written by import-residents) and the marker stay.
+      // references them any more. Admitted-list sources (no round, written by import-residents), the marker and a source
+      // a college another exam keeps still names stay.
       const goneSources = await tx.dataSource.deleteMany({
-        where: { OR: [{ round: { not: null } }, { key: { startsWith: "http" } }, { seatSource: { isNot: null } }, { meritList: { isNot: null } }], key: { notIn: [...sourceId.keys()] } },
+        where: { exam, OR: [{ round: { not: null } }, { key: { startsWith: "http" } }, { seatSource: { isNot: null } }, { meritList: { isNot: null } }], key: { notIn: [...sourceId.keys()] }, colleges: { none: {} } },
       });
 
       const specialtyId = new Map<string, string>();
       for (const c of courses) {
         const data = { name: c.name, degree: c.degree, code: c.specialty };
-        const row = await tx.specialty.upsert({ where: { slug: c.slug }, create: { slug: c.slug, ...data }, update: data, select: { id: true } });
+        const row = await tx.specialty.upsert({ where: { exam_slug: { exam, slug: c.slug } }, create: { exam, slug: c.slug, ...data }, update: data, select: { id: true } });
         specialtyId.set(`${c.degree}|${c.specialty}`, row.id);
       }
 
@@ -576,7 +635,7 @@ async function main() {
       }
       await tx.collegeSpecialty.createMany({ data: [...pairs.values()], skipDuplicates: true });
       const csId = new Map(
-        (await tx.collegeSpecialty.findMany({ select: { id: true, collegeId: true, specialtyId: true } })).map((r) => [`${r.collegeId}|${r.specialtyId}`, r.id]),
+        (await tx.collegeSpecialty.findMany({ where: { specialty: { exam } }, select: { id: true, collegeId: true, specialtyId: true } })).map((r) => [`${r.collegeId}|${r.specialtyId}`, r.id]),
       );
 
       const csOf = (c: { ikey: string; degree: string; specialty: string }) => csId.get(`${collegeId.get(c.ikey)}|${specialtyId.get(`${c.degree}|${c.specialty}`)}`)!;
@@ -587,6 +646,7 @@ async function main() {
         for (let i = 0; i < rows.length; i += 5000) {
           await tx.cutoff.createMany({
             data: rows.slice(i, i + 5000).map((c) => ({
+              exam,
               collegeSpecialtyId: csOf(c),
               counsellingYear: c.year,
               round: c.round,
@@ -622,18 +682,19 @@ async function main() {
             };
           });
           await tx.$executeRaw`
-            INSERT INTO "Allotment" (id, "collegeSpecialtyId", "counsellingYear", round, rank, quota, category, status, "sourceId",
+            INSERT INTO "Allotment" (id, exam, "collegeSpecialtyId", "counsellingYear", round, rank, quota, category, status, "sourceId",
               "candidateCategory", "optionNo", "prevCollegeId", "prevSpecialtyId", "prevQuota", "prevRemark")
-            SELECT gen_random_uuid()::text, d.cs, d.y, d.r, d.k, d.q, d.c, d.st, ${id}, d.cc, d.o, d.pc, d.ps, d.pq, d.pr
+            SELECT gen_random_uuid()::text, ${exam}, d.cs, d.y, d.r, d.k, d.q, d.c, d.st, ${id}, d.cc, d.o, d.pc, d.ps, d.pq, d.pr
             FROM jsonb_to_recordset(${JSON.stringify(data)}::jsonb)
               AS d(cs text, y int, r text, k int, q text, c text, st text, cc text, o int, pc text, ps text, pq text, pr text)`;
         }
         console.log(`${s.key}: ${rows.length} cutoffs, ${seats.length} allotments`);
       }
 
-      // ponytail: this bundle is the only term source today; scope the delete above by source once a second one exists.
+      // ponytail: this bundle is its exam's only term source; scope the delete above by source once a second one exists.
       await tx.collegeTerm.createMany({
         data: terms.map((t) => ({
+          exam,
           collegeId: collegeId.get(t.ikey)!,
           program: t.program,
           kind: t.kind,
@@ -648,13 +709,13 @@ async function main() {
       await tx.$executeRaw`
         UPDATE "CollegeTerm" t SET details = d.details
         FROM jsonb_to_recordset(${JSON.stringify(details)}::jsonb) AS d("collegeId" text, program text, kind text, details jsonb)
-        WHERE t."collegeId" = d."collegeId" AND t.program = d.program AND t.kind::text = d.kind`;
+        WHERE t.exam = ${exam} AND t."collegeId" = d."collegeId" AND t.program = d.program AND t.kind::text = d.kind`;
 
       // schema 2: clinical facts (one row per college) and the fee table (per programme and seat-type group), as JSONB
       const facts = clinical.map(({ key, nbems_disclosure: d, ...data }) => ({ collegeId: collegeId.get(key)!, data, status: d.status, url: d.url ?? null, checked: d.checked ?? null }));
       await tx.$executeRaw`
-        INSERT INTO "ClinicalFacts" ("collegeId", data, "disclosureStatus", "disclosureUrl", "checkedAt")
-        SELECT d."collegeId", d.data, d.status, d.url, d.checked::date
+        INSERT INTO "ClinicalFacts" (exam, "collegeId", data, "disclosureStatus", "disclosureUrl", "checkedAt")
+        SELECT ${exam}, d."collegeId", d.data, d.status, d.url, d.checked::date
         FROM jsonb_to_recordset(${JSON.stringify(facts)}::jsonb) AS d("collegeId" text, data jsonb, status text, url text, checked text)`;
       for (let i = 0; i < feeTable.length; i += 500) {
         // data: the record without what the row's own columns and College hold
@@ -665,8 +726,8 @@ async function main() {
           data: Object.fromEntries(Object.entries(r).filter(([k]) => !["id", "key", "college", "state", "programme", "seat_groups"].includes(k))),
         }));
         await tx.$executeRaw`
-          INSERT INTO "FeesStructured" ("collegeId", programme, "quotaGroup", data)
-          SELECT d."collegeId", d.programme, d."quotaGroup", d.data
+          INSERT INTO "FeesStructured" (exam, "collegeId", programme, "quotaGroup", data)
+          SELECT ${exam}, d."collegeId", d.programme, d."quotaGroup", d.data
           FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS d("collegeId" text, programme text, "quotaGroup" text, data jsonb)`;
       }
 
@@ -694,10 +755,11 @@ async function main() {
         }
       }
       await tx.announcement.createMany({
-        data: notices.map((n) => ({ title: n.title, authority: n.authority, category: n.kind, counsellingYear: n.year, round: n.round, publishedAt: new Date(`${n.date}T00:00:00Z`), officialUrl: n.url, sourceId: sourceId.get(n.url)! })),
+        data: notices.map((n) => ({ exam, title: n.title, authority: n.authority, category: n.kind, counsellingYear: n.year, round: n.round, publishedAt: new Date(`${n.date}T00:00:00Z`), officialUrl: n.url, sourceId: sourceId.get(n.url)! })),
       });
       await tx.roundStep.createMany({
         data: steps.map((st) => ({
+          exam,
           year: roundStatus!.year,
           round: st.round,
           step: st.step,
@@ -715,43 +777,46 @@ async function main() {
         })),
       });
       const listIdOf = (y: number) => sourceId.get(nbems.get(y)!.key)!;
-      await tx.scoreRank.createMany({ data: scoreRows.map((r) => ({ ...r, listId: listIdOf(r.year) })) });
-      await tx.meritPosition.createMany({ data: meritRows.map((r) => ({ ...r, listId: listIdOf(r.year) })) });
+      await tx.scoreRank.createMany({ data: scoreRows.map((r) => ({ exam, ...r, listId: listIdOf(r.year) })) });
+      await tx.meritPosition.createMany({ data: meritRows.map((r) => ({ exam, ...r, listId: listIdOf(r.year) })) });
 
       // ---------- 3. re-assert known values before committing; any failure rolls the whole import back ----------
-      const closingOf = async (prefix: string, slug: string, year: number, round: string, quota: string, category?: string) =>
-        tx.cutoff.findMany({
-          where: { counsellingYear: year, round, quota, category, collegeSpecialty: { college: { key: { startsWith: prefix } }, specialty: { slug } } },
-          select: { closingRank: true, category: true, n: true },
-        });
-      const kokila = "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8";
-      const SETH_GS = "SETHGORDHANDASSUNDERDASMEDICALCOLLEGEMUM";
-      const expected: [number, string, number][] = [[2025, "R1", 21699], [2025, "R2", 25059], [2025, "R3", 29892], [2025, "stray", 33685], [2026, "R1", 20132]];
-      const dnbAnaes = courseSlug.get("DNB|ANAESTHESIOLOGY")!;
-      const mdAnaes = courseSlug.get("MD|ANAESTHESIOLOGY")!;
       const bad: string[] = [];
-      for (const [y, r, want] of expected) {
-        const got = await closingOf(kokila, dnbAnaes, y, r, "DNB Quota", "Open");
-        if (got.length !== 1 || got[0].closingRank !== want) bad.push(`Kokilaben ${y} ${r}: expected ${want}, got ${JSON.stringify(got)}`);
+      if (stillUsed.length) bad.push(`key_aliases.json retires ${stillUsed.join(", ")}, which another exam's import still has: re-export that exam with the same aliases first`);
+      // NEET PG's known values; every exam's bundle gets the generic checks below.
+      if (pg) {
+        const closingOf = async (prefix: string, slug: string, year: number, round: string, quota: string, category?: string) =>
+          tx.cutoff.findMany({
+            where: { exam, counsellingYear: year, round, quota, category, collegeSpecialty: { college: { key: { startsWith: prefix } }, specialty: { slug } } },
+            select: { closingRank: true, category: true, n: true },
+          });
+        const kokila = "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8";
+        const expected: [number, string, number][] = [[2025, "R1", 21699], [2025, "R2", 25059], [2025, "R3", 29892], [2025, "stray", 33685], [2026, "R1", 20132]];
+        const dnbAnaes = courseSlug.get("DNB|ANAESTHESIOLOGY")!;
+        const mdAnaes = courseSlug.get("MD|ANAESTHESIOLOGY")!;
+        for (const [y, r, want] of expected) {
+          const got = await closingOf(kokila, dnbAnaes, y, r, "DNB Quota", "Open");
+          if (got.length !== 1 || got[0].closingRank !== want) bad.push(`Kokilaben ${y} ${r}: expected ${want}, got ${JSON.stringify(got)}`);
+        }
+        const nagpur = await closingOf("GOVERNMENTMEDICALCOLLEGENAGPUR", mdAnaes, 2026, "R1", "All India");
+        const total = nagpur.reduce((a, c) => a + c.n, 0);
+        const obc = nagpur.filter((c) => c.category === "OBC").map((c) => c.closingRank);
+        if (total !== 12 || obc.length !== 1 || obc[0] !== 17213) bad.push(`GMC Nagpur 2026 R1: n=${total}, OBC=${obc}`);
+        const kokilaStray = await tx.allotment.count({
+          where: { exam, counsellingYear: 2025, round: "stray", quota: "DNB Quota", category: "Open", rank: 33685, collegeSpecialty: { college: { key: { startsWith: kokila } }, specialty: { slug: dnbAnaes } } },
+        });
+        if (kokilaStray !== 1) bad.push(`Kokilaben 2025 stray Open allotment at rank 33685: ${kokilaStray} rows`);
+        const nagpurSeats = await tx.allotment.count({
+          where: { exam, counsellingYear: 2026, round: "R1", collegeSpecialty: { college: { key: { startsWith: "GOVERNMENTMEDICALCOLLEGENAGPURGOVERNMENT" } }, specialty: { slug: mdAnaes } } },
+        });
+        if (nagpurSeats !== 12) bad.push(`GMC Nagpur 2026 R1 MD Anaesthesiology: ${nagpurSeats} allotment rows, expected 12`);
+        const provisional2026R1 = await tx.dataSource.count({ where: { exam, counsellingYear: 2026, round: "R1", provisional: true } });
+        if (provisional2026R1) bad.push(`2026 R1: ${provisional2026R1} provisional source(s) left`);
       }
-      const nagpur = await closingOf("GOVERNMENTMEDICALCOLLEGENAGPUR", mdAnaes, 2026, "R1", "All India");
-      const total = nagpur.reduce((a, c) => a + c.n, 0);
-      const obc = nagpur.filter((c) => c.category === "OBC").map((c) => c.closingRank);
-      if (total !== 12 || obc.length !== 1 || obc[0] !== 17213) bad.push(`GMC Nagpur 2026 R1: n=${total}, OBC=${obc}`);
-      const kokilaStray = await tx.allotment.count({
-        where: { counsellingYear: 2025, round: "stray", quota: "DNB Quota", category: "Open", rank: 33685, collegeSpecialty: { college: { key: { startsWith: kokila } }, specialty: { slug: dnbAnaes } } },
-      });
-      if (kokilaStray !== 1) bad.push(`Kokilaben 2025 stray Open allotment at rank 33685: ${kokilaStray} rows`);
-      const nagpurSeats = await tx.allotment.count({
-        where: { counsellingYear: 2026, round: "R1", collegeSpecialty: { college: { key: { startsWith: "GOVERNMENTMEDICALCOLLEGENAGPURGOVERNMENT" } }, specialty: { slug: mdAnaes } } },
-      });
-      if (nagpurSeats !== 12) bad.push(`GMC Nagpur 2026 R1 MD Anaesthesiology: ${nagpurSeats} allotment rows, expected 12`);
-      const provisional2026R1 = await tx.dataSource.count({ where: { counsellingYear: 2026, round: "R1", provisional: true } });
-      if (provisional2026R1) bad.push(`2026 R1: ${provisional2026R1} provisional source(s) left`);
       // every seat list adds up to the file's total, one list (one kind) at a time; links exactly where the course exists
       const dbLists = await tx.$queryRaw<{ key: string; total: number; sum: number | null; n: number }[]>`
         SELECT d.key, s.total, SUM(c.seats)::int AS sum, COUNT(c.id)::int AS n
-        FROM "SeatSource" s JOIN "DataSource" d ON d.id = s."sourceId" LEFT JOIN "SeatCount" c ON c."seatSourceId" = s."sourceId" GROUP BY 1, 2`;
+        FROM "SeatSource" s JOIN "DataSource" d ON d.id = s."sourceId" LEFT JOIN "SeatCount" c ON c."seatSourceId" = s."sourceId" WHERE d.exam = ${exam} GROUP BY 1, 2`;
       for (const s of seatSources) {
         const got = dbLists.find((l) => l.key === s.key);
         const want = { total: listTotal.get(s.key), rows: seats.filter((x) => x.src === s.key).length };
@@ -766,35 +831,38 @@ async function main() {
         const [{ n, seats: held }] = await tx.$queryRaw<{ n: number; seats: number | null }[]>`
           SELECT COUNT(*)::int AS n, SUM(x.seats)::int AS seats
           FROM "SeatCount" x JOIN "DataSource" d ON d.id = x."seatSourceId"
-          WHERE d.key = ${newest.key} AND NOT EXISTS (
+          WHERE d.exam = ${exam} AND d.key = ${newest.key} AND NOT EXISTS (
             SELECT 1 FROM "Cutoff" u JOIN "CollegeSpecialty" p ON p.id = u."collegeSpecialtyId"
-            WHERE p."collegeId" = x."collegeId" AND p."specialtyId" = x."specialtyId" AND u.quota = x.quota AND u.category = x.category
+            WHERE u.exam = ${exam} AND p."collegeId" = x."collegeId" AND p."specialtyId" = x."specialtyId" AND u.quota = x.quota AND u.category = x.category
               AND u."counsellingYear" = ${newest.year} AND u.round = ANY(${earlier}))`;
         if (n) bad.push(`${newest.key}: ${n} virtual vacancy rows (${held} seats) have no ${newest.year} ${earlier.join("/")} allotment on their college, course, quota and seat category (one institute under two keys?)`);
       }
       const wantLinked = seats.filter((x) => pairKeys.has(`${x.ikey}|${courseSlug.get(`${x.degree}|${x.specialty}`)}`)).length;
-      const linked = await tx.seatCount.count({ where: { collegeSpecialtyId: { not: null } } });
+      const linked = await tx.seatCount.count({ where: { collegeSpecialtyId: { not: null }, seatSource: { source: { exam } } } });
       if (linked !== wantLinked) bad.push(`seat rows linked to a course at a college: ${linked}, expected ${wantLinked}`);
       for (const [y, v] of Object.entries(scoreRank?.years ?? {})) {
         const [score, best] = v.rows[0];
-        const got = await tx.scoreRank.findUnique({ where: { year_score: { year: +y, score } } });
+        const got = await tx.scoreRank.findUnique({ where: { exam_year_score: { exam, year: +y, score } } });
         if (got?.bestRank !== best) bad.push(`score_rank ${y}: top score ${score} → rank ${got?.bestRank}, file ${best}`);
       }
 
-      // schema 2: every previous seat in the DB is that rank's allotment one round back (as checked in the file), and one
-      // known journey: 2023 rank 23, R1 LTMMC Mumbai MD General Medicine, upgraded in R2 to Seth GS (choice 1)
+      // schema 2: every previous seat in the DB is that rank's allotment one round back (as checked in the file; NEET SS: an
+      // allotment one round back), and (NEET PG) one known journey: 2023 rank 23, R1 LTMMC Mumbai MD General Medicine, upgraded in R2 to Seth GS (choice 1)
       if (v2) {
         const [{ n: prevBad }] = await tx.$queryRaw<{ n: number }[]>`
-          SELECT COUNT(*)::int AS n FROM "Allotment" a WHERE a."prevCollegeId" IS NOT NULL AND NOT EXISTS (
+          SELECT COUNT(*)::int AS n FROM "Allotment" a WHERE a.exam = ${exam} AND a."prevCollegeId" IS NOT NULL AND NOT EXISTS (
             SELECT 1 FROM "Allotment" b JOIN "CollegeSpecialty" p ON p.id = b."collegeSpecialtyId"
-            WHERE b."counsellingYear" = a."counsellingYear" AND b.rank = a.rank AND b.round = (CASE a.round WHEN 'R2' THEN 'R1' WHEN 'R3' THEN 'R2' END)
+            WHERE b.exam = a.exam AND b."counsellingYear" = a."counsellingYear" AND (b.rank = a.rank OR ${grouped}) AND b.round = (CASE a.round WHEN 'R2' THEN 'R1' WHEN 'R3' THEN 'R2' END)
               AND p."collegeId" = a."prevCollegeId" AND p."specialtyId" = a."prevSpecialtyId" AND b.quota = a."prevQuota")`;
         if (prevBad) bad.push(`${prevBad} allotment(s) whose previous seat is not that rank's allotment one round back`);
+      }
+      if (v2 && pg) {
+        const SETH_GS = "SETHGORDHANDASSUNDERDASMEDICALCOLLEGEMUM";
         const r23 = await tx.$queryRaw<{ c: string; s: string; st: string; o: number | null; cc: string | null; pc: string | null; ps: string | null; pr: string | null }[]>`
           SELECT c.key AS c, sp.slug AS s, a.status AS st, a."optionNo" AS o, a."candidateCategory" AS cc, pc.key AS pc, ps.slug AS ps, a."prevRemark" AS pr
           FROM "Allotment" a JOIN "CollegeSpecialty" p ON p.id = a."collegeSpecialtyId" JOIN "College" c ON c.id = p."collegeId" JOIN "Specialty" sp ON sp.id = p."specialtyId"
             LEFT JOIN "College" pc ON pc.id = a."prevCollegeId" LEFT JOIN "Specialty" ps ON ps.id = a."prevSpecialtyId"
-          WHERE a."counsellingYear" = 2023 AND a.round = 'R2' AND a.rank = 23`;
+          WHERE a.exam = ${exam} AND a."counsellingYear" = 2023 AND a.round = 'R2' AND a.rank = 23`;
         const gm = courseSlug.get("MD|GENERALMEDICINE");
         const j = r23[0];
         if (r23.length !== 1 || !j.c.startsWith(SETH_GS) || j.s !== gm || j.st !== "upgraded" || j.o !== 1 || j.cc !== "General" || !j.pc?.startsWith("LOKMANYATILAKMEDICALCOLLEGEMUMBAI") || j.ps !== gm || j.pr !== "reported")
@@ -810,30 +878,33 @@ async function main() {
         FROM "RetiredCollegeKey"`;
       if (retired.bundle !== aliases.length || retired.dangling) bad.push(`retired keys: ${retired.bundle} of the bundle's ${aliases.length} as given, ${retired.dangling} pointing at no college`);
 
+      // This exam's rows; the college fields of the colleges it wrote.
+      const mine = written.map((c) => collegeId.get(c.key)!);
+      const ofExam = { where: { exam } };
       const counts = {
-        resultSources: await tx.dataSource.count({ where: { round: { not: null } } }),
-        sources: await tx.dataSource.count(),
-        colleges: await tx.college.count(),
-        specialties: await tx.specialty.count(),
-        collegeSpecialties: await tx.collegeSpecialty.count(),
-        cutoffs: await tx.cutoff.count(),
-        terms: await tx.collegeTerm.count(),
-        termDetails: (await tx.$queryRaw<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM "CollegeTerm" WHERE details IS NOT NULL`)[0].n,
-        allotments: await tx.allotment.count(),
-        seatSources: await tx.seatSource.count(),
-        seatCounts: await tx.seatCount.count(),
-        announcements: await tx.announcement.count(),
-        roundSteps: await tx.roundStep.count(),
-        meritLists: await tx.meritList.count(),
-        scoreRanks: await tx.scoreRank.count(),
-        meritPositions: await tx.meritPosition.count(),
+        resultSources: await tx.dataSource.count({ where: { exam, round: { not: null } } }),
+        sources: await tx.dataSource.count(ofExam),
+        colleges: await tx.collegeExam.count(ofExam),
+        specialties: await tx.specialty.count(ofExam),
+        collegeSpecialties: await tx.collegeSpecialty.count({ where: { specialty: { exam } } }),
+        cutoffs: await tx.cutoff.count(ofExam),
+        terms: await tx.collegeTerm.count(ofExam),
+        termDetails: (await tx.$queryRaw<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM "CollegeTerm" WHERE exam = ${exam} AND details IS NOT NULL`)[0].n,
+        allotments: await tx.allotment.count(ofExam),
+        seatSources: await tx.seatSource.count({ where: { source: { exam } } }),
+        seatCounts: await tx.seatCount.count({ where: { seatSource: { source: { exam } } } }),
+        announcements: await tx.announcement.count(ofExam),
+        roundSteps: await tx.roundStep.count(ofExam),
+        meritLists: await tx.meritList.count(ofExam),
+        scoreRanks: await tx.scoreRank.count(ofExam),
+        meritPositions: await tx.meritPosition.count(ofExam),
         ...(await tx.$queryRaw<Record<string, number>[]>`
-          SELECT (SELECT COUNT(*)::int FROM "ClinicalFacts") AS "clinicalFacts", (SELECT COUNT(*)::int FROM "FeesStructured") AS "feesStructured",
-            (SELECT COUNT(*)::int FROM "College" WHERE type IS NOT NULL) AS "collegeTypes", (SELECT COUNT(*)::int FROM "College" WHERE cardinality("mccIds") > 0) AS "collegeMccIds",
-            (SELECT COUNT(*)::int FROM "College" WHERE website IS NOT NULL) AS "collegeWebsites",
+          SELECT (SELECT COUNT(*)::int FROM "ClinicalFacts" WHERE exam = ${exam}) AS "clinicalFacts", (SELECT COUNT(*)::int FROM "FeesStructured" WHERE exam = ${exam}) AS "feesStructured",
+            (SELECT COUNT(*)::int FROM "College" WHERE id = ANY(${mine}) AND type IS NOT NULL) AS "collegeTypes", (SELECT COUNT(*)::int FROM "College" WHERE id = ANY(${mine}) AND cardinality("mccIds") > 0) AS "collegeMccIds",
+            (SELECT COUNT(*)::int FROM "College" WHERE id = ANY(${mine}) AND website IS NOT NULL) AS "collegeWebsites",
             COUNT(*) FILTER (WHERE "candidateCategory" IS NOT NULL)::int AS "allotmentCandidateCategories", COUNT("optionNo")::int AS "allotmentOptionNos",
             COUNT("prevCollegeId")::int AS "allotmentPrevSeats"
-          FROM "Allotment"`)[0],
+          FROM "Allotment" WHERE exam = ${exam}`)[0],
       };
       const want = {
         resultSources: sources.length,
@@ -853,10 +924,10 @@ async function main() {
         meritPositions: meritRows.length,
         clinicalFacts: clinical.length,
         feesStructured: feeTable.length,
-        collegeTypes: v2 ? colleges.length + seatColleges.length : 0,
-        collegeMccIds: [...colleges, ...seatColleges].filter((c) => c.mcc_ids?.length).length,
-        collegeWebsites: [...colleges, ...seatColleges].filter((c) => c.website).length,
-        allotmentCandidateCategories: v2 ? allotments.length : 0,
+        collegeTypes: v2 ? written.length : 0,
+        collegeMccIds: written.filter((c) => c.mcc_ids?.length).length,
+        collegeWebsites: written.filter((c) => c.website).length,
+        allotmentCandidateCategories: allotments.filter((a) => "candidate_category" in a && a.candidate_category != null).length,
         allotmentOptionNos: allotments.filter((a) => "option_no" in a && a.option_no != null).length,
         allotmentPrevSeats: allotments.filter((a) => "prev_ikey" in a && a.prev_ikey != null).length,
       };
@@ -866,7 +937,7 @@ async function main() {
       if (bad.length) throw new Error(`Spot checks FAILED, import rolled back (nothing written):\n${bad.join("\n")}`);
 
       const marker = { name: `MCC export bundle (built ${manifest.built})`, type: "OFFICIAL" as const, createdAt: new Date() };
-      await tx.dataSource.upsert({ where: { key: MARKER }, create: { key: MARKER, ...marker }, update: marker });
+      await tx.dataSource.upsert({ where: sk(MARKER), create: { exam, key: MARKER, ...marker }, update: marker });
       return {
         ...counts,
         removed: { colleges: goneColleges.length, specialties: goneSpecialties.length, collegeSpecialties: gonePairs.length, sources: goneSources.count, residents: goneResidents },
@@ -884,7 +955,8 @@ async function main() {
   if (unsourced) console.log(`${unsourced} unknown bond term(s) with no document: source "${BOND_CHECK.name}".`);
   if (unknownCourses.size) console.log(`Seat rows with a course not in courses.json (kept, no Specialty link): ${[...unknownCourses].join(", ")}`);
   if (result.removed.residents) console.warn(`${result.removed.residents} resident row(s) went with their college or course: run npm run db:import-residents.`);
-  console.log(`Committed. Spot checks passed (Kokilaben DNB Anaesthesiology 2025 R1–stray + 2026 R1 and its stray allotment; GMC Nagpur 2026 R1 closing and 12 allotments; no provisional 2026 R1; every seat list adds up to its file; every newest virtual vacancy has an earlier allotment; NBEMS top scores; every retired key of the bundle points at its college${v2 ? "; every previous seat is that rank's allotment one round back, and 2023 R2 rank 23's" : ""}).`);
+  if (pg) console.log(`Committed. Spot checks passed (Kokilaben DNB Anaesthesiology 2025 R1–stray + 2026 R1 and its stray allotment; GMC Nagpur 2026 R1 closing and 12 allotments; no provisional 2026 R1; every seat list adds up to its file; every newest virtual vacancy has an earlier allotment; NBEMS top scores; every retired key of the bundle points at its college${v2 ? "; every previous seat is that rank's allotment one round back, and 2023 R2 rank 23's" : ""}).`);
+  else console.log(`Committed ${exam}. Spot checks passed (row counts; every seat list adds up to its file; every newest virtual vacancy has an earlier allotment; NBEMS top scores; every retired key of the bundle points at its college${v2 ? "; every previous seat is that rank's allotment one round back" : ""}). Other exams' rows were not touched.`);
 }
 
 main()

@@ -23,6 +23,8 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { getMeta, rankJourney } from "@/features/decide/service";
 import { roundLabel } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
+import { examGate } from "@/features/exams/active";
+import { activeExam } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Rank journey" };
 const VIEW = "rank-journey";
@@ -30,17 +32,20 @@ const VIEW = "rank-journey";
 const schema = z.object({ air: rankValue.optional(), year: z.coerce.number().int().optional() });
 
 export default async function RankJourneyPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const gated = await examGate("/decide/rank-journey");
+  if (gated) return gated;
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
-  const meta = await getMeta();
+  const exam = await activeExam();
+  const meta = await getMeta(exam);
   const typed = params.get("air")?.trim() || null;
   const invalid = typed != null && f.air == null;
   const rank = invalid ? null : (f.air ?? profile?.rank ?? null);
   // Default: the newest year with results.
   const year = meta.years.find((y) => y.year === f.year) ?? meta.years[0];
-  const rows = rank && year ? await withRowInfo(await rankJourney(year.year, rank)) : [];
+  const rows = rank && year ? await withRowInfo(await rankJourney(year.year, rank, exam), exam) : [];
   const none = year ? year.rounds.filter((r) => !rows.some((a) => a.round === r)) : [];
   const courseOf = new Map(meta.courses.map((c) => [`${c.degree}|${c.specialty}`, c]));
   const provisional = (round: string) => meta.sources.some((s) => s.year === year?.year && s.round === round && s.provisional);

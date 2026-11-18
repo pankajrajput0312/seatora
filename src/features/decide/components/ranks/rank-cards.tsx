@@ -1,4 +1,5 @@
 import "server-only";
+import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import type { StatKey } from "../../lib/stat-format";
 import { rounds, type Round } from "../../types";
 import { getCatalog } from "../../server/catalog";
@@ -14,8 +15,8 @@ export type RowHospital = Pick<HospitalInfo, "type" | "beds"> | null;
 export type RowInfo = { state: string | null; fees: ProgrammeTerms; hospital: RowHospital; mcc: string | null };
 
 /** Allotment rows with their course and quota's terms (stat cells, term filters), the institute's state, type, beds and MCC profile. */
-export async function withRowInfo<T extends { college: string; degree: string; specialty: string; quota: string }>(rows: T[]): Promise<(T & RowInfo)[]> {
-  const [cat, info] = await Promise.all([getCatalog(), hospitalInfo()]);
+export async function withRowInfo<T extends { college: string; degree: string; specialty: string; quota: string }>(rows: T[], exam: ExamKey = DEFAULT_EXAM): Promise<(T & RowInfo)[]> {
+  const [cat, info] = await Promise.all([getCatalog(exam), hospitalInfo(exam)]);
   return rows.map((r) => {
     const h = info.get(r.college);
     return {

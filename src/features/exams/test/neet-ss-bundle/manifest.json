@@ -1,0 +1,31 @@
+{
+ "schema_version": 3,
+ "exam": "neet-ss",
+ "built": "2026-11-19T00:00:00+00:00",
+ "files": {
+  "sources.json": {
+   "count": 2,
+   "sha256": "f06eccb97dd39e2d715dd5cfd0ee57eafaa391b50f1debc0982a7ed6fc2c52bd"
+  },
+  "courses.json": {
+   "count": 2,
+   "sha256": "2448a1e87c3d44bf4764aada650e1e1b5a5acd205082c78920dcc7b5da5debb7"
+  },
+  "colleges.ndjson": {
+   "count": 3,
+   "sha256": "71a22828bbd47ceaa31455c7d1d78be6661b79523e8928d519ce6ddae79511d2"
+  },
+  "cutoffs.ndjson": {
+   "count": 7,
+   "sha256": "775aa6736d058a3b09479ec0aad242e3860d8fea9292092aafb65e9c6f23878a"
+  },
+  "allotments.ndjson": {
+   "count": 7,
+   "sha256": "c726e865af810b3dc552e3d5be8dcdcfc19c7da481640007ffdc64ac54f776f3"
+  }
+ },
+ "excluded_unparsed_course_rows": 0,
+ "notes": {
+  "fixture": "Synthetic NEET SS bundle for src/features/exams/exams.db.test.ts. Not real data: never import it anywhere but a throwaway database."
+ }
+}

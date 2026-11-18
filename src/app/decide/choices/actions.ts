@@ -4,6 +4,7 @@ import { z } from "zod";
 import { canUseDecide } from "@/features/auth/lib/session";
 import { profileFromParams } from "@/features/decide/profile";
 import { choiceOptions } from "@/features/decide/service";
+import { activeExam } from "@/features/exams/active";
 
 const inputSchema = z.object({ ids: z.array(z.string().min(1).max(300)).max(1000), profile: z.string().max(2000) });
 
@@ -24,7 +25,7 @@ export async function liveReach(ids: string[], profile: string) {
   try {
     if (!(await canUseDecide())) return null;
     const uniq = [...new Set(input.data.ids)];
-    const { lists, rows } = await choiceOptions(uniq, p);
+    const { lists, rows } = await choiceOptions(uniq, p, await activeExam());
     return {
       lists: p ? lists : [],
       options: Object.fromEntries(

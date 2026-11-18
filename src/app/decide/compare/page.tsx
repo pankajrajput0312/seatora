@@ -26,6 +26,7 @@ import { Paywall } from "@/features/plans/components/paywall";
 import { currentPlan } from "@/features/plans/usage";
 import { currentOptionIds, currentSeatLists, getMeta, getOptionsByIds, PAST_YEARS, YEARS, type OptionRow } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
+import { activeExam } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Compare" };
 
@@ -89,13 +90,14 @@ function IfYouLeave({ r, leaving }: { r: OptionRow; leaving: string }) {
 export default async function ComparePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
-  const ids = [...new Set(await currentOptionIds([...new Set(parseSearchParams(paramsSchema, params, ["ids"]).ids)].slice(0, 5 * MAX_COMPARE)))];
-  const [known, meta, me] = await Promise.all([getOptionsByIds(ids, profile), getMeta(), currentPlan()]);
+  const exam = await activeExam();
+  const ids = [...new Set(await currentOptionIds([...new Set(parseSearchParams(paramsSchema, params, ["ids"]).ids)].slice(0, 5 * MAX_COMPARE), exam))];
+  const [known, meta, me] = await Promise.all([getOptionsByIds(ids, profile, exam), getMeta(exam), currentPlan()]);
   // The plan's cap (features/plans): Free compares fewer; past it, the paywall says so above the table.
   const cap = Math.min(MAX_COMPARE, me?.eff.limits.compare ?? MAX_COMPARE);
   const options = known.slice(0, cap);
   const L = decideLinks(params);
-  const lists: SeatList[] = options.length ? await currentSeatLists() : [];
+  const lists: SeatList[] = options.length ? await currentSeatLists(exam) : [];
   const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
   const risk = options.length > 1 && lowestRisk(options.map((r) => ({ name: r.college.name, t: r.fees })));
   const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);

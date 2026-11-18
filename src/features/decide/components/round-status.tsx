@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { activeExam } from "@/features/exams/active";
+import { exams } from "@/features/exams/registry";
 import { decideLinks } from "../lib/links";
 import { LATEST_YEAR } from "../lib/reach";
 import { alertOf, badgeOf, currentSteps, NOTICE_CLOSED_COOKIE, dueToday, fmtIST, fmtNote, nextDate, roundName, stepName, stepsNow, type StepNow } from "../lib/round-status";
@@ -33,7 +35,9 @@ const mccSite = (
  * "Full schedule" (at that round). No round status in the data: says so and points to MCC, never a made-up date.
  */
 export async function RoundStatusBanner({ params }: { params: URLSearchParams }) {
-  const rs = await roundStatus(LATEST_YEAR);
+  const exam = await activeExam();
+  if (!exams[exam].has.notices) return null;
+  const rs = await roundStatus(LATEST_YEAR, exam);
   if (!rs)
     return (
       <section aria-label={`MCC counselling ${LATEST_YEAR} today`} className="rounded-xl border border-border bg-card px-4 py-3 text-body">
@@ -103,7 +107,7 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
 
 /** Home's top strip while MCC holds a step (alertOf: "Round 2 result on hold"), unless she closed this notice's strip. */
 export async function HeldStrip() {
-  const rs = await roundStatus(LATEST_YEAR);
+  const rs = await roundStatus(LATEST_YEAR, await activeExam());
   const a = rs && alertOf(stepsNow(rs, new Date()));
   if (!a || decodeURIComponent((await cookies()).get(NOTICE_CLOSED_COOKIE)?.value ?? "") === a.id) return null;
   return <NoticeStrip id={a.id} text={a.text} href={a.url} />;

@@ -1,5 +1,6 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
+import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import { db } from "@/lib/db";
 import type { PageQuery, Paged } from "../service";
 import { optionId, rounds, seatKinds, type College, type Course, type MccNotice, type Round, type SeatKind, type SeatList } from "../types";
@@ -7,11 +8,13 @@ import { dataVersion, getCatalog, perImport, type Catalog } from "./catalog";
 import { categoryOrder, roundKey, seatRoundRows, snapshotAt, type SeatDbRow } from "./snapshot";
 
 // MCC seat lists (SeatSource + SeatCount, prisma/import-mcc.ts). Each list is one kind of one round as its PDF printed
-// it; kinds overlap, so everything here works on one kind at a time and never adds kinds together.
+// it; kinds overlap, so everything here works on one kind at a time and never adds kinds together. One exam's lists
+// (their DataSource's exam), default NEET PG.
 
-/** Every seat list PDF: newest year and round first, then kind (clear, virtual, new), then newest PDF. */
-export const seatLists: () => Promise<SeatList[]> = perImport(async () => {
-  const rows = await db.seatSource.findMany({ select: { year: true, round: true, kind: true, total: true, source: { select: { key: true, name: true, url: true, publishedAt: true } } } });
+/** Every seat list PDF of the exam: newest year and round first, then kind (clear, virtual, new), then newest PDF. */
+export const seatLists = (exam: ExamKey = DEFAULT_EXAM) => listsOnce("", exam);
+const listsOnce = perImport(async (_, exam): Promise<SeatList[]> => {
+  const rows = await db.seatSource.findMany({ where: { source: { exam } }, select: { year: true, round: true, kind: true, total: true, source: { select: { key: true, name: true, url: true, publishedAt: true } } } });
   return rows
     .map(({ source: s, ...l }) => ({ key: s.key, name: s.name, url: s.url, year: l.year, round: l.round as Round, kind: l.kind as SeatKind, publishedAt: s.publishedAt?.toISOString().slice(0, 10) ?? null, seats: l.total }))
     .sort(
@@ -110,14 +113,15 @@ function rowWhere(f: SeatFilters): Prisma.Sql[] {
  * seats (`list` "", `seats` 0), filtered as listSeats is (list aside), by college name, course, quota, category. The
  * Seats matrix adds the ones no seat list prints ("All rounds").
  */
-export async function allottedRows(f: Omit<SeatFilters, "list" | "kind" | "year" | "round"> = {}): Promise<SeatRow[]> {
-  const cat = await getCatalog();
+export async function allottedRows(f: Omit<SeatFilters, "list" | "kind" | "year" | "round"> = {}, exam: ExamKey = DEFAULT_EXAM): Promise<SeatRow[]> {
+  const cat = await getCatalog(exam);
   const where = rowWhere(f);
   const found = await db.$queryRaw<{ k: string; dg: string; sc: string; slug: string; name: string; q: string; c: string; cs: string }[]>`
     SELECT c.key AS k, x.degree AS dg, x.code AS sc, sp.slug, sp.name, x.quota AS q, x.category AS c, x."collegeSpecialtyId" AS cs
     FROM (
       SELECT DISTINCT p."collegeId", p."specialtyId", u."collegeSpecialtyId", s.degree, COALESCE(s.code, '') AS code, u.quota, u.category
       FROM "Cutoff" u JOIN "CollegeSpecialty" p ON p.id = u."collegeSpecialtyId" JOIN "Specialty" s ON s.id = p."specialtyId"
+      WHERE u.exam = ${exam}
     ) x JOIN "College" c ON c.id = x."collegeId" JOIN "Specialty" sp ON sp.id = x."specialtyId"
     ${where.length ? Prisma.sql`WHERE ${Prisma.join(where, " AND ")}` : Prisma.empty}
     ORDER BY c.name, c.key, x.degree, sp.name, x.quota, array_position(${categoryOrder}::text[], x.category)`;
@@ -133,14 +137,14 @@ export async function allottedRows(f: Omit<SeatFilters, "list" | "kind" | "year"
  * them (source, date, link); `seats` = Σ seats of the matching rows per list key (within one list only). `pg` returns
  * one page, without it every row; `total` counts rows.
  */
-export async function listSeats(f: SeatFilters = {}, pg?: PageQuery): Promise<Paged<SeatRow> & { lists: SeatList[]; seats: Record<string, number> }> {
-  const cat = await getCatalog();
-  const lists = pickLists(await seatLists(), f);
+export async function listSeats(f: SeatFilters = {}, pg?: PageQuery, exam: ExamKey = DEFAULT_EXAM): Promise<Paged<SeatRow> & { lists: SeatList[]; seats: Record<string, number> }> {
+  const cat = await getCatalog(exam);
+  const lists = pickLists(await seatLists(exam), f);
   if (!lists.length) return { rows: [], total: 0, page: 1, pageSize: pg?.pageSize ?? 1, lists, seats: {} };
   // pickLists' lists are all of one round: its rows, cached per import, filtered here as rowWhere filters in SQL.
   const keys = new Set(lists.map((l) => l.key));
   const match = rowMatch(cat, f);
-  const all = (await roundRows(roundKey(lists[0].year, lists[0].round))).filter((r) => keys.has(r.l) && match(r));
+  const all = (await roundRows(roundKey(lists[0].year, lists[0].round), exam)).filter((r) => keys.has(r.l) && match(r));
   const total = all.length;
   const pageSize = pg?.pageSize ?? Math.max(1, total);
   // A page past the end is the last one.
@@ -157,14 +161,14 @@ export async function listSeats(f: SeatFilters = {}, pg?: PageQuery): Promise<Pa
 }
 
 /**
- * Every seat row of a round (roundKey), once per import per process: the build's snapshot holds the newest round
+ * Every seat row of a round (roundKey), once per import per process: the build's snapshot holds NEET PG's newest round
  * (server/snapshot.ts), other rounds and data imported since the build are read from Postgres. ~10k rows per list.
  */
-const roundRows = perImport(async (key): Promise<SeatDbRow[]> => {
-  const snap = await snapshotAt(await dataVersion());
+const roundRows = perImport(async (key, exam): Promise<SeatDbRow[]> => {
+  const snap = exam === DEFAULT_EXAM ? await snapshotAt(await dataVersion(exam)) : null;
   if (snap?.seats[key]) return snap.seats[key];
   const [year, round] = key.split("|");
-  return seatRoundRows(db, Number(year), round);
+  return seatRoundRows(db, Number(year), round, exam);
 });
 
 /** rowWhere in JS, on a cached seat row (SQL ILIKE ≈ case-insensitive contains). */
@@ -204,10 +208,12 @@ export type OptionSeats = { college: string; degree: string; specialty: string; 
 export async function optionSeats(
   lists: SeatList[],
   f: { pairs?: string[]; specialties?: string[]; degrees?: string[]; quotas?: string[]; categories?: string[]; colleges?: string[] } = {},
+  exam: ExamKey = DEFAULT_EXAM,
 ): Promise<Map<string, OptionSeats>> {
   const out = new Map<string, OptionSeats>();
   if (!lists.length) return out;
   const where = [
+    Prisma.sql`d.exam = ${exam}`,
     Prisma.sql`d.key = ANY(${lists.map((l) => l.key)})`,
     Prisma.sql`x.quota IS NOT NULL`,
     f.pairs && Prisma.sql`(x.degree || '~' || x.code) = ANY(${f.pairs})`,

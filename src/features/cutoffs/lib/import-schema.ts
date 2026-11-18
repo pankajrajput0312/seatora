@@ -109,24 +109,29 @@ const prevFields = ["prev_ikey", "prev_degree", "prev_specialty", "prev_quota", 
 /**
  * Schema 2 adds the candidate's own category, the choice number of the allotted seat (R2 / R3 PDFs only) and the seat
  * the PDF prints in the previous round's columns (R2 / R3; all prev_* null where it prints "-"). No names.
+ * `loose` (another exam than NEET PG): null where its PDF prints none, a choice number in R2 / R3 or the candidate's category.
  */
-export const mccAllotmentV2Schema = mccAllotmentSchema
-  .extend({
-    candidate_category: z.enum(candidateCategories),
-    option_no: z.number().int().positive().nullable(),
-    prev_ikey: ikey.nullable(),
-    prev_degree: z.string().min(1).nullable(),
-    prev_specialty: z.string().regex(/^[A-Z0-9]+$/).nullable(),
-    prev_quota: z.string().min(1).nullable(),
-    prev_remark: z.enum(prevRemarks).nullable(),
-  })
-  .strict()
-  .refine((a) => (a.option_no != null) === (a.round === "R2" || a.round === "R3"), { message: "option_no is printed in R2 / R3 only", path: ["option_no"] })
-  .refine((a) => prevFields.every((f) => a[f] == null) || (prevFields.every((f) => a[f] != null) && (a.round === "R2" || a.round === "R3")), {
-    message: "prev_* are all set (R2 / R3 only) or all null",
-    path: ["prev_ikey"],
-  })
-  .refine((a) => (a.round === "R2" || a.round === "R3" ? a.status !== "allotted" : a.status === "allotted"), { message: "status allotted in R1 / stray rounds only", path: ["status"] });
+const allotmentV2 = (loose: boolean) =>
+  mccAllotmentSchema
+    .extend({
+      candidate_category: loose ? z.enum(candidateCategories).nullable() : z.enum(candidateCategories),
+      option_no: z.number().int().positive().nullable(),
+      prev_ikey: ikey.nullable(),
+      prev_degree: z.string().min(1).nullable(),
+      prev_specialty: z.string().regex(/^[A-Z0-9]+$/).nullable(),
+      prev_quota: z.string().min(1).nullable(),
+      prev_remark: z.enum(prevRemarks).nullable(),
+    })
+    .strict()
+    .refine((a) => (a.round === "R2" || a.round === "R3" ? loose || a.option_no != null : a.option_no == null), { message: "option_no is printed in R2 / R3 only", path: ["option_no"] })
+    .refine((a) => prevFields.every((f) => a[f] == null) || (prevFields.every((f) => a[f] != null) && (a.round === "R2" || a.round === "R3")), {
+      message: "prev_* are all set (R2 / R3 only) or all null",
+      path: ["prev_ikey"],
+    })
+    .refine((a) => (a.round === "R2" || a.round === "R3" ? a.status !== "allotted" : a.status === "allotted"), { message: "status allotted in R1 / stray rounds only", path: ["status"] });
+export const mccAllotmentV2Schema = allotmentV2(false);
+/** An exam other than NEET PG: no choice number where an R2 / R3 PDF prints none (NEET MDS mop-up 2019, 2020, 2022), no candidate category where none is printed (NEET SS). */
+export const mccAllotmentV2LooseSchema = allotmentV2(true);
 export type MccAllotmentV2 = z.infer<typeof mccAllotmentV2Schema>;
 
 const inr = z.number().int().nonnegative().max(2_147_483_647);
@@ -488,7 +493,9 @@ export function citedSources(v: unknown, out: number[] = []): number[] {
 }
 
 export const mccManifestSchema = z.object({
-  schema_version: z.union([z.literal(1), z.literal(2)]),
+  /** 3: schema 2 plus `exam` (src/features/exams/keys.ts; absent: NEET PG). */
+  schema_version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  exam: z.string().optional(),
   built: z.string(),
   files: z.record(z.string(), z.object({ count: z.number().int().nonnegative(), sha256: z.string().regex(/^[0-9a-f]{64}$/) })),
   excluded_unparsed_course_rows: z.number().int().nonnegative(),

@@ -1,0 +1,18 @@
+[
+ {
+  "key": "mcc/2025/R1_final.pdf",
+  "url": "https://example.invalid/neet-ss-fixture/2025/R1.pdf",
+  "year": 2025,
+  "round": "R1",
+  "provisional": false,
+  "name": "NEET SS 2025 Round 1 (synthetic test fixture)"
+ },
+ {
+  "key": "mcc/2025/R2_final.pdf",
+  "url": "https://example.invalid/neet-ss-fixture/2025/R2.pdf",
+  "year": 2025,
+  "round": "R2",
+  "provisional": false,
+  "name": "NEET SS 2025 Round 2 (synthetic test fixture)"
+ }
+]

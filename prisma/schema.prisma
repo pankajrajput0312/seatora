@@ -34,8 +34,10 @@ enum TermKind {
 
 model DataSource {
   id              String         @id @default(cuid())
-  /// Stable import key, e.g. "mcc/2025/R1_final.pdf".
-  key             String         @unique
+  /// The exam whose bundle it came from (src/features/exams/keys.ts); every import replaces only its own exam's rows.
+  exam            String         @default("neet-pg")
+  /// Stable import key, e.g. "mcc/2025/R1_final.pdf"; unique per exam (two exams may cite one notice or document).
+  key             String
   name            String
   url             String?
   type            SourceType
@@ -52,6 +54,8 @@ model DataSource {
   allotments      Allotment[]
   seatSource      SeatSource?
   meritList       MeritList?
+
+  @@unique([exam, key])
 }
 
 model College {
@@ -85,17 +89,30 @@ model College {
   residents          Resident[]
   seatCounts         SeatCount[]
   prevAllotments     Allotment[]
-  clinicalFacts      ClinicalFacts?
+  clinicalFacts      ClinicalFacts[]
   feesStructured     FeesStructured[]
+  exams              CollegeExam[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
   @@index([state])
 }
 
+/// The exams whose bundles have the college (colleges.ndjson or seat_colleges.ndjson). One College row per institute
+/// across exams; an import adds and removes only its own exam's row here, and deletes a college no exam has any more.
+model CollegeExam {
+  exam      String
+  collegeId String
+  college   College @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+
+  @@id([exam, collegeId])
+}
+
 model Specialty {
   id             String             @id @default(cuid())
-  slug           String             @unique
+  /// As DataSource.exam: a course belongs to one exam (its CollegeSpecialty, cutoffs and allotments with it).
+  exam           String             @default("neet-pg")
+  slug           String
   name           String
   degree         String // MD, MS, DNB, Diploma
   /// Canonical specialty code shared across degrees, e.g. "ANAESTHESIOLOGY" (MD and DNB Anaesthesiology). Set by the importer.
@@ -104,6 +121,8 @@ model Specialty {
   residents      Resident[]
   seatCounts     SeatCount[]
   prevAllotments Allotment[]
+
+  @@unique([exam, slug])
 }
 
 model CollegeSpecialty {
@@ -123,6 +142,8 @@ model CollegeSpecialty {
 /// Historical rank data. Never a prediction.
 model Cutoff {
   id                 String             @id @default(cuid())
+  /// As DataSource.exam.
+  exam               String             @default("neet-pg")
   collegeSpecialtyId String
   collegeSpecialty   CollegeSpecialty   @relation(fields: [collegeSpecialtyId], references: [id])
   counsellingYear    Int
@@ -146,11 +167,13 @@ model Cutoff {
 /// One seat allotment as printed in an MCC result PDF: rank and seat only, never a name or roll number.
 model Allotment {
   id                 String           @id @default(cuid())
+  /// As DataSource.exam.
+  exam               String           @default("neet-pg")
   collegeSpecialtyId String
   collegeSpecialty   CollegeSpecialty @relation(fields: [collegeSpecialtyId], references: [id])
   counsellingYear    Int
   round              String // as Cutoff.round
-  /// NEET PG All India Rank.
+  /// The exam's rank (NEET PG: All India Rank).
   rank               Int
   quota              String // as Cutoff.quota
   category           String // seat category, as Cutoff.category
@@ -256,13 +279,17 @@ model RetiredCollegeKey {
 /// (import-schema.ts mccClinicalFactsSchema): `values_meta` gives every value's source, period, check date and flags.
 /// Replaced whole on import; raw SQL like CollegeTerm.details.
 model ClinicalFacts {
-  collegeId        String    @id
+  /// As DataSource.exam.
+  exam             String    @default("neet-pg")
+  collegeId        String
   college          College   @relation(fields: [collegeId], references: [id], onDelete: Cascade)
   data             Json
   /// NBEMS mandatory disclosure on the hospital's site: "found" | "not_found" | "blocked" | "na".
   disclosureStatus String
   disclosureUrl    String?
   checkedAt        DateTime? @db.Date
+
+  @@id([exam, collegeId])
 }
 
 /// Fee and stipend per course year, bond, leaving penalty and MCC forfeit per college × programme ("MD/MS", "Diploma",
@@ -271,18 +298,22 @@ model ClinicalFacts {
 /// (import-schema.ts mccFeesStructuredSchema); `fee_display` "verbatim" (or absent) means its fee figures are never
 /// shown, only `fee_text` (server/facts.ts). Replaced whole on import; raw SQL like CollegeTerm.details.
 model FeesStructured {
+  /// As DataSource.exam.
+  exam       String  @default("neet-pg")
   collegeId  String
   college    College @relation(fields: [collegeId], references: [id], onDelete: Cascade)
   programme  String
   quotaGroup String
   data       Json
 
-  @@id([collegeId, programme, quotaGroup])
+  @@id([exam, collegeId, programme, quotaGroup])
 }
 
 /// Fee, stipend, bond or penalty text exactly as published, per college and program (MD or DNB).
 model CollegeTerm {
   id        String     @id @default(cuid())
+  /// As DataSource.exam.
+  exam      String     @default("neet-pg")
   collegeId String
   college   College    @relation(fields: [collegeId], references: [id])
   program   String // "MD" | "DNB"
@@ -297,11 +328,13 @@ model CollegeTerm {
   sourceId  String
   source    DataSource @relation(fields: [sourceId], references: [id])
 
-  @@unique([collegeId, program, kind])
+  @@unique([exam, collegeId, program, kind])
 }
 
 model Announcement {
   id              String     @id @default(cuid())
+  /// As DataSource.exam.
+  exam            String     @default("neet-pg")
   title           String
   authority       String // e.g. "MCC", "DME Maharashtra"
   category        String // MCC import: notices.json kind verbatim, "notice" | "seat_matrix" | "result" | "schedule" | "bulletin"
@@ -362,6 +395,8 @@ model SeatCount {
 
 /// One step of an MCC round (round_status.json), derived only from MCC notices, as of `asOf`.
 model RoundStep {
+  /// As DataSource.exam.
+  exam          String   @default("neet-pg")
   year          Int
   round         String // "R1" | "R2" | "R3" | "stray"
   step          String // "seat_matrix" | "choice_filling" | "provisional_result" | "final_result"
@@ -382,7 +417,7 @@ model RoundStep {
   events        Json
   asOf          DateTime
 
-  @@id([year, round, step])
+  @@id([exam, year, round, step])
 }
 
 /// An NBEMS result PDF behind the score→rank and merit-position aggregates (score_rank.json, merit_position.json).
@@ -390,7 +425,9 @@ model RoundStep {
 model MeritList {
   sourceId   String          @id
   source     DataSource      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  year       Int             @unique
+  /// As DataSource.exam.
+  exam       String          @default("neet-pg")
+  year       Int
   /// Total marks of that year's exam (2025: 800, 2026: 720): compare ranks across years, not scores.
   maxMarks   Int
   /// Candidates the PDF ranks.
@@ -405,10 +442,14 @@ model MeritList {
   qualified  Json?
   scores     ScoreRank[]
   positions  MeritPosition[]
+
+  @@unique([exam, year])
 }
 
 /// NEET PG rank range per score in one year's NBEMS result (best/worst = lowest/highest rank with that score).
 model ScoreRank {
+  /// As DataSource.exam.
+  exam      String    @default("neet-pg")
   year      Int
   score     Int
   bestRank  Int
@@ -417,13 +458,15 @@ model ScoreRank {
   listId    String
   list      MeritList @relation(fields: [listId], references: [sourceId], onDelete: Cascade)
 
-  @@id([year, score])
+  @@id([exam, year, score])
   @@index([year, bestRank])
 }
 
 /// One NBEMS AIQ merit-list threshold (every MeritList.step AIQ ranks): maxAir = highest NEET PG rank among candidates
 /// at or ahead of AIQ rank `aiqRank`; count = candidates of `category` among them ("<cat> PwBD" also counted in <cat>).
 model MeritPosition {
+  /// As DataSource.exam.
+  exam     String    @default("neet-pg")
   year     Int
   aiqRank  Int
   maxAir   Int
@@ -432,7 +475,7 @@ model MeritPosition {
   listId   String
   list     MeritList @relation(fields: [listId], references: [sourceId], onDelete: Cascade)
 
-  @@id([year, category, aiqRank])
+  @@id([exam, year, category, aiqRank])
   @@index([year, category, maxAir])
 }
 

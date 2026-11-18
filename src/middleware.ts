@@ -1,9 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { EXAM_COOKIE, isExam } from "@/features/exams/keys";
 import { AID_COOKIE, AID_MAX_AGE_S, isAid, isBot } from "@/features/funnel/lib";
 import { ACCESS_COOKIE, accessCookieUser, siteGate } from "@/lib/site-access";
 
 // Two jobs. 1. The seatora_aid device cookie (docs/FUNNEL.md) on page requests that lack it, bots aside; it is also put
-// on this request, so the page or route handler sees it the first time. 2. The access gate for /decide and /api/v1: a
+// on this request, so the page or route handler sees it the first time. Likewise a Decide page's ?exam= becomes the
+// seatora_exam cookie, which only staff's pages heed (features/exams/active.tsx). 2. The access gate for /decide and /api/v1: a
 // valid seatora_access cookie, which only a member's sign-in sets (any account with SEATORA_OPEN_ACCESS=1, else an
 // allowlisted one). Server Actions can be POSTed to any route, so Decide actions re-check access themselves. See
 // docs/ARCHITECTURE.md "Access gate".
@@ -14,8 +16,11 @@ export async function middleware(req: NextRequest) {
   const api = req.nextUrl.pathname.startsWith("/api/");
   const aid = !api && !isAid(req.cookies.get(AID_COOKIE)?.value) && !isBot(req.headers.get("user-agent")) ? newAid() : null;
   if (aid) req.cookies.set(AID_COOKIE, aid);
+  const exam = req.nextUrl.pathname.startsWith("/decide") ? req.nextUrl.searchParams.get("exam") : null;
+  if (isExam(exam)) req.cookies.set(EXAM_COOKIE, exam);
   const res = await gate(req, api);
   if (aid) res.cookies.set(AID_COOKIE, aid, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: AID_MAX_AGE_S });
+  if (isExam(exam)) res.cookies.set(EXAM_COOKIE, exam, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/decide", maxAge: 60 * 60 * 24 * 365 });
   return res;
 }
 

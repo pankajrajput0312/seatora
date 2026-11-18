@@ -128,7 +128,7 @@ describe("query", () => {
     expect(r).toMatchObject({ total: 120, page: 3, pageSize: RESIDENTS_PAGE_SIZE });
     expect(r).not.toHaveProperty("withRank");
     expect(r.rows[0]).toEqual({ ...row, specialty: undefined, course: { degree: "MD", specialty: "PAEDIATRICS", name: "Paediatrics", slug: "md-paediatrics" } });
-    expect(m.sources.mock.lastCall![0].where).toEqual({ key: { in: [row.sourceKey] } });
+    expect(m.sources.mock.lastCall![0].where).toEqual({ exam: "neet-pg", key: { in: [row.sourceKey] } });
     expect(r.sources).toEqual([{ key: row.sourceKey, name: "MCC admitted candidates list (up to Round 3)", url: null, year: 2025 }]);
     m.findMany.mockClear();
     const deep = await list({ page: RESIDENTS_MAX_PAGE + 1 });

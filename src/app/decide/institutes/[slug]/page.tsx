@@ -44,6 +44,8 @@ import { checkAndCount, currentPlan } from "@/features/plans/usage";
 import { roundLabel, seatKindLabel } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
+import { exams } from "@/features/exams/registry";
+import { activeExam } from "@/features/exams/active";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 const tabs = [
@@ -66,7 +68,7 @@ const schema = z.object({
 });
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
-  const college = await getCollege((await params).slug).catch((e) => {
+  const college = await getCollege((await params).slug, await activeExam()).catch((e) => {
     unstable_rethrow(e);
     return null;
   });
@@ -83,10 +85,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const L = decideLinks(sp);
   const slug = (await params).slug;
   const f = parseSearchParams(schema, sp);
-  const [inst, meta] = await Promise.all([getInstitute(slug, profile), getMeta()]);
+  const exam = await activeExam();
+  const [inst, meta] = await Promise.all([getInstitute(slug, profile, exam), getMeta(exam)]);
   if (!inst) {
     // A slug of a college key an MCC import retired (merged, or a neutral name): 308 to the college it became.
-    const to = await renamedCollege(slug);
+    const to = await renamedCollege(slug, exam);
     if (to) permanentRedirect(`/decide/institutes/${to.slug}${sp.size ? `?${sp}` : ""}`);
     notFound();
   }
@@ -102,7 +105,9 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       </AppPage>
     );
   }
-  const tab = f.tab;
+  // Residents are NEET PG's (no exam on Resident): no tab for an exam without them.
+  const shownTabs = tabs.filter((t) => t.key !== "residents" || exams[exam].has.residents);
+  const tab = shownTabs.some((t) => t.key === f.tab) ? f.tab : "overview";
   const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
   const latest = latestRound(meta.sources);
   const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n ?? 0));
@@ -115,7 +120,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const nLatest = allotmentsByYear.find((a) => a.year === LATEST_YEAR)?.n ?? null;
 
   // Allotments tab: one page from SQL; a page past the end shows the last page.
-  const allot = tab === "allotments" ? await listAllotments({ year: allotYear, course: allotCourse }, { page: f.page, pageSize: await pageSizeFor(PAGE_SIZE) }, college.key) : null;
+  const allot = tab === "allotments" ? await listAllotments({ year: allotYear, course: allotCourse }, { page: f.page, pageSize: await pageSizeFor(PAGE_SIZE) }, college.key, exam) : null;
   // ponytail: every row on one page (largest institute ~930 rows, ~1.6 MB HTML); add a course filter if that grows.
   const residentsAccess = tab !== "residents" ? null : !(await canSeeResidents()) ? "locked" : ((await residentsDenied("read")) ?? "ok");
   const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
@@ -167,12 +172,12 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // Fees tab: the fee table by seat-type group per programme (none for MCh, MPH); Hospital facts tab: clinical facts.
   const listsTab = tab === "courses" || tab === "seats";
   const [round, totals, mix, info, feeGroups, clinical] = await Promise.all([
-    listsTab ? roundSeatsAt(college.key) : [],
-    listsTab ? null : roundSeatTotals(college.key),
-    tab === "overview" ? allotmentMixAt(college.key) : null,
-    hospitalInfo().then((m) => m.get(college.key) ?? null),
-    tab === "fees" ? Promise.all(fees.map((p) => feesFor(college.key, p.programme))) : [],
-    tab === "clinical" ? clinicalAt(college.key, profile) : null,
+    listsTab ? roundSeatsAt(college.key, exam) : [],
+    listsTab ? null : roundSeatTotals(college.key, exam),
+    tab === "overview" ? allotmentMixAt(college.key, exam) : null,
+    hospitalInfo(exam).then((m) => m.get(college.key) ?? null),
+    tab === "fees" ? Promise.all(fees.map((p) => feesFor(college.key, p.programme, exam))) : [],
+    tab === "clinical" ? clinicalAt(college.key, profile, exam) : null,
   ]);
   const website = websiteUrl(info?.website ?? null);
   const roundLists = round.map((x) => x.list);
@@ -270,7 +275,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         </div>
       </div>
 
-      <SubTabs label="Institute sections" current={tab} items={tabs.map((t) => ({ key: t.key, label: t.label, accent: "accent" in t && t.accent, href: L.to(`/decide/institutes/${slug}`, { tab: t.key }) }))} />
+      <SubTabs label="Institute sections" current={tab} items={shownTabs.map((t) => ({ key: t.key, label: t.label, accent: "accent" in t && t.accent, href: L.to(`/decide/institutes/${slug}`, { tab: t.key }) }))} />
 
       {tab === "overview" && (
         <>

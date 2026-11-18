@@ -1,7 +1,12 @@
 import "server-only";
+import { DEFAULT_EXAM } from "@/features/exams/keys";
 import { db } from "@/lib/db";
 import type { SourceType } from "@/types/provenance";
 import { perImport } from "./catalog";
+
+// ponytail: NEET PG's aggregates only (no other exam has scoreRank / merit in the registry); give these an exam
+// argument once one does.
+const exam = DEFAULT_EXAM;
 
 // NBEMS result aggregates (MeritList, ScoreRank, MeritPosition; prisma/import-mcc.ts). History of one year's exam, never
 // a prediction: say "In NEET PG 2025, a score of X was rank A–B". Scores of different years are out of different totals
@@ -29,11 +34,11 @@ type ListRow = { year: number; maxMarks: number; candidates: number; coverage: s
 const toSource = ({ source: s, step, ...l }: ListRow): MeritSource => ({ ...s, ...l, hasCategories: step != null });
 
 /** Years with NBEMS aggregates, newest first. */
-export const meritLists: () => Promise<MeritSource[]> = perImport(async () => (await db.meritList.findMany({ select: listSelect, orderBy: { year: "desc" } })).map(toSource));
+export const meritLists: () => Promise<MeritSource[]> = perImport(async () => (await db.meritList.findMany({ where: { exam }, select: listSelect, orderBy: { year: "desc" } })).map(toSource));
 
 const listOf = (year: number) => listOnce(String(year));
 const listOnce = perImport(async (key) => {
-  const l = await db.meritList.findUnique({ where: { year: Number(key) }, select: { ...listSelect, qualified: true } });
+  const l = await db.meritList.findUnique({ where: { exam_year: { exam, year: Number(key) } }, select: { ...listSelect, qualified: true } });
   if (!l) return null;
   const { qualified, ...rest } = l;
   return { source: toSource(rest), qualified: (qualified ?? null) as Record<string, number> | null };
@@ -47,15 +52,15 @@ export type ScoreLookup = { year: number; at: ScoreRankRow | null; above: ScoreR
 const rowSelect = { score: true, bestRank: true, worstRank: true, count: true } as const;
 const neighbours = (year: number, score: number) =>
   Promise.all([
-    db.scoreRank.findFirst({ where: { year, score: { gt: score } }, orderBy: { score: "asc" }, select: rowSelect }),
-    db.scoreRank.findFirst({ where: { year, score: { lt: score } }, orderBy: { score: "desc" }, select: rowSelect }),
+    db.scoreRank.findFirst({ where: { exam, year, score: { gt: score } }, orderBy: { score: "asc" }, select: rowSelect }),
+    db.scoreRank.findFirst({ where: { exam, year, score: { lt: score } }, orderBy: { score: "desc" }, select: rowSelect }),
   ]);
 
 /** What rank a score was in that year's result. Null when the year has no NBEMS data. */
 export async function scoreToRank(year: number, score: number): Promise<(ScoreLookup & { score: number }) | null> {
   const list = await listOf(year);
   if (!list) return null;
-  const [at, [above, below]] = await Promise.all([db.scoreRank.findUnique({ where: { year_score: { year, score } }, select: rowSelect }), neighbours(year, score)]);
+  const [at, [above, below]] = await Promise.all([db.scoreRank.findUnique({ where: { exam_year_score: { exam, year, score } }, select: rowSelect }), neighbours(year, score)]);
   return { year, score, at, above, below, source: list.source };
 }
 
@@ -63,12 +68,12 @@ export async function scoreToRank(year: number, score: number): Promise<(ScoreLo
 export async function rankToScore(year: number, rank: number): Promise<(ScoreLookup & { rank: number }) | null> {
   const list = await listOf(year);
   if (!list) return null;
-  const prev = await db.scoreRank.findFirst({ where: { year, bestRank: { lte: rank } }, orderBy: { bestRank: "desc" }, select: rowSelect });
+  const prev = await db.scoreRank.findFirst({ where: { exam, year, bestRank: { lte: rank } }, orderBy: { bestRank: "desc" }, select: rowSelect });
   if (prev && prev.worstRank >= rank) {
     const [above, below] = await neighbours(year, prev.score);
     return { year, rank, at: prev, above, below, source: list.source };
   }
-  const below = await db.scoreRank.findFirst({ where: { year, bestRank: { gt: rank } }, orderBy: { bestRank: "asc" }, select: rowSelect });
+  const below = await db.scoreRank.findFirst({ where: { exam, year, bestRank: { gt: rank } }, orderBy: { bestRank: "asc" }, select: rowSelect });
   return { year, rank, at: null, above: prev, below, source: list.source };
 }
 
@@ -108,8 +113,8 @@ export async function meritPosition(year: number, category: string, rank: number
   if (!list?.qualified || !(cat in list.qualified)) return null;
   const select = { aiqRank: true, maxAir: true, count: true } as const;
   const [from, to] = await Promise.all([
-    db.meritPosition.findFirst({ where: { year, category: cat, maxAir: { lte: rank } }, orderBy: [{ maxAir: "desc" }, { aiqRank: "desc" }], select }),
-    db.meritPosition.findFirst({ where: { year, category: cat, maxAir: { gt: rank } }, orderBy: [{ maxAir: "asc" }, { aiqRank: "asc" }], select }),
+    db.meritPosition.findFirst({ where: { exam, year, category: cat, maxAir: { lte: rank } }, orderBy: [{ maxAir: "desc" }, { aiqRank: "desc" }], select }),
+    db.meritPosition.findFirst({ where: { exam, year, category: cat, maxAir: { gt: rank } }, orderBy: [{ maxAir: "asc" }, { aiqRank: "asc" }], select }),
   ]);
   return { year, category: cat, rank, min: from?.count ?? 0, max: to?.count ?? from?.count ?? 0, from, to, qualified: list.qualified[cat], source: list.source };
 }

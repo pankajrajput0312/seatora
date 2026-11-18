@@ -2,6 +2,7 @@ import "server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { cache as perRequest } from "react";
 import { requireDecideAccess } from "@/features/auth/lib/session";
+import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import { db } from "@/lib/db";
 import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Source, type Term } from "../types";
 import { bucketOfDegree } from "./terms";
@@ -19,9 +20,10 @@ export type Opt = Pair & { id: string; quota: string; byYear: Record<number, num
 
 /**
  * Everything small enough to keep in memory: colleges, courses, sources, terms and the option list. Cutoffs and
- * allotments (133k / 210k rows) are queried per request in ./queries.ts.
+ * allotments (133k / 210k rows) are queried per request in ./queries.ts. One exam's: every query made with it is too.
  */
 export type Catalog = {
+  exam: ExamKey;
   /** Tests only: the whole fixture in memory, filtered in JS instead of SQL. Null at runtime (Postgres). */
   mem: { cutoffs: Cutoff[]; allotments: Allotment[] } | null;
   colleges: College[];
@@ -68,6 +70,7 @@ export function yearsOf(sources: Source[]): YearInfo[] {
 const uniq = (xs: (string | null)[]) => [...new Set(xs.filter((x): x is string => !!x))].sort();
 
 export function indexCatalog(p: {
+  exam?: ExamKey;
   mem?: Catalog["mem"];
   colleges: College[];
   courses: Course[];
@@ -95,6 +98,7 @@ export function indexCatalog(p: {
   const sources = p.sources.map(([, s]) => s);
   const specialtyCodes = uniq(courses.map((c) => c.specialty));
   return {
+    exam: p.exam ?? DEFAULT_EXAM,
     mem: p.mem ?? null,
     colleges: p.colleges,
     courses,
@@ -151,9 +155,10 @@ export function memoryCatalog(d: DecideData): Catalog {
 const WORKING_NOTE = /;?\s*\b(?:I|we) (?:did not|could not|have not|didn't|couldn't|haven't) [^."\\]*\./gi;
 export const scrubNotes = <T,>(x: T): T => JSON.parse(JSON.stringify(x).replace(WORKING_NOTE, (m) => (m.startsWith(";") ? "." : "")));
 
-async function loadCatalog(version: string): Promise<Catalog> {
-  // The build's snapshot while no import has committed since (zero DB egress), else Postgres.
-  const { sources, colleges, specialties, pairs, terms, options, details, retired, feeTable } = (await snapshotAt(version))?.catalog ?? (await catalogRows(db));
+async function loadCatalog(exam: ExamKey, version: string): Promise<Catalog> {
+  // NEET PG: the build's snapshot while no import has committed since (zero DB egress), else Postgres.
+  const snap = exam === DEFAULT_EXAM ? await snapshotAt(version) : null;
+  const { sources, colleges, specialties, pairs, terms, options, details, retired, feeTable } = snap?.catalog ?? (await catalogRows(db, exam));
   const detailsOf = new Map(details.map((d) => [d.id, scrubNotes(d.details)]));
   // FEE and STIPEND terms carry their college + program's fee-table records, as the bundle's terms do (details.records).
   const feeRecords = Map.groupBy(feeTable, (r) => `${r.collegeId}|${bucketOfDegree(r.programme)}`);
@@ -161,6 +166,7 @@ async function loadCatalog(version: string): Promise<Catalog> {
   const collegeKey = new Map(colleges.map((c) => [c.id, c.key]));
   const spec = new Map(specialties.map((s) => [s.id, s]));
   return indexCatalog({
+    exam,
     // Beds and year established are not in the MCC data; type (inferred, College.typeBasis) is imported (bundle schema
     // 2) but not shown yet. Never guessed. website: the MCC profile's (a fee cell "On college website ↗" links it).
     colleges: colleges.map((c) => ({ key: c.key, slug: c.slug, name: c.name, state: c.state, pincode: c.pincode, address: c.address, type: null, beds: null, established: null, website: c.website })),
@@ -185,12 +191,12 @@ async function loadCatalog(version: string): Promise<Catalog> {
   });
 }
 
-// ponytail: one catalog per process, re-validated on every request against the data version: the marker row
-// prisma/import-mcc.ts writes last in its transaction, so it changes only once an import has committed (never mid-import).
+// ponytail: one catalog per exam per process, re-validated on every request against that exam's data version: the marker
+// row prisma/import-mcc.ts writes last in its transaction, so it changes only once an import has committed (never mid-import).
 // Checked per request, not per minute: a catalog older than the cutoffs would drop rows whose source or course it
 // doesn't know (e.g. right after the provisional-to-final swap). One primary-key read, once per render (React cache).
 // Multi-instance deploys each hold their own copy, which is fine.
-let cache: { version: string; catalog: Promise<Catalog> } | null = null;
+const cache = new Map<ExamKey, { version: string; catalog: Promise<Catalog> }>();
 let testCatalog: Catalog | null = null;
 const trusted = new AsyncLocalStorage<true>();
 /**
@@ -199,7 +205,7 @@ const trusted = new AsyncLocalStorage<true>();
  */
 export const asTrustedServer = <T>(fn: () => Promise<T>) => trusted.run(true, fn);
 const access = perRequest(() => (trusted.getStore() ? undefined : requireDecideAccess()));
-export const dataVersion = perRequest(() => markerOf(db));
+export const dataVersion = perRequest((exam: ExamKey) => markerOf(db, exam));
 
 /** No database configured or reachable: Decide shows "Data unavailable", never stand-in data. */
 export class DataUnavailableError extends Error {
@@ -214,7 +220,8 @@ export function setTestCatalog(d: DecideData | null) {
   testCatalog = d && memoryCatalog(d);
 }
 
-export async function getCatalog(): Promise<Catalog> {
+/** The exam's catalog (default NEET PG: what every caller that names none reads). */
+export async function getCatalog(exam: ExamKey = DEFAULT_EXAM): Promise<Catalog> {
   if (testCatalog) return testCatalog;
   if (!process.env.DATABASE_URL) throw new DataUnavailableError("DATABASE_URL is not set");
   // Every Decide page, API route and Server Action reads through here. src/middleware.ts checks only the access cookie's
@@ -222,31 +229,31 @@ export async function getCatalog(): Promise<Catalog> {
   // Open while the gate is off (development, unit tests).
   // Access and version in parallel (one round trip less per request); a redirect from access() still wins.
   // Read before loading: an import committing during the load leaves the old version cached, so the next check reloads.
-  const [, version] = await Promise.all([access(), dataVersion()]);
-  if (cache?.version !== version) {
-    const catalog = loadCatalog(version);
-    catalog.catch(() => (cache = null)); // don't keep a failed load
-    cache = { version, catalog };
-  }
-  return cache.catalog;
+  const [, version] = await Promise.all([access(), dataVersion(exam)]);
+  const hit = cache.get(exam);
+  if (hit?.version === version) return hit.catalog;
+  const catalog = loadCatalog(exam, version);
+  catalog.catch(() => cache.delete(exam)); // don't keep a failed load
+  cache.set(exam, { version, catalog });
+  return catalog;
 }
 
 /**
- * `load(key)` once per data version per process, shared across requests and users, like the catalog: only for import
- * data (seat lists, MCC notices), never per-user or resident data. Results are shared: callers must not mutate them.
- * Tests with an in-memory catalog read through.
+ * `load(key, exam)` once per exam's data version per process, shared across requests and users, like the catalog: only
+ * for import data (seat lists, MCC notices), never per-user or resident data. Results are shared: callers must not
+ * mutate them. Tests with an in-memory catalog read through.
  */
-export function perImport<T>(load: (key: string) => Promise<T>): (key?: string) => Promise<T> {
-  let memo = { version: "", values: new Map<string, Promise<T>>() };
-  return async (key = "") => {
-    await getCatalog(); // same access and availability as the rest of Decide
-    if (testCatalog) return load(key);
-    const version = await dataVersion();
-    if (memo.version !== version) memo = { version, values: new Map() };
-    const { values } = memo;
+export function perImport<T>(load: (key: string, exam: ExamKey) => Promise<T>): (key?: string, exam?: ExamKey) => Promise<T> {
+  const memo = new Map<ExamKey, { version: string; values: Map<string, Promise<T>> }>();
+  return async (key = "", exam = DEFAULT_EXAM) => {
+    await getCatalog(exam); // same access and availability as the rest of Decide
+    if (testCatalog) return load(key, exam);
+    const version = await dataVersion(exam);
+    if (memo.get(exam)?.version !== version) memo.set(exam, { version, values: new Map() });
+    const { values } = memo.get(exam)!;
     const hit = values.get(key);
     if (hit) return hit;
-    const p = load(key);
+    const p = load(key, exam);
     values.set(key, p);
     p.catch(() => values.delete(key)); // don't keep a failed read
     return p;

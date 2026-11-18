@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { activeExam } from "@/features/exams/active";
 import { fmtDay } from "../lib/format";
 import { roundName } from "../lib/round-status";
 import { listNotices } from "../server/notices";
@@ -34,9 +35,10 @@ const noticeLinks = (ns: MccNotice[]) =>
  */
 export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLinks }) {
   if (!lists.length) return null;
-  const all = await seatLists();
+  const exam = await activeExam();
+  const all = await seatLists(exam);
   const each = await Promise.all(
-    lists.map(async (list) => ({ list, ...seatChanges(list, all, await listNotices({ kind: "seat_matrix", year: list.year, round: list.round })) })),
+    lists.map(async (list) => ({ list, ...seatChanges(list, all, await listNotices({ kind: "seat_matrix", year: list.year, round: list.round }, exam)) })),
   );
   const seen = new Set<string>();
   const once = (ns: MccNotice[]) => ns.filter((n) => !seen.has(n.url ?? n.title) && !!seen.add(n.url ?? n.title));
@@ -90,7 +92,7 @@ type Used = { year: number; round?: string };
  * wherever on the page it sits.
  */
 export async function DataSource({ used, terms, results = true }: { used?: Used[]; terms?: (Term["source"] | null | undefined)[]; results?: boolean }) {
-  const meta = await getMeta();
+  const meta = await getMeta(await activeExam());
   const keys = used && new Set(used.map((u) => `${u.year}|${u.round ?? "*"}`));
   const pdfs = results ? meta.sources.filter((s) => !keys || keys.has(`${s.year}|${s.round}`) || keys.has(`${s.year}|*`)) : [];
   const years = [...new Set(pdfs.map((s) => s.year))].sort((a, b) => b - a);

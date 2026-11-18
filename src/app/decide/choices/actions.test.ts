@@ -6,6 +6,7 @@ import { optionId } from "@/features/decide/types";
 import { liveReach } from "./actions";
 
 vi.stubEnv("DATABASE_URL", "");
+vi.mock("@/features/exams/active", () => ({ activeExam: async () => "neet-pg" })); // no request here: no cookies
 afterAll(() => setTestCatalog(null));
 
 it("relabels saved choices from the current data, and validates what the browser sends", async () => {

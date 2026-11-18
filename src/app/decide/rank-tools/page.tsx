@@ -10,6 +10,7 @@ import { parseSearchParams, rankValue } from "@/features/decide/lib/params";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { meritLists, meritPosition, scoreToRank, type MeritSource, type ScoreRankRow } from "@/features/decide/server/merit";
 import { baseCategories } from "@/features/decide/types";
+import { examGate } from "@/features/exams/active";
 
 export const metadata: Metadata = { title: "Score & rank" };
 const categories = [...baseCategories, ...baseCategories.map((c) => `${c} PwD` as const)] as const;
@@ -43,6 +44,8 @@ function Sheet({ title, children }: { title: string; children: React.ReactNode }
 }
 
 export default async function RankToolsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const gated = await examGate("/decide/rank-tools");
+  if (gated) return gated;
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
   const f = parseSearchParams(schema, params);
