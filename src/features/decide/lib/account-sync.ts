@@ -1,5 +1,21 @@
 // Pure rules for syncing the profile and choice lists with the account (components/account-sync.tsx, tested).
+import { DEFAULT_EXAM, examKeys, type ExamKey } from "@/features/exams/keys";
 import type { ChoicesState } from "./choices";
+
+/**
+ * The account's json (UserProfile, UserChoices) holds NEET PG's value at its top level, exactly as before exams; another
+ * exam's (staff only) under its exam key ("neet-mds": {...}). examPart reads one exam's, withExamPart writes one and keeps
+ * the others. NEET PG with no other exam saved: the value itself, unchanged.
+ */
+const isObject = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
+const others = (json: unknown) => (isObject(json) ? Object.fromEntries(examKeys.filter((k) => k !== DEFAULT_EXAM && k in json).map((k) => [k, json[k]])) : {});
+export function examPart(json: unknown, exam: ExamKey): unknown {
+  if (exam !== DEFAULT_EXAM) return isObject(json) ? (json[exam] ?? null) : null;
+  if (!isObject(json) || !Object.keys(others(json)).length) return json;
+  return Object.fromEntries(Object.entries(json).filter(([k]) => !(examKeys as readonly string[]).includes(k)));
+}
+export const withExamPart = (json: unknown, exam: ExamKey, value: object): Record<string, unknown> =>
+  exam === DEFAULT_EXAM ? { ...value, ...others(json) } : { ...(isObject(json) ? json : {}), [exam]: value };
 
 /** The newer copy wins; every list and choice only in the older one is kept, appended, so a choice is never lost. */
 export function mergeChoices(newer: ChoicesState, older: ChoicesState): ChoicesState {

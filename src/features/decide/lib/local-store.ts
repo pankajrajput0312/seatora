@@ -16,6 +16,9 @@ function getRaw(key: string): string | null {
   }
 }
 
+/** The stored value now, outside React (the exam switcher reads the next exam's profile with it). */
+export const readLocal = <T,>(key: string, fallback: T) => read(key, fallback);
+
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   const raw = getRaw(key);

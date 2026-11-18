@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import type { DecideLinks } from "../../lib/links";
 import type { Latest } from "../../lib/reach";
-import { openQuotas, roundLabel, seatKindLabel, type SeatKind, type SeatList } from "../../types";
+import { DEFAULT_EXAM, restrictedQuota, type ExamKey } from "@/features/exams/registry";
+import { roundLabel, seatKindLabel, type SeatKind, type SeatList } from "../../types";
 import { Dash, Provisional, ReachBadge } from "../bits";
 import { Beds } from "../pages/beds";
 import { ResultCard, ResultCards } from "../result-card";
@@ -29,7 +30,7 @@ const shortKind: Record<SeatKind, string> = { clear: "Clear", virtual: "Virtual"
  * round (All rounds) shows its newest list with seats instead, its round in the chip. `onDetails`: the matrix's drawer,
  * by row key (a Details button per card). `latest`: lib/reach.ts latestRound.
  */
-export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, latest }: {
+export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, latest, exam = DEFAULT_EXAM }: {
   rows: CardRow[];
   list: SeatList;
   lists: SeatList[];
@@ -38,6 +39,8 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
   title: string;
   onDetails?: (key: string) => void;
   latest: Latest;
+  /** The exam shown: which quotas are restricted. */
+  exam?: ExamKey;
 }) {
   const sameRound = (a: SeatList, b: SeatList) => a.year === b.year && a.round === b.round;
   return (
@@ -57,7 +60,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
             chips={[
               `${own.year} · ${roundLabel[own.round]}`,
               r.quota ?? "Quota not printed",
-              r.quota != null && !openQuotas.includes(r.quota) && <Badge tone="warning">Restricted</Badge>,
+              r.quota != null && restrictedQuota(exam, r.quota) && <Badge tone="warning">Restricted</Badge>,
               `${r.category} seat`,
             ]}
             actions={onDetails && (

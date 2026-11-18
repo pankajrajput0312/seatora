@@ -21,10 +21,11 @@ import { parseSearchParams, rankValue } from "@/features/decide/lib/params";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankJourney } from "@/features/decide/service";
-import { roundLabel } from "@/features/decide/types";
+import { roundLabel, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
 import { activeExam } from "@/features/exams/active";
+import { exams, groupsOf, perGroup, roundNameIn } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Rank journey" };
 const VIEW = "rank-journey";
@@ -39,13 +40,16 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
   const exam = await activeExam();
+  const E = exams[exam];
   const meta = await getMeta(exam);
   const typed = params.get("air")?.trim() || null;
+  // NEET SS: a rank is one candidate only within a question group: her group's seats (none picked: every group's).
+  const group = perGroup(exam) && profile?.quotas.length ? profile.quotas : undefined;
   const invalid = typed != null && f.air == null;
   const rank = invalid ? null : (f.air ?? profile?.rank ?? null);
   // Default: the newest year with results.
   const year = meta.years.find((y) => y.year === f.year) ?? meta.years[0];
-  const rows = rank && year ? await withRowInfo(await rankJourney(year.year, rank, exam), exam) : [];
+  const rows = rank && year ? await withRowInfo(await rankJourney(year.year, rank, exam, group), exam) : [];
   const none = year ? year.rounds.filter((r) => !rows.some((a) => a.round === r)) : [];
   const courseOf = new Map(meta.courses.map((c) => [`${c.degree}|${c.specialty}`, c]));
   const provisional = (round: string) => meta.sources.some((s) => s.year === year?.year && s.round === round && s.provisional);
@@ -57,18 +61,19 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
   type Row = (typeof rows)[number];
   const key = (a: Row) => `${a.round}|${a.college}|${a.degree}|${a.specialty}|${a.quota}`;
   const courseLink = (a: Row) => L.allotments({ course: courseOf.get(`${a.degree}|${a.specialty}`)?.slug, inst: a.collegeSlug || undefined, year: year!.year, round: a.round });
-  const of = (a: Row) => `${a.collegeName}, ${a.courseName}, ${roundLabel[a.round]}`;
+  const roundOf = (r: Round) => (year ? roundNameIn(exam, meta.sources, year.year, r) : roundLabel[r]);
+  const of = (a: Row) => `${a.collegeName}, ${a.courseName}, ${roundOf(a.round)}`;
 
   return (
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Rank journey"
-        about="One All India Rank's seat in every round of one year's MCC results: the seat, MCC's status, the choice number and the seat held a round earlier. Ranks only, never names."
+        about={`One ${E.rankName}'s seat in every round of one year's MCC results: the seat, MCC's status, the choice number and the seat held a round earlier.${group ? ` In your question group (${groupsOf(exam, group).join(", ")}) only: the same rank in another group is another candidate.` : ""} Ranks only, never names.`}
         note="History, not a prediction."
       />
 
       <FilterBar action="/decide/rank-journey" params={params} cols="md:grid-cols-[1fr_1fr_auto]">
-        <Field label="All India Rank">
+        <Field label={E.rankName}>
           <input name="air" inputMode="numeric" defaultValue={typed ?? rank ?? ""} placeholder="e.g. 42,284" aria-invalid={invalid || undefined} aria-describedby={invalid ? "air-error" : undefined} className={`${control} numeric`} />
         </Field>
         <Field label="Year"><Select name="year" value={year ? String(year.year) : undefined} options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
@@ -77,12 +82,12 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
       {invalid ? (
         <p id="air-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example 42,284.</p>
       ) : !rank || !year ? (
-        <EmptyState title="Enter a rank" description="Type an All India Rank above, or set your rank, to see that rank's seat in every round of one year's MCC results." />
+        <EmptyState title="Enter a rank" description={`Type ${E.rankName === "All India Rank" ? "an" : "a"} ${E.rankName} above, or set your rank, to see that rank's seat in every round of one year's MCC results.`} />
       ) : rows.length === 0 ? (
         <>
           <EmptyState
             title={`No allotment to rank ${formatRank(rank)} in ${year.year}`}
-            description={`MCC's ${year.year} results (${year.rounds.map((r) => roundLabel[r]).join(", ")}) list no seat for this rank in any round.`}
+            description={`MCC's ${year.year} results (${year.rounds.map(roundOf).join(", ")}) list no seat for this rank in any round.`}
             href={L.rankScan(rank, year.year)}
             action={`Scan ranks around ${formatRank(rank)}`}
           />
@@ -96,7 +101,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
               <div className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
                 <p aria-live="polite">
                   Seat in <span className="numeric font-semibold text-foreground">{rows.length}</span> of {year.rounds.length} rounds
-                  {none.length > 0 && <>; none in {none.map((r) => roundLabel[r]).join(", ")}</>}
+                  {none.length > 0 && <>; none in {none.map(roundOf).join(", ")}</>}
                 </p>
                 <InfoTip label="rounds without a seat">
                   In R2 and later the results list only new or upgraded seats, so a round without a row may mean a seat from an
@@ -117,7 +122,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
                 {rows.map((a) => (
                   <ResultCard
                     key={key(a)}
-                    chips={[<span key="r" className="inline-flex items-center gap-1"><span className="numeric">{year.year}</span> · {roundLabel[a.round]}<Provisional when={provisional(a.round)} /></span>, a.quota, `${a.category} seat`, statusLabel[a.status] ?? a.status]}
+                    chips={[<span key="r" className="inline-flex items-center gap-1"><span className="numeric">{year.year}</span> · {roundOf(a.round)}<Provisional when={provisional(a.round)} /></span>, a.quota, `${a.category} seat`, statusLabel[a.status] ?? a.status]}
                     stat={{ label: "Choice no.", value: a.optionNo != null ? <span className="numeric">{formatRank(a.optionNo)}</span> : <Dash /> }}
                     title={a.collegeName}
                     href={a.collegeSlug ? L.institute(a.collegeSlug) : undefined}
@@ -149,13 +154,13 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
                     <th scope="col" className={th}>Round, status</th>
                     <th scope="col" className={th}>Institute and seat</th>
                     <th scope="col" className={th}>Choice, previous seat</th>
-                    {statKeys.map((k) => <th key={k} scope="col" className={termCol.th(k)}>{statLabel[k]}</th>)}
+                    {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={termCol.th(k)}>{statLabel[k]}</th>)}
                   </tr></thead>
                   <tbody>
                     {rows.map((a) => (
                       <tr key={key(a)} className={tbl.row}>
                         <th scope="row" className={`${short} text-left font-medium`}>
-                          <span className="numeric">{year.year}</span> {roundLabel[a.round]}
+                          <span className="numeric">{year.year}</span> {roundOf(a.round)}
                           <span className="block"><Provisional when={provisional(a.round)} /></span>
                           <span className="block text-xs font-normal text-muted-foreground">{statusLabel[a.status] ?? a.status}</span>
                         </th>

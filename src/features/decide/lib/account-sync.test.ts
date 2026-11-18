@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fingerprint, hasChoices, mergeChoices, reconcile } from "./account-sync";
+import { examPart, fingerprint, hasChoices, mergeChoices, reconcile, withExamPart } from "./account-sync";
 import { defaultChoices, toggleItem, type ChoiceItem, type ChoicesState } from "./choices";
 
 const item = (id: string): ChoiceItem => ({ id, institute: id, slug: id, state: null, course: "MD X", quota: "All India", reachLabel: "", closedEveryRound: false });
@@ -36,4 +36,23 @@ it("hasChoices and fingerprint", () => {
   expect(hasChoices(withItems("a"))).toBe(true);
   expect(fingerprint(withItems("a"))).toBe(fingerprint(withItems("a")));
   expect(fingerprint(withItems("a"))).not.toBe(fingerprint(withItems("b")));
+});
+
+describe("exam parts of the account's json (NEET PG's format unchanged)", () => {
+  const pg = { rank: 42284, category: "OBC" };
+  it("NEET PG reads and writes the top level exactly as before when no other exam is saved", () => {
+    expect(examPart(pg, "neet-pg")).toBe(pg);
+    expect(JSON.stringify(withExamPart(null, "neet-pg", pg))).toBe(JSON.stringify(pg));
+    expect(JSON.stringify(withExamPart(pg, "neet-pg", { ...pg, rank: 1 }))).toBe(JSON.stringify({ ...pg, rank: 1 }));
+  });
+  it("another exam lives under its key; each exam's write keeps the others", () => {
+    const mds = { rank: 900, category: "Open" };
+    const both = withExamPart(pg, "neet-mds", mds);
+    expect(both).toEqual({ ...pg, "neet-mds": mds });
+    expect(examPart(both, "neet-pg")).toEqual(pg);
+    expect(examPart(both, "neet-mds")).toEqual(mds);
+    expect(examPart(both, "neet-ss")).toBeNull();
+    expect(withExamPart(both, "neet-pg", { rank: 5 })).toEqual({ rank: 5, "neet-mds": mds });
+    expect(examPart({ "neet-ss": { rank: 3 } }, "neet-pg")).toEqual({});
+  });
 });

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { activeExam } from "@/features/exams/active";
+import { DEFAULT_EXAM, exams, roundNameIn } from "@/features/exams/registry";
 import { fmtDay } from "../lib/format";
 import { roundName } from "../lib/round-status";
 import { listNotices } from "../server/notices";
@@ -92,16 +93,17 @@ type Used = { year: number; round?: string };
  * wherever on the page it sits.
  */
 export async function DataSource({ used, terms, results = true }: { used?: Used[]; terms?: (Term["source"] | null | undefined)[]; results?: boolean }) {
-  const meta = await getMeta(await activeExam());
+  const exam = await activeExam();
+  const meta = await getMeta(exam);
   const keys = used && new Set(used.map((u) => `${u.year}|${u.round ?? "*"}`));
   const pdfs = results ? meta.sources.filter((s) => !keys || keys.has(`${s.year}|${s.round}`) || keys.has(`${s.year}|*`)) : [];
   const years = [...new Set(pdfs.map((s) => s.year))].sort((a, b) => b - a);
   const docs: SourceDoc[] = [
     ...years.map((y) => ({
       key: `mcc-results|${y}`,
-      name: `MCC allotment results, PG ${y}`,
+      name: `MCC allotment results, ${exam === DEFAULT_EXAM ? "PG" : exams[exam].label} ${y}`,
       type: "OFFICIAL" as const,
-      links: pdfs.filter((s) => s.year === y).map((s) => ({ label: roundLabel[s.round], url: s.url, title: s.name, provisional: s.provisional, order: rounds.indexOf(s.round) })),
+      links: pdfs.filter((s) => s.year === y).map((s) => ({ label: roundNameIn(exam, meta.sources, s.year, s.round), url: s.url, title: s.name, provisional: s.provisional, order: rounds.indexOf(s.round) })),
     })),
     ...(terms ?? []).flatMap((t) => (t ? [{ name: t.name, url: t.url, type: t.type }] : [])),
   ];

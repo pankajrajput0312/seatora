@@ -286,7 +286,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
  * `tools`: after the Cards | Table toggle beside the count (the CSV download). `historyMore`: what the closing
  * ranks count, behind the history note's (i).
  */
-export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, tools, notes, historyMore, view, latest, pastYears, includeLatest, seatLists }: {
+export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, moreHref, tools, notes, historyMore, view, latest, pastYears, includeLatest, seatLists }: {
   initial: ListRow[];
   page: number;
   pageSize: number;
@@ -294,6 +294,8 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
   query: string;
   caption: string;
   firstPageHref?: string;
+  /** The next page as a link instead of "Show more" (another exam than NEET PG: /api/v1 serves NEET PG only). */
+  moreHref?: string;
   tools?: React.ReactNode;
   /** Beside the history note: the seat lists' "as printed" and a later MCC notice chip (SeatSource). */
   notes?: React.ReactNode;
@@ -343,7 +345,12 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
         </div>
       </div>
       <OptionsList rows={rows} caption={caption} start={start} L={L} view={view} latest={latest} pastYears={pastYears} includeLatest={includeLatest} seatLists={seatLists} />
-      {shown < total && (
+      {shown < total && moreHref && (
+        <div className="grid justify-items-center">
+          <Button asChild variant="secondary"><Link href={moreHref}>Next {formatRank(Math.min(pageSize, total - shown))}</Link></Button>
+        </div>
+      )}
+      {shown < total && !moreHref && (
         <div className="grid justify-items-center gap-2">
           {/* aria-disabled, not disabled: the button keeps focus while the next page loads. */}
           <Button variant="secondary" onClick={more} aria-disabled={status === "loading" || undefined} aria-describedby="options-count">

@@ -15,3 +15,9 @@ export const EXAM_COOKIE = "seatora_exam";
 
 /** The data-version marker an import writes last (server/catalog.ts dataVersion); NEET PG keeps its old key. */
 export const markerKey = (exam: ExamKey) => (exam === DEFAULT_EXAM ? "import/mcc" : `import/${exam}`);
+
+/**
+ * A per-exam storage key (localStorage, sessionStorage, the account's synced json): NEET PG keeps today's key exactly,
+ * another exam gets its own ("medpath.profile.neet-mds"), so no exam ever reads or overwrites another's.
+ */
+export const scopedKey = (key: string, exam: ExamKey) => (exam === DEFAULT_EXAM ? key : `${key}.${exam}`);

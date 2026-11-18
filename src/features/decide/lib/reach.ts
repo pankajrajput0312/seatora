@@ -6,17 +6,23 @@ export const LATEST_YEAR = 2026;
 export const PAST_YEARS: [number, number] = [2024, 2025];
 export const YEARS = [2024, 2025, 2026];
 
-/** The latest year and its newest round with an MCC result in the data (latestRound). */
-export type Latest = { year: number; round: Round };
+/**
+ * The latest year and its newest round with an MCC result in the data (latestRound). `pastYears`: another exam's two past
+ * years (exams/registry.ts latestOf); absent = NEET PG's PAST_YEARS (pastOf).
+ */
+export type Latest = { year: number; round: Round; pastYears?: [number, number] };
+/** The past years the labels beside `latest` count. */
+export const pastOf = (latest: Latest): [number, number] => latest.pastYears ?? PAST_YEARS;
 
 /**
  * THE latest round (one source of truth for every label, note, filter and export): the latest year's newest round with
- * a result PDF in the data (`rounds` order; R1 before any), provisional while MCC's result for it is.
+ * a result PDF in the data (`rounds` order; R1 before any), provisional while MCC's result for it is. `year`: the
+ * exam's latest year (exams/registry.ts latestOf), NEET PG's by default.
  */
-export function latestRound(sources: Pick<Source, "year" | "round" | "provisional">[]): Latest & { provisional: boolean } {
-  const mine = sources.filter((s) => s.year === LATEST_YEAR);
+export function latestRound(sources: Pick<Source, "year" | "round" | "provisional">[], year = LATEST_YEAR): Latest & { provisional: boolean } {
+  const mine = sources.filter((s) => s.year === year);
   const round = rounds.filter((r) => mine.some((s) => s.round === r)).at(-1) ?? "R1";
-  return { year: LATEST_YEAR, round, provisional: mine.some((s) => s.round === round && s.provisional) };
+  return { year, round, provisional: mine.some((s) => s.round === round && s.provisional) };
 }
 
 /** Index in `rounds` of the latest year's last round the labels count: its newest, the one before without it (-1: none). */

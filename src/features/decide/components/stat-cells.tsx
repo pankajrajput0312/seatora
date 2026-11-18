@@ -118,7 +118,7 @@ function YearCell({ t, pick, year, className }: { t: ProgrammeTerms; pick: "fee"
 /** A compact table's column header: "Fee" and one (i) for the whole column (the cells have none). */
 export function StatHead({ k }: { k: StatKey }) {
   return (
-    <span className="inline-flex items-center gap-0.5">
+    <span data-terms className="inline-flex items-center gap-0.5">
       {statLabel[k]}
       <InfoTip label={`${statLabel[k]} column`}>
         {columnNote[k]} Each figure&apos;s exact words and sources: the cards, or the institute&apos;s Fees tab.
@@ -149,7 +149,7 @@ export function TermStatCells({ t, variant = "card", short, of, className, tdCla
     ]);
   }
   return (
-    <dl className={cn("grid grid-cols-6 border-t border-border sm:grid-cols-5", className)}>
+    <dl data-terms className={cn("grid grid-cols-6 border-t border-border sm:grid-cols-5", className)}>
       {cells.map((c, i) => (
         <div
           key={c.key}

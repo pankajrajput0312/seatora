@@ -73,7 +73,7 @@ type StripPoint = { name: string; quota: string; closing: number; round: Round; 
  * label: dots are not focusable (hundreds of tab stops); the hover tooltip finds the nearest dot, and ChartCard's
  * table view carries the numbers for keyboard and screen-reader use.
  */
-export function RankStrip({ rank, rows }: { rank: number; rows: { course: string; points: StripPoint[] }[] }) {
+export function RankStrip({ rank, rows, year = 2025 }: { rank: number; rows: { course: string; points: StripPoint[] }[]; year?: number }) {
   const [tip, setTip] = useState<Tip>(null);
   const all = rows.flatMap((r) => r.points.map((p) => p.closing));
   const max = niceMax(Math.max(rank * 1.2, ...all));
@@ -92,12 +92,12 @@ export function RankStrip({ rank, rows }: { rank: number; rows: { course: string
       const d = Math.abs(x(p.closing) - vx);
       if (d < dist) [best, dist] = [p, d];
     }
-    setTip(best && { x: x(best.closing) * s, y: (top + i * rowH + rowH / 2) * s, value: formatRank(best.closing), label: best.name, sub: `${best.quota} · 2025 ${roundLabel[best.round]} · ${best.category} seat` });
+    setTip(best && { x: x(best.closing) * s, y: (top + i * rowH + rowH / 2) * s, value: formatRank(best.closing), label: best.name, sub: `${best.quota} · ${year} ${roundLabel[best.round]} · ${best.category} seat` });
   };
   const summary = rows.map((r) => `${r.course}: ${r.points.length} options, ${r.points.filter((p) => p.closing >= rank).length} closed at or after your rank`).join("; ");
   return (
     <div role="region" aria-label="Where your rank sits (chart)" tabIndex={0} className="relative overflow-x-auto overflow-y-hidden" onPointerLeave={() => setTip(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[860px]" role="img" aria-label={`2025 deepest closing rank of each option, with your rank ${formatRank(rank)} marked. ${summary}.`} onPointerMove={onMove}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[860px]" role="img" aria-label={`${year} deepest closing rank of each option, with your rank ${formatRank(rank)} marked. ${summary}.`} onPointerMove={onMove}>
         {ticks(max).map((t) => (
           <g key={t}>
             <line x1={x(t)} x2={x(t)} y1={top - 8} y2={H - 24} className="stroke-border" strokeWidth={1} />
@@ -143,7 +143,7 @@ export function LabelBars({ rows }: { rows: { label: string; count: number; href
 }
 
 /** Small multiple: median 2025 closing by round for one course, with a hairline at your rank. Hover tooltips; values in the label. */
-export function RoundTrend({ title, href, rank, points }: { title: string; href?: string; rank: number; points: { round: Round; median: number | null; n: number }[] }) {
+export function RoundTrend({ title, href, rank, points, year = 2025 }: { title: string; href?: string; rank: number; points: { round: Round; median: number | null; n: number }[]; year?: number }) {
   const [tip, setTip] = useState<Tip>(null);
   const vals = points.flatMap((p) => (p.median ? [p.median] : []));
   const max = niceMax(Math.max(rank * 1.15, ...vals));
@@ -155,7 +155,7 @@ export function RoundTrend({ title, href, rank, points }: { title: string; href?
   return (
     <div className="relative rounded-lg border border-border p-3" onPointerLeave={() => setTip(null)}>
       <h3 className="text-title font-semibold">{href ? <Link href={href} className="inline-flex min-h-11 items-center text-sky underline">{title}</Link> : title}</h3>
-      <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" role="img" aria-label={`${title}: median closing rank by round in 2025. ${points.map((p) => `${roundLabel[p.round]} ${p.median ? formatRank(p.median) : "none"}`).join(", ")}. Your rank ${formatRank(rank)}.`}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" role="img" aria-label={`${title}: median closing rank by round in ${year}. ${points.map((p) => `${roundLabel[p.round]} ${p.median ? formatRank(p.median) : "none"}`).join(", ")}. Your rank ${formatRank(rank)}.`}>
         <line x1={L} x2={W - R} y1={y(rank)} y2={y(rank)} className="stroke-foreground/70" strokeWidth={1} />
         <text x={L} y={y(rank) - 4} className="numeric fill-muted-foreground text-[12px]">You, {formatRank(rank)}</text>
         <polyline points={line} className="fill-none stroke-mark" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
@@ -164,7 +164,7 @@ export function RoundTrend({ title, href, rank, points }: { title: string; href?
             <g key={p.round}>
               {/* Hover only: the svg is one image with the values in its label; "Show as table" has them too. */}
               <circle cx={x(i)} cy={y(p.median)} r={12} className="fill-transparent"
-                onPointerEnter={(e) => { const s = e.currentTarget.ownerSVGElement!.getBoundingClientRect().width / W; setTip({ x: x(i) * s + 12, y: y(p.median!) * s + 28, value: formatRank(p.median!), label: `2025 ${roundLabel[p.round]} median`, sub: `${formatRank(p.n)} options` }); }} />
+                onPointerEnter={(e) => { const s = e.currentTarget.ownerSVGElement!.getBoundingClientRect().width / W; setTip({ x: x(i) * s + 12, y: y(p.median!) * s + 28, value: formatRank(p.median!), label: `${year} ${roundLabel[p.round]} median`, sub: `${formatRank(p.n)} options` }); }} />
               <circle cx={x(i)} cy={y(p.median)} r={4} className="pointer-events-none fill-mark stroke-card" strokeWidth={2} />
             </g>
           ) : null,

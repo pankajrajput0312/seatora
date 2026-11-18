@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { shortName } from "../lib/format";
-import { PAST_YEARS, reachLabel, reachTone, type Deepest, type Latest, type Reach } from "../lib/reach";
+import { pastOf, reachLabel, reachTone, type Deepest, type Latest, type Reach } from "../lib/reach";
 import { roundLabel, type Term } from "../types";
 import { InfoTip } from "./info-tip";
 import { SourceRef } from "./page-sources";
@@ -54,12 +54,14 @@ export function Provisional({ when }: { when: boolean | null | undefined }) {
  * `latest`: lib/reach.ts latestRound. `on`: the label is on that one seat category (Seats rows), so its no-data wording
  * names it.
  */
-export function ReachBadge({ reach, provisional, latest, includeLatest = true, on }: { reach: Reach; provisional?: boolean; latest: Latest; includeLatest?: boolean; on?: string }) {
+export function ReachBadge({ reach, provisional, latest, includeLatest = true, on, otherGroup }: { reach: Reach; provisional?: boolean; latest: Latest; includeLatest?: boolean; on?: string; otherGroup?: boolean }) {
+  // NEET SS: her rank isn't compared with another question group's seats (OptionRow.otherGroup).
+  if (otherGroup) return <Badge tone="neutral" className="text-muted-foreground">Another question group</Badge>;
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       <Badge tone={reachTone[reach]} className={reach === "closed-before" ? "text-muted-foreground" : undefined}>
         {reach === "reached-both" && <History className="mr-1 size-3" aria-hidden />}
-        {reachLabel(reach, latest, PAST_YEARS, includeLatest, on)}
+        {reachLabel(reach, latest, pastOf(latest), includeLatest, on)}
       </Badge>
       <Provisional when={provisional} />
     </span>

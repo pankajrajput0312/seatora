@@ -8,7 +8,8 @@ import type { Catalog } from "./catalog";
 /** Filters pushed into SQL, always with the catalog's exam. `cs` = CollegeSpecialty ids; undefined means no restriction, [] means nothing. */
 export type CutoffQuery = { cs?: string[]; quotas?: string[]; categories?: string[]; years?: number[] };
 /** `csQuota`: only these (CollegeSpecialty id, quota) pairs (the term filters' options); [] matches nothing. */
-export type AllotmentQuery = { cs?: string[]; csQuota?: [string, string][]; year?: number; round?: Round; quota?: string; category?: string; from?: number; to?: number };
+/** `quotas`: any of these (NEET SS: her question group's, as a rank is within one group). */
+export type AllotmentQuery = { cs?: string[]; csQuota?: [string, string][]; year?: number; round?: Round; quota?: string; quotas?: string[]; category?: string; from?: number; to?: number };
 
 /** MCC's remark, from the status: "Allotted" (R1, stray rounds), "Fresh" (a fresh allotment in R2 / R3), "Upgraded" (moved up a seat). */
 export const remarkOf = (status: string): Allotment["remark"] => (status === "upgraded" ? "Upgraded" : status === "fresh" ? "Fresh" : "Allotted");
@@ -115,7 +116,10 @@ export async function findReachInputs(
   return out;
 }
 
-/** Allotments, newest year first, then round, then rank. `total` counts every match (only when `count` is set). */
+/**
+ * Allotments, newest year first, then round, then rank (then quota and row: NEET SS ranks repeat across question groups,
+ * NEET PG's never do, so its order is as before). `total` counts every match (only when `count` is set).
+ */
 export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { limit?: number; offset?: number; count?: boolean } = {}): Promise<{ total: number; rows: Allotment[] }> {
   if (q.cs?.length === 0 || q.csQuota?.length === 0) return { total: 0, rows: [] };
   const offset = opts.offset ?? 0;
@@ -130,6 +134,7 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
           (!q.year || a.year === q.year) &&
           (!q.round || a.round === q.round) &&
           (!q.quota || a.quota === q.quota) &&
+          (!q.quotas || q.quotas.includes(a.quota)) &&
           (!q.category || a.category === q.category) &&
           (!q.from || a.rank >= q.from) &&
           (!q.to || a.rank <= q.to),
@@ -144,6 +149,7 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
     q.year && Prisma.sql`"counsellingYear" = ${q.year}`,
     q.round && Prisma.sql`round = ${q.round}`,
     q.quota && Prisma.sql`quota = ${q.quota}`,
+    q.quotas && Prisma.sql`quota = ANY(${q.quotas})`,
     q.category && Prisma.sql`category = ${q.category}`,
     q.from && Prisma.sql`rank >= ${q.from}`,
     q.to && Prisma.sql`rank <= ${q.to}`,
@@ -157,12 +163,12 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
       SELECT a.*, pc.key AS pk, ps.degree AS pd, ps.code AS psp
       FROM (
         SELECT "collegeSpecialtyId" AS cs, "counsellingYear" AS y, round AS r, rank AS k, quota AS q, category AS c, status AS st,
-          "candidateCategory" AS cc, "optionNo" AS o, "prevCollegeId" AS pci, "prevSpecialtyId" AS psi, "prevQuota" AS pq, "prevRemark" AS pr
+          "candidateCategory" AS cc, "optionNo" AS o, "prevCollegeId" AS pci, "prevSpecialtyId" AS psi, "prevQuota" AS pq, "prevRemark" AS pr, id
         FROM "Allotment" ${whereSql}
-        ORDER BY "counsellingYear" DESC, array_position(${sqlRounds}::text[], round), rank
+        ORDER BY "counsellingYear" DESC, array_position(${sqlRounds}::text[], round), rank, quota, id
         ${opts.limit == null ? Prisma.empty : Prisma.sql`LIMIT ${opts.limit}`} OFFSET ${offset}
       ) a LEFT JOIN "College" pc ON pc.id = a.pci LEFT JOIN "Specialty" ps ON ps.id = a.psi
-      ORDER BY a.y DESC, array_position(${sqlRounds}::text[], a.r), a.k`,
+      ORDER BY a.y DESC, array_position(${sqlRounds}::text[], a.r), a.k, a.q, a.id`,
     opts.count ? db.$queryRaw<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM "Allotment" ${whereSql}`.then(([r]) => r.n) : Promise.resolve(-1),
   ]);
   const out = rows.flatMap((r) => {

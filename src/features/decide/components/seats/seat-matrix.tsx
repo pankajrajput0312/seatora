@@ -11,10 +11,12 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { fmtDay, listDay } from "../../lib/format";
 import { useLocal } from "../../lib/local-store";
-import { LATER_ROUNDS_NOTE, latestRound, PAST_YEARS, reachWindow } from "../../lib/reach";
+import { exams, restrictedQuota } from "@/features/exams/registry";
+import { LATER_ROUNDS_NOTE, latestRound, pastOf, reachWindow, type Latest } from "../../lib/reach";
+import { useExam } from "../../lib/use-decide-store";
 import { useDecideLinks } from "../../lib/use-decide-store";
 import { statKeys, statLabel } from "../../lib/stat-format";
-import { openQuotas, roundLabel, seatKindLabel, type Round, type SeatList, type Source } from "../../types";
+import { roundLabel, seatKindLabel, type Round, type SeatList, type Source } from "../../types";
 import { Dash, HISTORY_CAPTION, Provisional, ReachBadge } from "../bits";
 import { programmeTitle, TermSources } from "../fees";
 import { Beds } from "../pages/beds";
@@ -150,7 +152,7 @@ export function SeatMatrixDisplay({ groups, ranked, years }: { groups: SeatGroup
  * PDFs behind them; `ranked`: she has a rank (the "Your chances" column). `list` / `lists`: the picked list and every list
  * shown (its round's, or all with All rounds: the cards' numbers). Rows are one page, in the server's order.
  */
-export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption, list, lists, view }: {
+export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption, list, lists, view, latest: latestIn }: {
   rows: MatrixRow[];
   groups: SeatGroup[];
   years: ClosingYear[];
@@ -162,9 +164,12 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   lists: SeatList[];
   /** The view on show (chosenView "seats"). */
   view: View;
+  /** The exam's latest round (exams/registry.ts latestOf); NEET PG's from `results` when absent. */
+  latest?: Latest;
 }) {
   const L = useDecideLinks();
-  const latest = latestRound(results);
+  const exam = useExam();
+  const latest = latestIn ?? latestRound(results);
   const cols = useMemo(() => matrixCols(groups, ranked, years), [groups, ranked, years]);
   const [hidden] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   const [open, setOpen] = useState<string | null>(null);
@@ -193,7 +198,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
       <ViewPanes
         page="seats"
         view={view}
-        cards={<SeatCards rows={rows} list={list} lists={lists} ranked={ranked} L={L} title={caption} onDetails={show} latest={latest} />}
+        cards={<SeatCards rows={rows} list={list} lists={lists} ranked={ranked} L={L} title={caption} onDetails={show} latest={latest} exam={exam} />}
         table={
           <ScrollTable id="seat-matrix" scope="seat-matrix" label={caption} scrollClassName="scroll-pl-44 md:scroll-pl-68">
             <table className={tbl.table}>
@@ -262,7 +267,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                       <td data-col="course" className={td}>{courseOf(r)}</td>
                       <td data-col="quota" className={td}>
                         {r.quota ?? "Not printed"}
-                        {r.quota != null && !openQuotas.includes(r.quota) && <Badge tone="warning" className="mt-1">Restricted</Badge>}
+                        {r.quota != null && restrictedQuota(exam, r.quota) && <Badge tone="warning" className="mt-1">Restricted</Badge>}
                       </td>
                       <td data-col="category" className={cn(td, "whitespace-nowrap")}>{r.category}</td>
                       <TermStatCells t={r.fees} variant="table" short of={`${r.college.name}, ${name}`} />
@@ -298,24 +303,25 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
           </ScrollTable>
         }
       />
-      <RowDetails row={row} groups={groups} years={years} results={results} ranked={ranked} onClose={() => setOpen(null)} refocus={refocus} />
+      <RowDetails row={row} groups={groups} years={years} results={results} ranked={ranked} latest={latest} onClose={() => setOpen(null)} refocus={refocus} />
     </div>
   );
 }
 
 /** Every number of one row with its source: seats per list (PDF and date), closing ranks per round (result PDF), the course's terms and their documents. */
-function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }: {
+function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, refocus }: {
   row: MatrixRow | null;
   groups: SeatGroup[];
   years: ClosingYear[];
   results: Source[];
   ranked: boolean;
+  latest: Latest;
   onClose: () => void;
   refocus: () => void;
 }) {
   const L = useDecideLinks();
+  const exam = useExam();
   const pdf = (year: number, round: Round) => results.find((s) => s.year === year && s.round === round);
-  const latest = latestRound(results);
   const lists = groups.flatMap((g) => [g.clear, g.virtual, ...g.added].filter((l): l is SeatList => !!l));
   const link = "underline hover:text-sky";
   return (
@@ -336,7 +342,7 @@ function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }
                 <div>
                   <Dialog.Title className="text-xl font-semibold">{r.college.name}</Dialog.Title>
                   <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-                    {courseOf(r)} · {r.quota ?? "quota not printed"}{r.quota != null && !openQuotas.includes(r.quota) && " (restricted quota)"} · {r.category} seats · {r.college.state ?? "state not listed"}
+                    {courseOf(r)} · {r.quota ?? "quota not printed"}{r.quota != null && restrictedQuota(exam, r.quota) && " (restricted quota)"} · {r.category} seats · {r.college.state ?? "state not listed"}
                   </Dialog.Description>
                 </div>
                 <Dialog.Close asChild>
@@ -362,7 +368,7 @@ function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }
 
               <section aria-labelledby="row-closing" className="grid gap-2">
                 <h3 id="row-closing" className="font-semibold">Closing ranks on {r.quota ?? "this quota"}, {r.category} seats</h3>
-                <p className="text-xs text-muted-foreground">The highest All India Rank MCC allotted in that round; allotments made in brackets (not seats). Each round links its MCC result PDF. {LATER_ROUNDS_NOTE}</p>
+                <p className="text-xs text-muted-foreground">The highest {exams[exam].rankName} MCC allotted in that round; allotments made in brackets (not seats). Each round links its MCC result PDF. {LATER_ROUNDS_NOTE}</p>
                 <div className="overflow-x-auto overflow-y-hidden">
                   <table className="text-sm">
                     <caption className="sr-only">Closing rank and allotments by year and round: {r.college.name}, {courseOf(r)}</caption>
@@ -396,7 +402,7 @@ function RowDetails({ row: r, groups, years, results, ranked, onClose, refocus }
                 <section aria-labelledby="row-chances" className="grid gap-2">
                   <h3 id="row-chances" className="font-semibold">Your chances</h3>
                   {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} on={r.category} /> : <p className="text-sm">{r.noLabel}.</p>}
-                  <p className="text-xs text-muted-foreground">Options&apos; label on this one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round). {HISTORY_CAPTION}</p>
+                  <p className="text-xs text-muted-foreground">Options&apos; label on this one seat category, counting {reachWindow(latest, pastOf(latest))} (every round). {HISTORY_CAPTION}</p>
                 </section>
               )}
 

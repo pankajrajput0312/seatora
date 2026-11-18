@@ -29,7 +29,7 @@ export async function liveReach(ids: string[], profile: string) {
     return {
       lists: p ? lists : [],
       options: Object.fromEntries(
-        rows.map((o) => [o.id, p ? { reach: o.reach, provisional: o.reachProvisional, seats: o.seatsBy ?? {}, below: o.seatsBelow ?? [], fees: o.fees, hospital: o.hospital ?? null } : { reach: null, provisional: false, seats: {}, below: [], fees: o.fees, hospital: o.hospital ?? null }]),
+        rows.map((o) => [o.id, p ? { reach: o.reach, provisional: o.reachProvisional, seats: o.seatsBy ?? {}, below: o.seatsBelow ?? [], fees: o.fees, hospital: o.hospital ?? null, ...(o.otherGroup && { otherGroup: true }) } : { reach: null, provisional: false, seats: {}, below: [], fees: o.fees, hospital: o.hospital ?? null }]),
       ),
     };
   } catch (e) {

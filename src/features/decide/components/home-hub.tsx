@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Building2, ChevronRight, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
 import { activeExam } from "@/features/exams/active";
-import { exams } from "@/features/exams/registry";
+import { DEFAULT_EXAM, exams, showsPage, type ExamKey } from "@/features/exams/registry";
 import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import { PLANS } from "@/features/payments/plans";
 import { limitLine, passView } from "@/features/plans/components/plan-cards";
@@ -42,11 +42,11 @@ const groups = [
   },
 ] as const;
 
-/** Plan and Research: a section label and its one-line hint, then a tile per tool (two across on phones). */
-export function ToolGroups({ L }: { L: DecideLinks }) {
+/** Plan and Research: a section label and its one-line hint, then a tile per tool (two across on phones). `exam`: only the tools it has data for. */
+export function ToolGroups({ L, exam = DEFAULT_EXAM }: { L: DecideLinks; exam?: ExamKey }) {
   return (
     <div className="grid gap-4">
-      {groups.map((g) => (
+      {groups.map((g) => ({ ...g, tools: g.tools.filter((t) => showsPage(exam, t.href)) })).map((g) => (
         <section key={g.title} aria-labelledby={`tools-${g.title}`} className="grid gap-2">
           <div>
             <h2 id={`tools-${g.title}`} className="section-label text-muted-foreground">{g.title}</h2>

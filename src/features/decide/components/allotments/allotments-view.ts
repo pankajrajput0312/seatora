@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
+import { DEFAULT_EXAM, perGroup, type ExamKey } from "@/features/exams/registry";
 import { pageValue, parseSearchParams, rankValue } from "../../lib/params";
 import { anyTermFilter, feeValue, termFilterLists, termFilters, termFilterShape } from "../../lib/term-filters";
 import { profileFromParams, profileHasCourse } from "../../profile";
@@ -67,13 +67,16 @@ export async function allotmentsView(params: URLSearchParams, pageSize: number, 
   const pristine = !["inst", "course", "year", "round", "aq", "acat", "state", "from", "to"].some((k) => params.get(k)?.trim());
   const profile = profileFromParams(params);
   const mine = profile && meta.courses.filter((c) => profileHasCourse(profile, c)).map((c) => c.slug);
-  const fromProfile = pristine && profile && f.mine !== "0" ? { courses: mine && mine.length < meta.courses.length ? mine : [], ...rankWindow(profile.rank) } : null;
+  // NEET SS: ranks near hers in her question group only (a rank is within one group).
+  const groupQuotas = profile && perGroup(exam) && profile.quotas.length ? profile.quotas : undefined;
+  const fromProfile = pristine && profile && f.mine !== "0" ? { courses: mine && mine.length < meta.courses.length ? mine : [], ...rankWindow(profile.rank), ...(groupQuotas && { quotas: groupQuotas }) } : null;
   const latest = pristine && !fromProfile ? meta.years[0] : undefined;
   const filters = {
     year: meta.years.some((y) => y.year === f.year) ? f.year : latest?.year,
     round: f.round ?? latest?.rounds.at(-1),
     courses: fromProfile?.courses ?? f.course,
     quota: f.aq,
+    ...(fromProfile?.quotas && { quotas: fromProfile.quotas }),
     category: f.acat,
     state: f.state,
     from: fromProfile?.from ?? (rankError ? undefined : f.from),

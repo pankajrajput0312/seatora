@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { formatInrShort } from "../lib/format";
 import type { DecideLinks } from "../lib/links";
-import { LATER_ROUNDS_NOTE, PAST_YEARS, reachLabel, seatsBelowNotes, type Deepest, type Latest } from "../lib/reach";
+import { LATER_ROUNDS_NOTE, pastOf, reachLabel, seatsBelowNotes, type Deepest, type Latest } from "../lib/reach";
 import type { ChoiceItem } from "../lib/choices";
 import type { OptionRow } from "../service";
 import { roundLabel, rounds, seatKindLabel, type Round, type SeatList, type Term } from "../types";
@@ -30,7 +30,7 @@ export function cardClosing(r: Pick<OptionRow, "latest" | "byYear">, latestYear:
 export function toChoiceItem(r: ListRow, latest: Latest): ChoiceItem {
   return {
     id: r.id, institute: r.college.name, slug: r.college.slug, state: r.college.state, course: courseName(r), courseSlug: r.course.slug, quota: r.quota,
-    reachLabel: reachLabel(r.reach, latest, PAST_YEARS), closedEveryRound: r.reach === "closed-before",
+    reachLabel: reachLabel(r.reach, latest, pastOf(latest)), closedEveryRound: r.reach === "closed-before",
   };
 }
 
@@ -66,7 +66,7 @@ export function SeatsCell({ r, list, L, n = r.seats, end = true }: { r: ListRow;
 
 /** Under an option's label: the lists whose seats here are all on seat categories with another label (OptionRow.seatsBelow). */
 export function SeatsBelowNote({ r, latest, includeLatest = true }: { r: Pick<OptionRow, "seatsBelow">; latest: Latest; includeLatest?: boolean }) {
-  return seatsBelowNotes(r.seatsBelow ?? [], latest, PAST_YEARS, includeLatest).map((t) => <span key={t} className="mt-1 block max-w-xs text-xs text-sun">{t}</span>);
+  return seatsBelowNotes(r.seatsBelow ?? [], latest, pastOf(latest), includeLatest).map((t) => <span key={t} className="mt-1 block max-w-xs text-xs text-sun">{t}</span>);
 }
 
 /** A closing rank with its round and seat category, marked Provisional when its MCC result is. */

@@ -24,13 +24,14 @@ import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, Pager, rangeLabel, smallLink, tbl, toolbar } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
-import { latestRound, reachWindow } from "@/features/decide/lib/reach";
+import { pastOf, reachWindow } from "@/features/decide/lib/reach";
 import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, type Profile } from "@/features/decide/profile";
-import { allotmentTrends, getMeta, LATEST_YEAR, PAST_YEARS, YEARS } from "@/features/decide/service";
+import { allotmentTrends, getMeta } from "@/features/decide/service";
 import { fmtDay, listDay } from "@/features/decide/lib/format";
-import { openQuotas, openQuotasNote, quotaScopeNote, roundLabel, rounds, seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
-import { examGate } from "@/features/exams/active";
+import { roundLabel, rounds, seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
+import { activeExam, examGate } from "@/features/exams/active";
+import { DEFAULT_EXAM, examYears, exams, latestOf, restrictedQuota, type ExamKey } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Seats" };
 const PAGE_SIZE = 50;
@@ -66,6 +67,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
   const profile = profileFromParams(params);
   const L = decideLinks(params);
   const f = parseSeatsParams(params);
+  const exam = await activeExam();
 
   return (
     <AppPage className="grid grid-cols-1 gap-3">
@@ -74,13 +76,14 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
         about={<>MCC&apos;s seat lists for a round, as each PDF printed them: the seat matrix (every list of the round with every closing rank, fee and bond per row), one list, or the round&apos;s lists side by side.{profile && " Filtered to the courses, quotas, states, seat categories and fee and bond caps in your profile."}</>}
       />
       <SubTabs label="Seats" current={f.tab} items={[{ key: "matrix", label: "Seat lists", href: L.to("/decide/seats", { tab: "matrix" }) }, { key: "trends", label: "Allotment trends", href: L.to("/decide/seats", { tab: "trends" }) }]} />
-      {f.tab === "trends" ? <Trends profile={profile} page={f.page} L={L} /> : <SeatLists f={f} profile={profile} params={params} L={L} />}
+      {f.tab === "trends" ? <Trends profile={profile} page={f.page} L={L} exam={exam} /> : <SeatLists f={f} profile={profile} params={params} L={L} exam={exam} />}
     </AppPage>
   );
 }
 
-async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: Profile | null; params: URLSearchParams; L: DecideLinks }) {
-  const [{ all, meta, inst, course, list, mine, sort, r }, view] = await Promise.all([seatsView(f, profile, SEATS_PAGE_SIZE), chosenView(params, "seats")]);
+async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; profile: Profile | null; params: URLSearchParams; L: DecideLinks; exam: ExamKey }) {
+  const E = exams[exam];
+  const [{ all, meta, inst, course, list, mine, sort, r }, view] = await Promise.all([seatsView(f, profile, SEATS_PAGE_SIZE, exam), chosenView(params, "seats")]);
   const one = !!(inst || course || f.squota);
   if (!list || !r)
     return (
@@ -107,7 +110,8 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
     ? `Seat matrix, ${round}${allRounds ? " and every other round" : ""}: seats per list, terms${profile ? ", your chances" : ""} and closing ranks by year and round, ${sortLabels[sort].toLowerCase()}, page ${r.page}`
     : `${compare ? `Seats in every ${round} list side by side` : `Seats in the ${title} list`} (MCC PDF${compare ? "s" : ""}), ${sortLabels[sort].toLowerCase()}, page ${r.page}`;
   const years: ClosingYear[] = meta.years.map((y, i) => ({ year: y.year, rounds: i === 0 ? y.rounds : [...rounds] }));
-  const latest = latestRound(meta.sources);
+  const latest = latestOf(meta.sources, exam);
+  const PAST_YEARS = pastOf(latest);
   // Chips for what narrows the rows beyond the courses (the Course pill shows those); inst / course / nohist have their own lines below.
   const hasWords = { clear: "Has clear vacancy", virtual: "Has virtual vacancy", new: "Has newly added" } as const;
   const active = [
@@ -211,12 +215,12 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
           <FilterDropdown
             label="Quota"
             name="quota"
-            options={meta.quotas.map((q) => ({ value: q, label: openQuotas.includes(q) ? q : `${q} (restricted)` }))}
+            options={meta.quotas.map((q) => ({ value: q, label: restrictedQuota(exam, q) ? `${q} (restricted)` : q }))}
             selected={f.quota}
             none={profile ? "Open quotas" : undefined}
-            info={profile ? openQuotasNote : undefined}
+            info={profile ? E.quotasNote : undefined}
           />
-          <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.st} none="All states" info={quotaScopeNote} />
+          <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.st} none="All states" info={E.scopeNote} />
           {matrix && (
             <FilterDropdown
               label={`Seats in ${round}`}
@@ -227,14 +231,16 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
               info={`Ticked: rows with seats in any ticked ${round} list.`}
             />
           )}
-          <TermFilterControls f={f} caps={profile} />
-          <Field label="Seat category">
-            <select name="scat" defaultValue={f.scat ?? ""} className={control}>
-              <option value="">{mine ? `Yours: ${mine.join(", ")}` : "All seat categories"}</option>
-              {mine && <option value="all">All seat categories</option>}
-              {seatCategories.map((c) => <option key={c} value={c}>{c} seats</option>)}
-            </select>
-          </Field>
+          {E.has.fees && <TermFilterControls f={f} caps={profile} />}
+          {E.categories.length > 1 && (
+            <Field label="Seat category">
+              <select name="scat" defaultValue={f.scat ?? ""} className={control}>
+                <option value="">{mine ? `Yours: ${mine.join(", ")}` : "All seat categories"}</option>
+                {mine && <option value="all">All seat categories</option>}
+                {seatCategories.map((c) => <option key={c} value={c}>{c} seats</option>)}
+              </select>
+            </Field>
+          )}
           <Field label="Sort">
             <select name="sort" defaultValue={sort} className={control}>
               {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && several ? `Most ${kindSeats(list)} first` : s === "reach" && matrix ? "Your chances: beyond your rank first" : sortLabels[s]}</option>)}
@@ -289,7 +295,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         {r.total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle page="seats" view={view} />
-            <CsvLink href={L.with("/api/v1/seats/export", { tab: null, page: null })} what={`${matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row`} total={r.total} />
+            {exam === DEFAULT_EXAM && <CsvLink href={L.with("/api/v1/seats/export", { tab: null, page: null })} what={`${matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row`} total={r.total} />}
             {matrix && view === "table" && <SeatMatrixDisplay groups={seatGroups(r.lists)} ranked={!!profile} years={years} />}
           </div>
         )}
@@ -319,7 +325,7 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
         />
       ) : matrix ? (
         <>
-          <SeatMatrix rows={r.rows.map(matrixRow)} groups={seatGroups(r.lists)} years={years} results={meta.sources} ranked={!!profile} sort={sort} caption={caption} list={list} lists={r.lists} view={view} />
+          <SeatMatrix latest={exam === DEFAULT_EXAM ? undefined : latest} rows={r.rows.map(matrixRow)} groups={seatGroups(r.lists)} years={years} results={meta.sources} ranked={!!profile} sort={sort} caption={caption} list={list} lists={r.lists} view={view} />
           <DataSource terms={termDocs(r.rows.map((x) => x.fees))} />
         </>
       ) : (
@@ -327,10 +333,10 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
           <ViewPanes
             page="seats"
             view={view}
-            cards={<SeatCards rows={r.rows} list={list} lists={several ? roundLists : [list]} ranked={!!profile} L={L} title={caption} latest={latest} />}
-            table={<SeatTable rows={r.rows} lists={r.lists} current={list.key} sort={sort} ranked={!!profile} L={L} caption={caption} latest={latest} />}
+            cards={<SeatCards rows={r.rows} list={list} lists={several ? roundLists : [list]} ranked={!!profile} L={L} title={caption} latest={latest} exam={exam} />}
+            table={<SeatTable rows={r.rows} lists={r.lists} current={list.key} sort={sort} ranked={!!profile} L={L} caption={caption} latest={latest} exam={exam} />}
           />
-          <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: LATEST_YEAR }]} terms={termDocs(r.rows.map((x) => x.fees))} />
+          <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: latest.year }]} terms={termDocs(r.rows.map((x) => x.fees))} />
         </>
       )}
       <Pager page={r.page} pageSize={r.pageSize} total={r.total} href={(n) => L.page("/decide/seats", n)} focusId="results" label="Seats" />
@@ -345,11 +351,12 @@ async function SeatLists({ f, profile, params, L }: { f: SeatsParams; profile: P
 }
 
 /** Allotments made per year (not seats), for the courses in her profile. */
-async function Trends({ profile, page, L }: { profile: Profile | null; page: number; L: DecideLinks }) {
+async function Trends({ profile, page, L, exam }: { profile: Profile | null; page: number; L: DecideLinks; exam: ExamKey }) {
   const mine = profile && (profile.pairs?.length || profile.specialties.length || profile.degrees.length) ? profile : null;
-  const [meta, res] = await Promise.all([getMeta(), allotmentTrends({ profile: mine }, { page, pageSize: PAGE_SIZE })]);
+  const [meta, res] = await Promise.all([getMeta(exam), allotmentTrends({ profile: mine }, { page, pageSize: PAGE_SIZE }, exam)]);
   const label = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
-  const [y0, y1] = PAST_YEARS;
+  const [y0, y1] = exams[exam].pastYears;
+  const YEARS = examYears(exam);
   const max = Math.max(1, ...res.rows.flatMap((r) => YEARS.map((y) => r.byYear[y] ?? 0)));
   const newest = [...YEARS].sort((a, b) => b - a);
   return (

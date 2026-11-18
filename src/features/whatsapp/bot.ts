@@ -10,7 +10,9 @@ import { ASK_MAX_TURNS, askConfig } from "@/features/ask/config";
 import { resolveCourses } from "@/features/ask/lookup";
 import { finishTurn, getPreferences, RETENTION_DAYS, startTurn } from "@/features/ask/memory";
 import type { ToolContext, ToolResult } from "@/features/ask/tools";
+import { withExamPart } from "@/features/decide/lib/account-sync";
 import { profileSchema, type Profile } from "@/features/decide/profile";
+import { DEFAULT_EXAM } from "@/features/exams/keys";
 import { getDecideData, getMeta } from "@/features/decide/service";
 import { baseCategories } from "@/features/decide/types";
 import { checkAndCount } from "@/features/plans/usage";
@@ -61,7 +63,8 @@ async function chatOf(userId: string) {
   return c?.id ?? (await db.askConversation.create({ data: { userId, title: "WhatsApp" }, select: { id: true } })).id;
 }
 
-async function saveProfile(userId: string, current: Profile | null, input: z.infer<typeof profileInput>): Promise<Profile> {
+/** `row`: her account json as read (staff may keep another exam's profile in it: kept, lib/account-sync.ts withExamPart). */
+async function saveProfile(userId: string, current: Profile | null, input: z.infer<typeof profileInput>, row?: unknown): Promise<Profile> {
   let pairs = current?.pairs;
   if (input.courses?.length) {
     const m = await getMeta();
@@ -83,7 +86,7 @@ async function saveProfile(userId: string, current: Profile | null, input: z.inf
     maxFeeLakh: current?.maxFeeLakh ?? null,
     maxBondYears: current?.maxBondYears ?? null,
   });
-  const json = p as unknown as Prisma.InputJsonValue;
+  const json = withExamPart(row, DEFAULT_EXAM, p) as unknown as Prisma.InputJsonValue;
   await db.userProfile.upsert({ where: { userId }, create: { userId, json, updatedAt: new Date() }, update: { json, updatedAt: new Date() } });
   return p;
 }
@@ -142,7 +145,7 @@ export async function handleMessage(m: Incoming) {
     if (name === "update_profile") {
       const r = profileInput.safeParse(input);
       if (!r.success) return Promise.resolve({ ok: false, error: r.error.issues[0]?.message ?? "invalid" });
-      return saveProfile(user.id, ctx.profile, r.data).then(
+      return saveProfile(user.id, ctx.profile, r.data, saved?.json).then(
         (p) => ((ctx.profile = p), { ok: true as const, data: { saved: p } }),
         (e: Error) => ({ ok: false as const, error: e.message }),
       );

@@ -6,7 +6,7 @@ import { AppPage } from "@/features/decide/components/app-page";
 import { Button } from "@/components/ui/button";
 import { HistoryNote, Provisional } from "@/features/decide/components/bits";
 import { ChartCard, LabelBars, RankStrip, RoundTrend } from "@/features/decide/components/charts";
-import { ChoicesStat, SetupCard, TopChoices } from "@/features/decide/components/dashboard-parts";
+import { ChoicesStat, GroupPrompt, SetupCard, TopChoices } from "@/features/decide/components/dashboard-parts";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { HeldStrip, RoundStatusBanner } from "@/features/decide/components/round-status";
@@ -17,11 +17,12 @@ import { fmtIST, nextChoiceFilling, nextDate, nextFilling, roundName, stepName, 
 import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { roundStatus } from "@/features/decide/server/notices";
 import { termValueLabel } from "@/features/decide/lib/term-filters";
-import { eligibleCategories, latestRound, latestText, reachLabel, reachOrder, reachWindow, type Latest, type Reach } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestText, pastOf, reachLabel, reachOrder, reachWindow, type Latest, type Reach } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { dashboard, getMeta, LATEST_YEAR, listOptions, PAST_YEARS, type StripPoint } from "@/features/decide/service";
+import { dashboard, getMeta, listOptions, type StripPoint } from "@/features/decide/service";
 import { roundLabel } from "@/features/decide/types";
 import { activeExam } from "@/features/exams/active";
+import { exams, latestOf, perGroup } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -42,7 +43,7 @@ function ReachedParts({ L, counts, latest }: { L: ReturnType<typeof decideLinks>
   return parts.map((x, i) => (
     <Fragment key={x}>
       {i > 0 && ", "}
-      <Link href={L.options({ reach: x })} className={smallLink}><span className="numeric">{formatRank(counts[x])}</span> {reachLabel(x, latest, PAST_YEARS).replace(/^Reached /, "")}</Link>
+      <Link href={L.options({ reach: x })} className={smallLink}><span className="numeric">{formatRank(counts[x])}</span> {reachLabel(x, latest, pastOf(latest)).replace(/^Reached /, "")}</Link>
     </Fragment>
   ));
 }
@@ -59,20 +60,23 @@ const title = <h1 id="main-h1" tabIndex={-1} className="sr-only">Home</h1>;
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
-  if (!profile)
+  const exam = await activeExam();
+  // NEET SS: no label without her question group (a rank is within one group).
+  const noGroup = !!profile && perGroup(exam) && !profile.quotas.length;
+  if (!profile || noGroup)
     return (
       <AppPage className="grid grid-cols-1 gap-4">
         {title}
         <HeldStrip />
         <ResidentsPromo L={decideLinks(params)} />
-        <SetupCard />
+        {noGroup ? <GroupPrompt /> : <SetupCard />}
         <RoundStatusBanner params={params} />
-        <ToolGroups L={decideLinks(params)} />
+        <ToolGroups L={decideLinks(params)} exam={exam} />
       </AppPage>
     );
 
   // pageSize 1: only the counts and the round summary are used, not the rows.
-  const exam = await activeExam();
+  const { latestYear: LATEST_YEAR, pastYears: PAST_YEARS } = exams[exam];
   const [d, meta, r, rs] = await Promise.all([dashboard(profile, exam), getMeta(exam), listOptions(profile, {}, { page: 1, pageSize: 1 }, exam), roundStatus(LATEST_YEAR, exam)]);
   const L = decideLinks(params);
   const list = r.view === "round" ? r.seatLists[0] : undefined;
@@ -81,7 +85,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const labels = reachOrder.filter((x) => r.counts[x] > 0);
   const total = reachOrder.reduce((n, x) => n + r.counts[x], 0);
   const reached = r.counts["reached-latest"] + r.counts["reached-both"] + r.counts["reached-one"];
-  const latest = latestRound(meta.sources);
+  const latest = latestOf(meta.sources, exam);
   const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
   const counted = reachWindow(latest, PAST_YEARS);
   const labelSources = <DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR }]} />;
@@ -134,7 +138,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </>
         )}
       </section>
-      <ToolGroups L={L} />
+      <ToolGroups L={L} exam={exam} />
       <RoundStatusBanner params={params} />
 
       <section aria-labelledby="numbers-h" className="grid gap-2">
@@ -186,7 +190,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       </section>
 
       {reached === 0 && (
-        <StillCanDo L={L} rank={profile.rank} list={list} fresh={sum?.fresh ?? 0} counts={r.counts} id="next-h" title={`None of these reached your rank in ${counted}: what you can still do`} />
+        <StillCanDo L={L} exam={exam} rank={profile.rank} list={list} fresh={sum?.fresh ?? 0} counts={r.counts} id="next-h" title={`None of these reached your rank in ${counted}: what you can still do`} />
       )}
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1.4fr_1fr]">
@@ -216,20 +220,20 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       </div>
 
       <ChartCard
-        source={<DataSource used={[{ year: 2025 }]} />}
+        source={<DataSource used={[{ year: PAST_YEARS[1] }]} />}
         className="chart-paper"
         title="Where your rank sits"
-        subtitle={`Each dot is one option's deepest closing rank in 2025, on ${seats} seats. Dots at or right of your line closed at or after your rank.${d.strip.length < d.summary.length ? ` The ${d.strip.length} courses with the most options are drawn; the table lists all ${d.summary.length}. Tick courses in your profile to choose which are drawn.` : ""} Every option, with its round and seat category, is on Options.`}
+        subtitle={`Each dot is one option's deepest closing rank in ${PAST_YEARS[1]}, on ${seats} seats. Dots at or right of your line closed at or after your rank.${d.strip.length < d.summary.length ? ` The ${d.strip.length} courses with the most options are drawn; the table lists all ${d.summary.length}. Tick courses in your profile to choose which are drawn.` : ""} Every option, with its round and seat category, is on Options.`}
         legend={
           <>
-            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-mark" />Closed at or after your rank in 2025</span>
+            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-mark" />Closed at or after your rank in {PAST_YEARS[1]}</span>
             <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-muted-foreground/60" />Closed before your rank</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-3 w-0.5 bg-foreground" />Your rank</span>
           </>
         }
         table={
           <table className="w-full text-sm">
-            <caption className="sr-only">2025 deepest closing ranks of your options, on {seats} seats, by course</caption>
+            <caption className="sr-only">{PAST_YEARS[1]} deepest closing ranks of your options, on {seats} seats, by course</caption>
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th scope="col" className="py-2">Course</th>
@@ -257,27 +261,27 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </table>
         }
       >
-        <RankStrip rank={profile.rank} rows={d.strip.map((x) => ({ course: `${x.course.degree} ${x.course.name}`, points: x.points }))} />
+        <RankStrip rank={profile.rank} year={PAST_YEARS[1]} rows={d.strip.map((x) => ({ course: `${x.course.degree} ${x.course.name}`, points: x.points }))} />
         <p className="mt-2 text-xs text-muted-foreground">
           <Link href={L.options({ closed: true, all: true })} className={`${smallLink} text-sky`}>Every option on Options</Link>
         </p>
       </ChartCard>
 
       <ChartCard
-        source={<DataSource used={[{ year: 2025 }]} />}
-        title="How closing ranks moved through 2025"
-        subtitle={`Median closing rank per round across your options, on ${seats} seats, in 2025.${d.trend.length < d.summary.length ? ` The ${d.trend.length} courses with the most options.` : ""}`}
+        source={<DataSource used={[{ year: PAST_YEARS[1] }]} />}
+        title={`How closing ranks moved through ${PAST_YEARS[1]}`}
+        subtitle={`Median closing rank per round across your options, on ${seats} seats, in ${PAST_YEARS[1]}.${d.trend.length < d.summary.length ? ` The ${d.trend.length} courses with the most options.` : ""}`}
         table={
           <table className="w-full text-sm">
-            <caption className="sr-only">Median 2025 closing rank by round, on {seats} seats</caption>
-            <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th scope="col" className="py-2">Course</th>{["R1", "R2", "R3", "Stray"].map((x) => <th key={x} scope="col" className="text-right">{x}</th>)}</tr></thead>
+            <caption className="sr-only">Median {PAST_YEARS[1]} closing rank by round, on {seats} seats</caption>
+            <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th scope="col" className="py-2">Course</th>{(d.trend[0]?.points.map((p) => roundLabel[p.round]) ?? ["R1", "R2", "R3", "Stray"]).map((x) => <th key={x} scope="col" className="text-right">{x}</th>)}</tr></thead>
             <tbody>{d.trend.map((t) => <tr key={t.course.slug} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{t.course.degree} {t.course.name}</th>{t.points.map((p) => <td key={p.round} className="numeric text-right">{formatRank(p.median)}</td>)}</tr>)}</tbody>
           </table>
         }
       >
         {/* Cards at least 284px wide: the 260-unit chart plus its padding, so its 12-unit labels draw at 12px or more. */}
         <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,17.75rem),1fr))] gap-3">
-          {d.trend.map((t) => <RoundTrend key={t.course.slug} title={`${t.course.degree} ${t.course.name}`} href={L.lastRanks(t.course.slug)} rank={profile.rank} points={t.points} />)}
+          {d.trend.map((t) => <RoundTrend key={t.course.slug} title={`${t.course.degree} ${t.course.name}`} href={L.lastRanks(t.course.slug)} rank={profile.rank} points={t.points} year={PAST_YEARS[1]} />)}
         </div>
       </ChartCard>
 

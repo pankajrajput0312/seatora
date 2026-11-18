@@ -1,7 +1,10 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { formatRank } from "@/features/cutoffs/lib/format";
+import { withExamPart } from "@/features/decide/lib/account-sync";
+import { DEFAULT_EXAM } from "@/features/exams/keys";
 import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
 import { collegeTypeLabel, typesIn } from "@/features/decide/components/institute/college-type";
 import { courseName, toChoiceItem } from "@/features/decide/components/options-view";
@@ -775,7 +778,8 @@ const handlers: Handlers = {
     const kept = i.mode === "append" && old ? [...old.items, ...items.filter((x) => !old.items.some((o) => o.id === x.id))] : items;
     const list = { id: listId, name, items: kept, typedIds: i.mode === "append" && old ? old.typedIds : [] };
     const next: ChoicesState = { lists: old ? state.lists.map((l) => (l.id === listId ? list : l)) : [...state.lists, list], activeId: listId };
-    const json = JSON.parse(JSON.stringify(next));
+    // Another exam's lists in her row (staff) are kept (lib/account-sync.ts withExamPart).
+    const json = withExamPart(row?.json, DEFAULT_EXAM, JSON.parse(JSON.stringify(next))) as Prisma.InputJsonValue;
     await db.userChoices.upsert({ where: { userId }, create: { userId, json, updatedAt: new Date() }, update: { json, updatedAt: new Date() } });
     return {
       saved: kept.length,

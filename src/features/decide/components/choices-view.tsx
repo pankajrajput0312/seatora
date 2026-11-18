@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { duplicateList, markTypedUpTo, move, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
-import { PAST_YEARS, reachWindow, seatsBelowNotes, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
+import { pastOf, reachWindow, seatsBelowNotes, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
 import { useChoices, useDecideLinks } from "../lib/use-decide-store";
 import { keepProfileParams } from "../profile";
@@ -30,7 +30,7 @@ import { ViewToggle, type View } from "./view-toggle";
 import { ScrollTable } from "./scroll-table";
 
 /** `reach` null: no rank in the address (terms and hospital only; the stored label stays). */
-type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; fees: ProgrammeTerms; hospital: RowHospital }>;
+type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; fees: ProgrammeTerms; hospital: RowHospital; otherGroup?: boolean }>;
 
 // Memoised: a reorder re-renders every row, but each one's terms, type and beds (their (i) tips and source refs, the
 // bulk of a long list) only change when the live data does.
@@ -221,10 +221,10 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     const closed = lr?.reach ? lr.reach === "closed-before" : item.closedEveryRound;
     const flags = [
       (counts.get(dupKey(item)) ?? 0) > 1 && "Same institute and course listed more than once",
-      closed && `Closed before your rank in every round of ${reachWindow(latest, PAST_YEARS)}${lr?.reach ? "" : " (when added)"}`,
+      closed && `Closed before your rank in every round of ${reachWindow(latest, pastOf(latest))}${lr?.reach ? "" : " (when added)"}`,
       // Seats are matched to the option by institute and course; say what was found, not what MCC printed.
       lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
-      ...seatsBelowNotes(lr?.below ?? [], latest, PAST_YEARS),
+      ...seatsBelowNotes(lr?.below ?? [], latest, pastOf(latest)),
       fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
       typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
     ].filter(Boolean) as string[];
@@ -280,7 +280,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     </span>
   );
   const reachOf = (item: ChoiceItem, lr: Live[string] | undefined) =>
-    lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} latest={latest} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>;
+    lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} latest={latest} otherGroup={lr.otherGroup} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>;
   const typedBadge = <Badge tone="success"><Check className="mr-1 size-3" aria-hidden />Typed into MCC</Badge>;
   const seatsOf = (item: ChoiceItem, lr: Live[string], l: SeatList) => (
     <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${item.quota}`} />
@@ -349,7 +349,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
             <th scope="col" className={cn(th, "bg-card md:sticky md:left-0 md:z-[3]")}>Choice</th>
             <th scope="col" className={cn(th, "px-3!")}>Your reach</th>
             {lists.length > 0 && <th scope="col" className={cn(th, "px-3! text-right")}>{round} seats</th>}
-            {statKeys.map((k) => <th key={k} scope="col" className={cn(th, "px-3! text-right")}>{statLabel[k]}</th>)}
+            {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={cn(th, "px-3! text-right")}>{statLabel[k]}</th>)}
           </tr>
         </thead>
         <tbody>

@@ -6,21 +6,28 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
-import { baseCategories, openQuotasNote } from "../types";
 import { formatRank } from "@/features/cutoffs/lib/format";
+import { DEFAULT_EXAM, exams, groupOf, groupsOf, perGroup, type ExamKey } from "@/features/exams/registry";
 import { BOND_YEAR_CHOICES, coursesFromPicks, feeChoices, picksOf, profileSchema, type Profile } from "../profile";
+import { useExam } from "../lib/use-decide-store";
 import { control } from "./ui";
 import { matchesSpecialty } from "../lib/specialty-search";
 
 /** "Open (General/UR)": what Open means, where she picks it and on her rank chip; the stored value stays "Open". */
 export const categoryName = (c: string) => (c === "Open" ? "Open (General/UR)" : c);
+/** What her rank chip and card say beside the rank: her category ("OBC PwD"); NEET SS: her question group. */
+export const profileSub = (exam: ExamKey, p: Pick<Profile, "category" | "pwd" | "quotas">) =>
+  perGroup(exam) ? groupsOf(exam, p.quotas).join(", ") || "No question group" : `${categoryName(p.category)}${p.pwd ? " PwD" : ""}`;
 
-export type ProfileMeta = { courses: { degree: string; specialty: string }[]; specialties: { code: string; name: string }[]; degrees: string[]; quotas: string[]; states: string[] };
+/** `groups`: NEET SS's question groups of its latest year (the group system she sits now), for her pick. */
+export type ProfileMeta = { courses: { degree: string; specialty: string }[]; specialties: { code: string; name: string }[]; degrees: string[]; quotas: string[]; states: string[]; groups?: string[] };
 
 const empty: Profile = { rank: 0, category: "Open", pwd: false, specialties: [], degrees: [], quotas: [], states: [], maxFeeLakh: null, maxBondYears: null };
 
 // The first-run setup asks these in order (fee and bond, optional, with the quotas); states are in the full editor.
-const steps = ["Rank and category", "Courses", "Quotas and budget"];
+// Another exam asks only what it has: no fee or bond data (NEET MDS), no category or quota but a question group (NEET SS).
+const stepsOf = (exam: ExamKey) =>
+  exam === DEFAULT_EXAM ? ["Rank and category", "Courses", "Quotas and budget"] : perGroup(exam) ? ["Rank and question group", "Courses"] : ["Rank and category", "Courses", exams[exam].has.fees ? "Quotas and budget" : "Quotas"];
 
 const pill = "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-input bg-secondary px-3 text-sm has-checked:border-sky";
 
@@ -43,6 +50,10 @@ function Checks({ legend, options, value, onChange, note = "None ticked = all." 
 
 /** The profile editor; with `setup` (no profile yet) the guided first run: one step at a time, then Options. */
 export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup = false }: { open: boolean; onOpenChange: (o: boolean) => void; profile: Profile | null; meta: ProfileMeta; onSave: (p: Profile) => void; setup?: boolean }) {
+  const exam = useExam();
+  const E = exams[exam];
+  const steps = stepsOf(exam);
+  const grouped = perGroup(exam);
   const [draft, setDraft] = useState<Profile>(profile ?? empty);
   const [rankText, setRankText] = useState(profile ? String(profile.rank) : "");
   const [error, setError] = useState<string | null>(null);
@@ -73,13 +84,17 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
   const current = () => courses && { ...draft, pairs: undefined, ...courses };
 
   const rank = () => Number(rankText.replace(/\D/g, ""));
-  const rankError = `Enter your All India Rank: a number from 1 to ${formatRank(profileSchema.shape.rank.maxValue ?? 0)}.`; // the schema's limit
+  const rankError = `Enter your ${E.rankName}: a number from 1 to ${formatRank(profileSchema.shape.rank.maxValue ?? 0)}.`; // the schema's limit
+  // NEET SS: a rank means nothing without its question group.
+  const groupError = grouped && !draft.quotas.length ? "Pick your question group: your rank compares only with that group's seats." : null;
+  const [groupMsg, setGroupMsg] = useState(false);
   // Said as she types (a rank typed into a filled field used to run on: 4228442284), not only on Save.
   const rankOff = rankText.trim() !== "" && !profileSchema.shape.rank.safeParse(rank()).success;
   const rankMsg = error ?? (rankOff ? rankError : null);
   const save = () => {
     const c = current();
     if (!c) return setNoCourse(true);
+    if (groupError) return setGroupMsg(true);
     const r = profileSchema.safeParse({ ...c, rank: rank() });
     if (!r.success) return setError(rankError);
     setError(null);
@@ -92,6 +107,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
       const ok = profileSchema.shape.rank.safeParse(rank()).success;
       setError(ok ? null : rankError);
       if (!ok) return;
+      if (groupError) return setGroupMsg(true);
     }
     if (step === 1 && !courses) return setNoCourse(true);
     if (step < steps.length - 1) go(step + 1);
@@ -128,7 +144,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
     <>
       <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <label className="grid gap-1.5 text-sm font-medium">
-          All India Rank
+          {E.rankName}
           <Input
             ref={rankInput}
             inputMode="numeric"
@@ -144,16 +160,37 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
         </label>
         {/* Right under the field on a phone (the grid stacks); under the whole row from sm. */}
         {rankMsg && <p id="profile-error" role="alert" className="text-sm text-ember sm:order-last sm:col-span-3">{rankMsg}</p>}
-        <label className="grid gap-1.5 text-sm font-medium">
-          Category
-          <select value={draft.category} onChange={(e) => set("category", e.target.value as Profile["category"])} className={control}>
-            {baseCategories.map((c) => <option key={c} value={c}>{categoryName(c)}</option>)}
-          </select>
-        </label>
-        <label className="inline-flex min-h-11 items-center gap-2 text-sm">
-          <input type="checkbox" className="size-4 accent-sky" checked={draft.pwd} onChange={(e) => set("pwd", e.target.checked)} /> PwD
-        </label>
+        {E.categories.length > 1 && (
+          <label className="grid gap-1.5 text-sm font-medium">
+            Category
+            <select value={draft.category} onChange={(e) => set("category", e.target.value as Profile["category"])} className={control}>
+              {E.categories.map((c) => <option key={c} value={c}>{categoryName(c)}</option>)}
+            </select>
+          </label>
+        )}
+        {E.pwd && (
+          <label className="inline-flex min-h-11 items-center gap-2 text-sm">
+            <input type="checkbox" className="size-4 accent-sky" checked={draft.pwd} onChange={(e) => set("pwd", e.target.checked)} /> PwD
+          </label>
+        )}
+        {/* NEET SS: one question group (its quota labels carry it), the group system of the latest year. */}
+        {grouped && (
+          <label className="grid gap-1.5 text-sm font-medium">
+            Question group
+            <select
+              value={groupsOf(exam, draft.quotas)[0] ?? ""}
+              onChange={(e) => { set("quotas", meta.quotas.filter((q) => groupOf(q) === e.target.value)); setGroupMsg(false); }}
+              aria-invalid={groupMsg && !!groupError}
+              aria-describedby="group-note"
+              className={control}
+            >
+              <option value="">Pick your group</option>
+              {(meta.groups ?? []).map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </label>
+        )}
       </div>
+      {grouped && <p id="group-note" role={groupMsg && groupError ? "alert" : undefined} className={cn("text-xs", groupMsg && groupError ? "text-sm text-ember" : "text-muted-foreground")}>{groupMsg && groupError ? groupError : E.quotasNote}</p>}
     </>
   );
   const courseStep = (
@@ -212,16 +249,16 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
       )}
     </>
   );
-  const quotaStep = (
+  const quotaStep = grouped ? null : (
     <Checks
       legend="Quotas"
-      note={openQuotasNote}
+      note={E.quotasNote}
       options={meta.quotas.map((q) => ({ value: q, label: q }))}
       value={draft.quotas}
       onChange={(v) => set("quotas", v)}
     />
   );
-  const budget = (
+  const budget = !E.has.fees ? null : (
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-1.5 text-sm font-medium">
           Budget per year (fee)
@@ -264,7 +301,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
         className="fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-xl border border-border bg-popover p-6 pb-0 shadow-overlay outline-none md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Dialog.Title className="text-xl font-semibold">{setup ? "Your rank and courses" : "Your rank and preferences"}</Dialog.Title>
+            <Dialog.Title className="text-xl font-semibold">{`Your ${exam === DEFAULT_EXAM ? "" : `${E.label} `}${setup ? "rank and courses" : "rank and preferences"}`}</Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-muted-foreground">Saved to your account, on every device you sign in on.</Dialog.Description>
           </div>
           <Dialog.Close asChild>

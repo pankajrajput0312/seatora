@@ -5,9 +5,10 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { fmtDay, listDay } from "../../lib/format";
 import type { DecideLinks } from "../../lib/links";
-import { PAST_YEARS, reachWindow, type Latest } from "../../lib/reach";
+import { DEFAULT_EXAM, restrictedQuota, type ExamKey } from "@/features/exams/registry";
+import { pastOf, reachWindow, type Latest } from "../../lib/reach";
 import { statKeys, statLabel } from "../../lib/stat-format";
-import { openQuotas, roundLabel, rounds, seatKindLabel, type Round, type SeatKind, type SeatList } from "../../types";
+import { roundLabel, rounds, seatKindLabel, type Round, type SeatKind, type SeatList } from "../../types";
 import { Dash, InstName, Provisional, ReachBadge } from "../bits";
 import { InfoTip } from "../info-tip";
 import { TermStatCells } from "../stat-cells";
@@ -99,11 +100,13 @@ export function UnlistedSeats({ u, profile, here, href, options }: { u: { list: 
 }
 
 /** The deepest closing of every round the reach label counts (Stray included, lib/reach.ts deepestOf), and behind a disclosure each of them. */
-function PastClosings({ r, name }: { r: SeatLine; name: string }) {
+function PastClosings({ r, name, latest }: { r: SeatLine; name: string; latest: Latest }) {
   if (!r.rounds.length) return <Dash />;
   const d = r.deepest;
   const at = (p: { year: number; round: Round }) => r.rounds.find((c) => c.year === p.year && c.round === p.round);
-  const all: { year: number; round: Round; closing: number | null; provisional: boolean }[] = [...PAST_ROUNDS.map((p) => at(p) ?? { ...p, closing: null, provisional: false }), ...r.rounds.filter((c) => !PAST_ROUNDS.some((p) => p.year === c.year && p.round === c.round))]
+  // NEET PG's fixed rounds (each "—" when none); another exam (its own years, latest.pastYears): the rounds it has.
+  const fixed = latest.pastYears ? [] : PAST_ROUNDS;
+  const all: { year: number; round: Round; closing: number | null; provisional: boolean }[] = [...fixed.map((p) => at(p) ?? { ...p, closing: null, provisional: false }), ...r.rounds.filter((c) => !fixed.some((p) => p.year === c.year && p.round === c.round))]
     .sort((a, b) => b.year - a.year || rounds.indexOf(a.round) - rounds.indexOf(b.round));
   return (
     <div className="grid justify-items-end gap-1 whitespace-nowrap">
@@ -137,7 +140,7 @@ function PastClosings({ r, name }: { r: SeatLine; name: string }) {
  * added; `current` orders the seats sort), the deepest past closing on the row's quota and seat category, and her reach
  * label on it (`ranked`; `latest`: lib/reach.ts latestRound).
  */
-export function SeatTable({ rows, lists, current, sort, caption, ranked, L, latest }: { rows: SeatLine[]; lists: SeatList[]; current: string; sort: SeatSort; caption: string; ranked: boolean; L: DecideLinks; latest: Latest }) {
+export function SeatTable({ rows, lists, current, sort, caption, ranked, L, latest, exam = DEFAULT_EXAM }: { rows: SeatLine[]; lists: SeatList[]; current: string; sort: SeatSort; caption: string; ranked: boolean; L: DecideLinks; latest: Latest; exam?: ExamKey }) {
   const td = "px-3 py-3 align-top md:px-4";
   const th = cn(tbl.th, "px-3 align-bottom md:px-4");
   const sticky = "sticky left-0 z-[1] w-40 min-w-40 border-r border-border bg-card md:w-72 md:min-w-72";
@@ -152,7 +155,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L, late
             <th scope="col" className={th}>Seat category</th>
             {/* The course's terms beside it (as on Options), in view without scrolling sideways. */}
             {statKeys.map((k) => (
-              <th key={k} scope="col" className={cn(th, "text-right")} aria-sort={(sort === "fee" && k === "fee") || (sort === "bond" && k === "bond") ? "ascending" : undefined}>{statLabel[k]}</th>
+              <th key={k} scope="col" data-col={k} className={cn(th, "text-right")} aria-sort={(sort === "fee" && k === "fee") || (sort === "bond" && k === "bond") ? "ascending" : undefined}>{statLabel[k]}</th>
             ))}
             {lists.map((l) => (
               <th key={l.key} scope="col" className={cn(th, "text-right")} aria-sort={sort === "seats" && l.key === current ? "descending" : undefined}>
@@ -161,7 +164,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L, late
             ))}
             <th scope="col" className={cn(th, "text-right whitespace-nowrap")} aria-sort={sort === "closing" ? "descending" : undefined}>
               Deepest past closing
-              <InfoTip label="deepest past closing">The deepest closing rank on the row&apos;s quota and seat category in {reachWindow(latest, PAST_YEARS)}, every round, Stray included, with its year and round; each round behind &quot;Every round&quot;.</InfoTip>
+              <InfoTip label="deepest past closing">The deepest closing rank on the row&apos;s quota and seat category in {reachWindow(latest, pastOf(latest))}, every round, Stray included, with its year and round; each round behind &quot;Every round&quot;.</InfoTip>
             </th>
             {ranked && <th scope="col" className={cn(th, "min-w-36")}>Reach</th>}
           </tr>
@@ -178,7 +181,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L, late
                   </span>
                   <span className="mt-1 flex flex-wrap gap-1">
                     {r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />}
-                    {r.quota != null && !openQuotas.includes(r.quota) && <Badge tone="warning">Restricted quota</Badge>}
+                    {r.quota != null && restrictedQuota(exam, r.quota) && <Badge tone="warning">Restricted quota</Badge>}
                   </span>
                 </th>
                 <td className={td}>{r.category}</td>
@@ -186,7 +189,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L, late
                 {lists.map((l) => (
                   <td key={l.key} className={cn(tbl.num, "px-3 md:px-4")}>{r.byList[l.key] != null ? formatRank(r.byList[l.key]) : <Dash />}</td>
                 ))}
-                <td className={td}><PastClosings r={r} name={name} /></td>
+                <td className={td}><PastClosings r={r} name={name} latest={latest} /></td>
                 {ranked && (
                   <td className={td}>
                     {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} on={r.category} /> : <span className="text-xs text-muted-foreground">{r.noLabel}</span>}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
+import { DEFAULT_EXAM, exams, perGroup, type ExamKey } from "@/features/exams/registry";
 import type { DecideLinks } from "../lib/links";
 import type { Reach } from "../lib/reach";
 import { roundName } from "../lib/round-status";
@@ -12,7 +13,7 @@ import { smallLink } from "./ui";
  * Rank scan. `list`: the newest round's seat list while Options lists that round; `fresh`: its options never
  * allotted before.
  */
-export function StillCanDo({ L, rank, list, fresh, counts, title, id }: {
+export function StillCanDo({ L, rank, list, fresh, counts, title, id, exam = DEFAULT_EXAM }: {
   L: DecideLinks;
   rank: number;
   list: SeatList | undefined;
@@ -20,7 +21,10 @@ export function StillCanDo({ L, rank, list, fresh, counts, title, id }: {
   counts: Record<Reach, number>;
   title: string;
   id: string;
+  /** Another exam: only what it has (no schedule; NEET SS: no other quota but her group's). */
+  exam?: ExamKey;
 }) {
+  const pg = exam === DEFAULT_EXAM;
   return (
     <section aria-labelledby={id} className="rounded-xl border border-border bg-card p-4">
       <h2 id={id} className="text-title font-semibold">{title}</h2>
@@ -31,8 +35,12 @@ export function StillCanDo({ L, rank, list, fresh, counts, title, id }: {
         {list && <li><Link href={L.to("/decide/options", { seats: "virtual" })} className={smallLink}>Virtual vacancy seats</Link>: seats held now that free up when someone upgrades this round. Fill them as choices too.</li>}
         {counts["stray-only"] > 0 && <li><Link href={L.options({ reach: "stray-only" })} className={smallLink}>{formatRank(counts["stray-only"])} reached your rank only in a stray round</Link>, after R1 to R3 had closed far earlier.</li>}
         {counts["within-10"] > 0 && <li><Link href={L.options({ reach: "within-10" })} className={smallLink}>{formatRank(counts["within-10"])} closed within 10% of your rank</Link> in a past round.</li>}
-        <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>Widen your courses, quotas or states</Link>: other states, Deemed/Paid seats (a quota), DNB and Diploma courses of your specialties, more specialties, or looser fee and bond caps.</li>
-        <li>The stray vacancy round comes after Round 3: see the <Link href={L.to("/decide/counselling")} className={smallLink}>schedule and notices</Link>.</li>
+        {pg ? (
+          <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>Widen your courses, quotas or states</Link>: other states, Deemed/Paid seats (a quota), DNB and Diploma courses of your specialties, more specialties, or looser fee and bond caps.</li>
+        ) : (
+          <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>{perGroup(exam) ? "Widen your courses or states" : "Widen your courses, quotas or states"}</Link>: other states, more courses{perGroup(exam) ? " of your question group" : `, other quotas you can take (${exams[exam].quotas.join(", ")})`}.</li>
+        )}
+        {pg && <li>The stray vacancy round comes after Round 3: see the <Link href={L.to("/decide/counselling")} className={smallLink}>schedule and notices</Link>.</li>}
         <li><Link href={L.rankScan(rank)} className={smallLink}>Rank scan</Link> shows what ranks near yours were allotted in past rounds.</li>
       </ul>
     </section>

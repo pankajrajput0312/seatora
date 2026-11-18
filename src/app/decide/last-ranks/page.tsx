@@ -31,6 +31,7 @@ import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decid
 import { baseCategories, roundLabel, rounds, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam } from "@/features/exams/active";
+import { exams, perGroup, roundNameIn } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Last ranks" };
 // ponytail: 25 a page: each card carries its five term cells and their (i)s (both views are in the page).
@@ -142,6 +143,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const f = parseSearchParams(schema, params);
   const tp = readTermFilters(params, profile);
   const exam = await activeExam();
+  const E = exams[exam];
   const meta = await getMeta(exam);
   // Every one of her courses by default (lib/course-filter.ts), the picked ones otherwise; no profile courses: the first course.
   const cf = courseFilter(params, profile, meta.courses);
@@ -152,17 +154,19 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   // Her quotas (the open ones when she ticked none) unless one is picked, or "all".
   const quota = f.lquota && meta.quotas.includes(f.lquota) ? f.lquota : undefined;
   const allQuotas = f.lquota === "all";
-  const quotas = quota ? [quota] : allQuotas || !profile ? undefined : profileQuotas(profile);
+  const mineQ = profile ? profileQuotas(profile, exam) : [];
+  const quotas = quota ? [quota] : allQuotas || !mineQ.length ? undefined : mineQ;
   const [sortYear, sortRound] = f.sort?.split("-") ?? [];
   const sort = f.sort ? { year: Number(sortYear), round: sortRound as Round, dir: f.dir } : undefined;
   const filtered = anyTermFilter(tp.filters);
-  // The closing-rank filter: a typed range, else her rank's preset (the profile's AIR).
-  const myRank = profile?.rank;
+  // The closing-rank filter: a typed range, else her rank's preset (the profile's AIR). NEET SS: her rank compares only
+  // with her question group's quotas, so with another group's (or every quota) there is no "would have got".
+  const myRank = !perGroup(exam) || (quotas?.length && quotas.every((q) => mineQ.includes(q))) ? profile?.rank : undefined;
   const rmin = rankNumber(f.rmin), rmax = rankNumber(f.rmax);
   const closing = rmin || rmax ? { min: rmin, max: rmax } : myRank && f.rk === "reached" ? { min: myRank } : myRank && f.rk === "near" ? { min: Math.round(myRank * 0.9), max: Math.round(myRank * 1.1) } : undefined;
   const closingLabel = !closing ? null
     : rmin || rmax ? `Closing ${rmin && rmax ? `${formatRank(rmin)}–${formatRank(rmax)}` : rmin ? `${formatRank(rmin)} or later` : `up to ${formatRank(rmax!)}`}`
-    : f.rk === "reached" ? `Would have got AIR ${formatRank(myRank!)}` : `Near AIR ${formatRank(myRank!)} (±10%)`;
+    : f.rk === "reached" ? `Would have got ${E.rankWord} ${formatRank(myRank!)}` : `Near ${E.rankWord} ${formatRank(myRank!)} (±10%)`;
   const base = { courses: courses.map((c) => ({ degree: c.degree, specialty: c.specialty })), category, quotas, search: f.q, sort, closing: closing && { ...closing, since: f.since } };
   const [lr, all, inst, info, view] = await Promise.all([
     lastRanks({ ...base, terms: tp.filters }, undefined, exam),
@@ -207,7 +211,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const clear = L.with("/decide/last-ranks", { q: null, rk: null, rmin: null, rmax: null, course: null, lquota: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
   const about = (
     <>
-      Closing = the highest All India Rank allotted that round on a {category} seat. Brackets = allotments made that round
+      {`Closing = the highest ${E.rankName} allotted that round on a `}{category} seat. Brackets = allotments made that round
       in every seat category (in R2 and later, new or upgraded allotments only), not the seat matrix. Fee, stipend, bond and
       leaving: the row&apos;s cells, each (i) with the exact words and source.
     </>
@@ -237,8 +241,8 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                 const on = f.sort === key;
                 return (
                   <th key={key} scope="col" aria-sort={on ? (f.dir === "asc" ? "ascending" : "descending") : undefined} className={`px-1 py-1 text-right font-normal ${i === 0 ? "border-l border-border" : ""}`}>
-                    <Link href={sortHref(key)} aria-label={`${c.year} ${roundLabel[r]}, sort ${on && f.dir === "desc" ? "ascending" : "descending"}`} className="inline-flex min-h-11 items-center justify-end px-1 hover:text-foreground">
-                      {roundLabel[r]}{on ? (f.dir === "asc" ? " ↑" : " ↓") : ""}
+                    <Link href={sortHref(key)} aria-label={`${c.year} ${roundNameIn(exam, meta.sources, c.year, r)}, sort ${on && f.dir === "desc" ? "ascending" : "descending"}`} className="inline-flex min-h-11 items-center justify-end px-1 hover:text-foreground">
+                      {roundNameIn(exam, meta.sources, c.year, r)}{on ? (f.dir === "asc" ? " ↑" : " ↓") : ""}
                     </Link>
                   </th>
                 );
@@ -263,7 +267,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                 {cols.flatMap((c) =>
                   c.rounds.map((round, i) => (
                     <td key={`${c.year}-${round}`} className={`numeric px-2 py-2 text-right ${i === 0 ? "border-l border-border" : ""}`}>
-                      <Cell c={r.grid[c.year]?.[round]} rank={profile?.rank} />
+                      <Cell c={r.grid[c.year]?.[round]} rank={myRank} />
                     </td>
                   )),
                 )}
@@ -283,8 +287,8 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         about={about}
         note={
           <>
-            The last All India Rank that got each seat on {category} seats, by year and round, newest first. (2) = seats given that round.
-            {profile?.rank != null && <> <span className={GOT}>Highlighted</span>: your AIR <span className="numeric">{formatRank(profile.rank)}</span> would have got it.</>}
+            {`The last ${E.rankName} that got each seat on `}{category} seats, by year and round, newest first. (2) = seats given that round.
+            {myRank != null && <> <span className={GOT}>Highlighted</span>: your {E.rankWord} <span className="numeric">{formatRank(myRank)}</span> would have got it.</>}
           </>
         }
       >
@@ -310,17 +314,17 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         {/* Her courses by default (none ticked); the shared searchable chips, never a 100-item native list. */}
         <FilterDropdown label="Course" name="course" search options={cf.choices.filter((c) => c.value !== "all")} selected={cf.typed} none={cf.mine.length ? `Your courses (${cf.mine.length})` : `${course.degree} ${course.name}`} info={cf.mine.length ? "None ticked means your courses." : undefined} />
-        <Field label="Seat category"><Select name="lcat" value={category} options={categories.map((c) => ({ value: c, label: c }))} /></Field>
-        <Field label="Quota"><Select name="lquota" value={f.lquota} all={profile ? `Your quotas (${profileQuotas(profile).join(", ")})` : "All quotas"} options={[...(profile ? [{ value: "all", label: "All quotas" }] : []), ...meta.quotas.map((q) => ({ value: q, label: q }))]} /></Field>
+        {E.categories.length > 1 && <Field label="Seat category"><Select name="lcat" value={category} options={(E.pwd ? [...E.categories, ...E.categories.map((c) => `${c} PwD`)] : E.categories).map((c) => ({ value: c, label: c }))} /></Field>}
+        <Field label="Quota"><Select name="lquota" value={f.lquota} all={mineQ.length ? `Your quotas (${mineQ.join(", ")})` : "All quotas"} options={[...(mineQ.length ? [{ value: "all", label: "All quotas" }] : []), ...meta.quotas.map((q) => ({ value: q, label: q }))]} /></Field>
         {myRank != null && (
           <Field label="Your rank">
-            <Select name="rk" value={f.rk} all="Any closing rank" options={[{ value: "reached", label: `Would have got AIR ${formatRank(myRank)}` }, { value: "near", label: `Near AIR ${formatRank(myRank)} (±10%)` }]} />
+            <Select name="rk" value={f.rk} all="Any closing rank" options={[{ value: "reached", label: `Would have got ${E.rankWord} ${formatRank(myRank)}` }, { value: "near", label: `Near ${E.rankWord} ${formatRank(myRank)} (±10%)` }]} />
           </Field>
         )}
         <Field label="Closing rank from"><input name="rmin" inputMode="numeric" defaultValue={f.rmin ?? ""} placeholder="e.g. 40,000" className={`${control} numeric`} /></Field>
         <Field label="Closing rank to"><input name="rmax" inputMode="numeric" defaultValue={f.rmax ?? ""} placeholder="e.g. 60,000" className={`${control} numeric`} /></Field>
         <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
-        <TermFilterControls f={tp.params} caps={profile} />
+        {E.has.fees && <TermFilterControls f={tp.params} caps={profile} />}
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
 
@@ -365,7 +369,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       {/* Her institute (a link from it, #inst-…) in view in either view: its card above the list. */}
       {pinned && (
         <div id={`inst-${pinned.college.slug}`} tabIndex={-1} className="scroll-mt-24">
-          <LastRankCard r={pinned} cols={cols} rds={rds} stat={stat} mcc={mcc(pinned)} L={L} mine rank={profile?.rank} />
+          <LastRankCard r={pinned} cols={cols} rds={rds} stat={stat} mcc={mcc(pinned)} L={L} mine rank={myRank} />
         </div>
       )}
 
@@ -377,7 +381,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
           view={view}
           cards={
             <ResultCards title={caption} hideTitle>
-              {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} mine={inst?.slug === r.college.slug} rank={profile?.rank} />)}
+              {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} mine={inst?.slug === r.college.slug} rank={myRank} />)}
             </ResultCards>
           }
           table={table}

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { listDay } from "../../lib/format";
 import { pageValue, parseSearchParams } from "../../lib/params";
 import { splitByTerms, termFilterLists, termFilters, termFilterShape, type TermFilters } from "../../lib/term-filters";
+import { DEFAULT_EXAM, exams, latestOf, perGroup, type ExamKey } from "@/features/exams/registry";
 import { classifyReach, deepestOf, eligibleCategories, LATEST_YEAR, latestRound, PAST_YEARS, reachLabel, reachOrder, type Reach } from "../../lib/reach";
 import { pairSchema, profileCourseFilter, profileQuotas, type Profile } from "../../profile";
 import { getCatalog, type Catalog } from "../../server/catalog";
@@ -159,14 +160,15 @@ async function withHistory<T extends SeatRow & Pick<SeatHistory, "terms" | "fees
   const years = cat.meta.years.map((y) => y.year);
   const cutoffs = await findCutoffs(cat, { cs: uniq(opts.map((r) => r.cs!)), quotas: uniq(opts.map((r) => r.quota!)), categories: uniq(opts.map((r) => r.category)), years });
   const provisional = new Set(cat.sources.filter((s) => s.provisional).map((s) => s.key));
-  const latest = latestRound(cat.sources);
+  const latest = latestOf(cat.sources, cat.exam);
+  const { pastYears, latestYear } = exams[cat.exam];
   const by = new Map<string, Cutoff[]>();
   for (const c of cutoffs) {
     const k = `${optionId(c)}|${c.category}`;
     (by.get(k) ?? by.set(k, []).get(k)!).push(c);
   }
-  const opt = { latest, pastYears: PAST_YEARS };
-  const counted = (c: { year: number; round: Round }) => PAST_YEARS.includes(c.year) || c.year === LATEST_YEAR;
+  const opt = { latest, pastYears };
+  const counted = (c: { year: number; round: Round }) => pastYears.includes(c.year) || c.year === latestYear;
   return rows.map((r) => {
     const all = (r.quota != null && by.get(`${optionId({ college: r.college.key, degree: r.degree, specialty: r.specialty, quota: r.quota })}|${r.category}`)) || [];
     const closings = all.map((c) => ({ year: c.year, round: c.round, closing: c.closing, n: c.n, provisional: provisional.has(c.src) }));
@@ -206,19 +208,19 @@ const rowKey = (x: SeatRow) => [x.college.key, x.degree, x.specialty, x.quota, x
  * row) and sorts/pages here; history is read for the page only unless the sort needs it (reach, closing). Move sort and
  * paging into SQL if lists grow.
  */
-export async function findSeats(f: SeatQuery, pg?: PageQuery) {
+export async function findSeats(f: SeatQuery, pg?: PageQuery, exam: ExamKey = DEFAULT_EXAM) {
   const { quotas, states, sort, nohist, compare, has, reachFor, terms, courses, specialties, degrees, pairs, categories, ...rest } = f;
   const filters = { ...rest, courses: some(courses), specialties: some(specialties), degrees: some(degrees), pairs: some(pairs), categories: some(categories), quota: quotas?.length === 1 ? (quotas[0] ?? undefined) : undefined };
   // State is filtered here, not in SQL, so the rows a state filter drops for having no state can be counted.
-  const [r, cat, info] = await Promise.all([listSeats(filters), getCatalog(), hospitalInfo()]);
+  const [r, cat, info] = await Promise.all([listSeats(filters, undefined, exam), getCatalog(exam), hospitalInfo(exam)]);
   const cur = r.lists[0];
   let lists = r.lists;
   let lines = r.rows.map((x) => ({ ...x, byList: { [x.list]: x.seats } }));
   if (compare && cur) {
-    lists = (await seatLists()).filter((l) => compare === "all" || (l.year === cur.year && l.round === cur.round));
+    lists = (await seatLists(exam)).filter((l) => compare === "all" || (l.year === cur.year && l.round === cur.round));
     const [more, allotted] = await Promise.all([
-      Promise.all(lists.filter((l) => !r.lists.some((x) => x.key === l.key)).map((l) => listSeats({ ...filters, list: l.key }))),
-      compare === "all" ? allottedRows(filters) : [],
+      Promise.all(lists.filter((l) => !r.lists.some((x) => x.key === l.key)).map((l) => listSeats({ ...filters, list: l.key }, undefined, exam))),
+      compare === "all" ? allottedRows(filters, exam) : [],
     ]);
     const merged = mergeLists([...r.rows, ...more.flatMap((m) => m.rows)], cur.key);
     const listed = new Set(merged.map(rowKey));
@@ -301,8 +303,8 @@ export const parseSeatsParams = (p: URLSearchParams) => parseSearchParams(seatsP
  * What the Seats page shows for these params: the picked list (default the newest), her seat categories (`mine`), the
  * sort in force and the rows (`r`, null when no list is imported). `pageSize` gives page `f.page`; without it every row (CSV).
  */
-export async function seatsView(f: SeatsParams, profile: Profile | null, pageSize?: number) {
-  const [all, meta, inst] = await Promise.all([seatLists(), getMeta(), f.inst ? getCollege(f.inst) : null]);
+export async function seatsView(f: SeatsParams, profile: Profile | null, pageSize?: number, exam: ExamKey = DEFAULT_EXAM) {
+  const [all, meta, inst] = await Promise.all([seatLists(exam), getMeta(exam), f.inst ? getCollege(f.inst, exam) : null]);
   const course = meta.courses.find((c) => c.slug === f.course);
   const list = all.find((l) => l.key === f.list) ?? all[0] ?? null;
   const mine = profile ? eligibleCategories(profile.category, profile.pwd) : null;
@@ -311,7 +313,7 @@ export async function seatsView(f: SeatsParams, profile: Profile | null, pageSiz
   if (!list) return { ...base, r: null };
   const cats = f.scat === "all" ? undefined : f.scat ? [f.scat] : (mine ?? undefined);
   // As on Options: with a profile, no quota ticked means the open quotas, never the restricted ones.
-  const quotas = f.squota ? [f.squota] : profile ? profileQuotas(profile) : f.quota;
+  const quotas = f.squota ? [f.squota] : profile ? profileQuotas(profile, exam) : f.quota;
   const r = await findSeats(
     {
       list: list.key,
@@ -327,11 +329,13 @@ export async function seatsView(f: SeatsParams, profile: Profile | null, pageSiz
       sort,
       compare: f.view === "list" ? false : f.view === "matrix" && f.rounds ? "all" : true,
       has: f.view === "matrix" ? f.has : undefined,
-      reachFor: profile && mine && { rank: profile.rank, categories: mine },
+      // NEET SS: no label without her question group (a rank compares only within one group).
+      reachFor: profile && mine && (!perGroup(exam) || profile.quotas.length > 0) ? { rank: profile.rank, categories: mine } : null,
       // An absent fee / bond cap is her profile's, as on Options.
       terms: termFilters(f, profile),
     },
     pageSize ? { page: f.page, pageSize } : undefined,
+    exam,
   );
   return { ...base, r };
 }

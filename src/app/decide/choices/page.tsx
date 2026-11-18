@@ -4,13 +4,13 @@ import { HistoryNote, PageHead } from "@/features/decide/components/bits";
 import { ChoicesView } from "@/features/decide/components/choices-view";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { decideLinks } from "@/features/decide/lib/links";
-import { latestRound } from "@/features/decide/lib/reach";
 import { fillWindow, nextChoiceFilling, roundName, stepsNow } from "@/features/decide/lib/round-status";
 import { toURLSearchParams } from "@/features/decide/profile";
 import { roundStatus } from "@/features/decide/server/notices";
 import { chosenView } from "@/features/decide/server/view";
-import { currentSeatLists, getMeta, LATEST_YEAR, PAST_YEARS } from "@/features/decide/service";
+import { currentSeatLists, getMeta } from "@/features/decide/service";
 import { activeExam } from "@/features/exams/active";
+import { exams, latestOf } from "@/features/exams/registry";
 import { currentPlan } from "@/features/plans/usage";
 import { liveReach } from "./actions";
 
@@ -20,6 +20,7 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
   const exam = await activeExam();
+  const { latestYear: LATEST_YEAR, pastYears: PAST_YEARS } = exams[exam];
   const [lists, view, me, rs, meta] = await Promise.all([currentSeatLists(exam), chosenView(params, "choices"), currentPlan(), roundStatus(LATEST_YEAR, exam).catch(() => null), getMeta(exam)]);
   // Her list is for the choice filling she fills next (MCC's schedule), never a fixed round (the layout names it the same).
   const fill = rs && nextChoiceFilling(stepsNow(rs, new Date()));
@@ -27,7 +28,7 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   return (
     <AppPage>
       <PageHead title="Choices" about="Your list in the order you'll enter it on the MCC portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons; in the table, pick a choice's number to move it straight there." />
-      <ChoicesView reachFor={liveReach} view={view} maxLists={me?.eff.limits.choiceLists} hasLists={lists.length > 0} nextRound={nextRound} latest={latestRound(meta.sources)} />
+      <ChoicesView reachFor={liveReach} view={view} maxLists={me?.eff.limits.choiceLists} hasLists={lists.length > 0} nextRound={nextRound} latest={latestOf(meta.sources, exam)} />
       <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
         <HistoryNote />
         {/* The reach labels read the past years' closing ranks and the latest year's rounds; the seat counts these lists. */}

@@ -1,15 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { createContext, use, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
+import { DEFAULT_EXAM, scopedKey, type ExamKey } from "@/features/exams/keys";
 import { PROFILE_KEY, profileSchema, type Profile } from "../profile";
 import { CHOICES_KEY, compareSchema, COMPARE_KEY, defaultChoices, parseChoices, type ChoicesState } from "./choices";
 import { decideLinks } from "./links";
 import { useLocal } from "./local-store";
 
+/**
+ * The exam Decide shows (DecideShell provides it: staff's pick, else NEET PG). Every saved thing (profile, choice lists,
+ * compare tray) is the exam's own: NEET PG keeps its keys, another exam has its own (exams/keys.ts scopedKey).
+ */
+export const ExamContext = createContext<ExamKey>(DEFAULT_EXAM);
+export const useExam = () => use(ExamContext);
+/** A localStorage key for the exam shown. */
+export const useScopedKey = (key: string) => scopedKey(key, useExam());
+
 /** Choice lists from localStorage, Zod-validated (a malformed value falls back instead of crashing). */
 export function useChoices(): [ChoicesState, (fn: (s: ChoicesState) => ChoicesState) => void, boolean] {
-  const [raw, setRaw, hydrated] = useLocal<unknown>(CHOICES_KEY, defaultChoices);
+  const [raw, setRaw, hydrated] = useLocal<unknown>(useScopedKey(CHOICES_KEY), defaultChoices);
   const state = useMemo(() => parseChoices(raw), [raw]);
   const update = useCallback((fn: (s: ChoicesState) => ChoicesState) => setRaw((prev: unknown) => fn(parseChoices(prev))), [setRaw]);
   return [state, update, hydrated];
@@ -32,7 +42,7 @@ export function useChoicesFor(nextRound: string | null | undefined) {
 
 /** Compare tray ids, validated and de-duplicated. */
 export function useCompare(): [string[], (fn: (ids: string[]) => string[]) => void] {
-  const [raw, setRaw] = useLocal<unknown>(COMPARE_KEY, []);
+  const [raw, setRaw] = useLocal<unknown>(useScopedKey(COMPARE_KEY), []);
   const ids = useMemo(() => {
     const r = compareSchema.safeParse(raw);
     return r.success ? [...new Set(r.data)] : [];
@@ -52,7 +62,7 @@ export function useDecideLinks() {
 
 /** The saved profile, Zod-validated (null when missing or malformed). */
 export function useSavedProfile(): [Profile | null, (p: Profile) => void, boolean] {
-  const [raw, setRaw, hydrated] = useLocal<unknown>(PROFILE_KEY, null);
+  const [raw, setRaw, hydrated] = useLocal<unknown>(useScopedKey(PROFILE_KEY), null);
   const profile = useMemo(() => {
     const r = profileSchema.safeParse(raw);
     return r.success ? r.data : null;

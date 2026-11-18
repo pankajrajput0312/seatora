@@ -133,11 +133,12 @@ export function indexCatalog(p: {
   };
 }
 
-/** In-memory catalog over a whole dataset (the unit-test fixture). */
-export function memoryCatalog(d: DecideData): Catalog {
+/** In-memory catalog over a whole dataset (the unit-test fixture), as `exam`'s. */
+export function memoryCatalog(d: DecideData, exam: ExamKey = DEFAULT_EXAM): Catalog {
   const cs = (c: { college: string; degree: string; specialty: string }) => `${c.college}~${c.degree}~${c.specialty}`;
   const pairs = new Map(d.cutoffs.map((c) => [cs(c), { cs: cs(c), college: c.college, degree: c.degree, specialty: c.specialty }]));
   return indexCatalog({
+    exam,
     mem: { cutoffs: d.cutoffs, allotments: d.allotments },
     colleges: d.colleges,
     courses: d.courses,
@@ -215,9 +216,9 @@ export class DataUnavailableError extends Error {
   }
 }
 
-/** Unit tests only: serve this in-memory dataset instead of Postgres (null to reset). */
-export function setTestCatalog(d: DecideData | null) {
-  testCatalog = d && memoryCatalog(d);
+/** Unit tests only: serve this in-memory dataset (as `exam`'s) instead of Postgres (null to reset). */
+export function setTestCatalog(d: DecideData | null, exam: ExamKey = DEFAULT_EXAM) {
+  testCatalog = d && memoryCatalog(d, exam);
 }
 
 /** The exam's catalog (default NEET PG: what every caller that names none reads). */

@@ -23,17 +23,17 @@ import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { latestRound } from "@/features/decide/lib/reach";
-import { getMeta, LATEST_YEAR, listInstitutes, PAST_YEARS } from "@/features/decide/service";
+import { getMeta, listInstitutes } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam } from "@/features/exams/active";
+import { exams, latestOf } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Institutes" };
 const PAGE_SIZE = 24; // splits evenly into 2, 3 and 4 columns; small enough for a phone to paint fast
 const PATH = "/decide/institutes";
-const sorts = [
+const sortsFor = (last: number) => [
   { value: "name", label: "Name" },
-  { value: "allotments", label: `Most allotments (${PAST_YEARS[1]})` },
+  { value: "allotments", label: `Most allotments (${last})` },
   { value: "beds", label: "Most beds (as reported)" },
 ] as const;
 const schema = z.object({
@@ -53,8 +53,11 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const { params: tp, filters: tf } = readTermFilters(params, profile);
   const pg = { page: f.page, pageSize: PAGE_SIZE };
   const exam = await activeExam();
+  const E = exams[exam];
+  const { latestYear: LATEST_YEAR, pastYears: PAST_YEARS } = E;
+  const sorts = sortsFor(PAST_YEARS[1]);
   const [meta, info, byTerms, view] = await Promise.all([getMeta(exam), hospitalInfo(exam), institutesByTerms(tf, f.course, exam), chosenView(params, "institutes")]);
-  const latest = latestRound(meta.sources);
+  const latest = latestOf(meta.sources, exam);
   // Term filters and the beds sort narrow and order the list before it is paged, so reach is read for one page only.
   const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort, only: byTerms?.pass, bedsOf: (key: string) => info.get(key)?.beds?.n };
   const [res, unknown] = await Promise.all([
@@ -125,7 +128,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
                       <dd className="numeric flex min-h-11 items-center font-semibold">{allot(r, `${smallLink} min-w-11 text-sky`)}</dd>
                     </div>
                   </dl>
-                  <Link href={L.institute(r.college.slug, "fees")} className={`${smallLink} shrink-0 border-l border-border px-4 text-sky`}>Fees & bond</Link>
+                  {E.has.fees && <Link href={L.institute(r.college.slug, "fees")} className={`${smallLink} shrink-0 border-l border-border px-4 text-sky`}>Fees & bond</Link>}
                 </div>
               }
             />
@@ -176,7 +179,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Institutes"
-        about={<>Every institute in the MCC results: where it is, its type and beds, the courses it offers and how many allotments were made there in {PAST_YEARS[1]} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments, fees and bond.</>}
+        about={<>Every institute in the MCC results: where it is, its type and beds, the courses it offers and how many allotments were made there in {PAST_YEARS[1]} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments{E.has.fees ? ", fees and bond" : ""}.</>}
       />
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
@@ -198,7 +201,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.state ?? []} none="All states" />
         <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={f.course ?? []} none="Any course" />
         <Field label="Sort"><Select name="sort" value={f.sort} options={[...sorts]} /></Field>
-        <TermFilterControls f={tp} caps={profile} />
+        {E.has.fees && <TermFilterControls f={tp} caps={profile} />}
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
 

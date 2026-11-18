@@ -309,6 +309,9 @@ html:has(.app [data-compare-pill]) { scroll-padding-bottom: 8rem; }
    A cell focused by Tab stops below a ScrollTable's pinned header copy (--head-h) and the bars above it (--table-top,
    beyond the page's 6rem scroll-padding), not under them. */
 .app [data-scroll-table] tbody * { scroll-margin-top: calc(var(--head-h, 0px) + max(0px, var(--table-top, 0px) - 6rem)); }
+/* An exam with no fee, stipend or bond data (exams/registry.ts has.fees; DecideShell sets data-no-terms): no term cells,
+   cards' term strips or columns, wherever a page shows them (TermStatCells, StatHead, `data-col` term headers). */
+.app [data-no-terms] :is([data-terms], th:has([data-terms]), :is(th, td):is([data-col="fee"], [data-col="stipend"], [data-col="bond"], [data-col="bondInr"], [data-col="leaving"])) { display: none; }
 /* On paper no 44px hit box (as the (i)'s): in a table's last row it would reach past the box, as if a row were cut off. */
 @media print { .hit::before { display: none; } }
 /* A row that scrolls sideways (.fade-x: SubTabs) fades out at an edge with more beyond it, by its own scroll position

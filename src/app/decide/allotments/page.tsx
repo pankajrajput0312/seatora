@@ -24,10 +24,11 @@ import { decideLinks } from "@/features/decide/lib/links";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { roundLabel, rounds } from "@/features/decide/types";
+import { roundLabel, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
 import { activeExam } from "@/features/exams/active";
+import { DEFAULT_EXAM, exams, groupsOf, roundNameIn } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Allotments" };
 const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
@@ -65,9 +66,13 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
   const pageSize = await pageSizeFor(PAGE_SIZE);
-  const [v, view] = await Promise.all([allotmentsView(params, pageSize, await activeExam()), chosenView(params, "allotments")]);
+  const exam = await activeExam();
+  const E = exams[exam];
+  const [v, view] = await Promise.all([allotmentsView(params, pageSize, exam), chosenView(params, "allotments")]);
   if (!v) notFound();
   const { f, meta, inst, typed, rankError, latest, fromProfile, filters } = v;
+  // A round as that year's MCC result names it (NEET SS's Mop-up; NEET PG: R1 … Special stray, as before).
+  const roundOf = (a: { year: number; round: Round }) => roundNameIn(exam, meta.sources, a.year, a.round);
   const { rows, total, page, unknownTerms } = v.r;
   // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers: allotmentsView).
   const caps = profileFromParams(params);
@@ -98,7 +103,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
     set("year") && { label: filters.year ? `Year: ${meta.years.find((y) => y.year === filters.year)?.label ?? filters.year}` : "All years", param: "year", href: here({ year: null }) },
     set("round") && filters.round && { label: `Round: ${roundLabel[filters.round]}`, param: "round", href: here({ round: null }) },
     // Her profile's default (no filter set): one chip saying so; × shows every allotment (the latest round).
-    fromProfile && { label: `From your profile: ${fromProfile.courses.length ? `${fromProfile.courses.length === 1 ? courseLabel(fromProfile.courses[0]) : `your ${fromProfile.courses.length} courses`}, ` : ""}ranks ${formatRank(fromProfile.from)}–${formatRank(fromProfile.to)}`, param: "course", href: showAll },
+    fromProfile && { label: `From your profile: ${fromProfile.courses.length ? `${fromProfile.courses.length === 1 ? courseLabel(fromProfile.courses[0]) : `your ${fromProfile.courses.length} courses`}, ` : ""}ranks ${formatRank(fromProfile.from)}–${formatRank(fromProfile.to)}${fromProfile.quotas ? `, ${groupsOf(exam, fromProfile.quotas).join(", ")}` : ""}`, param: "course", href: showAll },
     ...(fromProfile ? [] : f.course ?? []).map((c) => ({ label: courseLabel(c), param: "course", href: L.without("/decide/allotments", "course", c) })),
     filters.quota && { label: `Quota: ${filters.quota}`, param: "aq", href: here({ aq: null }) },
     filters.category && { label: `${filters.category} seats`, param: "acat", href: here({ acat: null }) },
@@ -133,7 +138,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <ResultCard
           key={i}
           chips={[
-            <span key="r" className="inline-flex items-center gap-1.5"><span className="numeric">{a.year} · {roundLabel[a.round]}</span><Provisional when={a.provisional} /></span>,
+            <span key="r" className="inline-flex items-center gap-1.5"><span className="numeric">{a.year} · {roundOf(a)}</span><Provisional when={a.provisional} /></span>,
             a.quota,
             `${a.category} seat`,
             // Only when it differs from the seat's (the PDF prints an Open candidate as "General").
@@ -199,12 +204,12 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
             <tr key={i} className={tbl.row}>
               <td className={`${td} ${stick} text-right max-md:text-left ${tbl.pin}`}>
                 {rankLink(a, "numeric inline-flex min-h-6 min-w-6 items-center justify-end text-[15px] font-semibold hover:text-sky hover:underline max-md:justify-start")}
-                <span className="block text-xs md:hidden"><span className="numeric">{a.year}</span> {roundLabel[a.round]} <Provisional when={a.provisional} /></span>
+                <span className="block text-xs md:hidden"><span className="numeric">{a.year}</span> {roundOf(a)} <Provisional when={a.provisional} /></span>
                 <span title={inst ? a.courseName : a.college.name} className={`block text-xs text-muted-foreground md:hidden ${tbl.clamp}`}>{inst ? a.courseName : a.college.name}</span>
                 {/* Two stacked targets, each at least 24 × 24 px (WCAG 2.5.8). */}
               </td>
               <td className={`${short} max-md:hidden`}>
-                <span className="font-medium"><span className="numeric">{a.year}</span> {roundLabel[a.round]}</span>
+                <span className="font-medium"><span className="numeric">{a.year}</span> {roundOf(a)}</span>
                 <span className="block"><Provisional when={a.provisional} /></span>
               </td>
               {/* Two lines at most: the institute, then its course, state, type and beds on one small line. Filtered to one
@@ -268,13 +273,13 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         {f.mine && <input type="hidden" name="mine" value={f.mine} />}
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
-        <Field label="Round"><Select name="round" value={filters.round} all="All rounds" options={rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
+        <Field label="Round"><Select name="round" value={filters.round} all="All rounds" options={E.rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
         <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={fromProfile?.courses ?? f.course ?? []} none="All courses" />
         <Field label="Quota"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
-        <Field label="Seat category"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>
+        {E.categories.length > 1 && <Field label="Seat category"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>}
         <Field label="Rank from"><input {...rankInput("from")} /></Field>
         <Field label="Rank to"><input {...rankInput("to")} /></Field>
-        <TermFilterControls f={f} caps={caps} />
+        {E.has.fees && <TermFilterControls f={f} caps={caps} />}
       </FilterBar>
       <ActiveFilters items={active} clear={showAll} />
       {fromProfile && (
@@ -296,7 +301,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         {total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle page="allotments" view={view} />
-            <CsvLink href={L.with("/api/v1/allotments/export", { page: null, [VIEW_PARAM]: null })} what={`these ${formatRank(total)} allotments`} total={total} />
+            {exam === DEFAULT_EXAM && <CsvLink href={L.with("/api/v1/allotments/export", { page: null, [VIEW_PARAM]: null })} what={`these ${formatRank(total)} allotments`} total={total} />}
             {view === "table" && <AllotmentsDisplay cols={cols} />}
           </div>
         )}

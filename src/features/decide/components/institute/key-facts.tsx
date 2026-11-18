@@ -85,7 +85,7 @@ export function KeyFacts({ rows, total, mine, cats, list, name, slug, L }: { row
             <tr className="border-b border-border text-xs text-muted-foreground">
               <th scope="col" className="px-3 py-2 text-left font-semibold">Course</th>
               {statKeys.map((k) => (
-                <th key={k} scope="col" className={cn("px-3 py-2 text-right font-semibold", k.startsWith("bond") && "bg-wash/60 text-foreground")}>
+                <th key={k} scope="col" data-col={k} className={cn("px-3 py-2 text-right font-semibold", k.startsWith("bond") && "bg-wash/60 text-foreground")}>
                   {k === "fee" ? "Fee / yr" : k === "stipend" ? "Stipend / mo" : statLabel[k]}
                 </th>
               ))}

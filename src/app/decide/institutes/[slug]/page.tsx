@@ -30,10 +30,10 @@ import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { fmtDay } from "@/features/decide/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { eligibleCategories, latestRound, latestText } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestText } from "@/features/decide/lib/reach";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { getCollege, getInstitute, getMeta, LATEST_YEAR, listAllotments, optionsView, PAST_YEARS, renamedCollege } from "@/features/decide/service";
+import { getCollege, getInstitute, getMeta, listAllotments, optionsView, renamedCollege } from "@/features/decide/service";
 import { feesFor } from "@/features/decide/server/facts";
 import { programmes } from "@/features/decide/server/terms";
 import { canSeeResidents, groupResidents, listResidents, residentsDenied } from "@/features/decide/server/residents";
@@ -44,7 +44,7 @@ import { checkAndCount, currentPlan } from "@/features/plans/usage";
 import { roundLabel, seatKindLabel } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { exams } from "@/features/exams/registry";
+import { exams, latestOf, type ExamKey } from "@/features/exams/registry";
 import { activeExam } from "@/features/exams/active";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -67,8 +67,15 @@ const schema = z.object({
   page: pageValue.default(1),
 });
 
+/** The tabs the exam has: Residents, fees and hospital facts are NEET PG's. */
+const tabsFor = (exam: ExamKey) => {
+  const has = exams[exam].has;
+  return tabs.filter((t) => (t.key !== "residents" || has.residents) && (t.key !== "fees" || has.fees) && (t.key !== "clinical" || has.clinical));
+};
+
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
-  const college = await getCollege((await params).slug, await activeExam()).catch((e) => {
+  const exam = await activeExam();
+  const college = await getCollege((await params).slug, exam).catch((e) => {
     unstable_rethrow(e);
     return null;
   });
@@ -76,7 +83,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // People's names: never indexed.
   const robots = tab === "residents" ? { index: false, follow: false } : undefined;
   // The tab is in the title, so switching tabs is announced (Next's route announcer reads the title).
-  return { title: `${tabs.find((t) => t.key === tab)!.label} · ${college?.name ?? "Institute"}`, robots };
+  return { title: `${(tabsFor(exam).find((t) => t.key === tab) ?? tabs[0]).label} · ${college?.name ?? "Institute"}`, robots };
 }
 
 export default async function InstitutePage({ params, searchParams }: Props) {
@@ -105,11 +112,13 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       </AppPage>
     );
   }
-  // Residents are NEET PG's (no exam on Resident): no tab for an exam without them.
-  const shownTabs = tabs.filter((t) => t.key !== "residents" || exams[exam].has.residents);
+  // Residents, fees and hospital facts are NEET PG's: no tab for an exam without them.
+  const E = exams[exam];
+  const { latestYear: LATEST_YEAR, pastYears: PAST_YEARS } = E;
+  const shownTabs = tabsFor(exam);
   const tab = shownTabs.some((t) => t.key === f.tab) ? f.tab : "overview";
   const yearInfo = (y: number) => meta.years.find((x) => x.year === y);
-  const latest = latestRound(meta.sources);
+  const latest = latestOf(meta.sources, exam);
   const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n ?? 0));
   const courses = [...new Map(options.map((o) => [o.course.slug, o.course])).values()];
   const listed = profile ? yours : options;
@@ -225,7 +234,9 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             {info?.type && <TypeBadge type={info.type} />}
             {(college.state || college.pincode) && <span>{college.state}{college.pincode && <span className="numeric text-muted-foreground"> {college.pincode}</span>}</span>}
             <span className="inline-flex items-center gap-1">
-              {beds ? (
+              {beds && !E.has.clinical ? (
+                <span><span className="numeric font-semibold">{beds.text}</span>&nbsp;beds</span>
+              ) : beds ? (
                 <Link href={L.institute(slug, "clinical")} className="inline-flex min-h-11 items-center text-sky hover:underline"><span className="numeric font-semibold">{beds.text}</span>&nbsp;beds<span className="sr-only">: see Hospital facts</span></Link>
               ) : (
                 <span className="text-muted-foreground">Beds: not published</span>
@@ -314,7 +325,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       </span>
                     </span>
                     <span className="flex items-center gap-4">
-                      {profile && <ReachBadge reach={o.reach} provisional={o.reachProvisional} latest={latest} />}
+                      {profile && <ReachBadge reach={o.reach} provisional={o.reachProvisional} latest={latest} otherGroup={o.otherGroup} />}
                       <span className="text-right"><span className="block text-xs text-muted-foreground">{PAST_YEARS[1]} deepest</span><Closing d={o.byYear[PAST_YEARS[1]]} /></span>
                     </span>
                   </li>
@@ -324,7 +335,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <HistoryNote className="mt-3" more={!profile && "Closing ranks shown across all seat categories."} />
           </section>
 
-          <section aria-labelledby="terms-h" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+          {E.has.fees && <section aria-labelledby="terms-h" className="grid gap-3 rounded-xl border border-border bg-card p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 id="terms-h" className="flex items-center gap-1 text-lg font-semibold">
                 Fees, stipend and bond
@@ -348,7 +359,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               </ul>
             )}
             <DataSource terms={termDocs(fees)} results={false} />
-          </section>
+          </section>}
 
           <section aria-labelledby="trend" className="rounded-xl border border-border bg-card p-5">
             <h2 id="trend" className="flex items-center gap-1 text-lg font-semibold">
@@ -407,7 +418,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     return (
                       <li key={r.id} className="grid min-w-0">
                         <ResultCard
-                          chips={[r.quota, profile && <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} />]}
+                          chips={[r.quota, profile && <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} />]}
                           actions={<>{profile && <ChoiceStar item={toChoiceItem(r, latest)} />}<CompareToggle id={r.id} label={name} /></>}
                           stat={{ label: `${PAST_YEARS[1]} deepest`, value: d ? <span className="numeric">{formatRank(d.closing)}</span> : <Dash /> }}
                           title={courseName(r)}
@@ -448,7 +459,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                           <th scope="row" className={`${stick} min-w-48 px-3 py-3 text-left align-top font-medium`}>
                             <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link>
                             <span className="block text-xs font-normal text-muted-foreground">{r.quota}</span>
-                            {profile && <span className="mt-1 block font-normal"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} /><SeatsBelowNote r={r} latest={latest} /></span>}
+                            {profile && <span className="mt-1 block font-normal"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} /><SeatsBelowNote r={r} latest={latest} /></span>}
                             {round.length > 0 && <span className="mt-1 flex flex-wrap gap-x-3 text-xs font-normal">{seatLinks(r).length ? seatLinks(r) : <span className="text-muted-foreground">No {roundLabel[round[0].list.round]} seats</span>}</span>}
                             <div className="flex flex-wrap items-center gap-x-3 text-xs font-normal">
                               <details className="w-fit"><summary className="cursor-pointer py-3 text-sky">Rounds by year</summary></details>

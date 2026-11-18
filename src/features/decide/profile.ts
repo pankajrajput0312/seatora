@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { baseCategories, openQuotas } from "./types";
+import { DEFAULT_EXAM, exams, type ExamKey } from "@/features/exams/registry";
+import { baseCategories } from "./types";
 
 /** One exact course as "degree~SPECIALTY", e.g. "DNB~FAMILYMEDICINE" (the `c` URL param). */
 export const pairSchema = z.string().max(200).regex(/^[^~,]+~[^~,]+$/, "degree~SPECIALTY, e.g. DNB~FAMILYMEDICINE");
@@ -19,7 +20,7 @@ export const profileSchema = z.object({
    * specialties, for display); absent or empty = specialties x degrees, as before pairs existed. Match with profileHasCourse.
    */
   pairs: z.array(pairSchema).optional(),
-  /** MCC quota labels. Empty = the open quotas (types.ts openQuotas), never the restricted ones. */
+  /** MCC quota labels. Empty = the exam's open quotas (types.ts openQuotas for NEET PG), never the restricted ones. NEET SS: her question group's. */
   quotas: z.array(z.string()),
   states: z.array(z.string()),
   maxFeeLakh: z.number().positive().nullable(),
@@ -89,8 +90,8 @@ export function picksOf(p: ProfileCourses, courses: { degree: string; specialty:
   return out;
 }
 
-/** The quotas her profile covers: the ones she ticked, else the open quotas. */
-export const profileQuotas = (p: Pick<Profile, "quotas">) => (p.quotas.length ? p.quotas : openQuotas);
+/** The quotas her profile covers: the ones she ticked, else the exam's open quotas (NEET SS: none, she picks her group). */
+export const profileQuotas = (p: Pick<Profile, "quotas">, exam: ExamKey = DEFAULT_EXAM) => (p.quotas.length ? p.quotas : exams[exam].quotas);
 
 const list = (p: URLSearchParams, k: string) => p.getAll(k).flatMap((v) => v.split(",")).map((v) => v.trim()).filter(Boolean);
 const num = (v: string | null | undefined) => (v != null && v.trim() !== "" ? Number(v) : null);

@@ -17,18 +17,20 @@ import { chosenView } from "@/features/decide/server/view";
 import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { StillCanDo } from "@/features/decide/components/still-can-do";
+import { GroupPrompt } from "@/features/decide/components/dashboard-parts";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
 import { iniCetIn } from "@/features/decide/lib/college-aliases";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { eligibleCategories, latestRound, latestText, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
 import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
-import { getMeta, listOptions, optionsView, PAST_YEARS, unlistedSeats } from "@/features/decide/service";
-import { openQuotas, openQuotasNote, quotaScopeNote, optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
+import { getMeta, listOptions, optionsView, unlistedSeats } from "@/features/decide/service";
+import { optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 import { activeExam } from "@/features/exams/active";
+import { DEFAULT_EXAM, exams, latestOf, perGroup } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
@@ -51,25 +53,30 @@ const filtersSchema = z.object({
   sort: z.enum(optionSorts).optional(),
   page: pageValue.default(1),
 });
-const sortLabel: Record<OptionSort, string> = {
+const sortLabels = (last: number): Record<OptionSort, string> => ({
   label: "Label (reached first)",
-  deep: `${PAST_YEARS[1]} closing: deepest first`,
-  tight: `${PAST_YEARS[1]} closing: tightest first`,
+  deep: `${last} closing: deepest first`,
+  tight: `${last} closing: tightest first`,
   fee: "Fee, year 1: lowest first",
   stipend: "Stipend, year 1: highest first",
-};
+});
 
 export default async function OptionsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
   if (!profile) return <AppPage><PageHead title="Options" /><SetRankPrompt path="/decide/options" /></AppPage>;
+  const exam = await activeExam();
+  const E = exams[exam];
+  // NEET SS: a rank is within one question group, so nothing is labelled until she picks hers.
+  if (perGroup(exam) && !profile.quotas.length) return <AppPage><PageHead title="Options" /><GroupPrompt /></AppPage>;
+  const PAST_YEARS = E.pastYears;
+  const sortLabel = sortLabels(PAST_YEARS[1]);
 
   const f = parseSearchParams(filtersSchema, params);
   // Term filters (college type, fee, stipend, bond, leaving): an absent maxfee / bondyrs is her profile's cap.
   const { params: tp, filters: terms } = readTermFilters(params, profile);
   const hasSeats = f.seats === "1" ? "clear" : f.seats === "all" ? false : f.seats;
   const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms, sort: f.sort };
-  const exam = await activeExam();
   const [meta, r, view] = await Promise.all([getMeta(exam), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }, exam), chosenView(params, "options")]);
   const lists = r.seatLists;
   const roundView = r.view === "round";
@@ -83,7 +90,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const all = reachOrder.reduce((s, x) => s + r.counts[x], 0) - (r.showClosed ? 0 : r.counts["closed-before"]);
   // The latest year's newest round (lib/reach.ts latestRound): the only one that can be provisional (MCC's provisional
   // result); the toggle exists only then.
-  const latest = latestRound(meta.sources);
+  const latest = latestOf(meta.sources, exam);
   const latestName = `${latest.year} ${roundLabel[latest.round]}`;
   const counted = reachWindow(latest, PAST_YEARS, !f.prov);
   const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
@@ -102,7 +109,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const api = profileToParams(profile);
   for (const [k, v] of [["q", f.q], ["reach", f.reach], ["prov", f.prov], ["view", r.view], ["showClosed", r.showClosed ? "1" : "0"], ["hasSeats", r.seats ?? "all"], ["sort", f.sort]] as const) if (v) api.set(k, v);
   for (const [k, v] of Object.entries(tp)) if (v != null) api.set(k, Array.isArray(v) ? v.join(",") : String(v));
-  const caption = `Options for AIR ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added` : ""}`;
+  const caption = `Options for ${E.rankWord} ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added` : ""}`;
   // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
   const pairLabel = (c: string) => pairChoices(meta.courses).find((x) => x.value === c)?.label ?? c.replace("~", " ");
   const seatsWords = (s: SeatKind | "any") => (s === "any" ? `Has seats in a ${round} list` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
@@ -124,14 +131,15 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           ...profile.specialties.map((sp) => ({ label: meta.specialties.find((x) => x.code === sp)?.name ?? sp, param: "sp", href: L.without("/decide/options", "sp", sp) })),
           ...profile.degrees.map((d) => ({ label: d, param: "deg", href: L.without("/decide/options", "deg", d) })),
         ]),
-    ...profile.quotas.map((q) => ({ label: q, param: "quota", href: L.without("/decide/options", "quota", q) })),
+    // NEET SS: her quotas are her question group, kept (another group's seats aren't hers to compare): no × for them.
+    ...(perGroup(exam) ? [] : profile.quotas.map((q) => ({ label: q, param: "quota", href: L.without("/decide/options", "quota", q) }))),
     ...profile.states.map((s) => ({ label: s, param: "st", href: L.without("/decide/options", "st", s) })),
     // Her profile's caps, while the page's own fee / bond filter does not replace them.
     profile.maxFeeLakh != null && tp.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: here({ fee: null }) },
     profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: here({ bond: null }) },
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/options", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
-  const clearAll = here({ q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, sort: null, quota: null, st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
+  const clearAll = here({ q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, sort: null, ...(perGroup(exam) ? {} : { quota: null }), st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const n = (x: number) => <span className="numeric font-semibold">{formatRank(x)}</span>;
@@ -170,8 +178,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         about={
           <>
             Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats,
-            the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${openQuotas.join(", ")})`}. Within 10%: in a past round the closing rank was at
-            least 90% of yours (AIR <span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or later) but before your rank.
+            the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${E.quotas.join(", ")})`}. Within 10%: in a past round the closing rank was at
+            least 90% of yours ({`${E.rankWord} `}<span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or later) but before your rank.
             {roundView && <> Never allotted before = MCC allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years)}), in any round or seat category, so there is no closing rank to compare.</>}
           </>
         }
@@ -206,7 +214,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         <>
           {/* The current results (her courses and filters), never "N options – good": none of them reached her rank. */}
           <p className="flex flex-wrap items-center gap-x-3 text-body">
-            <span className="font-semibold">None of these reached AIR {n(profile.rank)}: {n(0)} of {n(labelled)} options in a past round ({counted}).</span>
+            <span className="font-semibold">None of these reached {`${E.rankWord} `}{n(profile.rank)}: {n(0)} of {n(labelled)} options in a past round ({counted}).</span>
             {r.counts["closed-before"] > 0 && !f.reach && (
               // One tap either way; closed ones are never hidden without saying so.
               <Link href={here({ closed: r.showClosed ? "0" : "1" })} className={`${smallLink} text-sky`}>
@@ -214,7 +222,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
               </Link>
             )}
           </p>
-          <StillCanDo L={L} rank={profile.rank} list={roundView ? lists[0] : undefined} fresh={sum?.fresh ?? 0} counts={r.counts} id="still-h" title="What you can still do" />
+          <StillCanDo L={L} exam={exam} rank={profile.rank} list={roundView ? lists[0] : undefined} fresh={sum?.fresh ?? 0} counts={r.counts} id="still-h" title="What you can still do" />
         </>
       )}
       {!roundView && lists.length > 0 && (
@@ -229,6 +237,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       {/* The profile filters are URL params, so this visit can differ from the saved profile. The toolbar (pinned on phones): the search box, Filters (the rest, in a sheet) and the count. The form, its buttons and the sheet stay mounted; only the fields remount to show what was applied. */}
       <FilterForm action="/decide/options" role="search" aria-label="Filter options" className={toolbar}>
         {(["rank", "cat", "pwd", "fee", "bond"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
+        {/* NEET SS: no Quota filter; her group's quotas ride along. */}
+        {perGroup(exam) && keep.get("quota") && <input type="hidden" name="quota" value={keep.get("quota")!} />}
         {f.reach && <input type="hidden" name="reach" value={f.reach} />}
         {f.closed && <input type="hidden" name="closed" value={f.closed} />}
         {f.view && <input type="hidden" name="view" value={f.view} />}
@@ -252,8 +262,9 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
                 <FilterDropdown label="Degree" name="deg" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={profile.degrees} />
               </>
             )}
-            <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" info={openQuotasNote} />
-            <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} none="All states" info={quotaScopeNote} />
+            {/* NEET SS: the quota is her question group (her profile's), never another group's. */}
+            {!perGroup(exam) && <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" info={E.quotasNote} />}
+            <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} none="All states" info={E.scopeNote} />
             {lists.length > 0 && (
               <Field label="Seats">
                 <select name="seats" defaultValue={r.seats ?? "all"} className={control}>
@@ -265,10 +276,10 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             )}
             <Field label="Sort by">
               <select name="sort" defaultValue={f.sort ?? "label"} className={control}>
-                {optionSorts.map((s) => <option key={s} value={s}>{sortLabel[s]}</option>)}
+                {optionSorts.filter((s) => E.has.fees || (s !== "fee" && s !== "stipend")).map((s) => <option key={s} value={s}>{sortLabel[s]}</option>)}
               </select>
             </Field>
-            <TermFilterControls f={tp} caps={profile} />
+            {E.has.fees && <TermFilterControls f={tp} caps={profile} />}
             {latest.provisional && (
               <span className="flex min-h-12 items-center gap-1 border-b border-border text-sm">
                 <label className="flex min-h-11 cursor-pointer items-center gap-3">
@@ -321,8 +332,10 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           query={api.toString()}
           caption={caption}
           firstPageHref={r.page > 1 ? here({}) : undefined}
+          // /api/v1 (Show more, the CSV) serves NEET PG only: another exam pages by link and has no CSV yet.
+          moreHref={exam === DEFAULT_EXAM ? undefined : here({ page: String(r.page + 1) })}
           notes={<SeatSource lists={lists} L={L} />}
-          tools={<CsvLink href={`/api/v1/options/export?${api}`} what={`these ${formatRank(r.total)} options`} total={r.total} />}
+          tools={exam === DEFAULT_EXAM && <CsvLink href={`/api/v1/options/export?${api}`} what={`these ${formatRank(r.total)} options`} total={r.total} />}
           latest={latest}
           pastYears={PAST_YEARS}
           includeLatest={!f.prov}
@@ -330,7 +343,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           view={view}
           historyMore={
             <>
-              Closing = the highest All India Rank allotted in that round on a seat of that category; here {seats} seats, the ones you can take. {latestText(latest)} is {latest.round === "R1" ? "that round alone" : "the deepest of those rounds"}. Labels
+              {`Closing = the highest ${E.rankName} allotted in that round on a seat of that category; here `}{seats} seats, the ones you can take. {latestText(latest)} is {latest.round === "R1" ? "that round alone" : "the deepest of those rounds"}. Labels
               count every round of {PAST_YEARS[0]} and {PAST_YEARS[1]}{(!f.prov || latest.round !== "R1") && `, and ${latestText(latest, !f.prov)}`}; Rounds by year shows every round of every year (R2 and R3 included), older years
               too, which the labels do not count; its bracketed numbers are allotments made that round in every category, not the seat matrix.
             </>

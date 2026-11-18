@@ -73,10 +73,10 @@ export type DecideLinks = ReturnType<typeof decideLinks>;
 
 /**
  * A page's own filters to remember (the bottom bar and sidebar bring them back, lib/links `withFilters`): every param
- * with a value but the profile's (links carry those), the page number and one-off flags.
+ * with a value but the profile's (links carry those), the page number and one-off flags (and staff's ?exam=, a switch).
  */
 export function pageFilters(params: URLSearchParams | string) {
-  const drop = new Set<string>([...profileParamKeys, "page", "editProfile"]);
+  const drop = new Set<string>([...profileParamKeys, "page", "editProfile", "exam"]);
   return new URLSearchParams([...new URLSearchParams(params)].filter(([k, v]) => v.trim() && !drop.has(k))).toString();
 }
 

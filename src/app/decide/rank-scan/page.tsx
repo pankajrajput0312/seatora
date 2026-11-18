@@ -31,6 +31,7 @@ import { roundLabel, rounds } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
 import { activeExam } from "@/features/exams/active";
+import { exams, groupsOf, perGroup, roundNameIn } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Rank scan" };
 const VIEW = "rank-scan";
@@ -61,8 +62,11 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const f = parseSearchParams(schema, params);
   const tp = readTermFilters(params, profile);
   const exam = await activeExam();
+  const E = exams[exam];
   const meta = await getMeta(exam);
   const typed = params.get("scan")?.trim() || null;
+  // NEET SS: a rank is within one question group: her group's allotments only, unless she lifts it (grp=all).
+  const group = perGroup(exam) && profile?.quotas.length && params.get("grp") !== "all" ? profile.quotas : undefined;
   const invalid = typed != null && f.scan == null;
   const rank = invalid ? null : (f.scan ?? profile?.rank ?? null);
   // Default: the newest year whose results are final.
@@ -82,7 +86,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
     (!cf.slugs || cf.slugs.has(courseSlug.get(`${a.degree}|${a.specialty}`) ?? "")) &&
     (!degrees.length || degrees.includes(a.degree)) &&
     (!cats || cats.includes(a.category));
-  const scanned = rank && year ? await withRowInfo((await rankScan(rank, year.year, window, exam)).flatMap((g) => g.rows).filter(wanted), exam) : [];
+  const scanned = rank && year ? await withRowInfo((await rankScan(rank, year.year, window, exam, group)).flatMap((g) => g.rows).filter(wanted), exam) : [];
   // Fee, stipend, bond, leaving and type filters on each allotment's course and quota (lib/term-filters.ts).
   const { kept, unknown } = splitByTerms(scanned, tp.filters, (a) => a.fees, (a) => a.hospital?.type?.value);
   type Row = (typeof kept)[number];
@@ -93,7 +97,9 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const courseOf = new Map(meta.courses.map((c) => [`${c.degree}|${c.specialty}`, c]));
   const provisional = (rd: string) => meta.sources.some((s) => s.year === year?.year && s.round === rd && s.provisional);
   const R = "/decide/rank-scan";
+  const roundOf = (rd: (typeof rounds)[number]) => (year ? roundNameIn(exam, meta.sources, year.year, rd) : roundLabel[rd]);
   const chips = [
+    ...(group ? [{ label: `Your question group (${groupsOf(exam, group).join(", ")})`, param: "grp", href: L.with(R, { grp: "all", page: null }) }] : []),
     ...cf.chips((v) => L.with(R, { course: v, page: null }), (s) => L.without(R, "course", s)),
     ...degrees.map((d) => ({ label: d, param: "degree", href: L.without(R, "degree", d) })),
     ...(allCats ? [{ label: "All seat categories", param: "scat", href: L.with(R, { scat: null, page: null }) }] : scatPicked.length ? scatPicked.map((c) => ({ label: `${c} seats`, param: "scat", href: L.without(R, "scat", c) })) : mineCats.length ? [{ label: `Your seat categories (${mineCats.join(", ")})`, param: "scat", href: L.with(R, { scat: "all", page: null }) }] : []),
@@ -130,26 +136,27 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
       >
         <Field label="Year"><Select name="year" value={year ? String(year.year) : undefined} options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
         <Field label="Range"><Select name="w" value={f.w} options={windows.map((w) => ({ value: w, label: w.endsWith("%") ? `± ${w} of your rank${rank ? ` (± ${formatRank(halfWindow(w, rank))})` : ""}` : `± ${formatRank(Number(w))}` }))} /></Field>
-        <Field label="Round"><Select name="round" value={round} all="All rounds" options={(year?.rounds ?? []).map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
+        <Field label="Round"><Select name="round" value={round} all="All rounds" options={(year?.rounds ?? []).map((r) => ({ value: r, label: roundOf(r) }))} /></Field>
         {/* Her courses and seat categories by default (none ticked), as Residents; the shared searchable chips. */}
         <FilterDropdown label="Course" name="course" search options={cf.choices} selected={cf.selected} none={cf.none} info={cf.mine.length ? "None ticked means your courses. Tick All courses for every one." : undefined} />
         <FilterDropdown label="Degree" name="degree" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={degrees} none="Any degree" />
-        <FilterDropdown
+        {params.get("grp") === "all" && <input type="hidden" name="grp" value="all" />}
+        {E.categories.length > 1 && <FilterDropdown
           label="Seat category"
           name="scat"
           options={[...(mineCats.length ? [{ value: "all", label: "All seat categories" }] : []), ...seatCategories.map((c) => ({ value: c, label: c }))]}
           selected={allCats ? ["all"] : scatPicked}
           none={mineCats.length ? `Yours (${mineCats.join(", ")})` : "All seat categories"}
           info={mineCats.length ? "None ticked means the seat categories you can take. Tick All seat categories for every one." : undefined}
-        />
-        <TermFilterControls f={tp.params} caps={profile} />
+        />}
+        {E.has.fees && <TermFilterControls f={tp.params} caps={profile} />}
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
 
       {invalid ? (
         <p id="scan-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example 42,284.</p>
       ) : !rank || !year ? (
-        <EmptyState title="Enter a rank to scan" description="Type an All India Rank above, or set your rank, to see the allotments made to ranks around it." />
+        <EmptyState title="Enter a rank to scan" description={`Type ${E.rankName === "All India Rank" ? "an" : "a"} ${E.rankName} above, or set your rank, to see the allotments made to ranks around it.`} />
       ) : (
         <>
           <div className={toolbarRow}>
@@ -160,7 +167,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                 <InfoTip label="these allotments">
                   Ranks <span className="numeric">{formatRank(Math.max(1, rank - window))}–{formatRank(rank + window)}</span> in {year.label},{" "}
                   {cf.slugs ? (cf.typed.length ? "the courses picked" : "your courses") : "every course"}{degrees.length ? ` (${degrees.join(", ")})` : ""},{" "}
-                  {cats ? `${cats.join(", ")} seats` : "every seat category"}{round ? `, ${roundLabel[round]} only` : ""}. A “Your rank falls here” line marks where ranks pass yours. What happened then, not what will happen now.
+                  {cats ? `${cats.join(", ")} seats` : "every seat category"}{round ? `, ${roundOf(round)} only` : ""}. A “Your rank falls here” line marks where ranks pass yours. What happened then, not what will happen now.
                 </InfoTip>
                 {unknown.length > 0 && (
                   <Link href={L.with("/decide/rank-scan", { nd: "keep", page: null })} className={`${smallLink} text-sky`}>
@@ -183,13 +190,13 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
             </EmptyState>
           )}
           {groups.map((g) => {
-            const label = `${year.year} ${roundLabel[g.round]} allotments`;
+            const label = `${year.year} ${roundOf(g.round)} allotments`;
             const courseLink = (a: Row) => L.allotments({ course: course(a)?.slug, inst: a.collegeSlug, year: year.year, round: g.round });
             const of = (a: Row) => `${a.collegeName}, ${courseName(a)}, rank ${formatRank(a.rank)}`;
             return (
               <section key={g.round} aria-labelledby={`r-${g.round}`} className="grid grid-cols-1 gap-3">
                 <h2 id={`r-${g.round}`} className="flex flex-wrap items-center gap-2 text-lg font-semibold">
-                  <span><span className="numeric">{year.year}</span> {roundLabel[g.round]}</span> <Provisional when={provisional(g.round)} />
+                  <span><span className="numeric">{year.year}</span> {roundOf(g.round)}</span> <Provisional when={provisional(g.round)} />
                 </h2>
                 <ViewPanes
                   page={VIEW}
@@ -223,7 +230,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                     // Phones: the seat category and a short institute name ride in the pinned Rank cell.
                     <ScrollTable label={label} scrollClassName="max-md:scroll-pl-[8.5rem]">
                       <table className={tbl.table}>
-                        <caption className="sr-only">{year.year} {roundLabel[g.round]}: allotments to ranks near {formatRank(rank)}</caption>
+                        <caption className="sr-only">{year.year} {roundOf(g.round)}: allotments to ranks near {formatRank(rank)}</caption>
                         <thead className={tbl.head}>
                           <tr className={tbl.headRow}>
                             <th scope="col" className={`${tbl.th} sticky left-0 z-[3] bg-card text-right max-md:text-left ${tbl.pin}`}>Rank<span className="md:hidden">, seat, institute</span></th>

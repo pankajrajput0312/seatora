@@ -14,15 +14,16 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { LogOutButton } from "@/features/auth/components/log-out-button";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { examKeys, exams, showsPage, type ExamKey } from "@/features/exams/registry";
+import { DEFAULT_EXAM, examKeys, exams, perGroup, scopedKey, showsPage, type ExamKey } from "@/features/exams/registry";
 import { MAX_COMPARE } from "../lib/choices";
 import { pageFilters, withFilters } from "../lib/links";
-import { useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
-import { profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
+import { readLocal } from "../lib/local-store";
+import { ExamContext, useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
+import { PROFILE_KEY, profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
 import { AccountSync } from "./account-sync";
 import { BackToTop } from "./back-to-top";
 import { NAV_EVENT, navigating, TOAST_EVENT } from "./nav-pending";
-import { categoryName, ProfileDialog, type ProfileMeta } from "./profile-dialog";
+import { categoryName, ProfileDialog, profileSub, type ProfileMeta } from "./profile-dialog";
 import { RenamedSaved } from "./renamed-saved";
 
 const sections = [
@@ -68,8 +69,22 @@ const bottom = [
 /** `admin`: the server says she is an owner or admin (layout.tsx); only then is the Admin nav entry rendered. */
 /** `account`: the signed-in user (layout.tsx) for the sidebar's footer and the header's plan chip; null signed out. */
 /** `listName`: the round she fills next, for her first choice list's name (RenamedSaved). */
-/** `exam`: staff only (layout.tsx): the exam shown, with a switcher in the header; the nav leaves out pages it has no data for. */
-export function DecideShell({ meta, phone, ask, admin, exam, account, listName, children }: { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; exam?: ExamKey; account: ShellAccount | null; listName?: string | null; children: React.ReactNode }) {
+/**
+ * `exam`: staff only (layout.tsx): the exam shown, with a switcher in the header; the nav leaves out pages it has no data
+ * for, and every saved thing (her profile, choice lists, compare tray) is that exam's own (ExamContext).
+ */
+export function DecideShell(props: ShellProps) {
+  return (
+    <ExamContext value={props.exam ?? DEFAULT_EXAM}>
+      <Shell {...props} />
+    </ExamContext>
+  );
+}
+type ShellProps = { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; exam?: ExamKey; account: ShellAccount | null; listName?: string | null; children: React.ReactNode };
+
+function Shell({ meta, phone, ask, admin, exam, account, listName, children }: ShellProps) {
+  const ex = exam ?? DEFAULT_EXAM;
+  const E = exams[ex];
   const pathname = usePathname();
   const sp = useSearchParams();
   const router = useRouter();
@@ -183,12 +198,14 @@ export function DecideShell({ meta, phone, ask, admin, exam, account, listName, 
   const [last, setLast] = useState<Record<string, string>>({});
   useEffect(() => {
     try {
-      sessionStorage.setItem(`decide:filters:${pathname}`, pageFilters(sp));
-      setLast(Object.fromEntries([...sections.flatMap((x) => x.items), ...bottom].map(({ href }) => [href, sessionStorage.getItem(`decide:filters:${href}`) ?? ""])));
+      // Each exam's own (a NEET PG course filter means nothing on NEET MDS).
+      const key = (path: string) => scopedKey(`decide:filters:${path}`, ex);
+      sessionStorage.setItem(key(pathname), pageFilters(sp));
+      setLast(Object.fromEntries([...sections.flatMap((x) => x.items), ...bottom].map(({ href }) => [href, sessionStorage.getItem(key(href)) ?? ""])));
     } catch {
       // storage blocked: nav links without them
     }
-  }, [pathname, sp]);
+  }, [pathname, sp, ex]);
   const navHref = (href: string) => withFilters(L.to(href), last[href]);
 
   const isCurrent = (href: string) => (href === "/decide" || href === "/" ? pathname === href : pathname.startsWith(href));
@@ -203,12 +220,18 @@ export function DecideShell({ meta, phone, ask, admin, exam, account, listName, 
   ]
     .map((sec) => ({ ...sec, items: sec.items.filter(shows) }))
     .filter((sec) => sec.items.length);
-  // Staff's exam switcher: ?exam= becomes the seatora_exam cookie (src/middleware.ts), which only staff's pages heed.
-  const pickExam = (k: string) => {
-    const next = new URLSearchParams(sp.toString());
+  // Staff's exam switcher: ?exam= becomes the seatora_exam cookie (src/middleware.ts), which only staff's pages heed. The
+  // URL's profile and page filters are this exam's: they go, and the next exam's saved profile comes in (none: none).
+  // A page that exam lacks opens Home; an institute page, the institutes (its slug may be another exam's).
+  const pickExam = (k: ExamKey) => {
+    const saved = profileSchema.safeParse(readLocal<unknown>(scopedKey(PROFILE_KEY, k), null));
+    const next = saved.success ? profileToParams(saved.data) : new URLSearchParams();
     next.set("exam", k);
+    const path = pathname.startsWith("/decide/institutes/") ? "/decide/institutes" : showsPage(k, pathname) ? pathname : "/decide";
     navigating();
-    router.replace(`${pathname}?${next}`, { scroll: false });
+    // A full load: the layout (this shell's exam, the dialog's courses, every saved store) is the next exam's too; a
+    // client navigation keeps the layout as it was.
+    location.replace(`${path}?${next}`);
   };
 
   return (
@@ -226,7 +249,7 @@ export function DecideShell({ meta, phone, ask, admin, exam, account, listName, 
               // sooner), then shrink (globals.css): never over the logo.
               <span data-topbar-end className="flex min-w-0 items-center gap-2.5">
                 {exam && (
-                  <select aria-label="Exam" value={exam} onChange={(e) => pickExam(e.target.value)} className="hit h-8 rounded-full border border-input bg-card px-2.5 text-xs font-semibold">
+                  <select aria-label="Exam" value={exam} onChange={(e) => pickExam(e.target.value as ExamKey)} className="hit h-8 rounded-full border border-input bg-card px-2.5 text-xs font-semibold">
                     {examKeys.map((k) => <option key={k} value={k}>{exams[k].label}</option>)}
                   </select>
                 )}
@@ -249,9 +272,9 @@ export function DecideShell({ meta, phone, ask, admin, exam, account, listName, 
                   </span>
                 )}
                 {/* Phones: the rank and its edit button as one chip here (the sidebar, with its rank card, is in the drawer). */}
-                <button type="button" data-profile-edit aria-label={shown ? `AIR ${formatRank(shown.rank)} ${categoryName(shown.category)}${shown.pwd ? " PwD" : ""}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(true)}
+                <button type="button" data-profile-edit aria-label={shown ? `${E.rankWord} ${formatRank(shown.rank)} ${profileSub(ex, shown)}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(true)}
                   className="hit inline-flex h-8 min-w-0 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
-                  {shown ? <><span className="numeric truncate font-semibold"><span className="@max-[23.75rem]/topbar:hidden">AIR </span>{formatRank(shown.rank)}</span><span className="truncate text-muted-foreground @max-[25rem]/topbar:hidden">· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</span></> : <span className="truncate">{hydrated ? <>Set <span className="@max-[23.75rem]/topbar:hidden">your </span>rank</> : "Loading…"}</span>}
+                  {shown ? <><span className="numeric truncate font-semibold"><span className="@max-[23.75rem]/topbar:hidden">{`${E.rankWord} `}</span>{formatRank(shown.rank)}</span><span className="truncate text-muted-foreground @max-[25rem]/topbar:hidden">{perGroup(ex) ? `· ${profileSub(ex, shown)}` : <>· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</>}</span></> : <span className="truncate">{hydrated ? <>Set <span className="@max-[23.75rem]/topbar:hidden">your </span>rank</> : "Loading…"}</span>}
                   <Pencil className="size-3 shrink-0 text-muted-foreground" aria-hidden />
                 </button>
                 <Link href="/" className="hidden min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground md:inline-flex">Back to site</Link>
@@ -265,12 +288,12 @@ export function DecideShell({ meta, phone, ask, admin, exam, account, listName, 
             footer={<AccountFooter account={account} href={L.to("/decide/plan")} current={pathname === "/decide/plan"} />}
             header={
               <div className="rounded-lg border border-border bg-card p-3">
-                <p className="text-xs text-muted-foreground">Your rank</p>
+                <p className="text-xs text-muted-foreground">{ex === DEFAULT_EXAM ? "Your rank" : `Your ${E.label} rank`}</p>
                 {shown ? (
                   <>
                     <p className="mt-0.5 text-2xl font-bold tracking-tight">{formatRank(shown.rank)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {shown.category}{shown.pwd ? " PwD" : ""}, {shown.pairs?.length ? `${shown.pairs.length} ${shown.pairs.length === 1 ? "course" : "courses"}` : shown.specialties.length ? `${shown.specialties.length} ${shown.specialties.length === 1 ? "specialty" : "specialties"}` : "all specialties"}
+                      {perGroup(ex) ? profileSub(ex, shown) : <>{shown.category}{shown.pwd ? " PwD" : ""}</>}, {shown.pairs?.length ? `${shown.pairs.length} ${shown.pairs.length === 1 ? "course" : "courses"}` : shown.specialties.length ? `${shown.specialties.length} ${shown.specialties.length === 1 ? "specialty" : "specialties"}` : "all specialties"}
                     </p>
                   </>
                 ) : (
@@ -292,9 +315,9 @@ export function DecideShell({ meta, phone, ask, admin, exam, account, listName, 
         }
       >
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
-        <div aria-busy={loading || undefined} className={cn("isolate transition-opacity md:pb-0", compare.length ? "pb-[calc(9rem+env(safe-area-inset-bottom))]" : "pb-[calc(6rem+env(safe-area-inset-bottom))]", loading && "opacity-60")}>
+        <div aria-busy={loading || undefined} data-no-terms={!E.has.fees || undefined} className={cn("isolate transition-opacity md:pb-0", compare.length ? "pb-[calc(9rem+env(safe-area-inset-bottom))]" : "pb-[calc(6rem+env(safe-area-inset-bottom))]", loading && "opacity-60")}>
           <RenamedSaved listName={listName} />
-          <AccountSync />
+          <AccountSync key={ex} />
           {children}
         </div>
       </AppShell>

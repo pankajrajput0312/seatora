@@ -173,7 +173,19 @@ describe.skipIf(!local || !existsSync(join(pgBundle, "manifest.json")))("multi-e
       for (const k of keys.filter((x) => pgKeys.has(x))) expect(await examsOf(k)).toContain("neet-pg");
       const out = await fresh(() => examOutputs(exam));
       expect(out.options.total).toBeGreaterThan(0);
-      if (exam === "neet-ss") ss = out;
+      if (exam === "neet-ss") {
+        ss = out;
+        // A rank is within one question group: her group's options only, labelled; no group, nothing labelled.
+        const svc = await import("@/features/decide/service");
+        expect(await svc.examGroups(exam)).toContain("Medical Group");
+        const p = { rank: 300, category: "Open" as const, pwd: false, specialties: ["CARDIOLOGY"], degrees: [], quotas: [] as string[], states: [], maxFeeLakh: null, maxBondYears: null };
+        const quotas = out.meta.quotas.filter((q: string) => q.endsWith("(Medical Group)"));
+        const mine = await svc.listOptions({ ...p, quotas }, { view: "all" }, undefined, exam);
+        expect(mine.total).toBeGreaterThan(0);
+        expect(mine.rows.every((r) => quotas.includes(r.quota))).toBe(true);
+        expect(mine.rows.some((r) => r.reach.startsWith("reached"))).toBe(true);
+        expect((await svc.listOptions(p, { view: "all" }, undefined, exam)).total).toBe(0);
+      }
     });
   }
 

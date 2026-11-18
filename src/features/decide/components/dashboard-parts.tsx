@@ -2,11 +2,12 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { perGroup } from "@/features/exams/registry";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { typedPrefix } from "../lib/choices";
-import { useChoicesFor, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
+import { useChoicesFor, useDecideLinks, useExam, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams } from "../profile";
 import { navigating } from "./nav-pending";
 import { EmptyState, smallLink, StatCell } from "./ui";
@@ -51,19 +52,30 @@ export function SetRankPrompt({ path }: { path: string }) {
 
 const STEPS = ["Rank and category", "Courses", "Quotas"];
 
+/** NEET SS with no question group in her profile (a URL rank alone): nothing is labelled until she picks it. */
+export function GroupPrompt() {
+  const L = useDecideLinks();
+  return (
+    <EmptyState title="Pick your question group" description="A NEET SS rank is a rank within one question group, so Seatora compares it only with that group's seats. Pick your group in your profile." className="mt-6">
+      <Button asChild size="lg"><Link href={L.to(usePathname(), { editProfile: 1 })}>Pick your group</Link></Button>
+    </EmptyState>
+  );
+}
+
 /**
  * Home's first card while no rank is set: the first-run setup's three steps (the profile dialog's), "Set your rank" to
  * start it. While a saved profile is read, a loading line, as SetRankPrompt.
  */
 export function SetupCard() {
   const [saved, hydrated] = useSavedForPrompt();
+  const steps = perGroup(useExam()) ? ["Rank and question group", "Courses"] : STEPS;
   if (!hydrated || saved) return <p role="status" className="text-body text-muted-foreground">Loading your saved rank and courses…</p>;
   return (
     <section aria-labelledby="setup-h" className="rounded-xl border border-border bg-card p-4 sm:p-5">
-      <h2 id="setup-h" className="text-h2 font-bold">Set up Decide in 3 steps</h2>
+      <h2 id="setup-h" className="text-h2 font-bold">Set up Decide in {steps.length} steps</h2>
       <p className="mt-1 text-body text-muted-foreground">Options then opens on this round&apos;s seats in your courses. Saved to your account, so it follows you to any device you sign in on.</p>
       <ol className="mt-3 grid gap-2 sm:grid-cols-3">
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <li key={s} className="flex items-center gap-2 text-body">
             <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full border border-input font-mono text-caption font-semibold">{i + 1}</span>
             {s}

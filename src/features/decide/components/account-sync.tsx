@@ -2,30 +2,33 @@
 
 import { useEffect, useRef } from "react";
 import { loadSynced, saveSynced, type Synced, type SyncKind } from "@/app/decide/sync-actions";
+import { scopedKey, type ExamKey } from "@/features/exams/keys";
 import { fingerprint, hasChoices, mergeChoices, reconcile } from "../lib/account-sync";
 import { CHOICES_KEY, defaultChoices, parseChoices } from "../lib/choices";
 import { useLocal, writeLocal } from "../lib/local-store";
+import { useExam } from "../lib/use-decide-store";
 import { PROFILE_KEY, profileSchema } from "../profile";
 
 // Signed in, the profile and choice lists follow the account (sync-actions.ts): loaded when Decide opens and when the
-// tab comes back into view, saved a second after each change. Signed out, nothing leaves localStorage.
+// tab comes back into view, saved a second after each change. Signed out, nothing leaves localStorage. The exam shown's
+// (useExam): NEET PG's keys and sync meta as before, another exam's under its own (exams/keys.ts scopedKey).
 
 /** Per kind: the account it last synced with, the server copy's time then, the value's fingerprint then, the last local edit. */
 type Meta = { uid?: string; seen?: number | null; synced?: string; at?: number };
 const META_KEY = "medpath.sync";
 const DEBOUNCE_MS = 1000;
 
-const kinds = {
+const kindsOf = (exam: ExamKey) => ({
   // A stored value as data to sync: null when there is nothing worth keeping (no valid profile, no choice).
-  profile: { key: PROFILE_KEY, fallback: null as unknown, value: (raw: unknown) => (profileSchema.safeParse(raw).success ? raw : null), merge: (newer: unknown) => newer, empty: null },
+  profile: { key: scopedKey(PROFILE_KEY, exam), fallback: null as unknown, value: (raw: unknown) => (profileSchema.safeParse(raw).success ? raw : null), merge: (newer: unknown) => newer, empty: null },
   choices: {
-    key: CHOICES_KEY,
+    key: scopedKey(CHOICES_KEY, exam),
     fallback: defaultChoices as unknown,
     value: (raw: unknown) => (hasChoices(parseChoices(raw)) ? raw : null),
     merge: (newer: unknown, older: unknown) => mergeChoices(parseChoices(newer), parseChoices(older)),
     empty: defaultChoices,
   },
-} as const;
+});
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -35,16 +38,19 @@ function readJson<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
-const readMeta = (kind: SyncKind): Meta => readJson<Partial<Record<SyncKind, Meta>>>(META_KEY, {})[kind] ?? {};
-function writeMeta(kind: SyncKind, m: Meta) {
+// Per kind and exam: "profile", "choices" (NEET PG, as before), "profile.neet-mds"…
+const readMetaOf = (kind: string): Meta => readJson<Partial<Record<string, Meta>>>(META_KEY, {})[kind] ?? {};
+function writeMetaOf(kind: string, m: Meta) {
   try {
-    localStorage.setItem(META_KEY, JSON.stringify({ ...readJson(META_KEY, {}), [kind]: { ...readMeta(kind), ...m } }));
+    localStorage.setItem(META_KEY, JSON.stringify({ ...readJson(META_KEY, {}), [kind]: { ...readMetaOf(kind), ...m } }));
   } catch {}
 }
 
 export function AccountSync() {
-  const [profileRaw, , h1] = useLocal<unknown>(PROFILE_KEY, null);
-  const [choicesRaw, , h2] = useLocal<unknown>(CHOICES_KEY, defaultChoices);
+  const exam = useExam();
+  const kinds = kindsOf(exam);
+  const [profileRaw, , h1] = useLocal<unknown>(kinds.profile.key, null);
+  const [choicesRaw, , h2] = useLocal<unknown>(kinds.choices.key, defaultChoices);
   const uid = useRef<string | null>(null);
   // The fingerprint last seen of each kind, so writes made here (sync's own) aren't taken for her edits.
   const observed = useRef<Partial<Record<SyncKind, string>>>({});
@@ -55,6 +61,9 @@ export function AccountSync() {
   useEffect(() => {
     if (!h1 || !h2) return;
     let alive = true;
+    const kinds = kindsOf(exam);
+    const readMeta = (kind: SyncKind) => readMetaOf(scopedKey(kind, exam));
+    const writeMeta = (kind: SyncKind, m: Meta) => writeMetaOf(scopedKey(kind, exam), m);
 
     const keep = (kind: SyncKind, value: unknown) => {
       const stored = value ?? kinds[kind].empty;
@@ -66,7 +75,7 @@ export function AccountSync() {
     async function push(kind: SyncKind, depth = 0): Promise<void> {
       const value = kinds[kind].value(readJson(kinds[kind].key, kinds[kind].fallback));
       if (value == null || !uid.current) return;
-      const r = await saveSynced(kind, value, readMeta(kind).seen ?? null);
+      const r = await saveSynced(kind, value, readMeta(kind).seen ?? null, exam);
       if (!r || !alive) return;
       if (r.ok) {
         // Saved what was read; an edit since then stays unsynced (fingerprints differ) and has its own push queued.
@@ -92,7 +101,7 @@ export function AccountSync() {
     }
 
     async function sync() {
-      const s = await loadSynced().catch(() => null);
+      const s = await loadSynced(exam).catch(() => null);
       if (!alive) return;
       uid.current = s?.uid ?? null;
       if (!s) return;
@@ -113,7 +122,7 @@ export function AccountSync() {
       document.removeEventListener("visibilitychange", onVisible);
       Object.values(pending).forEach(clearTimeout);
     };
-  }, [h1, h2]);
+  }, [h1, h2, exam]);
 
   useEffect(() => {
     if (!h1 || !h2) return;
@@ -123,10 +132,10 @@ export function AccountSync() {
       if (observed.current[kind] === f) continue;
       observed.current[kind] = f;
       if (first) continue; // as loaded: settle() decides
-      writeMeta(kind, { at: Date.now() });
+      writeMetaOf(scopedKey(kind, exam), { at: Date.now() });
       edited.current(kind);
     }
-  }, [profileRaw, choicesRaw, h1, h2]);
+  }, [profileRaw, choicesRaw, h1, h2, exam]);
 
   return null;
 }
