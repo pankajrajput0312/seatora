@@ -46,7 +46,7 @@ const newTab = <span className="sr-only"> (opens in a new tab)</span>;
 export function ResultCard({ chips, actions, stat, title, href, external, subtitle, meta, footer, level = 3, className }: {
   chips?: Node[];
   actions?: Node;
-  stat?: { label: string; value: Node };
+  stat?: { label: Node; value: Node };
   title: string;
   href?: string;
   /** `label` is not read: every card names the link "Open on MCC: <title>" (kept optional so callers still compile). */

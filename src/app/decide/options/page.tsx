@@ -279,10 +279,10 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Options"
-        about={
+        about={<>Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, each with its reach: how your rank compares with the closing ranks of {counted} on {seats} seats.</>}
+        more={
           <>
-            Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, each with its reach: how your rank compares with the closing ranks of {counted} on {seats} seats,
-            the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${E.quotas.map((q) => quotaIn(E, q)).join(", ")})`}. Within 10%: in a past round the closing rank was at
+            Those are the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${E.quotas.map((q) => quotaIn(E, q)).join(", ")})`}. Within 10%: in a past round the closing rank was at
             least 90% of yours ({`${E.rankWord} `}<span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or later) but before your rank.
             {" "}{STRAY_NOT_COUNTED}; <Link href={L.to("/decide/last-ranks")} className="text-sky underline">see Last ranks for them</Link>.
             {roundView && <> Never allotted before = {by} allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years, exam)}), in any round or seat category, so there is no closing rank to compare.</>}
@@ -312,7 +312,16 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <span className="md:hidden">·</span>
             {/* "Never allotted before" (no past allotment), never "new": "newly added" is only MCC's newly added seat list. */}
             {sum.fresh > 0 ? <Link href={here({ reach: "new", seats: null, q: null })} className={`${smallLink} text-sky`}>{n(sum.fresh)} never allotted before</Link> : <span>all allotted before</span>}
-            <InfoTip label={`${round} seats`}>
+            <InfoTip
+              label={`${round} seats`}
+              more={
+                <>
+                  {listsTip}{" "}
+                  Sorted by reach (reached, then within 10%, then no allotment in your categories, then closed before your rank, never allotted before last in a group of its own), then {round} {sp ? "seats" : "clear vacancy seats"},{" "}
+                  {exam === DEFAULT_EXAM ? <>then the deepest {HEAD} closing.</> : <>then, within Reached, the tightest closing first (the most sought seat that still reached your rank); within any other reach, the deepest {HEAD} closing.</>}
+                </>
+              }
+            >
               {sp ? (
                 <>{formatRank(sum.options)} {sum.options === 1 ? "option has" : "options have"} seats in {by}&apos;s {round} seat position, in your courses; </>
               ) : (
@@ -322,9 +331,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
                   {formatRank(sum.withNew)} with seats in {by}&apos;s newly added list;{" "}
                 </>
               )}
-              {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}. {listsTip}{" "}
-              Sorted by reach (reached, then within 10%, then no allotment in your categories, then closed before your rank, never allotted before last in a group of its own), then {round} {sp ? "seats" : "clear vacancy seats"},{" "}
-              {exam === DEFAULT_EXAM ? <>then the deepest {HEAD} closing.</> : <>then, within Reached, the tightest closing first (the most sought seat that still reached your rank); within any other reach, the deepest {HEAD} closing.</>}
+              {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}.
               <span className="mt-2 flex flex-col items-start md:hidden">{viewLinks}</span>
             </InfoTip>
           </p>

@@ -42,7 +42,10 @@ const CSS = `@layer components{
 .tip-i>svg{width:1rem;height:1rem}
 .tip-p{position:fixed;width:min(20rem,calc(100vw - 1rem));max-height:min(24rem,calc(100dvh - 1rem));overflow:auto;padding:.75rem;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-popover);color:var(--color-foreground);box-shadow:var(--shadow-overlay);font-size:var(--text-xs);line-height:var(--leading-relaxed);font-weight:400;text-align:left;white-space:normal;text-transform:none;outline:none}
 @supports (top:anchor(bottom)){.tip-p{position-anchor:auto;margin:0;right:auto;bottom:auto;top:calc(anchor(bottom,calc(50% - 6px)) + 6px);left:clamp(.5rem,calc(anchor(center,50%) - min(10rem,50vw - .5rem)),calc(100vw - min(20rem,100vw - 1rem) - .5rem))}}
-@media print{.tip-i::before{display:none}}
+.tip-t{position:relative;display:inline;padding:0;font:inherit;color:inherit;text-align:inherit;text-decoration:underline dotted;text-decoration-color:var(--color-muted-foreground);text-underline-offset:.2em;cursor:help}
+.tip-t::before{content:"";position:absolute;inset:-.6rem -.2rem}
+.tip-t:hover{color:var(--color-sky)}
+@media print{.tip-i::before,.tip-t::before{display:none}.tip-t{text-decoration:none}}
 }`;
 
 /**
@@ -82,8 +85,11 @@ function guardOutsideTaps() {
  * panel is a <span>, so a tip may sit inside a <p>, a <th> or a link's line: pass phrasing content (text, links,
  * <strong>, <br />, SourceRef), not <p> or <ul>.
  */
-/** `more`: the rest of a long explanation, behind a "More" button in the panel (the panel says 1-2 sentences first). */
-export function InfoTip({ label, children, more, className }: { label: string; children: React.ReactNode; more?: React.ReactNode; className?: string }) {
+/**
+ * `more`: the rest of a long explanation, behind a "More" button in the panel (the panel says 1-2 sentences first).
+ * `trigger`: the button is these words (a dotted underline: components/term.tsx), not the (i); named "<label>, what it means".
+ */
+export function InfoTip({ label, children, more, trigger, className }: { label: string; children: React.ReactNode; more?: React.ReactNode; trigger?: React.ReactNode; className?: string }) {
   const id = `tip${useId().replace(/[^\w-]/g, "")}`;
   const btn = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLSpanElement>(null);
@@ -114,13 +120,19 @@ export function InfoTip({ label, children, more, className }: { label: string; c
   return (
     <>
       <style href="medpath-info-tip" precedence="medpath">{CSS}</style>
-      <button onBlur={tabOut} ref={btn} type="button" popoverTarget={id} aria-label={`About ${label}`} aria-expanded={open} aria-controls={id} className={cn("tip-i", className)}>
-        {/* lucide's Info, its attributes trimmed (hundreds per page). */}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 16v-4M12 8h.01" />
-        </svg>
-      </button>
+      {trigger ? (
+        <button onBlur={tabOut} ref={btn} type="button" popoverTarget={id} aria-expanded={open} aria-controls={id} className={cn("tip-t", className)}>
+          {trigger}<span className="sr-only">, what it means</span>
+        </button>
+      ) : (
+        <button onBlur={tabOut} ref={btn} type="button" popoverTarget={id} aria-label={`About ${label}`} aria-expanded={open} aria-controls={id} className={cn("tip-i", className)}>
+          {/* lucide's Info, its attributes trimmed (hundreds per page). */}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+        </button>
+      )}
       <span
         ref={pop}
         id={id}

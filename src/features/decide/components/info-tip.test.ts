@@ -46,7 +46,7 @@ describe("InfoTip", () => {
   it("has a 44px hit area round its 20px icon, none on paper", () => {
     expect(rule(".tip-i")).toContain("width:1.25rem;height:1.25rem");
     expect(rule(".tip-i::before")).toContain("inset:-.75rem");
-    expect(css).toContain("@media print{.tip-i::before{display:none}}");
+    expect(css).toContain("@media print{.tip-i::before,.tip-t::before{display:none}");
   });
 
   it("is light: the stylesheet once however many tips, two short classes and a trimmed icon per tip", () => {

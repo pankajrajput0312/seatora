@@ -33,7 +33,7 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   const nextRound = fill && { name: `${roundName[fill.round]} · ${yearName(exam, rs.year)}`, when: `${roundName[fill.round]} choice filling, ${fillWindow(fill)}` };
   return (
     <AppPage>
-      <PageHead title={CHOICE_LIST} about={`Your list in the order you'll enter it on the ${authorityOf(exam)} portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons; in the table, pick a choice's number to move it straight there.`} />
+      <PageHead title={CHOICE_LIST} about={`Your list in the order you'll enter it on the ${authorityOf(exam)} portal, saved to your account.`} more="Every device you sign in on has it. Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons; in the table, pick a choice's number to move it straight there." />
       {/* The seat she holds and what she risks if this list upgrades her (with a rank in the address). */}
       {profile && <div className="mt-3"><HeldSeat profile={profile} exam={exam} L={L} where="choices" /></div>}
       {/* Her options in a suggested order (Dream, Target, Safe within her course order), each with its reason; added only when she says so. */}

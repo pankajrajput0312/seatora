@@ -26,6 +26,7 @@ import { cardClosing, ClosingCell, SeatsLink } from "./options-view";
 import { Beds } from "./pages/beds";
 import { ResultCard } from "./result-card";
 import { TermStatCells } from "./stat-cells";
+import { QuotaTerm, Term } from "./term";
 import { TypeBadge } from "./type-badge";
 import { Skeleton } from "./skeleton";
 import { control, EmptyState, smallLink, tbl } from "./ui";
@@ -330,7 +331,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
         return (
           <li key={item.id} {...drop(i)} className={cn("grid min-w-0 rounded-xl", picking && "ring-2 ring-sky")}>
             <ResultCard
-              chips={[quotaIn(E, item.quota), reachOf(item, lr), typed && typedBadge]}
+              chips={[<QuotaTerm key="quota" quota={item.quota} shown={quotaIn(E, item.quota)} />, reachOf(item, lr), typed && typedBadge]}
               actions={<>{handle(item, i, picking)}{upDown(item, i)}</>}
               stat={{ label: "Choice", value: formatRank(i + 1) }}
               title={item.institute}
@@ -377,7 +378,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
           <tr className={tbl.headRow}>
             <th scope="col" className={cn(th, "bg-card md:sticky md:left-0 md:z-[3]")}>Choice</th>
             <th scope="col" className={cn(th, "px-3! text-right")}>{latestText(latest)} closing</th>
-            <th scope="col" className={cn(th, "px-3!")}>Reach</th>
+            <th scope="col" className={cn(th, "px-3!")}><Term k="reach">Reach</Term></th>
             {lists.length > 0 && <th scope="col" className={cn(th, "px-3! text-right")}>{round} seats</th>}
             {E.has.fees && statKeys.flatMap((k) => [
               <th key={k} scope="col" data-col={k} className={cn(th, "px-3! text-right")}>{statLabel[k]}</th>,

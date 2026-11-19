@@ -9,6 +9,7 @@ import type { Profile } from "../profile";
 import type { OptionRow, OptionsPicture } from "../service";
 import { courseName } from "./options-view";
 import { levelClass } from "./stat-cells";
+import { Term } from "./term";
 import { smallLink } from "./ui";
 
 /** "MD Anaesthesiology, All India" under a picked option's name. */
@@ -43,13 +44,13 @@ export function YourPicture({ pic, profile, E, latest, includeLatest = true, L, 
       <h2 id="picture-h" className="text-title font-semibold">Your picture</h2>
       <p className="mt-0.5 text-sm text-muted-foreground">
         {E.rankWord} <span className="numeric">{formatRank(profile.rank)}</span>
-        {group ? ` in the ${group}` : E.categories.length > 1 ? `, ${profile.category}${profile.pwd ? " PwD" : ""}` : ""}: your{" "}
+        {group ? <> in the <Term k="question-group">{group}</Term></> : E.categories.length > 1 ? `, ${profile.category}${profile.pwd ? " PwD" : ""}` : ""}: your{" "}
         <span className="numeric">{formatRank(total)}</span> {total === 1 ? "option" : "options"}{scope} by reach. Based on last years&apos; closing ranks ({reachWindow(latest, pastOf(latest), includeLatest)}), not a prediction.
       </p>
       <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {shown.map((x) => (
           <div key={x} className="flex min-w-0 flex-col-reverse justify-end gap-0.5">
-            <dt className="text-xs leading-snug text-muted-foreground">{reachLabel(x, latest, pastOf(latest), includeLatest)}</dt>
+            <dt className="text-xs leading-snug text-muted-foreground">{x === "within-10" || x === "stray-only" ? <Term k={x === "stray-only" ? "stray" : "within-10"}>{reachLabel(x, latest, pastOf(latest), includeLatest)}</Term> : reachLabel(x, latest, pastOf(latest), includeLatest)}</dt>
             <dd className={`numeric text-2xl leading-tight font-bold ${tone(x)}`}>
               <Link href={href(x)} className="hover:underline">{formatRank(pic.counts[x])}</Link>
             </dd>

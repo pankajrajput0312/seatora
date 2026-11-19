@@ -29,6 +29,7 @@ import { smallLink, tbl } from "./ui";
 import { ViewPanes, ViewToggle, type View } from "./view-toggle";
 import { ScrollTable } from "./scroll-table";
 import { QuotaName } from "./round-name";
+import { QuotaTerm, RoundTerm, Term } from "./term";
 
 export function ChoiceStar({ item }: { item: ChoiceItem }) {
   const [state, setState] = useChoices();
@@ -184,14 +185,14 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
         chips={[
           // The closing's year and round are over the big number; a new option's chip names the round's seats.
           !c && list && `${yearName(E.key, list.year)} ${roundIn(E, list.year, list.round)} seats`,
-          !same.quota && quotaIn(E, r.quota),
+          !same.quota && <QuotaTerm key="quota" quota={r.quota} shown={quotaIn(E, r.quota)} />,
           c && !same.category && `${c.d.category} seat`,
           c?.d.provisional && <Provisional when />,
         ]}
         actions={<><ChoiceStar item={toChoiceItem(r, latest)} /><CompareToggle id={r.id} label={rowLabel(r, E)} /></>}
         stat={{
           // The big number's year and round, so it never reads against the label under it (which counts other rounds).
-          label: c ? `${yearName(E.key, c.year)} ${roundIn(E, c.year, c.d.round)} closing` : "Closing rank",
+          label: c ? <>{yearName(E.key, c.year)} <RoundTerm shown={roundIn(E, c.year, c.d.round)} /> <Term k="closing">closing</Term></> : <Term k="closing">Closing rank</Term>,
           value: (
             <>
               <span className="numeric">{c ? formatRank(c.d.closing) : <Dash />}</span>
@@ -221,7 +222,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
                 <span className="text-muted-foreground">{roundIn(E, list.year, list.round)} seats</span>
                 {seatLists.map((l) => (
                   <span key={l.key} className="inline-flex items-center gap-1">
-                    <span className="text-muted-foreground">{seatKindShort(l.kind, E.key)}</span>
+                    <span className="text-muted-foreground">{seatKindShort(l.kind, E.key) === "seat position" ? "seat position" : <Term k={l.kind === "new" ? "newly-added" : l.kind}>{seatKindShort(l.kind, E.key)}</Term>}</span>
                     <SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} end={false} />
                   </span>
                 ))}
@@ -362,7 +363,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
             {!sessionCols && <th scope="col" className={phoneOnly}>{yearName(E.key, last)} deepest</th>}
             <th scope="col" className={sessionCols ? "px-3 py-3 text-right" : notPhone}>{latestText(latest)} closing</th>
             {sessionCols && <th scope="col" className={phoneOnly}>{yearName(E.key, last)} deepest</th>}
-            <th scope="col" className="px-2 py-3">Reach</th>
+            <th scope="col" className="px-2 py-3"><Term k="reach">Reach</Term></th>
             {tableKeys.map((k) => <th key={k} scope="col" data-col={k} className="px-2 py-3 text-right">{statLabel[k]}</th>)}
             {seatLists.map((l) => <th key={l.key} scope="col" className="px-1.5 py-3 text-right"><SeatsHead list={l} short /></th>)}
             <th scope="col" className={notPhone}>{yearName(E.key, last)} deepest</th>

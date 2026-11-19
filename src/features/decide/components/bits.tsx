@@ -22,7 +22,7 @@ export function HistoryNote({ more, className }: { more?: React.ReactNode; class
   return (
     <span className={cn("inline-flex items-center gap-x-1 text-xs text-muted-foreground", className)}>
       History, not a prediction
-      <InfoTip label="previous years' closing ranks">{HISTORY_CAPTION}{more && <> {more}</>}</InfoTip>
+      <InfoTip label="previous years' closing ranks" more={more}>{HISTORY_CAPTION}</InfoTip>
     </span>
   );
 }
