@@ -20,8 +20,8 @@ import { readTermFilters, termValueLabel } from "@/features/decide/lib/term-filt
 import { eligibleCategories, latestText, pastOf, reachLabel, reachOrder, reachWindow, type Latest, type Reach } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { dashboard, getMeta, listOptions, type StripPoint } from "@/features/decide/service";
-import { roundLabel } from "@/features/decide/types";
-import { QuotaName } from "@/features/decide/components/round-name";
+import { kindName, roundShort } from "@/features/decide/types";
+import { QuotaName, RoundShort } from "@/features/decide/components/round-name";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { authorityOf, DEFAULT_EXAM, exams, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
 
@@ -33,7 +33,7 @@ function At({ p }: { p: StripPoint | null }) {
   return (
     <>
       {formatRank(p.closing)}
-      <span className="block text-xs text-muted-foreground">{p.category}, {roundLabel[p.round]}, <QuotaName quota={p.quota} /></span>
+      <span className="block text-xs text-muted-foreground">{p.category}, <RoundShort round={p.round} />, <QuotaName quota={p.quota} /></span>
     </>
   );
 }
@@ -106,7 +106,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const fillName = fill ? `${roundName[fill.round]} · ${yearName(exam, rs.year)}` : null;
   // MCC's seat lists of the round Options lists, said as such (never "Round 2 seats in your courses").
   const by = authorityOf(exam); // MCC; INI-CET: AIIMS
-  const lists = list && `${by}'s ${roundWords} seat lists`;
+  // INI-CET: one list a session, AIIMS's seat position (types.ts kindName).
+  const sp = kindName("clear", exam) === "Seat position";
+  const lists = list && (sp ? `${by}'s ${yearName(exam, list.year)} seat position` : `${by}'s ${roundWords} seat lists`);
   const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} without a published figure</Link></>;
   // Another exam (most of its MCC profiles give no fee figure): what her cap hides, said as Options says it, with the
   // ways back; then the cap, not her courses, is what to change.
@@ -182,7 +184,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <h2 id="numbers-h" className="text-h2 font-bold">{list ? `Your courses in ${lists}` : "Your options"}</h2>
           <InfoTip label={list ? `your courses in ${lists}` : "your options"}>
             {list
-              ? `Options with seats in ${by}'s ${yearName(exam, list.year)} ${roundWords} lists, in your courses, quotas and ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`
+              ? `Options with seats in ${sp ? lists : `${by}'s ${yearName(exam, list.year)} ${roundWords} lists`}, in your courses, quotas and ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`
               : `Every option in your profile with past allotments, on ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`}
           </InfoTip>
         </div>
@@ -193,8 +195,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               ? {
                   label: `Options in ${lists}`,
                   value: <span className="font-mono">{formatRank(total)}</span>,
-                  info: `${formatRank(sum.clear)} in the clear vacancy list, ${formatRank(sum.virtualOnly)} virtual only${sum.newOnly > 0 ? `, ${formatRank(sum.newOnly)} only newly added` : ""}.${leftOut}`,
-                  note: <><Link href={L.options()} className={smallLink}>{formatRank(sum.clear)} clear, {formatRank(sum.virtualOnly)} virtual only</Link>{undeclared}</>,
+                  info: sp ? `In your courses, quotas and ${seats} seats.${leftOut}` : `${formatRank(sum.clear)} in the clear vacancy list, ${formatRank(sum.virtualOnly)} virtual only${sum.newOnly > 0 ? `, ${formatRank(sum.newOnly)} only newly added` : ""}.${leftOut}`,
+                  note: sp ? <><Link href={L.options()} className={smallLink}>See them on Options</Link>{undeclared}</> : <><Link href={L.options()} className={smallLink}>{formatRank(sum.clear)} clear, {formatRank(sum.virtualOnly)} virtual only</Link>{undeclared}</>,
                 }
               : {
                   label: "Options in your profile",
@@ -311,7 +313,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         table={
           <table className="w-full text-sm">
             <caption className="sr-only">Median {head} closing rank by round, on {seats} seats</caption>
-            <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th scope="col" className="py-2">Course</th>{(d.trend[0]?.points.map((p) => roundLabel[p.round]) ?? ["R1", "R2", "R3", "Stray"]).map((x) => <th key={x} scope="col" className="text-right">{x}</th>)}</tr></thead>
+            <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th scope="col" className="py-2">Course</th>{(d.trend[0]?.points.map((p) => roundShort(p.round, exam)) ?? ["R1", "R2", "R3", "Stray"]).map((x) => <th key={x} scope="col" className="text-right">{x}</th>)}</tr></thead>
             <tbody>{d.trend.map((t) => <tr key={t.course.slug} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{t.course.degree} {t.course.name}</th>{t.points.map((p) => <td key={p.round} className="numeric text-right">{formatRank(p.median)}</td>)}</tr>)}</tbody>
           </table>
         }

@@ -8,7 +8,7 @@ import type { DecideLinks } from "../../lib/links";
 import { isRestricted, neetPg, type Exam } from "@/features/exams/exam";
 import { pastOf, reachWindow, type Latest } from "../../lib/reach";
 import { statKeys, statLabel } from "../../lib/stat-format";
-import { rounds, seatKindLabel, type Round, type SeatKind, type SeatList } from "../../types";
+import { kindName, rounds, seatCategoryName, type Round, type SeatKind, type SeatList } from "../../types";
 import { Dash, InstName, Provisional, ReachBadge } from "../bits";
 import { InfoTip } from "../info-tip";
 import { TermStatCells } from "../stat-cells";
@@ -30,10 +30,13 @@ export const seatKindNote: Record<SeatKind, string> = {
   virtual: "seats held after the previous round that fall vacant only if the holder upgrades or leaves in this round.",
   new: "seats added to the round after its seat matrix; most are also in the clear vacancy list.",
 };
+/** What a kind of list is, in the exam's words: INI-CET's one list is the session's whole seat position; every other exam's seatKindNote. */
+export const kindNote = (k: SeatKind, exam: ExamKey = DEFAULT_EXAM) =>
+  kindName(k, exam) === "Seat position" ? "every seat AIIMS offers in the session, by institute, course, quota and category, as its seat position notice prints them." : seatKindNote[k];
 
 export { fmtDay } from "../../lib/format";
 /** The round as the list's own PDF names it (NEET SS 2023's "Mop-up"; NEET PG's: roundLabel). */
-export const listTitle = (l: SeatList, exam: ExamKey = DEFAULT_EXAM) => `${yearName(exam, l.year)} ${roundNameFrom(l.name, l.round)} ${seatKindLabel[l.kind].toLowerCase()}`;
+export const listTitle = (l: SeatList, exam: ExamKey = DEFAULT_EXAM) => `${yearName(exam, l.year)} ${roundNameFrom(l.name, l.round)} ${kindName(l.kind, exam).toLowerCase()}`;
 /** "2026 R1 clear vacancy seats"; the new list's label already ends in seats ("newly added seats"). */
 export const listSeats = (l: SeatList, exam: ExamKey = DEFAULT_EXAM) => `${listTitle(l, exam)}${l.kind === "new" ? "" : " seats"}`;
 
@@ -62,7 +65,7 @@ export function SeatListPicker({ lists, current, href, exam = DEFAULT_EXAM }: { 
             l.key === current ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input",
           )}
         >
-          <span className="sr-only">{g} </span>{seatKindLabel[l.kind]} <span className="numeric font-semibold">{formatRank(l.seats)}</span><span className="sr-only"> seats in the whole list, All India</span>
+          <span className="sr-only">{g} </span>{kindName(l.kind, exam)} <span className="numeric font-semibold">{formatRank(l.seats)}</span><span className="sr-only"> seats in the whole list, All India</span>
           {xs.some((x) => x !== l && x.kind === l.kind) && listDay(l) && <span className="numeric text-xs"><span className="sr-only">, </span>{fmtDay(listDay(l)!)} PDF</span>}
         </Link>
       ))}
@@ -166,7 +169,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L, late
             ))}
             {lists.map((l) => (
               <th key={l.key} scope="col" className={cn(th, "text-right")} aria-sort={sort === "seats" && l.key === current ? "descending" : undefined}>
-                {several ? <>{seatKindLabel[l.kind]}{lists.some((x) => x !== l && x.kind === l.kind) && listDay(l) && <span className="numeric block font-normal">{fmtDay(listDay(l)!)} PDF</span>}</> : "Seats"}
+                {several ? <>{kindName(l.kind, exam.key)}{lists.some((x) => x !== l && x.kind === l.kind) && listDay(l) && <span className="numeric block font-normal">{fmtDay(listDay(l)!)} PDF</span>}</> : "Seats"}
               </th>
             ))}
             <th scope="col" className={cn(th, "text-right whitespace-nowrap")} aria-sort={sort === "closing" ? "descending" : undefined}>
@@ -191,7 +194,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L, late
                     {r.quota != null && isRestricted(exam, r.quota) && <Badge tone="warning">Restricted quota</Badge>}
                   </span>
                 </th>
-                <td className={td}>{r.category}</td>
+                <td className={td}>{seatCategoryName(r.category)}</td>
                 <TermStatCells t={r.fees} variant="table" short of={name} />
                 {lists.map((l) => (
                   <td key={l.key} className={cn(tbl.num, "px-3 md:px-4")}>{r.byList[l.key] != null ? formatRank(r.byList[l.key]) : <Dash />}</td>

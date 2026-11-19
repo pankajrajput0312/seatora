@@ -175,7 +175,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
                 <span className="text-muted-foreground">{roundIn(E, list.year, list.round)} seats</span>
                 {seatLists.map((l) => (
                   <span key={l.key} className="inline-flex items-center gap-1">
-                    <span className="text-muted-foreground">{seatKindShort(l.kind)}</span>
+                    <span className="text-muted-foreground">{seatKindShort(l.kind, E.key)}</span>
                     <SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} end={false} />
                   </span>
                 ))}

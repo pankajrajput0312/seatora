@@ -580,6 +580,13 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
             <dd><Parts parts={bond.otherPenalties} src={bond.src} sources={sources} /></dd>
           </div>
         )}
+        {t.roundRules ? (
+          // INI-CET: AIIMS's round rules (not joining an allotted seat, the Open Round's deposit, an Open Round seat after joining), each in its own words.
+          <div>
+            <dt className={term}>{authorityOf(t.exam)}&apos;s round rules</dt>
+            <dd><Parts parts={t.roundRules} src={bond.src} sources={sources} /><span className={note}>From the counselling rules: separate from the leaving penalty.</span></dd>
+          </div>
+        ) : (
         <div>
           <dt className={term}>Resign or don&apos;t join from Round 2</dt>
           <dd>
@@ -589,6 +596,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
             <span className={note}>What {authorityOf(t.exam)} lets the college keep if you resign or don&apos;t join from Round 2. Separate from the leaving penalty.</span>
           </dd>
         </div>
+        )}
       </dl>
       {t.unread.filter((u) => u.kind === "BOND" || u.kind === "PENALTY").map((u) => (
         <p key={u.kind} className="text-xs text-muted-foreground">{termLabel[u.kind]} in the profile&apos;s words: {u.text}<Sup n={u.src} sources={sources} /></p>
@@ -610,7 +618,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
 function bondBlock(t: ProgrammeTerms, off: number): ProgrammeTerms {
   const b = t.bond;
   const unread = t.unread.filter((u) => u.kind === "BOND" || u.kind === "PENALTY");
-  const cited = new Set([b.src, b.doc, t.resignForfeit?.src, t.resignForfeitText?.src, ...[...b.amounts, ...b.leaving, ...b.otherPenalties].map((p) => p.src), ...unread.map((u) => u.src)]);
+  const cited = new Set([b.src, b.doc, t.resignForfeit?.src, t.resignForfeitText?.src, ...[...b.amounts, ...b.leaving, ...b.otherPenalties, ...(t.roundRules ?? [])].map((p) => p.src), ...unread.map((u) => u.src)]);
   const kept = t.sources.filter((s) => cited.has(s.n));
   const to = new Map(kept.map((s, i) => [s.n, off + i + 1]));
   const re = (n: number) => to.get(n)!;
@@ -620,6 +628,7 @@ function bondBlock(t: ProgrammeTerms, off: number): ProgrammeTerms {
     bond: { ...b, src: b.src && re(b.src), doc: b.doc && re(b.doc), amounts: b.amounts.map(part), leaving: b.leaving.map(part), otherPenalties: b.otherPenalties.map(part) },
     resignForfeit: t.resignForfeit && { ...t.resignForfeit, src: re(t.resignForfeit.src) },
     resignForfeitText: t.resignForfeitText && { ...t.resignForfeitText, src: re(t.resignForfeitText.src) },
+    ...(t.roundRules && { roundRules: t.roundRules.map(part) }),
     unread: unread.map((u) => ({ ...u, src: re(u.src) })),
     sources: kept.map((s) => ({ ...s, n: re(s.n) })),
   };

@@ -2,10 +2,13 @@
 // No person-level data: no names.
 import type { BondDetails, MccFeesStructured, PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
 import type { SourceType } from "@/types/provenance";
+import { roundWordIn, seatPositionExams, type ExamKey } from "../exams/keys.ts";
 
 export const rounds = ["R1", "R2", "R3", "stray", "special_stray"] as const;
 export type Round = (typeof rounds)[number];
 export const roundLabel: Record<Round, string> = { R1: "R1", R2: "R2", R3: "R3", stray: "Stray", special_stray: "Special stray" };
+/** A round's short name as the exam says it (keys.ts roundWordIn: INI-CET's R3 "Open Round"); every other exam's roundLabel. */
+export const roundShort = (r: Round, exam?: ExamKey) => roundWordIn(exam, r) ?? roundLabel[r];
 
 export const baseCategories = ["Open", "OBC", "EWS", "SC", "ST"] as const;
 export type BaseCategory = (typeof baseCategories)[number];
@@ -154,6 +157,10 @@ export const optionSorts = ["label", "deep", "tight", "fee", "stipend"] as const
 export type OptionSort = (typeof optionSorts)[number];
 export type SeatKind = (typeof seatKinds)[number];
 export const seatKindLabel: Record<SeatKind, string> = { clear: "Clear vacancy", virtual: "Virtual vacancy", new: "Newly added seats" };
+/** A seat row's category in words: INI-CET's "All" (JIPMER prints only a course total) is "Categories not split", never Open. */
+export const seatCategoryName = (c: string) => (c === "All" ? "Categories not split" : c);
+/** A seat list's kind as the exam names it: INI-CET's one list a session is AIIMS's "Seat position"; every other exam's seatKindLabel. */
+export const kindName = (k: SeatKind, exam?: ExamKey) => (exam && seatPositionExams.includes(exam) ? "Seat position" : seatKindLabel[k]);
 /**
  * One seat list PDF. `publishedAt` = date (YYYY-MM-DD) of the MCC notice that links the PDF, null when no imported notice
  * does (never guessed). `seats` = Σ seats the list prints (one kind, one PDF).

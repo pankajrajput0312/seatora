@@ -81,6 +81,16 @@ export const exams: Record<ExamKey, Exam> = {
     resultsName: "AIIMS seat allocation results",
     site: { url: "https://www.aiimsexams.ac.in/", name: "AIIMS exams site" },
     roundWords: { R3: "Open Round" },
+    quotaScoped: true,
+    // Its institutes by family (college keys: neetpg-planner tools/exams/ini_cet identity.json).
+    instituteGroups: [
+      { label: "AIIMS New Delhi", prefix: "AIIMSNEWDELHI" },
+      { label: "New AIIMS", prefix: "AIIMS", not: "AIIMSNEWDELHI" },
+      { label: "JIPMER", prefix: "JIPMER" },
+      { label: "PGIMER", prefix: "PGIMER" },
+      { label: "NIMHANS", prefix: "NIMHANS" },
+      { label: "SCTIMST", prefix: "SCTIMST" },
+    ],
     // Its Schedule follows the session its round status is about (notices.ts scheduleYear: January 2027), the last
     // session's notices beside it as how that one ran.
     has: { ...resultsOnly, seats: true, notices: true },

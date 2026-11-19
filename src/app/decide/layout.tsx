@@ -21,7 +21,7 @@ import { roundStatus } from "@/features/decide/server/notices";
 import { examGroupCourses, examGroups, getMeta } from "@/features/decide/service";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { examShows } from "@/features/exams/exam";
-import { authorityOf, DEFAULT_EXAM, examKeys, exams, pageNeeds, perGroup, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, examKeys, exams, pageNeeds, perGroup, sessionExams, yearName } from "@/features/exams/registry";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { PlanPrompt } from "@/features/plans/components/plan-prompt";
 import { freeNow, passState, planLine, shortDate } from "@/features/plans/plans";
@@ -39,7 +39,15 @@ const mono = Atkinson_Hyperlegible_Mono({ subsets: ["latin"], variable: "--font-
 // redirect, not a 404 / 307 status. The access redirect stays a real 307 (getMeta, here, before anything streams).
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: { default: "Decide", template: "%s · Decide · Seatora" } };
+const title = { default: "Decide", template: "%s · Decide · Seatora" };
+/** NEET PG's as ever (the site's description); another exam's (staff only) says what it is, never NEET PG's or MCC's words. */
+export async function generateMetadata(): Promise<Metadata> {
+  const exam = await activeExam();
+  if (exam === DEFAULT_EXAM) return { title };
+  const { label } = exams[exam];
+  const description = `${label} counselling by ${authorityOf(exam)}: options for your ${label} rank, the seats on offer, closing ranks by ${sessionExams.includes(exam) ? "session" : "year"} and round, fees and bonds.`;
+  return { title, description, openGraph: { title: `Seatora · ${label} planner`, description } };
+}
 export const viewport: Viewport = { themeColor: "#f3f6f9", viewportFit: "cover" }; // chart paper (--color-background inside .app)
 
 /** Staff's exam switcher: every exam, with the pages it has no data for (the switcher opens Home instead). */

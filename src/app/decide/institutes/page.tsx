@@ -23,11 +23,11 @@ import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { readTermFilters, termChips, termValueLabel, untypedOnly } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { getMeta, listInstitutes } from "@/features/decide/service";
+import { getDecideData, getMeta, listInstitutes } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { authorityOf, headYearIn, latestOf, yearName } from "@/features/exams/registry";
-import { quotaIn } from "@/features/exams/exam";
+import { instituteGroupOf, quotaIn } from "@/features/exams/exam";
 import { iniElsewhere } from "@/features/decide/lib/college-aliases";
 
 export const metadata: Metadata = { title: "Institutes" };
@@ -42,6 +42,8 @@ const schema = z.object({
   q: z.string().max(100).optional(),
   state: z.array(z.string().max(100)).max(40).optional(), // pick one or more
   course: z.array(z.string().max(100)).max(40).optional(),
+  /** INI-CET: institute groups (Exam.instituteGroups labels), one or more. */
+  grp: z.array(z.string().max(40)).max(10).optional(),
   sort: z.enum(["name", "allotments", "beds"]).default("name"),
   page: pageValue.default(1),
 });
@@ -51,7 +53,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
   const L = decideLinks(params);
-  const f = parseSearchParams(schema, params, ["state", "course"]);
+  const f = parseSearchParams(schema, params, ["state", "course", "grp"]);
   const { params: tp, filters: tf } = readTermFilters(params, profile);
   const pg = { page: f.page, pageSize: PAGE_SIZE };
   const exam = await activeExam();
@@ -67,7 +69,11 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const sorts = sortsFor(head).filter((s) => E.has.beds || s.value !== "beds");
   const latest = latestOf(meta.sources, exam);
   // Term filters and the beds sort narrow and order the list before it is paged, so reach is read for one page only.
-  const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort, only: byTerms?.pass, bedsOf: (key: string) => info.get(key)?.beds?.n };
+  // INI-CET's institute groups picked: their colleges only (with the term filters' pass list, both).
+  const groups = (f.grp ?? []).filter((g) => E.instituteGroups?.some((x) => x.label === g));
+  const inGroups = groups.length ? new Set<string>((await getDecideData(exam)).colleges.map((c) => c.key).filter((k) => groups.includes(instituteGroupOf(E, k) ?? ""))) : null;
+  const only = inGroups && byTerms?.pass ? new Set([...byTerms.pass].filter((k) => inGroups.has(k))) : (inGroups ?? byTerms?.pass);
+  const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort, only, bedsOf: (key: string) => info.get(key)?.beds?.n };
   const [res, unknown, untyped] = await Promise.all([
     listInstitutes(profile, filters, pg, exam),
     byTerms ? listInstitutes(null, { ...filters, only: byTerms.unknown }, { page: 1, pageSize: 1 }, exam).then((r) => r.total) : 0,
@@ -86,9 +92,10 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
     // One chip per state and course: the × takes that one out.
     ...(f.state ?? []).map((s) => ({ label: s, param: "state", href: L.without(PATH, "state", s) })),
     ...(f.course ?? []).map((c) => ({ label: courseLabel(c), param: "course", href: L.without(PATH, "course", c) })),
+    ...groups.map((g) => ({ label: g, param: "grp", href: L.without(PATH, "grp", g) })),
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without(PATH, c.key, c.value) : L.with(PATH, { [c.key]: null, page: null }) })),
   ];
-  const clear = L.with(PATH, { q: null, state: null, course: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
+  const clear = L.with(PATH, { q: null, state: null, course: null, grp: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
   const bestOf = (r: (typeof res.rows)[number]) =>
     r.best && (
       <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -209,6 +216,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
       >
         <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.state ?? []} none="All states" />
         <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={f.course ?? []} none="Any course" />
+        {E.instituteGroups && <FilterDropdown label="Institute" name="grp" options={E.instituteGroups.map((g) => ({ value: g.label, label: g.label }))} selected={groups} none="Every institute" />}
         <Field label="Sort"><Select name="sort" value={f.sort} options={[...sorts]} /></Field>
         <TermFilterControls f={tp} caps={profile} fees={E.has.fees} />
       </FilterBar>

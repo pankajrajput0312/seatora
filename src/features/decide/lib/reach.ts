@@ -1,6 +1,6 @@
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
-import { roundLabel, rounds, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind, type Source } from "../types";
+import { kindName, roundLabel, rounds, roundShort, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind, type Source } from "../types";
 
 /** The years the labels compare (client-safe; service.ts re-exports them). They match the imported MCC results. */
 export const LATEST_YEAR = 2026;
@@ -36,7 +36,7 @@ const lastCounted = ({ round }: Latest, includeLatest: boolean) => rounds.indexO
 /** "2026 R1", or "2026 R1 to R2" once R2 is in: the latest year's rounds the labels count (R1 when none is). */
 export function latestText(latest: Latest, includeLatest = true) {
   const last = rounds[Math.max(0, lastCounted(latest, includeLatest))];
-  return `${yearOf(latest, latest.year)} ${last === "R1" ? "R1" : `R1 to ${roundLabel[last]}`}`;
+  return `${yearOf(latest, latest.year)} ${last === "R1" ? "R1" : `R1 to ${roundShort(last, latest.exam)}`}`;
 }
 
 /** Seat categories a candidate can be allotted: Open always, their own category, and PwD seats if PwD. */
@@ -117,7 +117,7 @@ export const isStrayRound = (round: Round | undefined) => round === "stray" || r
 export function resultsSpan(years: { year: number; rounds: readonly Round[] }[], exam: ExamKey = DEFAULT_EXAM) {
   if (!years.length) return "";
   const [last, first] = [years[0], years.at(-1)!];
-  const end = `${yearName(exam, last.year)}${last.rounds.length ? ` ${roundLabel[last.rounds.at(-1)!]}` : ""}`;
+  const end = `${yearName(exam, last.year)}${last.rounds.length ? ` ${roundShort(last.rounds.at(-1)!, exam)}` : ""}`;
   return first.year === last.year ? end : `${yearName(exam, first.year)} to ${end}`;
 }
 
@@ -255,14 +255,14 @@ export function seatsBelowNotes(ns: SeatsBelow[], latest: Latest, pastYears: [nu
     groups.set(k, [...(groups.get(k) ?? []), n]);
   }
   return [...groups.values()].map((g) => {
-    const kinds = g.map((n) => kindWords[n.kind]);
+    const kinds = g.map((n) => (kindName(n.kind, latest.exam) === "Seat position" ? "seat position" : kindWords[n.kind]));
     const lists = `${kinds.length > 1 ? `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)} lists` : `${kinds[0]} list`}`;
     const on = g[0].on;
     const facts = on.map(({ category, reach, at }) => {
       const verdict = atVerdict[reach];
       // Stray left out of the label's closing: say so, and give Stray as its own number.
       const stray = at?.stray ? ` Stray: ${formatRank(at.stray.closing)} in ${yearOf(latest, at.stray.year)}.` : "";
-      if (at && verdict) return `On ${category} seats: deepest ${at.stray ? "before Stray " : "closing "}${formatRank(at.closing)} in ${yearOf(latest, at.year)}${at.round ? ` ${roundLabel[at.round]}` : ""}, ${verdict}.${stray}`;
+      if (at && verdict) return `On ${category} seats: deepest ${at.stray ? "before Stray " : "closing "}${formatRank(at.closing)} in ${yearOf(latest, at.year)}${at.round ? ` ${roundShort(at.round, latest.exam)}` : ""}, ${verdict}.${stray}`;
       if (verdict) return `On ${category} seats alone: ${reachLabel(reach, latest, pastYears, includeLatest, category)}.`;
       return `On ${category} seats: no allotment in ${reachWindow(latest, pastYears, includeLatest, true)}.`;
     });

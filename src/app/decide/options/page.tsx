@@ -15,7 +15,7 @@ import { OptionsResults } from "@/features/decide/components/option-actions";
 import { ViewField } from "@/features/decide/components/view-toggle";
 import { chosenView } from "@/features/decide/server/view";
 import { listRow } from "@/features/decide/components/options-view";
-import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
+import { fmtDay, kindNote, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { GroupPrompt } from "@/features/decide/components/dashboard-parts";
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
@@ -28,7 +28,7 @@ import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, re
 import { readTermFilters, termChips, termValueLabel, untypedOnly } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, listOptions, optionsView, unlistedSeats } from "@/features/decide/service";
-import { optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
+import { kindName, optionSorts, optionsViews, roundShort, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { authorityOf, DEFAULT_EXAM, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
 import { quotaIn } from "@/features/exams/exam";
@@ -101,10 +101,10 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // The latest year's newest round (lib/reach.ts latestRound): the only one that can be provisional (MCC's provisional
   // result); the toggle exists only then.
   const latest = latestOf(meta.sources, exam);
-  const latestName = `${yearName(exam, latest.year)} ${roundLabel[latest.round]}`;
+  const latestName = `${yearName(exam, latest.year)} ${roundShort(latest.round, exam)}`;
   const by = authorityOf(exam); // MCC; INI-CET: AIIMS
   const counted = reachWindow(latest, PAST_YEARS, !f.prov);
-  const round = lists[0] && `${yearName(exam, lists[0].year)} ${roundLabel[lists[0].round]}`;
+  const round = lists[0] && `${yearName(exam, lists[0].year)} ${roundShort(lists[0].round, exam)}`;
   const roundWords = lists[0] && roundName[lists[0].round];
   // Switching views drops the filters whose default differs by view (seats, closed), so each view opens as itself, and
   // the "new" label, which only the round view has.
@@ -123,14 +123,16 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const caption = `Options for ${E.rankWord} ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added` : ""}`;
   // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
   const pairLabel = (c: string) => pairChoices(meta.courses).find((x) => x.value === c)?.label ?? c.replace("~", " ");
-  const seatsWords = (s: SeatKind | "any") => (s === "any" ? `Has seats in a ${round} list` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
+  // INI-CET: one list a session, AIIMS's seat position (never clear / virtual / newly added).
+  const sp = kindName("clear", exam) === "Seat position";
+  const seatsWords = (s: SeatKind | "any") => (s === "any" || sp ? `Has seats in ${sp ? `the ${round} seat position` : `a ${round} list`}` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
   const closedDefault = roundView ? "1" : "0";
   const termKeys = ["ctype", "maxfee", "minstip", "bondyrs", "maxbond", "maxleave", "nd"] as const;
   const active = [
     f.q && { label: `Search: “${f.q}”`, param: "q", href: here({ q: null }) },
     f.reach && { label: reachLabel(f.reach, latest, PAST_YEARS, !f.prov), href: here({ reach: null, closed: null }) },
     // The seats filter, the round view's default too ("Only with R2 seats"): × shows the options with or without seats.
-    lists.length > 0 && r.seats && { label: r.seats === "any" ? `Only with ${roundLabel[lists[0].round]} seats` : seatsWords(r.seats), param: "seats", href: here({ seats: roundView ? "all" : null }) },
+    lists.length > 0 && r.seats && { label: r.seats === "any" ? `Only with ${roundShort(lists[0].round, exam)} seats` : seatsWords(r.seats), param: "seats", href: here({ seats: roundView ? "all" : null }) },
     lists.length > 0 && !r.seats && f.seats && { label: `With or without ${round} seats`, param: "seats", href: here({ seats: null }) },
     f.closed && f.closed !== closedDefault && !f.reach && { label: f.closed === "1" ? "Closed before your rank: shown" : "Closed before your rank: hidden", href: here({ closed: null }) },
     f.prov && { label: `Without ${latestName} (provisional)`, param: "prov", href: here({ prov: null }) },
@@ -182,12 +184,12 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       {lists.map((l, i) => (
         <Fragment key={l.key}>
           {i > 0 && ", "}
-          {seatKindLabel[l.kind].toLowerCase()}
+          {kindName(l.kind, exam).toLowerCase()}
           {l.publishedAt && <> (<span className="numeric">{fmtDay(l.publishedAt)}</span>)</>}
         </Fragment>
       ))}
-      , each its own list (PDFs in Sources below), counted in your quotas and seat categories ({seats}). A seat can be in two lists, so they are never added:{" "}
-      {lists.map((l) => `${seatKindLabel[l.kind]}: ${seatKindNote[l.kind]}`).join(" ")} &quot;—&quot; when a list has none; select a number to see those seats.
+      {sp ? <> (PDF in Sources below), counted in your quotas and seat categories ({seats}): {kindNote("clear", exam)}</> : <>, each its own list (PDFs in Sources below), counted in your quotas and seat categories ({seats}). A seat can be in two lists, so they are never added:{" "}
+      {lists.map((l) => `${seatKindLabel[l.kind]}: ${seatKindNote[l.kind]}`).join(" ")}</>} &quot;—&quot; when a list has none; select a number to see those seats.
     </>
   );
 
@@ -195,9 +197,9 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const viewLinks = sum && (
     <>
       {r.seats ? (
-        <Link href={here({ seats: "all" })} className={`${smallLink} text-sky`}>Also without {roundLabel[lists[0].round]} seats</Link>
+        <Link href={here({ seats: "all" })} className={`${smallLink} text-sky`}>Also without {roundShort(lists[0].round, exam)} seats</Link>
       ) : (
-        <Link href={here({ seats: null })} className={`${smallLink} text-sky`}>Only with {roundLabel[lists[0].round]} seats</Link>
+        <Link href={here({ seats: null })} className={`${smallLink} text-sky`}>Only with {roundShort(lists[0].round, exam)} seats</Link>
       )}
       <Link href={otherView} className={`${smallLink} text-sky`}>Every option with past allotments (closed hidden)</Link>
     </>
@@ -224,16 +226,23 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         <section aria-label={`${round} seats in your courses`} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <p className="inline-flex flex-wrap items-center gap-x-1">
             <span>{n(sum.options)} with {round} seats<span className="max-md:hidden">:</span></span>
-            <span className="max-md:hidden">{n(sum.clear)} clear,</span>
-            <span className="max-md:hidden">{n(sum.virtualOnly)} virtual only{sum.newOnly > 0 && <>, {n(sum.newOnly)} only newly added</>},</span>
+            {!sp && <span className="max-md:hidden">{n(sum.clear)} clear,</span>}
+            {!sp && <span className="max-md:hidden">{n(sum.virtualOnly)} virtual only{sum.newOnly > 0 && <>, {n(sum.newOnly)} only newly added</>},</span>}
             <span className="md:hidden">·</span>
             {/* "Never allotted before" (no past allotment), never "new": "newly added" is only MCC's newly added seat list. */}
             {sum.fresh > 0 ? <Link href={here({ reach: "new", seats: null, q: null })} className={`${smallLink} text-sky`}>{n(sum.fresh)} never allotted before</Link> : <span>all allotted before</span>}
             <InfoTip label={`${round} seats`}>
-              {formatRank(sum.options)} {sum.options === 1 ? "option has" : "options have"} {roundWords} seats in your courses: {formatRank(sum.clear)} in the clear vacancy list,{" "}
-              {formatRank(sum.virtualOnly)} virtual only (seats there fall vacant only if their holder upgrades or leaves){sum.newOnly > 0 && `, ${formatRank(sum.newOnly)} only newly added`};{" "}
-              {formatRank(sum.withNew)} with seats in {by}&apos;s newly added list; {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}. {listsTip}{" "}
-              Sorted by label (reached, then within 10%, then never allotted before and no allotment in your categories, closed before your rank last), then {round} clear vacancy seats, then the deepest{" "}
+              {sp ? (
+                <>{formatRank(sum.options)} {sum.options === 1 ? "option has" : "options have"} seats in {by}&apos;s {round} seat position, in your courses; </>
+              ) : (
+                <>
+                  {formatRank(sum.options)} {sum.options === 1 ? "option has" : "options have"} {roundWords} seats in your courses: {formatRank(sum.clear)} in the clear vacancy list,{" "}
+                  {formatRank(sum.virtualOnly)} virtual only (seats there fall vacant only if their holder upgrades or leaves){sum.newOnly > 0 && `, ${formatRank(sum.newOnly)} only newly added`};{" "}
+                  {formatRank(sum.withNew)} with seats in {by}&apos;s newly added list;{" "}
+                </>
+              )}
+              {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}. {listsTip}{" "}
+              Sorted by label (reached, then within 10%, then never allotted before and no allotment in your categories, closed before your rank last), then {round} {sp ? "seats" : "clear vacancy seats"}, then the deepest{" "}
               {HEAD} closing.
               <span className="mt-2 flex flex-col items-start md:hidden">{viewLinks}</span>
             </InfoTip>
@@ -387,7 +396,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           }
         />
       ) : withoutSeats > 0 ? (
-        <EmptyState title="No options match" description={`${formatRank(withoutSeats)} ${withoutSeats === 1 ? "matches" : "match"} without ${roundLabel[lists[0].round]} seats.`}>
+        <EmptyState title="No options match" description={`${formatRank(withoutSeats)} ${withoutSeats === 1 ? "matches" : "match"} without ${roundShort(lists[0].round, exam)} seats.`}>
           <Link href={here({ seats: "all" })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Show {withoutSeats === 1 ? "it" : "them"}</Link>
         </EmptyState>
       ) : r.hiddenClosed > 0 && !f.q && !f.reach ? (
@@ -416,7 +425,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
 
       {r.virtualOnly && r.virtualOnly.options > 0 && (
         <p className="text-sm text-muted-foreground">
-          {n(r.virtualOnly.options)} more only in the {yearName(exam, r.virtualOnly.list.year)} {roundLabel[r.virtualOnly.list.round]} virtual vacancy list.{" "}
+          {n(r.virtualOnly.options)} more only in the {yearName(exam, r.virtualOnly.list.year)} {roundShort(r.virtualOnly.list.round, exam)} virtual vacancy list.{" "}
           <Link href={here({ seats: "virtual" })} className={`${smallLink} text-sky`}>Show options with virtual vacancy seats</Link>
         </p>
       )}

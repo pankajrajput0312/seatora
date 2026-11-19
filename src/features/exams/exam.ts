@@ -45,6 +45,10 @@ export type Exam = {
   site?: { url: string; name: string };
   /** A round's name on its schedule where not lib/round-status.ts roundName's ("Round 3"): INI-CET's "Open Round". */
   roundWords?: Partial<Record<Round, string>>;
+  /** Rank scan and Allotments' default read her quotas only (the open ones when she ticked none, as Options): INI-CET's Foreign National, Sponsored, IP… seats are not hers. */
+  quotaScoped?: boolean;
+  /** Institutes's groups (INI-CET: AIIMS New Delhi, the new AIIMS, JIPMER…), each its colleges' key prefix (`not`: one it leaves out); the Institutes filter. */
+  instituteGroups?: { label: string; prefix: string; not?: string }[];
 };
 
 export const neetPg: Exam = {
@@ -64,6 +68,9 @@ export const neetPg: Exam = {
   exampleRank: "42,284",
   has: { residents: true, fees: true, bonds: true, clinical: true, seats: true, scoreRank: true, merit: true, allotments: true, notices: true, beds: true },
 };
+
+/** The exam's institute group of a college key (Exam.instituteGroups; the first that matches), else null. */
+export const instituteGroupOf = (E: Pick<Exam, "instituteGroups">, key: string) => E.instituteGroups?.find((g) => key.startsWith(g.prefix) && !(g.not && key.startsWith(g.not)))?.label ?? null;
 
 /** The question group a NEET SS quota label names: "All India (Medical Group)" → "Medical Group"; null without one. */
 export const groupOf = (quota: string) => /\((.+)\)$/.exec(quota)?.[1] ?? null;

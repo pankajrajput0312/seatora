@@ -1,7 +1,7 @@
 import "server-only";
 import { formatINR } from "@/features/cutoffs/lib/format";
 import { seatGroups, termSourceName, type BondDetails, type PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
-import { DEFAULT_EXAM, inExamWords, type ExamKey } from "@/features/exams/keys";
+import { authorityOf, DEFAULT_EXAM, inExamWords, type ExamKey } from "@/features/exams/keys";
 import { variantFor } from "../lib/specialty-search";
 import type { Catalog } from "./catalog";
 import type { SourceType } from "@/types/provenance";
@@ -179,6 +179,8 @@ export type ProgrammeTerms = {
   resignForfeit: Figure | null;
   /** That forfeit when the PENALTY record gives it in words only (no ₹ figure): never the leaving penalty. */
   resignForfeitText?: { text: string; src: number } | null;
+  /** INI-CET: AIIMS's round rules, every counselling_forfeit item in its own words ("₹…: not joining a Round 1 seat…"), in place of MCC's Round 2 forfeit. */
+  roundRules?: TermPart[];
   /** The hostel fee, where the fee record states one (a numbers record's one hostel head, or a verbatim record's words). */
   hostelFee: HostelFee | null;
   /** Read out of the fee words beside the year figures: the amount at admission and the annual fee, when they differ from them. */
@@ -503,6 +505,14 @@ function bondYearsOf(text: string, years: BondDetails["years"], kind: Kind): num
   const head = text.slice(m[0].length).split(/ · |;/)[0];
   return [kind === "diploma" && m[3] ? Number(m[3]) : Number(m[1]), ...(m[2] ? [Number(m[2])] : []), ...[...head.matchAll(MORE_YEARS)].map((x) => Number(x[1]))];
 }
+const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+/** "…on contract service for a period of three years." → [3]; null without a number of years. */
+export function yearsInWords(text: string | null | undefined): number[] | null {
+  const m = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:\(\d{1,2}\)\s*)?years?\b/i.exec(text ?? "");
+  if (!m) return null;
+  const n = /^\d+$/.test(m[1]) ? Number(m[1]) : NUMBER_WORDS.indexOf(m[1].toLowerCase());
+  return n > 0 ? [n] : null;
+}
 const yearsOf = (ys: number[] | null) => ({ years: ys && ys.reduce((a, y) => a + y, 0), yearsSum: ys && ys.length > 1 ? ys.join(" + ") : null });
 /** One record row as a part: "₹35,00,000 (PG degree, clinical subjects)", or its words when it has no ₹ figure. */
 const recordPart = (appliesTo: string, inr: number | null): TermPart => ({ text: inr != null ? `${formatINR(inr)} (${appliesTo})` : `${appliesTo}: no rupee figure`, inr, group: groupOf(appliesTo) });
@@ -515,7 +525,7 @@ const MAY_APPLY = /; ([^;]*\bmay apply)$/;
  * record's rows for this programme kind (never in-service), the All India figure first. `amountInr` null (no figure for
  * a non-service All India candidate): the amount is words. `src`: a document's source number (`label`: its name).
  */
-function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url: string | null, label?: string) => number): Bond {
+function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url: string | null, label?: string) => number, wordYears = false): Bond {
   const kind = programmes[programme].kind;
   const course = d.by_course?.find((c) => c.course === programme);
   const st = STATUS[course?.status ?? d.status];
@@ -540,7 +550,8 @@ function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url
   // The rule's years: its amounts too (same basis), citing the rule; else the document's rows.
   const ruleRows = rule && d.state_rule?.amounts?.length ? d.state_rule.amounts : null;
   const ruleSrc = ruleRows && d.state_rule?.source ? src(d.state_rule.source.url) : own;
-  const ys = yearsOf(rule ?? bondYearsOf(text, course ? null : d.years, kind));
+  // INI-CET (`wordYears`): a contract's years said in its words only ("for a period of three years").
+  const ys = yearsOf(rule ?? bondYearsOf(text, course ? null : d.years, kind) ?? (wordYears ? yearsInWords(d.quote ?? text) : null));
   const yearsText = (rule ? d.state_rule?.years : typeof d.years === "string" ? d.years : null) ?? null;
   if (course) {
     // Its own entry: one figure; "₹10 L per unserved year" × the years (computed).
@@ -695,7 +706,9 @@ function fromRecords(r: FeeTableRecord | undefined, src: (s: FeeTableRecord["sou
  * NBEMS Diploma): never the other bucket's. `sharedBy`: institutes citing an MCC profile id. `quota`: the fee and stipend
  * of that quota's fee-table record (recordFor); omitted, the first record's.
  */
-export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy: (mccId: string) => number = () => 1, quota?: string): ProgrammeTerms {
+export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy: (mccId: string) => number = () => 1, quota?: string, exam: ExamKey = DEFAULT_EXAM): ProgrammeTerms {
+  // INI-CET: its round rules are AIIMS's (each forfeit item in its own words), and a contract's years may be in words only.
+  const aiims = authorityOf(exam) !== "MCC";
   const def = programmes[programme];
   const own = terms.filter((t) => t.program === def.bucket);
   const get = (k: Term["kind"]) => own.find((t) => t.kind === k);
@@ -767,16 +780,18 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
   const penT = get("PENALTY");
   const penRecord = penT?.details && "items" in penT.details ? penT.details : null;
   let bond = notDeclared();
-  if (bondT?.details && "status" in bondT.details) bond = bondFromRecord(programme, bondT, bondT.details, docOf(bondT));
+  if (bondT?.details && "status" in bondT.details) bond = bondFromRecord(programme, bondT, bondT.details, docOf(bondT), aiims);
   else if (bondT) unread.push({ kind: "BOND", text: bondT.text, src: srcOf(bondT, null) });
 
   let resignForfeit: Figure | null = null;
   let resignForfeitText: ProgrammeTerms["resignForfeitText"] = null;
+  let roundRules: TermPart[] | undefined;
   if (penT && penRecord) {
     const p = penaltiesFromRecord(penRecord, def.kind);
     const src = docOf(penT);
     const at = (parts: (TermPart & { url: string | null })[]) => parts.map(({ url, ...x }) => ({ ...x, src: src(url) }));
     bond = { ...bond, leaving: at(p.leaving), leavingAmount: amountOf(p.leaving, null), otherPenalties: at(p.other) };
+    if (aiims && p.forfeit.length) roundRules = at(p.forfeit);
     const f = p.forfeit.find((x) => x.inr != null);
     const w = p.forfeit[0];
     if (f) resignForfeit = { inr: f.inr!, kind: "declared", src: src(f.url) };
@@ -806,6 +821,7 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     bond,
     resignForfeit,
     resignForfeitText,
+    ...(roundRules && { roundRules }),
     unread,
     notes,
     ...(notesSrc != null && { notesSrc }),
@@ -845,7 +861,7 @@ export function collegeTerms(cat: Catalog, college: string): ProgrammeTerms[] {
   if (!out) {
     const terms = m.terms.get(college) ?? [];
     const website = cat.collegeByKey?.get(college)?.website ?? null;
-    out = programmesOf(m.degrees.get(college) ?? [], cat.exam).map((p) => ofExam(cat.exam, { ...normalizeProgramme(p, terms, m.sharedBy), website }));
+    out = programmesOf(m.degrees.get(college) ?? [], cat.exam).map((p) => ofExam(cat.exam, { ...normalizeProgramme(p, terms, m.sharedBy, undefined, cat.exam), website }));
     m.out.set(college, out);
   }
   return out;
@@ -896,7 +912,7 @@ function courseTermsBase(cat: Catalog, college: string, degree: string, specialt
   const k = quota ? `${college}|${p}|${quota}` : null;
   let t = k ? m.byQuota.get(k) : undefined;
   if (!t) {
-    t = k ? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy, quota) : (collegeTerms(cat, college).find((x) => x.programme === p) ?? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy));
+    t = k ? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy, quota, cat.exam) : (collegeTerms(cat, college).find((x) => x.programme === p) ?? normalizeProgramme(p, m.terms.get(college) ?? [], m.sharedBy, undefined, cat.exam));
     if (t.website === undefined) t = { ...t, website: cat.collegeByKey?.get(college)?.website ?? null };
     if (k) m.byQuota.set(k, t);
   }

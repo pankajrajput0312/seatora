@@ -18,7 +18,7 @@ import { allotmentMixAt, clinicalAt, headerLists, hospitalInfo, optionSeats, rou
 import { AllotmentMixTable, CategoryToggle, CollegeSeatTable, HospitalFacts } from "@/features/decide/components/institute/institute-parts";
 import { courseName, RoundGrid, SeatsBelowNote, seatKindShort, toChoiceItem } from "@/features/decide/components/options-view";
 import { ResultCard } from "@/features/decide/components/result-card";
-import { listSeats, listTitle, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
+import { kindNote, listSeats, listTitle, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { TermStatCells } from "@/features/decide/components/stat-cells";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TypeBadge } from "@/features/decide/components/type-badge";
@@ -41,7 +41,7 @@ import { residentYears } from "@/features/decide/server/residents-all";
 import { deviceAid } from "@/features/funnel/service";
 import { Paywall } from "@/features/plans/components/paywall";
 import { checkAndCount, currentPlan } from "@/features/plans/usage";
-import { seatKindLabel } from "@/features/decide/types";
+import { kindName } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { authorityOf, DEFAULT_EXAM, headYearIn, inExamWords, latestOf, yearName } from "@/features/exams/registry";
@@ -139,6 +139,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const HEAD = headYearIn(exam, meta.sources);
   const yn = (y: number) => yearName(exam, y); // as the exam names it (INI-CET: "Jan 2026")
   const by = authorityOf(exam); // MCC; INI-CET: AIIMS
+  const onePosition = kindName("clear", exam) === "Seat position"; // INI-CET: one seat list a session
   const w = (s: string) => inExamWords(exam, s); // a sentence in the exam's words (NEET PG, SS, MDS: as written)
   const head = yn(HEAD);
   const n2025 = allotmentsByYear.find((a) => a.year === HEAD)?.n ?? null;
@@ -227,7 +228,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       return n == null ? [] : [
         <span key={list.key}>
           <Link href={L.to("/decide/seats", { view: "list", list: list.key, inst: slug, course: r.course.slug, squota: r.quota, scat: mine && !seatCats ? "all" : undefined })} className="py-3 text-sky underline hover:text-foreground">
-            <span className="numeric font-semibold">{formatRank(n)}</span>&nbsp;{roundIn(E, list.year, list.round)} {seatKindShort(list.kind)}{twin && ` (${list.publishedAt ? fmtDay(list.publishedAt) : list.name})`}
+            <span className="numeric font-semibold">{formatRank(n)}</span>&nbsp;{roundIn(E, list.year, list.round)} {seatKindShort(list.kind, exam)}{twin && ` (${list.publishedAt ? fmtDay(list.publishedAt) : list.name})`}
             <span className="sr-only"> seats, {seatCats ? "your seat categories" : "every seat category"}</span>
           </Link>
         </span>,
@@ -276,11 +277,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             {roundSeats.map(({ list, n }) => (
               <span key={list.key} className="inline-flex items-center gap-0.5">
                 <Link href={L.to(`/decide/institutes/${slug}`, { tab: "seats" })} className="inline-flex min-h-11 items-center hover:underline">
-                  <span className="text-muted-foreground">{yn(list.year)} {roundIn(E, list.year, list.round)} {list.kind}:</span>&nbsp;{n > 0 ? <span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{formatRank(n)}</span> : <span className="numeric text-muted-foreground">0 seats</span>}
+                  <span className="text-muted-foreground">{yn(list.year)} {roundIn(E, list.year, list.round)} {seatKindShort(list.kind, exam)}:</span>&nbsp;{n > 0 ? <span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{formatRank(n)}</span> : <span className="numeric text-muted-foreground">0 seats</span>}
                   <span className="sr-only"> seats: see Seats</span>
                 </Link>
                 <InfoTip label={listSeats(list, exam)}>
-                  The {listTitle(list, exam)} list. {n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves." : "Every course, quota and category here.") : `The ${by} list prints none here.`} The lists overlap, so they are never added.
+                  The {listTitle(list, exam)} list. {n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves." : "Every course, quota and category here.") : `The ${by} list prints none here.`}{onePosition ? "" : " The lists overlap, so they are never added."}
                 </InfoTip>
               </span>
             ))}
@@ -509,7 +510,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               <>
                 {profile ? "Closing ranks are on the seat categories you can take." : "Closing ranks shown across all seat categories."}
                 {roundName &&
-                  ` ${roundName} seats: in each of ${by}'s ${roundName} lists (${[...new Set(roundLists.map((l) => seatKindLabel[l.kind].toLowerCase()))].join(", ")}), that quota and ${seatCats ? "your seat categories" : "every seat category"}; a list with none here is left out. The lists overlap, so their seats are never added together. Each number opens those seats on Seats.`}
+                  ` ${roundName} seats: in each of ${by}'s ${roundName} lists (${[...new Set(roundLists.map((l) => kindName(l.kind, exam).toLowerCase()))].join(", ")}), that quota and ${seatCats ? "your seat categories" : "every seat category"}; a list with none here is left out. The lists overlap, so their seats are never added together. Each number opens those seats on Seats.`}
               </>
             }
           />
@@ -527,7 +528,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               <h2 id="seats-h" className="flex items-center gap-1 text-lg font-semibold">
                 {roundName} seat lists here
                 <InfoTip label="seat lists">
-                  Every course here, each list as its {by} PDF printed it. The kinds of list overlap (most newly added seats are also clear vacancies), so their seats are never added together.
+                  Every course here, each list as its {by} PDF printed it.{onePosition ? "" : " The kinds of list overlap (most newly added seats are also clear vacancies), so their seats are never added together."}
                 </InfoTip>
               </h2>
             </div>
@@ -536,9 +537,9 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               return (
                 <section key={list.key} aria-labelledby={`seats-${i}`} className="grid gap-3">
                   <h3 id={`seats-${i}`} className="flex flex-wrap items-center gap-x-2 text-base font-semibold">
-                    {seatKindLabel[list.kind]}
+                    {kindName(list.kind, exam)}
                     {rows.length > 0 && <span className="numeric text-sm font-normal text-muted-foreground">{formatRank(n)} {n === 1 ? "seat" : "seats"} here</span>}
-                    <InfoTip label={seatKindLabel[list.kind].toLowerCase()}><span className="first-letter:uppercase">{seatKindLabel[list.kind]}: {seatKindNote[list.kind]}</span></InfoTip>
+                    <InfoTip label={kindName(list.kind, exam).toLowerCase()}><span className="first-letter:uppercase">{kindName(list.kind, exam)}: {kindNote(list.kind, exam)}</span></InfoTip>
                   </h3>
                   {rows.length > 0 ? (
                     <CollegeSeatTable rows={rows} caption={`${listSeats(list, exam)} at ${college.name} (${by} PDF), by course`} />

@@ -177,7 +177,8 @@ function Step({ s, by }: { s: StepNow; by: string }) {
           </p>
         )}
         {why && <p className="text-xs text-sun">{why}</p>}
-        {s.note && <p className="text-xs text-muted-foreground">{fmtNote(s.note[0].toUpperCase() + s.note.slice(1))}.</p>}
+        {/* A note that ends a sentence itself (INI-CET's '…separately").') takes no second full stop. */}
+        {s.note && <p className="text-xs text-muted-foreground">{fmtNote(s.note[0].toUpperCase() + s.note.slice(1))}{/[.!?]["”')]*$/.test(s.note) ? "" : "."}</p>}
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           {s.date && <time dateTime={s.date} className="numeric">{fmtIST(s.date, true)}</time>}
           {s.url ? <NoticeLink s={s} by={by} /> : <span>{by} notice: <Dash /></span>}

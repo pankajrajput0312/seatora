@@ -6,7 +6,7 @@ import { tidyLabel } from "@/features/exams/exam";
 import { exams } from "@/features/exams/registry";
 import { DEFAULT_EXAM, sessionExams, yearName, type ExamKey } from "@/features/exams/keys";
 import { db } from "@/lib/db";
-import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Source, type Term } from "../types";
+import { optionId, rounds, roundShort, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Source, type Term } from "../types";
 import { termSourceName } from "@/features/cutoffs/lib/import-schema";
 import { bucketOfDegree } from "./terms";
 import { specialtyName } from "../lib/specialty-search";
@@ -68,7 +68,7 @@ export function yearsOf(sources: Source[], exam: ExamKey = DEFAULT_EXAM): YearIn
     const rs = rounds.filter((r) => mine.some((s) => s.round === r));
     const provisional = mine.some((s) => s.provisional);
     const name = yearName(exam, year);
-    const label = i === 0 ? `${name} (${rs.map((r) => roundLabel[r]).join(", ")}${provisional ? ", provisional" : ""})` : provisional ? `${name} (provisional)` : name;
+    const label = i === 0 ? `${name} (${rs.map((r) => roundShort(r, exam)).join(", ")}${provisional ? ", provisional" : ""})` : provisional ? `${name} (provisional)` : name;
     return { year, rounds: rs, provisional, label };
   });
 }

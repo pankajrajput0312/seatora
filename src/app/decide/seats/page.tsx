@@ -16,7 +16,7 @@ import { courseName } from "@/features/decide/components/options-view";
 import { MccLink } from "@/features/decide/components/pages/mcc-link";
 import { parseSeatsParams, seatCategories, seatSorts, seatsView, type SeatLine, type SeatSort, type SeatsParams } from "@/features/decide/components/seats/find-seats";
 import { SeatCards } from "@/features/decide/components/seats/seat-cards";
-import { listTitle, SeatListPicker, SeatTable, seatKindNote } from "@/features/decide/components/seats/seat-lists";
+import { kindNote, listTitle, SeatListPicker, SeatTable } from "@/features/decide/components/seats/seat-lists";
 import { SeatMatrix, SeatMatrixDisplay, type ClosingYear, type MatrixRow, type SeatGroup } from "@/features/decide/components/seats/seat-matrix";
 import { ViewField, ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { chosenView } from "@/features/decide/server/view";
@@ -29,9 +29,9 @@ import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, type Profile } from "@/features/decide/profile";
 import { allotmentTrends, getMeta } from "@/features/decide/service";
 import { fmtDay, listDay } from "@/features/decide/lib/format";
-import { seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
+import { kindName, seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
 import { activeExam, examGate, examInfo } from "@/features/exams/active";
-import { authorityOf, DEFAULT_EXAM, examYears, exams, latestOf, restrictedQuota, yearName, type ExamKey } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, examYears, exams, latestOf, restrictedQuota, sessionExams, yearName, type ExamKey } from "@/features/exams/registry";
 import { roundNameFrom } from "@/features/exams/exam";
 import { quotaIn } from "@/features/exams/exam";
 
@@ -39,15 +39,16 @@ export const metadata: Metadata = { title: "Seats" };
 const PAGE_SIZE = 50;
 /** Seat rows render twice (cards and table, one shown) and the matrix's carry every round of every year, so they page by 25. */
 const SEATS_PAGE_SIZE = 25;
-/** "clear vacancy seats", "newly added seats". */
-const kindSeats = (l: SeatList) => `${seatKindLabel[l.kind].toLowerCase()}${l.kind === "new" ? "" : " seats"}`;
+/** "clear vacancy seats", "newly added seats" (INI-CET's one list a session: "seats"). */
+const kindSeats = (l: SeatList, exam: ExamKey) => (kindName(l.kind, exam) === "Seat position" ? "seats" : `${seatKindLabel[l.kind].toLowerCase()}${l.kind === "new" ? "" : " seats"}`);
 const sortLabels: Record<SeatSort, string> = {
   reach: "Reach: beyond your rank first", closing: "Deepest past closing first", seats: "Most seats first", college: "By institute", state: "By state", fee: "Lowest fee first", bond: "Shortest bond first",
 };
 /** The matrix count line: "1,234 clear seats", "567 virtual", "89 newly added" (a round's two newly added PDFs: each dated, as the picker does). */
-const kindCount = (l: SeatList, n: number, round: SeatList[]) => {
+const kindCount = (l: SeatList, n: number, round: SeatList[], exam: ExamKey) => {
   const day = round.some((x) => x !== l && x.kind === l.kind) ? listDay(l) : undefined;
-  return `${formatRank(n)} ${{ clear: n === 1 ? "clear seat" : "clear seats", virtual: "virtual", new: "newly added" }[l.kind]}${day ? ` (${fmtDay(day)} PDF)` : ""}`;
+  const one = n === 1 ? "seat" : "seats";
+  return `${formatRank(n)} ${kindName(l.kind, exam) === "Seat position" ? one : { clear: `clear ${one}`, virtual: "virtual", new: "newly added" }[l.kind]}${day ? ` (${fmtDay(day)} PDF)` : ""}`;
 };
 /** A matrix row without what the matrix never reads: the published terms alone are about half of a row's bytes. */
 const notInMatrix = ["terms", "rounds", "list", "seats", "cs"];
@@ -75,7 +76,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Seats"
-        about={<>{authorityOf(exam)}&apos;s seat lists for a round, as each PDF printed them: the seat matrix (every list of the round with every closing rank, fee and bond per row), one list, or the round&apos;s lists side by side.{profile && " Filtered to the courses, quotas, states, seat categories and fee and bond caps in your profile."}</>}
+        about={kindName("clear", exam) === "Seat position" ? <>{authorityOf(exam)}&apos;s seat position for each session, as its PDF printed it, with every closing rank, fee and bond per row.{profile && " Filtered to the courses, quotas, states, seat categories and fee and bond caps in your profile."}</> : <>{authorityOf(exam)}&apos;s seat lists for a round, as each PDF printed them: the seat matrix (every list of the round with every closing rank, fee and bond per row), one list, or the round&apos;s lists side by side.{profile && " Filtered to the courses, quotas, states, seat categories and fee and bond caps in your profile."}</>}
       />
       <SubTabs label="Seats" current={f.tab} items={[{ key: "matrix", label: "Seat lists", href: L.to("/decide/seats", { tab: "matrix" }) }, { key: "trends", label: "Allotment trends", href: L.to("/decide/seats", { tab: "trends" }) }]} />
       {f.tab === "trends" ? <Trends profile={profile} page={f.page} L={L} exam={exam} /> : <SeatLists f={f} profile={profile} params={params} L={L} exam={exam} />}
@@ -116,7 +117,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   const latest = latestOf(meta.sources, exam);
   const PAST_YEARS = pastOf(latest);
   // Chips for everything that narrows the rows, courses too (as Options); inst / course / nohist have their own lines below.
-  const hasWords = { clear: "Has clear vacancy", virtual: "Has virtual vacancy", new: "Has newly added" } as const;
+  const hasWords = { clear: kindName("clear", exam) === "Seat position" ? "Has seats" : "Has clear vacancy", virtual: "Has virtual vacancy", new: "Has newly added" } as const;
   const pairLabel = (c: string) => pairChoices(meta.courses).find((x) => x.value === c)?.label ?? c.replace("~", " ");
   const active = [
     f.q && { label: `Search: “${f.q}”`, param: "q", href: here({ q: null }) },
@@ -136,7 +137,14 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   const clearAll = here({ list: list.key, q: null, quota: null, st: null, has: null, scat: null, ...noTerms });
   const strong = (t: string) => <span className="font-semibold">{t}</span>;
   const by = authorityOf(exam); // MCC; INI-CET: AIIMS
-  const about = matrix ? (
+  const sp = kindName("clear", exam) === "Seat position"; // INI-CET: one list a session, AIIMS's seat position
+  const about = matrix && sp ? (
+    <>
+      One row per institute, course, quota and seat category in the {round} seat position (or, with every round, any {by} seat position or result in the data): its seats, the course&apos;s fee, stipend, bond
+      and leaving penalty{profile && ", your chances on that seat category"} and its closing rank in every round, with the allotments {by} made there in brackets. Select a row, or its Details button,
+      for every number and its source.
+    </>
+  ) : matrix ? (
     <>
       One row per institute, course, quota and seat category {allRounds ? `with seats in any ${by} seat list in the data, or allotted in any ${by} result` : `with seats in the ${round} lists`}: its {strong("clear")} and{" "}
       {strong("virtual")} vacancy seats per round, a {strong("+N new")} badge when the newly added list prints seats for it (most are also in the clear vacancy list, so they are
@@ -147,12 +155,12 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   ) : compare ? (
     <>
       One row per institute, course, quota and seat category, with its seats in each {round} list.{" "}
-      {r.lists.map((l) => <Fragment key={l.key}>{strong(seatKindLabel[l.kind])}: {seatKindNote[l.kind]}{" "}</Fragment>)}
+      {r.lists.map((l) => <Fragment key={l.key}>{strong(kindName(l.kind, exam))}: {kindNote(l.kind, exam)}{" "}</Fragment>)}
       The lists overlap (a newly added seat is usually also a clear vacancy, and a virtual vacancy opens only if its holder moves), so the columns are never added together.
-      {" "}The list picked above sets the round compared and the list that &quot;{`Most ${kindSeats(list)} first`}&quot; sorts by.
+      {" "}The list picked above sets the round compared and the list that &quot;{`Most ${kindSeats(list, exam)} first`}&quot; sorts by.
     </>
   ) : (
-    <>{strong(seatKindLabel[list.kind])}: {seatKindNote[list.kind]} The three kinds of list overlap, so their seats are never added together.</>
+    <>{strong(kindName(list.kind, exam))}: {kindNote(list.kind, exam)}{kindName(list.kind, exam) === "Seat position" ? "" : " The three kinds of list overlap, so their seats are never added together."}</>
   );
   const closingNote = matrix ? (
     <>
@@ -243,7 +251,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
           {E.categories.length > 1 && (
             <Field label="Seat category">
               <select name="scat" defaultValue={f.scat ?? ""} className={control}>
-                <option value="">{mine ? `Yours: ${mine.join(", ")}` : "All seat categories"}</option>
+                <option value="">{mine ? `Yours: ${mine.filter((c) => c !== "All").join(", ")}${mine.includes("All") ? ", and course totals not split by category" : ""}` : "All seat categories"}</option>
                 {mine && <option value="all">All seat categories</option>}
                 {seatCategories.map((c) => <option key={c} value={c}>{c} seats</option>)}
               </select>
@@ -251,7 +259,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
           )}
           <Field label="Sort">
             <select name="sort" defaultValue={sort} className={control}>
-              {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && several ? `Most ${kindSeats(list)} first` : s === "reach" && matrix ? "Your chances: beyond your rank first" : sortLabels[s]}</option>)}
+              {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && several ? `Most ${kindSeats(list, exam)} first` : s === "reach" && matrix ? "Your chances: beyond your rank first" : sortLabels[s]}</option>)}
             </select>
           </Field>
         </Fragment>
@@ -281,12 +289,12 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
             {matrix ? (
               <>
                 <span className="numeric text-base font-semibold text-foreground">{formatRank(r.total)}</span> {r.total === 1 ? "row" : "rows"} in {round}{allRounds && " and every other round"}, your filters
-                {roundLists.map((l) => <Fragment key={l.key}> · <span className="numeric">{kindCount(l, r.seats[l.key] ?? 0, roundLists)}</span></Fragment>)}
+                {roundLists.map((l) => <Fragment key={l.key}> · <span className="numeric">{kindCount(l, r.seats[l.key] ?? 0, roundLists, exam)}</span></Fragment>)}
               </>
             ) : compare ? (
               <>
                 <span className="numeric text-base font-semibold text-foreground">{formatRank(r.total)}</span> {r.total === 1 ? "row" : "rows"}
-                {r.lists.map((l) => <Fragment key={l.key}> · <span className="numeric">{formatRank(r.seats[l.key] ?? 0)}</span> {kindSeats(l)}</Fragment>)}
+                {r.lists.map((l) => <Fragment key={l.key}> · <span className="numeric">{formatRank(r.seats[l.key] ?? 0)}</span> {kindSeats(l, exam)}</Fragment>)}
               </>
             ) : (
               <>
@@ -318,7 +326,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
           <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
             <span><span className="numeric">{formatRank(noState)}</span> more seats have no state in the data</span>
             <InfoTip label="seats with no state">
-              They match everything but the state{several && ` (in the ${seatKindLabel[list.kind].toLowerCase()} list)`}: their institutes have no state in Decide&apos;s data, so the state filter leaves them out. The state shown is the institute&apos;s, not the PDF&apos;s state column.
+              They match everything but the state{several && ` (in the ${kindName(list.kind, exam).toLowerCase()} list)`}: their institutes have no state in Decide&apos;s data, so the state filter leaves them out. The state shown is the institute&apos;s, not the PDF&apos;s state column.
             </InfoTip>
           </p>
         )}
@@ -363,8 +371,9 @@ async function Trends({ profile, page, L, exam }: { profile: Profile | null; pag
   const mine = profile && (profile.pairs?.length || profile.specialties.length || profile.degrees.length) ? profile : null;
   const [meta, res] = await Promise.all([getMeta(exam), allotmentTrends({ profile: mine }, { page, pageSize: PAGE_SIZE }, exam)]);
   const label = (y: number) => meta.years.find((x) => x.year === y)?.label ?? yearName(exam, y);
-  const vs = `${yearName(exam, exams[exam].pastYears[1])} vs ${yearName(exam, exams[exam].pastYears[0])}`;
-  const [y0, y1] = exams[exam].pastYears;
+  // The two years compared: NEET PG's (and SS / MDS) past two, as ever; INI-CET's newest two sessions (Jul 2026 vs Jan 2026).
+  const [y0, y1] = sessionExams.includes(exam) ? examYears(exam).slice(-2) : exams[exam].pastYears;
+  const vs = `${yearName(exam, y1)} vs ${yearName(exam, y0)}`;
   const YEARS = examYears(exam);
   const max = Math.max(1, ...res.rows.flatMap((r) => YEARS.map((y) => r.byYear[y] ?? 0)));
   const newest = [...YEARS].sort((a, b) => b - a);

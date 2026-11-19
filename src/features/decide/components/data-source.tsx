@@ -9,7 +9,7 @@ import { getCatalog } from "../server/catalog";
 import { seatChanges, seatLists } from "../server/seats";
 import { getMeta } from "../service";
 import type { DecideLinks } from "../lib/links";
-import { rounds, roundLabel, type MccNotice, type SeatList, type Term } from "../types";
+import { rounds, roundShort, type MccNotice, type SeatList, type Term } from "../types";
 import { Provisional } from "./bits";
 import { InfoTip } from "./info-tip";
 import { RegisterSources, SourceRef, SourceRefs, type SourceDoc } from "./page-sources";
@@ -122,7 +122,7 @@ export async function DataSource({ used, terms, results = true }: { used?: Used[
       {provisional.length > 0 && (
         <span className="inline-flex items-center gap-1">
           <Provisional when />
-          {provisional.map((s) => `${yearName(exam, s.year)} ${roundLabel[s.round]}`).join(", ")} result
+          {provisional.map((s) => `${yearName(exam, s.year)} ${roundShort(s.round, exam)}`).join(", ")} result
         </span>
       )}
     </div>

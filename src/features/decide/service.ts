@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { cache } from "react";
-import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
+import { DEFAULT_EXAM, seatCategoriesFor, type ExamKey } from "@/features/exams/keys";
 import { examYears, exams, groupOf, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
 import { hospitalInfo, type HospitalInfo } from "./components/institute/institute-data";
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
@@ -351,7 +351,7 @@ async function unlistedOf(cat: Catalog, list: SeatList | null, profile: Profile 
       list: list.key,
       college,
       ...(p && profileCourseFilter(p)),
-      categories: p ? eligibleCategories(p.category, p.pwd) : undefined,
+      categories: p ? seatCategoriesFor(cat.exam, eligibleCategories(p.category, p.pwd)) : undefined,
     },
     undefined,
     cat.exam,
@@ -380,8 +380,8 @@ async function roundLists(cat: Catalog): Promise<SeatList[]> {
 /** The seat lists behind the R2 seats columns (Options, Choices). */
 export const currentSeatLists = async (exam: ExamKey = DEFAULT_EXAM) => roundLists(await getCatalog(exam));
 
-/** Her seat categories; null (every category) without a profile. */
-const seatCats = (profile: Profile | null) => (profile ? eligibleCategories(profile.category, profile.pwd) : undefined);
+/** Her seat categories; null (every category) without a profile. INI-CET: with a course total not split by category (keys.ts seatCategoriesFor). */
+const seatCats = (profile: Profile | null, exam: ExamKey = DEFAULT_EXAM) => (profile ? seatCategoriesFor(exam, eligibleCategories(profile.category, profile.pwd)) : undefined);
 
 /** The seats of these options in each list: one read for their colleges and courses. */
 const seatsOfOpts = async (cat: Catalog, lists: SeatList[], opts: Pick<Opt, "college" | "degree" | "specialty">[]) =>
@@ -423,8 +423,8 @@ async function optionsByIds(cat: Catalog, lists: SeatList[], ids: string[], with
  * Rows with their seats in each list (`seatsBy`, one kind each, never added; `seats` = the clear vacancy list's), in
  * her seat categories (all without a profile), and with a profile `seatsBelow`. `seats` = optionSeats of these rows.
  */
-function withSeats(rows: OptionRow[], lists: SeatList[], seats: Map<string, OptionSeats>, profile: Profile | null): OptionRow[] {
-  const categories = seatCats(profile);
+function withSeats(rows: OptionRow[], lists: SeatList[], seats: Map<string, OptionSeats>, profile: Profile | null, exam: ExamKey = DEFAULT_EXAM): OptionRow[] {
+  const categories = seatCats(profile, exam);
   return rows.map((r) => {
     const { by: seatsBy, mine } = seatsByKind(lists, seats.get(r.id), categories);
     const cats = Object.fromEntries(lists.map((l, i) => [l.kind, mine[i].filter((c) => c.seats > 0).map((c) => c.category)]));
@@ -437,7 +437,7 @@ export async function choiceOptions(ids: string[], profile: Profile | null, exam
   const cat = await getCatalog(exam);
   const lists = await roundLists(cat);
   const { opts, seats } = await optionsByIds(cat, lists, ids, true);
-  return { lists, rows: withSeats(await rowsFor(cat, opts, profile, true), lists, seats, profile) };
+  return { lists, rows: withSeats(await rowsFor(cat, opts, profile, true), lists, seats, profile, cat.exam) };
 }
 
 /**
@@ -477,7 +477,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   // Seats of every option in her profile (courses, quotas, seat categories) when the view or a seats filter needs them,
   // in one read beside the labels; else just the page's, below.
   const [profileSeats, labelled, labelledUnknown] = await Promise.all([
-    round || kind ? optionSeats(lists, profile ? { ...profileCourseFilter(profile), quotas: profileQuotas(profile, exams[cat.exam].quotas), categories: seatCats(profile) } : {}, cat.exam) : null,
+    round || kind ? optionSeats(lists, profile ? { ...profileCourseFilter(profile), quotas: profileQuotas(profile, exams[cat.exam].quotas), categories: seatCats(profile, cat.exam) } : {}, cat.exam) : null,
     rankOptions(cat, opts, profile, includeProvisional),
     unknownOpts.length ? rankOptions(cat, unknownOpts, profile, includeProvisional) : [],
   ]);
@@ -529,7 +529,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     : 0;
   return {
     ...page,
-    rows: withSeats(built, lists, seats, profile),
+    rows: withSeats(built, lists, seats, profile, cat.exam),
     view,
     showClosed,
     seats: kind,
@@ -557,7 +557,7 @@ export async function getOptionsByIds(ids: string[], profile: Profile | null, ex
   const cat = await getCatalog(exam);
   const lists = await roundLists(cat);
   const { opts, seats } = await optionsByIds(cat, lists, ids, ids.length > 0);
-  return withSeats(await rowsFor(cat, opts, profile, true), lists, seats, profile); // no ids → no query (cs = [])
+  return withSeats(await rowsFor(cat, opts, profile, true), lists, seats, profile, cat.exam); // no ids → no query (cs = [])
 }
 
 const sumYear = (opts: Opt[], year: number) => (opts.some((o) => o.byYear[year] != null) ? opts.reduce((s, o) => s + (o.byYear[year] ?? 0), 0) : null);
@@ -578,7 +578,7 @@ export async function getInstitute(slug: string, profile: Profile | null, exam: 
   // Courses and quotas with seats in the round's lists but no past allotment here: options too, labelled "new".
   const fresh = newOptions(cat, seats, null);
   const opts = [...known, ...fresh];
-  const options = withSeats([...built, ...(await rowsFor(cat, fresh, profile, true))], lists, seats, profile);
+  const options = withSeats([...built, ...(await rowsFor(cat, fresh, profile, true))], lists, seats, profile, cat.exam);
   const mine = new Set(opts.filter((o) => optMatches(cat, o, profile)).map((o) => o.id));
   const allotmentsByYear = examYears(exam).map((year) => ({ year, n: sumYear(opts, year) }));
   const terms = { md: termsFor(cat, college.key, "MD"), dnb: termsFor(cat, college.key, "DNB") };

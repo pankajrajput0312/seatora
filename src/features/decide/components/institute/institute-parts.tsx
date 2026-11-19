@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatINR, formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import type { SeatRow } from "../../server/seats";
+import { seatCategoryName } from "../../types";
 import { Dash, Provisional } from "../bits";
 import { InfoTip } from "../info-tip";
 import { RegisterSources } from "../page-sources";
@@ -58,7 +59,7 @@ export function CollegeSeatTable({ rows, caption }: { rows: SeatRow[]; caption: 
             <tr key={i} className={tbl.row}>
               <th scope="row" className={cn(td, "text-left font-medium")}>{r.degree} {r.course?.name ?? r.specialty}</th>
               <td className={td}>{r.quota ? <QuotaName quota={r.quota} /> : <Dash />}</td>
-              <td className={td}>{r.category}</td>
+              <td className={td}>{seatCategoryName(r.category)}</td>
               <td className={cn(tbl.num, "px-3 max-sm:px-2 md:px-4")}>{formatRank(r.seats)}</td>
             </tr>
           ))}

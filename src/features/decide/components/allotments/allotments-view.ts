@@ -1,9 +1,9 @@
 import "server-only";
 import { z } from "zod";
-import { DEFAULT_EXAM, perGroup, type ExamKey } from "@/features/exams/registry";
+import { DEFAULT_EXAM, exams, perGroup, type ExamKey } from "@/features/exams/registry";
 import { pageValue, parseSearchParams, rankValue } from "../../lib/params";
 import { anyTermFilter, feeValue, termFilterLists, termFilters, termFilterShape, untypedOnly } from "../../lib/term-filters";
-import { profileFromParams, profileHasCourse } from "../../profile";
+import { profileFromParams, profileHasCourse, profileQuotas } from "../../profile";
 import { getCollege, getMeta, listAllotments } from "../../service";
 import { baseCategories, roundLabel, rounds, termLabel, type Allotment, type PrevSeat, type Source, type Term } from "../../types";
 import { collegeTypeLabel } from "../institute/college-type";
@@ -68,7 +68,8 @@ export async function allotmentsView(params: URLSearchParams, pageSize: number, 
   const profile = profileFromParams(params);
   const mine = profile && meta.courses.filter((c) => profileHasCourse(profile, c)).map((c) => c.slug);
   // NEET SS: ranks near hers in her question group only (a rank is within one group).
-  const groupQuotas = profile && perGroup(exam) && profile.quotas.length ? profile.quotas : undefined;
+  // INI-CET: her quotas (the open ones when she ticked none, as Options): a Foreign National or Sponsored allotment is not hers.
+  const groupQuotas = profile && perGroup(exam) && profile.quotas.length ? profile.quotas : profile && exams[exam].quotaScoped ? profileQuotas(profile, exams[exam].quotas) : undefined;
   const fromProfile = pristine && profile && f.mine !== "0" ? { courses: mine && mine.length < meta.courses.length ? mine : [], ...rankWindow(profile.rank), ...(groupQuotas && { quotas: groupQuotas }) } : null;
   const latest = pristine && !fromProfile ? meta.years[0] : undefined;
   const filters = {

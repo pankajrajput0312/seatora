@@ -4,7 +4,7 @@ import { authorityOf, DEFAULT_EXAM, exams, perGroup, type ExamKey } from "@/feat
 import type { DecideLinks } from "../lib/links";
 import type { Reach } from "../lib/reach";
 import { roundName } from "../lib/round-status";
-import type { SeatList } from "../types";
+import { kindName, type SeatList } from "../types";
 import { smallLink } from "./ui";
 import { quotaIn } from "@/features/exams/exam";
 
@@ -33,13 +33,16 @@ export function StillCanDo({ L, rank, list, fresh, counts, title, id, exam = DEF
       <h2 id={id} className="text-title font-semibold">{title}</h2>
       <ul className="mt-2 grid list-disc gap-1.5 pl-5 text-sm">
         {list && fresh > 0 && (
-          <li><Link href={L.options({ reach: "new" })} className="underline hover:text-sky">{formatRank(fresh)} {fresh === 1 ? "option" : "options"} in {authorityOf(exam)}&apos;s {roundName[list.round]} seat lists never allotted before</Link>: no closing rank to compare. Look at them.</li>
+          <li><Link href={L.options({ reach: "new" })} className="underline hover:text-sky">{formatRank(fresh)} {fresh === 1 ? "option" : "options"} in {authorityOf(exam)}&apos;s {kindName("clear", exam) === "Seat position" ? "seat position" : `${roundName[list.round]} seat lists`} never allotted before</Link>: no closing rank to compare. Look at them.</li>
         )}
-        {list && <li><Link href={L.to("/decide/options", { seats: "virtual" })} className={smallLink}>Virtual vacancy seats</Link>: seats held now that free up when someone upgrades this round. Fill them as choices too.</li>}
+        {/* INI-CET has one seat position a session: no virtual vacancy list. */}
+        {list && kindName("clear", exam) !== "Seat position" && <li><Link href={L.to("/decide/options", { seats: "virtual" })} className={smallLink}>Virtual vacancy seats</Link>: seats held now that free up when someone upgrades this round. Fill them as choices too.</li>}
         {counts["stray-only"] > 0 && <li><Link href={L.options({ reach: "stray-only" })} className={smallLink}>{formatRank(counts["stray-only"])} reached your rank only in a stray round</Link>, after R1 to R3 had closed far earlier.</li>}
         {counts["within-10"] > 0 && <li><Link href={L.options({ reach: "within-10" })} className={smallLink}>{formatRank(counts["within-10"])} closed within 10% of your rank</Link> in a past round.</li>}
         {cap ? (
           <li><Link href={cap.href} className={smallLink}>{cap.n > 0 ? `${formatRank(cap.n)} ${cap.n === 1 ? "option" : "options"} hidden by ${cap.words}` : `Options hidden by ${cap.words}`}</Link>: see them on Options, or lift the limit in your profile.</li>
+        ) : exam === "ini-cet" ? (
+          <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>Widen your courses</Link>: more courses at these institutes (MD, MS, MDS, the 6-year DM and MCh). Tick a restricted quota (Institutional Preference, Sponsored, Foreign National) only if you are eligible.</li>
         ) : pg ? (
           <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>Widen your courses, quotas or states</Link>: other states, Deemed/Paid seats (a quota), DNB and Diploma courses of your specialties, more specialties, or looser fee and bond caps.</li>
         ) : (

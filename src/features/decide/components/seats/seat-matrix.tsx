@@ -16,7 +16,7 @@ import { LATER_ROUNDS_NOTE, latestRound, pastOf, reachWindow, type Latest } from
 import { useExamInfo } from "../../lib/use-decide-store";
 import { useDecideLinks } from "../../lib/use-decide-store";
 import { statKeys, statLabel } from "../../lib/stat-format";
-import { seatKindLabel, type Round, type SeatList, type Source } from "../../types";
+import { kindName, seatCategoryName, type Round, type SeatList, type Source } from "../../types";
 import { Dash, HISTORY_CAPTION, Provisional, ReachBadge } from "../bits";
 import { programmeTitle, TermSources } from "../fees";
 import { Beds } from "../pages/beds";
@@ -47,7 +47,7 @@ export type MatrixRow = Omit<SeatLine, "terms" | "rounds" | "list" | "seats" | "
 const DISPLAY_KEY = "medpath.seatMatrix.hidden";
 /** Hidden until she picks it in Display: it is in every row's details and card too. */
 const DEFAULT_HIDDEN = ["beds"];
-const listName = (l: SeatList, exam: ExamKey) => `${yearName(exam, l.year)} ${roundNameFrom(l.name, l.round)} ${seatKindLabel[l.kind].toLowerCase()}`;
+const listName = (l: SeatList, exam: ExamKey) => `${yearName(exam, l.year)} ${roundNameFrom(l.name, l.round)} ${kindName(l.kind, exam).toLowerCase()}`;
 const at = (r: MatrixRow, year: number, round: Round) => r.closings.find((c) => c.year === year && c.round === round);
 
 /** "1,23,456 (12)": closing rank (allotments made). Its cell is right-aligned, tabular and unwrapped already; the markup stays small (there are hundreds). */
@@ -233,7 +233,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                 <tr className="text-left">
                   {groups.map((g) => (
                     <Fragment key={g.key}>
-                      <th scope="col" data-col={g.key} className={cn(th, "border-l border-border text-right")} aria-sort={g.clear?.key === firstClear ? sorted("seats", "descending") : undefined}><span className="sr-only">{g.label} </span>Clear</th>
+                      <th scope="col" data-col={g.key} className={cn(th, "border-l border-border text-right")} aria-sort={g.clear?.key === firstClear ? sorted("seats", "descending") : undefined}><span className="sr-only">{g.label} </span>{kindName("clear", E.key) === "Seat position" ? "Seats" : "Clear"}</th>
                       {/* A round with no virtual vacancy list has no Virtual column. */}
                       {g.virtual && <th scope="col" data-col={g.key} className={cn(th, "text-right")}><span className="sr-only">{g.label} </span>Virtual</th>}
                     </Fragment>
@@ -276,7 +276,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                         {r.quota != null ? quotaIn(E, r.quota) : "Not printed"}
                         {r.quota != null && isRestricted(E, r.quota) && <Badge tone="warning" className="mt-1">Restricted</Badge>}
                       </td>
-                      <td data-col="category" className={cn(td, "whitespace-nowrap")}>{r.category}</td>
+                      <td data-col="category" className={cn(td, "whitespace-nowrap")}>{seatCategoryName(r.category)}</td>
                       <TermStatCells t={r.fees} variant="table" short of={`${r.college.name}, ${name}`} />
                       {groups.map((g) => (
                         <Fragment key={g.key}>
@@ -361,7 +361,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
 
               <section aria-labelledby="row-seats" className="grid gap-2">
                 <h3 id="row-seats" className="font-semibold">Seats in {authorityOf(E.key)}&apos;s lists</h3>
-                <p className="text-xs text-muted-foreground">Each list as its PDF printed it. The lists overlap (newly added seats are mostly also clear vacancies; a virtual vacancy opens only if its holder moves), so never add them.</p>
+                <p className="text-xs text-muted-foreground">{kindName("clear", E.key) === "Seat position" ? "The session's seat position as its PDF printed it." : "Each list as its PDF printed it. The lists overlap (newly added seats are mostly also clear vacancies; a virtual vacancy opens only if its holder moves), so never add them."}</p>
                 <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
                   {lists.map((l) => (
                     <div key={l.key} className="contents">

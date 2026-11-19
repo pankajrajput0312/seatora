@@ -5,10 +5,11 @@ import type { DecideLinks } from "../lib/links";
 import { LATER_ROUNDS_NOTE, pastOf, reachLabel, seatsBelowNotes, type Deepest, type Latest } from "../lib/reach";
 import type { ChoiceItem } from "../lib/choices";
 import type { OptionRow } from "../service";
-import { rounds, seatKindLabel, type Round, type SeatList, type Term } from "../types";
+import { kindName, rounds, type Round, type SeatList, type Term } from "../types";
+import type { ExamKey } from "@/features/exams/keys";
 import { Closing, Dash, Provisional, TermText } from "./bits";
 import { smallLink } from "./ui";
-import { Authority, RoundName, RoundNames, YearName } from "./round-name";
+import { Authority, KindName, RoundName, RoundNames, YearName } from "./round-name";
 import { quotaIn } from "@/features/exams/exam";
 import { useExamInfo } from "../lib/use-decide-store";
 
@@ -38,15 +39,15 @@ export function toChoiceItem(r: ListRow, latest: Latest): ChoiceItem {
 }
 
 /** A seat list's kind in a few letters: "clear", "virtual", "newly added" (MCC's newly added seat list; never "new", which reads as "never allotted"). */
-export const seatKindShort = (k: SeatList["kind"]) => (k === "new" ? "newly added" : k);
+export const seatKindShort = (k: SeatList["kind"], exam?: ExamKey) => (kindName(k, exam) === "Seat position" ? "seat position" : k === "new" ? "newly added" : k);
 
 /**
  * Column heading for an option's seats in one list, e.g. "R2 seats" over "clear vacancy" (`short`: "R2" over "clear";
  * the year is in each cell's name and the source line).
  */
 export function SeatsHead({ list, short }: { list: SeatList; short?: boolean }) {
-  if (short) return <span className="whitespace-nowrap"><RoundName year={list.year} round={list.round} /><span className="block font-normal">{seatKindShort(list.kind)}<span className="sr-only"> seats</span></span></span>;
-  return <span className="whitespace-nowrap"><RoundName year={list.year} round={list.round} /> seats<span className="block font-normal">{seatKindLabel[list.kind].toLowerCase()}</span></span>;
+  if (short) return <span className="whitespace-nowrap"><RoundName year={list.year} round={list.round} /><span className="block font-normal"><KindName kind={list.kind} short /><span className="sr-only"> seats</span></span></span>;
+  return <span className="whitespace-nowrap"><RoundName year={list.year} round={list.round} /> seats<span className="block font-normal"><KindName kind={list.kind} lower /></span></span>;
 }
 
 /** `n` seats of one option (`at`, named `name`) in one list, linking to them on Seats; "—" when the list prints none. `end`: right-aligned (columns). */
@@ -57,7 +58,7 @@ export function SeatsLink({ n, list, L, at, name, end }: { n: number | null | un
   if (n == null) return <Dash />;
   return (
     <Link href={L.seats({ list: list.key, ...at })} className={`${smallLink} numeric min-w-11 font-semibold ${seatKindClass[list.kind]} ${end ? "justify-end" : ""}`}>
-      {formatRank(n)}<span className="sr-only"> {n === 1 ? "seat" : "seats"} in the <YearName year={list.year} /> <RoundName year={list.year} round={list.round} /> {seatKindLabel[list.kind].toLowerCase()} list: {name}</span>
+      {formatRank(n)}<span className="sr-only"> {n === 1 ? "seat" : "seats"} in the <YearName year={list.year} /> <RoundName year={list.year} round={list.round} /> <KindName kind={list.kind} lower /> list: {name}</span>
     </Link>
   );
 }

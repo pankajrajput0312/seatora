@@ -50,7 +50,7 @@ import {
   type MccCollegeV2,
 } from "../src/features/cutoffs/lib/import-schema.ts";
 import { noticeKinds, roundSteps, seatKinds, stepStatuses } from "../src/features/decide/types.ts";
-import { DEFAULT_EXAM, examKeys, isExam, markerKey, rankListOf, ranksPerGroup, sessionExams } from "../src/features/exams/keys.ts";
+import { ALL_CATEGORIES, DEFAULT_EXAM, examKeys, isExam, markerKey, rankListOf, ranksPerGroup, sessionExams } from "../src/features/exams/keys.ts";
 
 const args = process.argv.slice(2);
 const examAt = args.indexOf("--exam");
@@ -135,7 +135,8 @@ const seatSchema = z
     degree: z.string().min(1),
     specialty: z.string().regex(/^[A-Z0-9]+$/),
     quota: z.string().min(1).nullable(),
-    category: z.enum(mccCategories),
+    // INI-CET: JIPMER prints only a course total, its seats "All" (categories not split); every other exam's as MCC prints them.
+    category: sessions ? z.enum([...mccCategories, ALL_CATEGORIES]) : z.enum(mccCategories),
     seats: z.number().int().nonnegative(),
     src: z.string().min(1),
   })

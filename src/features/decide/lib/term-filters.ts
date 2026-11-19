@@ -224,10 +224,17 @@ export const termMoreOpen = (f: TermParams) => f.minstip != null || f.maxbond !=
  * not published = unknown, never 0). The lowest bond penalty wins (ties named together), its leaving penalty said beside
  * it; with no bond figure anywhere, the lowest leaving penalty. All unknown, or all none, said plainly.
  */
-export function lowestRisk(items: { name: string; t: ProgrammeTerms }[]): string {
+export function lowestRisk(items: { name: string; t: ProgrammeTerms }[], byLeaving = false): string {
   const xs = items.map((x) => ({ ...x, bond: feeValue.bond(x.t), leave: feeValue.leave(x.t), years: feeValue.bondyrs(x.t) }));
   const money = (n: number) => inrL(n);
   const names = (ys: typeof xs) => ys.map((y) => y.name).join(" and ");
+  // `byLeaving` (INI-CET: no bond penalty figure, a leaving penalty everywhere): the leaving penalty that exists decides.
+  if (byLeaving && xs.every((x) => x.bond == null) && xs.some((x) => x.leave != null)) {
+    const none = xs.filter((x) => x.leave == null);
+    if (none.length) return `Can't tell: ${names(none)} ${none.length === 1 ? "publishes" : "publish"} no leaving penalty figure, so there is no fair lowest.`;
+    const low = Math.min(...xs.map((x) => x.leave!));
+    return `Lowest leaving penalty here: ${names(xs.filter((x) => x.leave === low))} (${money(low)}); none of these publishes a bond penalty figure.`;
+  }
   if (xs.every((x) => x.bond == null && x.leave == null))
     return xs.some((x) => x.years != null)
       ? "Can't tell: no bond penalty or leaving penalty figure is published for these (their bond years are in the table)."

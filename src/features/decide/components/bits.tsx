@@ -5,10 +5,10 @@ import { cn } from "@/lib/cn";
 import { shortName } from "../lib/format";
 import { pastOf, reachLabel, reachTone, type Deepest, type Latest, type Reach } from "../lib/reach";
 import type { OptionRow } from "../service";
-import { roundLabel, type Term } from "../types";
+import type { Term } from "../types";
 import { InfoTip } from "./info-tip";
 import { SourceRef } from "./page-sources";
-import { RoundName, YearName } from "./round-name";
+import { RoundName, RoundShort, YearName } from "./round-name";
 
 export const HISTORY_CAPTION =
   "Based on previous years' closing ranks. History, not a prediction — seat matrix, category and competition change every round.";
@@ -87,7 +87,7 @@ export function Closing({ d, year }: { d: Deepest | null | undefined; year?: num
   return (
     <span className="numeric">
       <span className="text-[15px] font-semibold">{formatRank(d.closing)}</span>
-      <span className="block text-xs font-normal text-muted-foreground">{year == null ? roundLabel[d.round] : <RoundName year={year} round={d.round} />}, {d.category} seat</span>
+      <span className="block text-xs font-normal text-muted-foreground">{year == null ? <RoundShort round={d.round} /> : <RoundName year={year} round={d.round} />}, {d.category} seat</span>
     </span>
   );
 }

@@ -4,7 +4,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import type { DecideLinks } from "../../lib/links";
 import type { Latest } from "../../lib/reach";
 import { isRestricted, neetPg, type Exam } from "@/features/exams/exam";
-import { seatKindLabel, type SeatKind, type SeatList } from "../../types";
+import { seatCategoryName, seatKindLabel, type SeatKind, type SeatList } from "../../types";
 import { Dash, Provisional, ReachBadge } from "../bits";
 import { Beds } from "../pages/beds";
 import { ResultCard, ResultCards } from "../result-card";
@@ -64,7 +64,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
               <><YearName year={own.year} /> · <RoundName year={own.year} round={own.round} /></>,
               r.quota != null ? <QuotaName key="q" quota={r.quota} /> : "Quota not printed",
               r.quota != null && isRestricted(exam, r.quota) && <Badge tone="warning">Restricted</Badge>,
-              `${r.category} seat`,
+              r.category === "All" ? seatCategoryName(r.category) : `${r.category} seat`,
             ]}
             actions={onDetails && (
               <Button type="button" variant="ghost" className="px-3 text-sky" data-row={k} onClick={() => onDetails(k)} aria-haspopup="dialog" aria-label={`Details: ${name}`}>

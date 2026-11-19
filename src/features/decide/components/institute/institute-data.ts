@@ -11,7 +11,7 @@ import { clinicalFactsFor } from "../../server/facts";
 import { countAllotments, type AllotmentCount } from "../../server/queries";
 import { listSeats, seatLists, sumSeats, type SeatRow } from "../../server/seats";
 import { courseTerms } from "../../server/terms";
-import { baseCategories, openQuotas, roundLabel, type Round, type SeatList, type Source } from "../../types";
+import { baseCategories, openQuotas, roundShort, type Round, type SeatList, type Source } from "../../types";
 import type { CollegeType } from "./college-type";
 import type { ValueMeta } from "./hospital-bits";
 export type { ValueMeta };
@@ -70,10 +70,10 @@ export function allotmentMix(rows: AllotmentCount[], years: YearInfo[], sources:
   if (!newest?.rounds.length || !rows.length) return null;
   const round = newest.rounds.at(-1)!;
   const columns: MixColumn[] = [
-    { label: `${yn(newest.year)} ${roundLabel[round]}`, year: newest.year, round, provisional: sources.some((s) => s.year === newest.year && s.round === round && s.provisional) },
+    { label: `${yn(newest.year)} ${roundShort(round, exam)}`, year: newest.year, round, provisional: sources.some((s) => s.year === newest.year && s.round === round && s.provisional) },
     ...years
       .filter((y) => y.year !== newest.year || y.rounds.length > 1)
-      .map((y) => ({ label: y.year === newest.year ? `${yn(y.year)} (${y.rounds.map((r) => roundLabel[r]).join(", ")})` : yn(y.year), year: y.year, provisional: y.provisional })),
+      .map((y) => ({ label: y.year === newest.year ? `${yn(y.year)} (${y.rounds.map((r) => roundShort(r, exam)).join(", ")})` : yn(y.year), year: y.year, provisional: y.provisional })),
   ];
   const quotas = [...new Set(rows.map((r) => r.quota))].sort((a, b) => pos(openQuotas, a) - pos(openQuotas, b) || a.localeCompare(b));
   const cats = [...new Set(rows.map((r) => r.category as string))].sort((a, b) => pos(categoryOrder, a) - pos(categoryOrder, b) || a.localeCompare(b));

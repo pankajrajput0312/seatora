@@ -19,7 +19,7 @@ import { parseSearchParams } from "@/features/decide/lib/params";
 import { deepestOf, eligibleCategories, LATER_ROUNDS_NOTE, latestText, pastOf } from "@/features/decide/lib/reach";
 import { inrFull } from "@/features/decide/lib/stat-format";
 import { lowestRisk } from "@/features/decide/lib/term-filters";
-import { rounds, seatKindLabel, type SeatList } from "@/features/decide/types";
+import { kindName, rounds, type SeatList } from "@/features/decide/types";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { statCells, statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { Paywall } from "@/features/plans/components/paywall";
@@ -75,6 +75,13 @@ function IfYouLeave({ r, leaving }: { r: OptionRow; leaving: string }) {
   return (
     <span className="grid gap-1 text-xs">
       <span><span className="text-muted-foreground">After joining:</span> <span className="font-semibold">{leaving === "—" ? "no penalty published" : leaving}</span></span>
+      {t.roundRules ? (
+        // INI-CET: AIIMS's round rules, each in its own words.
+        <span className="grid gap-0.5">
+          <span className="text-muted-foreground">{authorityOf(t.exam)}&apos;s round rules:</span>
+          {t.roundRules.map((p, i) => <span key={i}>{p.text}<Sup n={p.src ?? t.bond.src} sources={t.sources} /></span>)}
+        </span>
+      ) : (
       <span>
         <span className="text-muted-foreground">Resign or don&apos;t join from Round 2:</span>{" "}
         {t.resignForfeit ? (
@@ -85,6 +92,7 @@ function IfYouLeave({ r, leaving }: { r: OptionRow; leaving: string }) {
           "not published"
         )}
       </span>
+      )}
     </span>
   );
 }
@@ -103,7 +111,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const E = await examInfo(exam);
   const round = lists[0] && `${yearName(exam, lists[0].year)} ${roundIn(E, lists[0].year, lists[0].round)}`;
   const fees = E.has.fees; // another exam may have no fee, stipend or bond data: no such rows
-  const risk = fees && options.length > 1 && lowestRisk(options.map((r) => ({ name: r.college.name, t: r.fees })));
+  const risk = fees && options.length > 1 && lowestRisk(options.map((r) => ({ name: r.college.name, t: r.fees })), authorityOf(exam) !== "MCC");
   const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? yearName(exam, y);
   const latest = latestOf(meta.sources, exam);
   const [older, last] = pastOf(latest);
@@ -131,7 +139,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           cell: (r: OptionRow) => (
             <span className="grid text-xs">
               {lists.map((l) => (
-                <span key={l.key}><span className="text-muted-foreground">{seatKindLabel[l.kind]}:</span> <span className="numeric font-semibold">{r.seatsBy?.[l.kind] != null ? formatRank(r.seatsBy[l.kind]!) : "—"}</span></span>
+                <span key={l.key}><span className="text-muted-foreground">{kindName(l.kind, exam)}:</span> <span className="numeric font-semibold">{r.seatsBy?.[l.kind] != null ? formatRank(r.seatsBy[l.kind]!) : "—"}</span></span>
               ))}
             </span>
           ),

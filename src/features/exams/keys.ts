@@ -28,6 +28,14 @@ export function inExamWords(exam: ExamKey, s: string) {
     .replace(/MCC (?:institute )?profile/g, "INI-CET prospectus")
     .replace(/\bMCC\b/g, authorityOf(exam));
 }
+/** Exams with one seat list a session, the counselling body's seat position (stored as kind "clear"), never a clear vacancy list: INI-CET. */
+export const seatPositionExams: readonly ExamKey[] = ["ini-cet"];
+/** A round's short name where it isn't types.ts roundLabel's: INI-CET's R3 is AIIMS's "Open Round". Null: roundLabel's. */
+export const roundWordIn = (exam: ExamKey | undefined, round: string) => (exam === "ini-cet" && round === "R3" ? "Open Round" : null);
+/** INI-CET's seat category for an institute that prints only a course total (JIPMER): categories not split, never Open. */
+export const ALL_CATEGORIES = "All";
+/** A seat list's seat categories that may hold hers: her own, and (INI-CET) a course total not split by category. */
+export const seatCategoriesFor = (exam: ExamKey | undefined, mine: string[]) => (exam && seatPositionExams.includes(exam) ? [...mine, ALL_CATEGORIES] : mine);
 /** A seat's rank list: its degree when that degree has a list of its own (INI-CET's MDS), else "" (the exam's one list). */
 export const rankListOf = (exam: ExamKey, degree: string) => (separateRankList[exam] === degree ? degree : "");
 

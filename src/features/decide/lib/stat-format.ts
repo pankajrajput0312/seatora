@@ -445,7 +445,10 @@ function leavingCell(t: ProgrammeTerms): StatCell {
   const c = { key: "leaving", label: statLabel.leaving, about: "leaving penalty" } as const;
   const b = t.bond;
   const a = b.leavingAmount;
-  const forfeit: TipLine[] = t.resignForfeit
+  // INI-CET: AIIMS's round rules, each in its own words (never MCC's Round 2 forfeit).
+  const forfeit: TipLine[] = t.roundRules
+    ? [{ text: `Separate from it, ${authorityOf(t.exam)}'s round rules:` }, ...partLines(t.roundRules, b.src)]
+    : t.resignForfeit
     ? [{ text: `Separate from it: ${authorityOf(t.exam)} lets the college keep ${inrFull(t.resignForfeit.inr)} if you resign or don't join from Round 2.`, src: t.resignForfeit.src }]
     : t.resignForfeitText
       ? [{ text: `Separate from it: ${authorityOf(t.exam)} Round 2 / mop-up forfeit: ${t.resignForfeitText.text}`, src: t.resignForfeitText.src }]

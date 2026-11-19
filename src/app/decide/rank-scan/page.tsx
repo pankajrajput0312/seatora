@@ -24,7 +24,7 @@ import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankShorthand } from "@/features/decide/lib/params";
 import { readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
-import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
+import { profileFromParams, profileHasCourse, profileQuotas, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankScan } from "@/features/decide/service";
 import { statKeys } from "@/features/decide/lib/stat-format";
 import { roundLabel, rounds } from "@/features/decide/types";
@@ -33,6 +33,7 @@ import { examGate } from "@/features/exams/active";
 import { activeExam, examInfo, RankListNote } from "@/features/exams/active";
 import { authorityOf, groupsOf, perGroup, rankListIn, rankListOf, roundNameIn, yearName } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
+import { quotaIn } from "@/features/exams/exam";
 
 export const metadata: Metadata = { title: "Rank scan" };
 const VIEW = "rank-scan";
@@ -68,6 +69,8 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const typed = params.get("scan")?.trim() || null;
   // NEET SS: a rank is within one question group: her group's allotments only, unless she lifts it (grp=all).
   const group = perGroup(exam) && profile?.quotas.length && params.get("grp") !== "all" ? profile.quotas : undefined;
+  // INI-CET: her quotas (the open ones when she ticked none, as Options), unless she lifts it (rq=all).
+  const mineQ = E.quotaScoped && profile && params.get("rq") !== "all" ? profileQuotas(profile, E.quotas) : undefined;
   const invalid = typed != null && f.scan == null;
   const rank = invalid ? null : (f.scan ?? profile?.rank ?? null);
   // Default: the newest year whose results are final.
@@ -90,7 +93,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
     (!cf.slugs || cf.slugs.has(courseSlug.get(`${a.degree}|${a.specialty}`) ?? "")) &&
     (!degrees.length || degrees.includes(a.degree)) &&
     (!cats || cats.includes(a.category));
-  const scanned = rank && year ? await withRowInfo((await rankScan(rank, year.year, window, exam, group)).flatMap((g) => g.rows).filter(wanted), exam) : [];
+  const scanned = rank && year ? await withRowInfo((await rankScan(rank, year.year, window, exam, group ?? mineQ)).flatMap((g) => g.rows).filter(wanted), exam) : [];
   // Fee, stipend, bond, leaving and type filters on each allotment's course and quota (lib/term-filters.ts).
   const { kept, unknown } = splitByTerms(scanned, tp.filters, (a) => a.fees, (a) => a.hospital?.type?.value);
   type Row = (typeof kept)[number];
@@ -105,6 +108,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const yearWords = year && yearName(exam, year.year); // INI-CET: "Jan 2026"
   const chips = [
     ...(group ? [{ label: `Your question group (${groupsOf(exam, group).join(", ")})`, param: "grp", href: L.with(R, { grp: "all", page: null }) }] : []),
+    ...(mineQ ? [{ label: `Your quotas (${mineQ.map((q) => quotaIn(E, q)).join(", ")})`, param: "rq", href: L.with(R, { rq: "all", page: null }) }] : []),
     ...cf.chips((v) => L.with(R, { course: v, page: null }), (s) => L.without(R, "course", s)),
     ...degrees.map((d) => ({ label: d, param: "degree", href: L.without(R, "degree", d) })),
     ...(allCats ? [{ label: "All seat categories", param: "scat", href: L.with(R, { scat: null, page: null }) }] : scatPicked.length ? scatPicked.map((c) => ({ label: `${c} seats`, param: "scat", href: L.without(R, "scat", c) })) : mineCats.length ? [{ label: `Your seat categories (${mineCats.join(", ")})`, param: "scat", href: L.with(R, { scat: "all", page: null }) }] : []),
@@ -146,6 +150,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         <FilterDropdown label="Course" name="course" search options={cf.choices} selected={cf.selected} none={cf.none} info={cf.mine.length ? "None ticked means your courses. Tick All courses for every one." : undefined} />
         <FilterDropdown label="Degree" name="degree" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={degrees} none="Any degree" />
         {params.get("grp") === "all" && <input type="hidden" name="grp" value="all" />}
+        {params.get("rq") === "all" && <input type="hidden" name="rq" value="all" />}
         {list != null && params.get("list") && <input type="hidden" name="list" value={params.get("list")!} />}
         {E.categories.length > 1 && <FilterDropdown
           label="Seat category"

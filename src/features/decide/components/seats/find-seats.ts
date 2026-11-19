@@ -17,6 +17,7 @@ import { collegeTypeLabel } from "../institute/college-type";
 import { reportedCount } from "../institute/hospital-bits";
 import { hospitalInfo, type HospitalInfo, type ReportedBeds } from "../institute/institute-data";
 import { roundNameFrom } from "@/features/exams/exam";
+import { seatCategoriesFor } from "@/features/exams/keys";
 
 export const seatSorts = ["reach", "closing", "seats", "college", "state", "fee", "bond"] as const;
 export type SeatSort = (typeof seatSorts)[number];
@@ -308,7 +309,8 @@ export async function seatsView(f: SeatsParams, profile: Profile | null, pageSiz
   const [all, meta, inst] = await Promise.all([seatLists(exam), getMeta(exam), f.inst ? getCollege(f.inst, exam) : null]);
   const course = meta.courses.find((c) => c.slug === f.course);
   const list = all.find((l) => l.key === f.list) ?? all[0] ?? null;
-  const mine = profile ? eligibleCategories(profile.category, profile.pwd) : null;
+  // INI-CET: a course total not split by category (JIPMER) may hold hers (keys.ts seatCategoriesFor).
+  const mine = profile ? seatCategoriesFor(exam, eligibleCategories(profile.category, profile.pwd)) : null;
   const sort: SeatSort = f.sort ?? (profile ? "reach" : "college");
   const base = { f, profile, all, meta, inst, course, list, mine, sort };
   if (!list) return { ...base, r: null };

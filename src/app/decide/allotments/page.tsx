@@ -24,10 +24,10 @@ import { decideLinks } from "@/features/decide/lib/links";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { roundLabel, type Round } from "@/features/decide/types";
+import { roundLabel, roundShort, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examGate, examInfo } from "@/features/exams/active";
-import { authorityOf, DEFAULT_EXAM, groupsOf, roundNameIn, termsDocOf, yearName, type ExamKey } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, groupsOf, perGroup, roundNameIn, termsDocOf, yearName, type ExamKey } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 import { quotaIn, type Exam } from "@/features/exams/exam";
 import { PgOr } from "@/features/decide/components/round-name";
@@ -108,7 +108,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
     set("year") && { label: filters.year ? `Year: ${meta.years.find((y) => y.year === filters.year)?.label ?? yn(filters.year)}` : "All years", param: "year", href: here({ year: null }) },
     set("round") && filters.round && { label: `Round: ${roundChoice(filters.round)}`, param: "round", href: here({ round: null }) },
     // Her profile's default (no filter set): one chip saying so; × shows every allotment (the latest round).
-    fromProfile && { label: `From your profile: ${fromProfile.courses.length ? `${fromProfile.courses.length === 1 ? courseLabel(fromProfile.courses[0]) : `your ${fromProfile.courses.length} courses`}, ` : ""}ranks ${formatRank(fromProfile.from)}–${formatRank(fromProfile.to)}${fromProfile.quotas ? `, ${groupsOf(exam, fromProfile.quotas).join(", ")}` : ""}`, param: "course", href: showAll },
+    fromProfile && { label: `From your profile: ${fromProfile.courses.length ? `${fromProfile.courses.length === 1 ? courseLabel(fromProfile.courses[0]) : `your ${fromProfile.courses.length} courses`}, ` : ""}ranks ${formatRank(fromProfile.from)}–${formatRank(fromProfile.to)}${fromProfile.quotas ? `, ${perGroup(exam) ? groupsOf(exam, fromProfile.quotas).join(", ") : `your quotas (${fromProfile.quotas.map((q) => quotaIn(E, q)).join(", ")})`}` : ""}`, param: "course", href: showAll },
     ...(fromProfile ? [] : f.course ?? []).map((c) => ({ label: courseLabel(c), param: "course", href: L.without("/decide/allotments", "course", c) })),
     filters.quota && { label: `Quota: ${quotaIn(E, filters.quota)}`, param: "aq", href: here({ aq: null }) },
     filters.category && { label: `${filters.category} seats`, param: "acat", href: here({ acat: null }) },
@@ -229,7 +229,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
                     {/* Type and beds stay together: wrapped one above the other, the lower (i)'s 44px target covered the upper. */}
                     <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                       <span className="text-foreground">{courseLink(a)}</span>
-                      <span aria-hidden>·</span><span className="sr-only">, </span>
+                      <span aria-hidden>·</span>{exam === DEFAULT_EXAM || authorityOf(exam) === "MCC" ? <span className="sr-only">, </span> : null}
                       <span>{a.college.state}</span>
                       <span className="inline-flex items-center gap-x-1.5 whitespace-nowrap">
                         <TypeBadge type={a.hospital?.type} of={a.college.name} />
@@ -300,7 +300,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
           <span className="numeric font-semibold text-foreground">{rangeLabel({ rows, total, page, pageSize })}</span> allotments
           {/* The default view (no filter: the latest round) is what Year and Round show; say it for screen readers. */}
-          {latest && <span className="sr-only">, the latest round, {yn(latest.year)} {roundLabel[latest.rounds.at(-1)!]}</span>}
+          {latest && <span className="sr-only">, the latest round, {yn(latest.year)} {roundShort(latest.rounds.at(-1)!, exam)}</span>}
          <ColourLegend className="ml-1 align-middle" /></p>
         </AboutData>
         {total > 0 && (
