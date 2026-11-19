@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { baseCategories, openQuotas } from "./types";
+import { baseCategories, openQuotas, type BaseCategory } from "./types";
 
 /** One exact course as "degree~SPECIALTY", e.g. "DNB~FAMILYMEDICINE" (the `c` URL param). */
 export const pairSchema = z.string().max(200).regex(/^[^~,]+~[^~,]+$/, "degree~SPECIALTY, e.g. DNB~FAMILYMEDICINE");
@@ -92,6 +92,18 @@ export function picksOf(p: ProfileCourses, courses: { degree: string; specialty:
 /** The quotas her profile covers: the ones she ticked, else the exam's open quotas (`open`, exams' `quotas`; default NEET PG's; NEET SS: none, she picks her group). */
 export const profileQuotas = (p: Pick<Profile, "quotas">, open: string[] = openQuotas) => (p.quotas.length ? p.quotas : open);
 
+/** How a category is typed (letters only, any case) → Seatora's: General, GEN, UR and Unreserved are Open. */
+const CATEGORY_WORDS: Record<string, BaseCategory> = { open: "Open", general: "Open", gen: "Open", ur: "Open", unreserved: "Open", obc: "OBC", obcncl: "OBC", ews: "EWS", sc: "SC", st: "ST" };
+/**
+ * A category as typed in a URL ("UR", "gen", "General", "UR-PwD", "OBC PWBD"): Seatora's category and whether a PwD /
+ * PwBD suffix said PwD. Null: no category Seatora knows (the page says so instead of falling back unsaid).
+ */
+export function categoryFromText(s: string): { category: BaseCategory; pwd: boolean } | null {
+  const m = /^(.*?)[\s_\-/()]*(pwbd|pwd)?\)?$/i.exec(s.trim());
+  const category = CATEGORY_WORDS[(m?.[1] ?? "").toLowerCase().replace(/[^a-z]/g, "")];
+  return category ? { category, pwd: !!m?.[2] } : null;
+}
+
 const list = (p: URLSearchParams, k: string) => p.getAll(k).flatMap((v) => v.split(",")).map((v) => v.trim()).filter(Boolean);
 const num = (v: string | null | undefined) => (v != null && v.trim() !== "" ? Number(v) : null);
 /** 1/true/yes or 0/false/no (any case); absent is false; anything else stays a string, so strict parsing rejects it. */
@@ -103,11 +115,12 @@ const flag = (v: string | null) => {
 /** Profile params as typed values with no fallbacks (NaN for a malformed number), for strict validation (HTTP API). */
 export function profileInput(p: URLSearchParams) {
   const cat = p.get("cat")?.trim() ?? "Open";
+  const known = categoryFromText(cat); // "obc", "UR", "GEN-PwD"
   const pairs = list(p, "c");
   return {
     rank: num(p.get("rank")?.replace(/[,\s]/g, "")),
-    category: baseCategories.find((c) => c.toLowerCase() === cat.toLowerCase()) ?? cat, // "obc" is OBC
-    pwd: flag(p.get("pwd")),
+    category: known?.category ?? cat,
+    pwd: known?.pwd || flag(p.get("pwd")),
     specialties: list(p, "sp"),
     degrees: list(p, "deg"),
     pairs: pairs.length ? pairs : undefined,

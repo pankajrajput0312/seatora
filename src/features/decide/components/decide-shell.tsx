@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, House, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { CircleArrowUp, Gift, Globe, LogOut, Menu, MessageCircle, Pencil, ShieldCheck, Sparkles } from "lucide-react";
+import { CircleArrowUp, Gift, Globe, LogOut, Menu, MessageCircle, Pencil, ShieldCheck, Sparkles, X } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -14,13 +14,13 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { LogOutButton } from "@/features/auth/components/log-out-button";
 import { compactRank, formatRank } from "@/features/cutoffs/lib/format";
-import { examShows, neetPg, type Exam } from "@/features/exams/exam";
+import { examShows, groupsIn, neetPg, type Exam } from "@/features/exams/exam";
 import { DEFAULT_EXAM, scopedKey, type ExamKey } from "@/features/exams/keys";
 import { MAX_COMPARE } from "../lib/choices";
 import { pageFilters, withFilters } from "../lib/links";
 import { readLocal } from "../lib/local-store";
 import { ExamContext, useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
-import { PROFILE_KEY, profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
+import { categoryFromText, PROFILE_KEY, profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
 import { AccountSync } from "./account-sync";
 import { BackToTop } from "./back-to-top";
 import { NAV_EVENT, navigating, TOAST_EVENT } from "./nav-pending";
@@ -95,15 +95,24 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
   const [profile, setStored, hydrated] = useSavedProfile();
   const [menuOpen, setMenuOpen] = useState(false); // the phone menu (drawer): its ☰ and the bottom bar's More
   // What the page is actually using: URL params override the saved profile.
-  const shown = profileFromParams(new URLSearchParams(sp.toString())) ?? profile;
+  const inUrl = profileFromParams(new URLSearchParams(sp.toString()));
+  const shown = inUrl ?? profile;
+  // Trying a rank: the address's rank, category or (NEET SS) question group isn't her saved one (or none is saved).
+  // Nothing is saved until she says so; links carry the address's profile, so every page shows the one she is trying.
+  const group = (p: Profile) => groupsIn(E, p.quotas).join("|");
+  const trying = hydrated && !!inUrl && (!profile || inUrl.rank !== profile.rank || inUrl.category !== profile.category || inUrl.pwd !== profile.pwd || group(inUrl) !== group(profile));
+  // A `cat` the URL has that is no category (cat=XYZ): said, never a silent fallback (the saved profile, else Open).
+  const [badCat, setBadCat] = useState<string | null>(null);
   const [compare] = useCompare(); // Zod-validated tray: a malformed value is an empty tray, never a crash
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<false | "edit" | "try">(false);
   // The first-run setup's destination while it loads: until then the effect below leaves the URL alone, or its
   // replace (the new profile into the page she was on) would cancel the push.
   const landing = useRef<string | null>(null);
 
   // URL params override; otherwise bring the saved profile into the URL. A URL profile that doesn't parse (a hand-edited
-  // rank=abc or cat=GEN) counts as none, so the page and this sidebar both show the saved one, never a silent fallback.
+  // rank=abc or cat=XYZ; cat=UR or GEN is Open) counts as none, so the page and this sidebar both show the saved one, and
+  // an unknown category says so (badCat).
+  useEffect(() => setBadCat(null), [pathname]);
   useEffect(() => {
     if (!hydrated) return;
     if (landing.current) {
@@ -111,10 +120,14 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
       landing.current = null;
     }
     const next = new URLSearchParams(sp.toString());
-    // Pages ask for the editor with ?editProfile=1 (e.g. the "Set your rank" button); open it once and drop the flag.
-    const wantsEdit = next.get("editProfile") === "1";
+    const cat = next.get("cat");
+    if (cat && !categoryFromText(cat)) setBadCat(cat);
+    // Pages ask for the editor with ?editProfile=1 (e.g. the "Set your rank" button), or =try ("Try a rank"); open it
+    // once and drop the flag.
+    const asked = next.get("editProfile");
+    const wantsEdit = asked === "1" || asked === "try";
     next.delete("editProfile");
-    if (wantsEdit) setEditing(true);
+    if (wantsEdit) setEditing(asked === "try" ? "try" : "edit");
     const saved = profile && profileToParams(profile, next);
     if (saved && !profileSchema.safeParse(profileInput(next)).success && `${saved}` !== `${next}`) {
       navigating();
@@ -138,9 +151,12 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
     return () => window.removeEventListener(TOAST_EVENT, on);
   }, []);
 
-  const save = (p: Profile) => {
-    setStored(p);
-    setToast({ text: "Saved your rank", at: Date.now() });
+  // Into the page's address, saved (Save) or not ("Try without saving": only the address changes, the saved one stays).
+  const apply = (p: Profile, keep: boolean) => {
+    if (keep) {
+      setStored(p);
+      setToast({ text: "Saved your rank", at: Date.now() });
+    }
     // First run: on to Options, which opens on the current round's seats in her courses (service.ts optionsView).
     if (!shown) {
       landing.current = "/decide/options";
@@ -152,6 +168,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
     if (`${next}` !== `${sp}`) navigating();
     router.replace(`${pathname}?${next}`, { scroll: false });
   };
+  const save = (p: Profile) => apply(p, true);
 
   // Loading: a Decide link was followed and its page hasn't arrived (pages render on the server, no Suspense, so
   // without this nothing moves for a second or two). Cleared when the address changes.
@@ -287,7 +304,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
                   </span>
                 )}
                 {/* Phones: the rank and its edit button as one chip here (the sidebar, with its rank card, is in the drawer). */}
-                <button type="button" data-profile-edit aria-label={shown ? `${E.rankWord} ${formatRank(shown.rank)} ${profileSub(E, shown)}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(true)}
+                <button type="button" data-profile-edit aria-label={shown ? `${E.rankWord} ${formatRank(shown.rank)} ${profileSub(E, shown)}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing("edit")}
                   className="hit inline-flex h-8 min-w-0 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
                   {shown ? <><span className="numeric shrink-0 font-semibold"><span className="@max-[23.75rem]/topbar:hidden">{`${E.rankWord} `}</span><span className="@max-[21.25rem]/topbar:hidden">{formatRank(shown.rank)}</span><span className="hidden @max-[21.25rem]/topbar:inline">{compactRank(shown.rank)}</span></span><span className="truncate text-muted-foreground @max-[25rem]/topbar:hidden">{E.perGroup ? `· ${profileSub(E, shown)}` : <>· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</>}</span></> : <span className="truncate">{hydrated ? <>Set <span className="@max-[23.75rem]/topbar:hidden">your </span>rank</> : "Loading…"}</span>}
                   <Pencil className="size-3 shrink-0 text-muted-foreground" aria-hidden />
@@ -314,7 +331,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
                 ) : (
                   <p className="mt-0.5 text-sm">{hydrated ? "Not set yet" : "Loading…"}</p>
                 )}
-                <Button data-profile-edit variant="secondary" className="mt-2 w-full" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(true)}>{shown ? "Edit" : "Set your rank"}</Button>
+                <Button data-profile-edit variant="secondary" className="mt-2 w-full" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing("edit")}>{shown ? "Edit" : "Set your rank"}</Button>
                 <Link href="/" className="mt-1 inline-flex min-h-10 items-center text-sm text-muted-foreground hover:text-foreground md:hidden">Back to site</Link>
               </div>
             }
@@ -332,6 +349,30 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
         <div aria-busy={loading || undefined} data-no-terms={!E.has.fees || undefined} className={cn("isolate transition-opacity md:pb-0", compare.length ? "pb-[calc(9rem+env(safe-area-inset-bottom))]" : "pb-[calc(6rem+env(safe-area-inset-bottom))]", loading && "opacity-60")}>
           <RenamedSaved listName={listName} />
+          {(trying || badCat) && inUrl && (
+            <div className="grid gap-2 px-4 pt-4 md:px-6 xl:px-10" data-print-hide>
+              {badCat && (
+                <p role="status" className="flex items-start gap-2 rounded-md border border-sun/40 bg-sun/10 py-1 pr-1 pl-3 text-sm">
+                  <span className="min-w-0 flex-1 py-1.5">
+                    The address&apos;s category “{badCat}” isn&apos;t one Seatora knows, so this shows {E.perGroup ? "your rank" : <>{categoryName(inUrl.category)}{inUrl.pwd ? " PwD" : ""}</>}{profile && !trying ? ", as you saved it" : ""}.{" "}
+                    {E.categories.length > 1 && <>Categories: {E.categories.map(categoryName).join(", ")}; add PwD with “-PwD” (UR-PwD).</>}
+                  </span>
+                  <Button variant="ghost" size="icon" className="shrink-0 max-md:size-9" aria-label="Close this note" onClick={() => setBadCat(null)}><X className="size-4" aria-hidden /></Button>
+                </p>
+              )}
+              {trying && (
+                <p role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-sky/40 bg-sky/10 px-3 py-1.5 text-sm">
+                  <span className="min-w-[13rem] flex-1">
+                    <span className="font-semibold">Trying <span className="numeric">{E.rankWord} {formatRank(inUrl.rank)}</span> · {profileSub(E, inUrl)}</span> — not saved.
+                  </span>
+                  <span className="flex flex-wrap gap-x-2">
+                    <Button variant="ghost" size="sm" className="text-sky max-md:h-11" onClick={() => save(inUrl)}>Save as mine</Button>
+                    {profile && <Button variant="ghost" size="sm" className="text-sky max-md:h-11" onClick={() => apply(profile, false)}>Back to my rank</Button>}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
           <AccountSync key={ex} />
           {children}
         </div>
@@ -372,13 +413,17 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
           key={JSON.stringify(shown)}
           open
           onOpenChange={(o) => {
-            setEditing(o);
-            if (!o) setTimeout(() => [...document.querySelectorAll<HTMLElement>("[data-profile-edit]")].find((e) => e.offsetParent !== null)?.focus(), 50);
+            if (o) return;
+            setEditing(false);
+            setTimeout(() => [...document.querySelectorAll<HTMLElement>("[data-profile-edit]")].find((e) => e.offsetParent !== null)?.focus(), 50);
           }}
           profile={shown}
-          setup={!shown}
+          // "Try a rank" (first run's ?editProfile=try): the whole editor at once, not the setup's steps.
+          setup={!shown && editing !== "try"}
+          trial={editing === "try"}
           meta={meta}
           onSave={save}
+          onTry={(p) => apply(p, false)}
         />
       )}
     </>

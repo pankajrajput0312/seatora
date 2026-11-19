@@ -47,7 +47,11 @@ export function SetRankPrompt({ path }: { path: string }) {
       description="Rank and category, your courses, then quotas. Options then opens on this round's seats. Saved to your account, so it follows you to any device you sign in on; your rank and category show in page addresses."
       className="mt-6"
     >
-      <Button asChild size="lg"><Link href={`${path}?editProfile=1`}>Set your rank</Link></Button>
+      <span className="flex flex-wrap justify-center gap-3">
+        <Button asChild size="lg"><Link href={`${path}?editProfile=1`}>Set your rank</Link></Button>
+        {/* Nothing saved: the rank goes into the page's address only (decide-shell.tsx's "Trying …" banner offers Save). */}
+        <Button asChild size="lg" variant="secondary"><Link href={`${path}?editProfile=try`}>Try a rank without saving</Link></Button>
+      </span>
     </EmptyState>
   );
 }
@@ -96,7 +100,10 @@ export function SetupCard() {
           </li>
         ))}
       </ol>
-      <Button asChild size="lg" className="mt-4 min-h-11 max-sm:w-full"><Link href={exam ? L.to("/decide", { editProfile: 1 }) : "/decide?editProfile=1"}>Set your rank</Link></Button>
+      <span className="mt-4 flex flex-wrap gap-3">
+        <Button asChild size="lg" className="min-h-11 max-sm:w-full"><Link href={exam ? L.to("/decide", { editProfile: 1 }) : "/decide?editProfile=1"}>Set your rank</Link></Button>
+        <Button asChild size="lg" variant="secondary" className="min-h-11 max-sm:w-full"><Link href={exam ? L.to("/decide", { editProfile: "try" }) : "/decide?editProfile=try"}>Try a rank without saving</Link></Button>
+      </span>
     </section>
   );
 }

@@ -78,7 +78,10 @@ describe("profile params", () => {
     });
     expect(parseProfile(qs("rank=42284&fee=abc")).success).toBe(false);
     expect(parseProfile(qs("cat=OBC")).success).toBe(false);
-    expect(parseProfile(qs("rank=42284&cat=GEN")).success).toBe(false);
+    // The Decide URL's category words: GEN / UR / General are Open, a -PwD suffix is PwD; anything else fails.
+    expect(parseProfile(qs("rank=42284&cat=GEN")).data).toMatchObject({ category: "Open", pwd: false });
+    expect(parseProfile(qs("rank=42284&cat=UR-PwD")).data).toMatchObject({ category: "Open", pwd: true });
+    expect(parseProfile(qs("rank=42284&cat=XYZ")).success).toBe(false);
   });
   it("reads pwd as 1/true/yes or 0/false/no, rejects anything else; cat in any case", () => {
     for (const v of ["1", "true", "yes", "TRUE"]) expect(parseProfile(qs(`rank=1&pwd=${v}`)).data?.pwd).toBe(true);

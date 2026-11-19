@@ -63,8 +63,12 @@ function Checks({ legend, options, value, onChange, note = "None ticked = all." 
   );
 }
 
-/** The profile editor; with `setup` (no profile yet) the guided first run: one step at a time, then Options. */
-export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup = false }: { open: boolean; onOpenChange: (o: boolean) => void; profile: Profile | null; meta: ProfileMeta; onSave: (p: Profile) => void; setup?: boolean }) {
+/**
+ * The profile editor; with `setup` (no profile yet) the guided first run: one step at a time, then Options. `onTry`:
+ * "Try without saving", the profile into the page's address only (the saved one stays as it is); `trial`: opened as
+ * "Try a rank" (the first run's other way in), so it says nothing is saved unless she saves.
+ */
+export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry, setup = false, trial = false }: { open: boolean; onOpenChange: (o: boolean) => void; profile: Profile | null; meta: ProfileMeta; onSave: (p: Profile) => void; onTry?: (p: Profile) => void; setup?: boolean; trial?: boolean }) {
   const E = useExamInfo();
   const exam = E.key;
   const steps = stepsOf(E);
@@ -111,19 +115,27 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
   // Said as she types (a rank typed into a filled field used to run on: 4228442284), not only on Save.
   const rankOff = rankText.trim() !== "" && !profileSchema.shape.rank.safeParse(rank()).success;
   const rankMsg = error ?? (rankOff ? rankError : null);
-  const save = () => {
+  /** Save (`to` onSave), or Try without saving (onTry): the same checks either way. */
+  const save = (to = onSave) => {
     const c = current();
     if (!c) return setNoCourse(true);
-    if (groupError) return setGroupMsg(true);
+    if (groupError) {
+      if (step > 0) go(0); // the group is on the first step
+      return setGroupMsg(true);
+    }
     const r = profileSchema.safeParse({ ...c, rank: rank() });
     if (!r.success) {
+      if (step > 0) go(0);
       // The field and its error into view (on a phone the sheet is scrolled down to Save).
       setError(rankError);
-      rankInput.current?.focus();
-      return rankInput.current?.scrollIntoView({ block: "center" });
+      setTimeout(() => {
+        rankInput.current?.focus();
+        rankInput.current?.scrollIntoView({ block: "center" });
+      });
+      return;
     }
     setError(null);
-    onSave(r.data);
+    to(r.data);
     onOpenChange(false);
   };
   /** Setup: check this step's answer, then the next step (the last one saves). */
@@ -341,8 +353,8 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
         className="fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-xl border border-border bg-popover p-6 pb-0 shadow-overlay outline-none md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Dialog.Title className="text-xl font-semibold">{`Your ${exam === DEFAULT_EXAM ? "" : `${E.label} `}${setup ? "rank and courses" : "rank and preferences"}`}</Dialog.Title>
-            <Dialog.Description className="mt-1 text-sm text-muted-foreground">Saved to your account, on every device you sign in on.</Dialog.Description>
+            <Dialog.Title className="text-xl font-semibold">{trial ? `Try ${exam === DEFAULT_EXAM ? "a" : `a ${E.label}`} rank` : `Your ${exam === DEFAULT_EXAM ? "" : `${E.label} `}${setup ? "rank and courses" : "rank and preferences"}`}</Dialog.Title>
+            <Dialog.Description className="mt-1 text-sm text-muted-foreground">{trial ? "Try a rank: nothing is saved unless you choose Save." : "Saved to your account, on every device you sign in on."}{onTry && !trial && " Or try one without saving."}</Dialog.Description>
           </div>
           <Dialog.Close asChild>
             <Button variant="ghost" size="icon" className="shrink-0" aria-label="Close"><X className="size-5" /></Button>
@@ -394,7 +406,11 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
             <div className="flex gap-2">
               {setup && step > 0 && <Button type="button" variant="secondary" onClick={() => go(step - 1)}>Back</Button>}
             </div>
-            <Button type="submit" size="lg">{!setup ? "Save" : step < steps.length - 1 ? "Next" : "Save and see your options"}</Button>
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {/* Only the page's address changes (rank, category, courses…): every page shows it, a banner offers Save. */}
+              {onTry && (!setup || rankText.trim() !== "") && <Button type="button" variant="secondary" size="lg" className="max-md:h-12 max-md:px-4" onClick={() => save(onTry)}>Try without saving</Button>}
+              <Button type="submit" size="lg">{!setup ? "Save" : step < steps.length - 1 ? "Next" : "Save and see your options"}</Button>
+            </div>
           </div>
         </form>
       </Dialog.Content>

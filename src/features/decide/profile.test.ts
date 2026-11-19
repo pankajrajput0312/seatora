@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  coursesFromPicks, feeChoices, keepProfileParams, pairChoices, picksOf, profileCourseFilter, profileFromParams, profileHasCourse, profileInput, profileQuotas,
+  categoryFromText, coursesFromPicks, feeChoices, keepProfileParams, pairChoices, picksOf, profileCourseFilter, profileFromParams, profileHasCourse, profileInput, profileQuotas,
   profileSchema, profileToParams, profileWithFilters, toURLSearchParams, type Profile,
 } from "./profile";
 
@@ -23,6 +23,17 @@ it("returns null without a valid rank", () => {
 it("keeps the profile when one optional param is bad, reads repeated params, and strips commas from rank", () => {
   const p = profileFromParams(new URLSearchParams("rank=42,284&cat=OBC&fee=abc&sp=ANAESTHESIOLOGY&sp=FAMILYMEDICINE"));
   expect(p).toMatchObject({ rank: 42284, category: "OBC", maxFeeLakh: null, specialties: ["ANAESTHESIOLOGY", "FAMILYMEDICINE"] });
+});
+
+it("reads a category as typed: UR / GEN / General are Open, a PwD or PwBD suffix is PwD; an unknown one is no category", () => {
+  const read = (cat: string) => profileSchema.safeParse(profileInput(new URLSearchParams({ rank: "25000", cat }))).data;
+  for (const cat of ["UR", "ur", "GEN", "General", "unreserved", "Open"]) expect(read(cat)).toMatchObject({ category: "Open", pwd: false });
+  for (const cat of ["UR-PwD", "General PwD", "GEN_PWBD", "Open (PwD)"]) expect(read(cat)).toMatchObject({ category: "Open", pwd: true });
+  expect(read("obc pwbd")).toMatchObject({ category: "OBC", pwd: true });
+  expect(read("OBC-NCL")).toMatchObject({ category: "OBC", pwd: false });
+  expect(read("sc")).toMatchObject({ category: "SC" });
+  expect(categoryFromText("Gneral")).toBeNull();
+  expect(read("XYZ")).toBeUndefined();
 });
 
 it("keeps every value of a repeated key from Next's searchParams (GET form with two boxes ticked)", () => {
