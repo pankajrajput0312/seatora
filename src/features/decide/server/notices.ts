@@ -1,5 +1,6 @@
 import "server-only";
 import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
+import { LATEST_YEAR } from "../lib/reach";
 import { db } from "@/lib/db";
 import { rounds, roundSteps, type MccNotice, type NoticeKind, type Round, type RoundStepInfo, type RoundStepName, type StepStatus } from "../types";
 import { perImport } from "./catalog";
@@ -29,6 +30,13 @@ export type RoundStatus = {
   asOf: string;
   rounds: { round: Round; steps: RoundStepInfo[] }[];
 };
+
+/**
+ * The counselling year (an exam with sessions: the session) its round status follows: NEET PG's LATEST_YEAR as ever;
+ * another exam's newest one in its round steps (INI-CET: the January 2027 session, whose results are not out yet); null without any.
+ */
+export const scheduleYear = (exam: ExamKey = DEFAULT_EXAM): Promise<number | null> => (exam === DEFAULT_EXAM ? Promise.resolve(LATEST_YEAR) : scheduleYearOnce("", exam));
+const scheduleYearOnce = perImport(async (_key, exam) => (await db.roundStep.findFirst({ where: { exam }, orderBy: { year: "desc" }, select: { year: true } }))?.year ?? null);
 
 /** Round steps of a counselling year, R1 → stray, each seat matrix → final result. Null when none are imported. */
 export const roundStatus = (year: number, exam: ExamKey = DEFAULT_EXAM) => roundStatusOnce(String(year), exam);

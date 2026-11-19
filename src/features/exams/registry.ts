@@ -79,8 +79,11 @@ export const exams: Record<ExamKey, Exam> = {
     perGroup: false,
     exampleRank: "500",
     resultsName: "AIIMS seat allocation results",
-    // Its notices and round steps are imported but not shown: the Schedule page is MCC's (NEET PG's) for now.
-    has: { ...resultsOnly, seats: true },
+    site: { url: "https://www.aiimsexams.ac.in/", name: "AIIMS exams site" },
+    roundWords: { R3: "Open Round" },
+    // Its Schedule follows the session its round status is about (notices.ts scheduleYear: January 2027), the last
+    // session's notices beside it as how that one ran.
+    has: { ...resultsOnly, seats: true, notices: true },
   },
 };
 

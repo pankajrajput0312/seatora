@@ -170,10 +170,12 @@ describe("INI-CET: two sessions a year, a year is a session code", () => {
     expect(E).toMatchObject({ label: "INI-CET", rankWord: "Rank", rankName: "INI-CET rank", categories: baseCategories, pwd: true, perGroup: false });
     expect(E.scopeNote).toBe("Seatora covers INI-CET counselling by AIIMS New Delhi (AIIMS, JIPMER, PGIMER, NIMHANS, SCTIMST seats).");
     expect(E.quotasNote).toContain(E.scopeNote);
-    expect(E.has.allotments && E.has.seats && !E.has.residents && !E.has.notices && !E.has.scoreRank && !E.has.merit && !E.has.beds).toBe(true);
+    expect(E.has.allotments && E.has.seats && E.has.notices && !E.has.residents && !E.has.scoreRank && !E.has.merit && !E.has.beds).toBe(true);
     // its bundle (19 Nov 2026): January 2023 to July 2026, each session's 1st, 2nd and Open Round
     expect([E.latestYear, E.pastYears, E.rounds]).toEqual([20267, [20257, 20261], ["R1", "R2", "R3"]]);
-    for (const h of ["/decide/residents", "/decide/counselling", "/decide/rank-tools"]) expect(showsPage("ini-cet", h)).toBe(false);
+    for (const h of ["/decide/residents", "/decide/rank-tools"]) expect(showsPage("ini-cet", h)).toBe(false);
+    expect(showsPage("ini-cet", "/decide/counselling")).toBe(true); // its notices and round status (the Schedule)
+    expect([E.site?.name, E.roundWords?.R3]).toEqual(["AIIMS exams site", "Open Round"]);
     expect(restrictedQuota("ini-cet", "Sponsored")).toBe(true);
     expect(E.quotas.every((q) => !restrictedQuota("ini-cet", q))).toBe(true);
   });

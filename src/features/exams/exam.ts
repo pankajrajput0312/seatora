@@ -41,6 +41,10 @@ export type Exam = {
   typos?: [from: string, to: string][];
   /** What its result PDFs are, in a source line, when not "MCC allotment results" (INI-CET: AIIMS's). */
   resultsName?: string;
+  /** Its counselling body's official site, when not MCC's PG counselling site (INI-CET: AIIMS's exams site). */
+  site?: { url: string; name: string };
+  /** A round's name on its schedule where not lib/round-status.ts roundName's ("Round 3"): INI-CET's "Open Round". */
+  roundWords?: Partial<Record<Round, string>>;
 };
 
 export const neetPg: Exam = {
