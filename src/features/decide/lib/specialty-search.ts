@@ -72,6 +72,9 @@ const NAMES: Record<string, string> = {
   PHYSICALMEDICINEANDREHABILITATION: "Physical Medicine and Rehabilitation",
   COMMUNITYHEALTHADMINISTRATION: "Community Health and Administration",
   RESPIRATORYMEDICINE: "Respiratory Medicine",
+  // One name for every degree's (DNB Radiation Oncology, MD Radiotherapy, Diploma Medical Radio-Therapy; MD Radio-Diagnosis, DNB Radio Diagnosis).
+  RADIATIONONCOLOGY: "Radiation Oncology (Radiotherapy)",
+  RADIODIAGNOSIS: "Radiodiagnosis",
 };
 const KEEP = new Set(["ENT", "DVL", "OBG", "TB"]);
 const SMALL = new Set(["and", "of", "in"]);

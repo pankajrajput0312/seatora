@@ -16,7 +16,7 @@ const { db } = vi.hoisted(() => {
 });
 vi.mock("@/lib/db", () => ({ db }));
 
-import { getCatalog, perImport, scrubNotes } from "./catalog";
+import { getCatalog, memoryCatalog, perImport, scrubNotes } from "./catalog";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -69,4 +69,19 @@ it("scrubs first-person working notes from imported term text", () => {
   const years = "3 years. An amending resolution reportedly reduces this to 2 years; I did not retrieve its official text.";
   expect(scrubNotes({ years, n: 1 })).toEqual({ years: "3 years. An amending resolution reportedly reduces this to 2 years.", n: 1 });
   expect(scrubNotes({ t: "If I fail to complete my tenure, I will pay." })).toEqual({ t: "If I fail to complete my tenure, I will pay." });
+});
+
+it("names a specialty by a degree's name, never a diploma's suffix (MS, DNB and D.Orth. together are Orthopaedics)", () => {
+  const courses = [
+    { degree: "Diploma", specialty: "ORTHOPAEDICS", name: "Orthopaedics (D.Orth.)", slug: "diploma-orthopaedics" },
+    { degree: "DNB", specialty: "ORTHOPAEDICS", name: "Orthopaedics", slug: "dnb-orthopaedics" },
+    { degree: "MS", specialty: "ORTHOPAEDICS", name: "Orthopaedics", slug: "ms-orthopaedics" },
+    { degree: "Diploma", specialty: "SPORTSMEDICINE", name: "Sport Medicine", slug: "diploma-sports-medicine" },
+    { degree: "MD", specialty: "SPORTSMEDICINE", name: "Sports Medicine", slug: "md-sports-medicine" },
+  ];
+  const cut = (c: (typeof courses)[number]) => ({ college: "X#1", degree: c.degree, specialty: c.specialty, year: 2025, round: "R1" as const, quota: "All India", category: "Open" as const, opening: 1, closing: 2, n: 1, src: "s" });
+  const cat = memoryCatalog({ colleges: [], courses, sources: [], cutoffs: courses.map(cut), terms: [], allotments: [] });
+  expect(cat.meta.specialties).toEqual([{ code: "ORTHOPAEDICS", name: "Orthopaedics" }, { code: "SPORTSMEDICINE", name: "Sports Medicine" }]);
+  // the diploma's own course keeps its name
+  expect(cat.meta.courses.find((c) => c.degree === "Diploma" && c.specialty === "ORTHOPAEDICS")?.name).toBe("Orthopaedics (D.Orth.)");
 });

@@ -125,10 +125,11 @@ export function indexCatalog(p: {
     feeDocs: p.feeDocs ?? [],
     meta: {
       courses,
-      // One name per specialty: a mixed-case MCC name over an ALL-CAPS one, tidied; listed A–Z.
+      // One name per specialty: a mixed-case MCC name over an ALL-CAPS one, a degree's over a diploma's (MS, DNB and the
+      // diploma together are "Orthopaedics", never the diploma's "Orthopaedics (D.Orth.)"), tidied; listed A–Z.
       specialties: specialtyCodes
         .map((code) => {
-          const names = courses.filter((c) => c.specialty === code).map((c) => c.name);
+          const names = courses.filter((c) => c.specialty === code).sort((a, b) => Number(/diploma/i.test(a.degree)) - Number(/diploma/i.test(b.degree))).map((c) => c.name);
           return { code, name: specialtyName(names.find((n) => !/[A-Z]{3}/.test(n)) ?? names[0], code) };
         })
         .sort((a, b) => a.name.localeCompare(b.name)),
