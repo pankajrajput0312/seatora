@@ -1,0 +1,828 @@
+{
+ "topic": "Candidate in both NEET PG 2026 counselling (MCC + state) and INI-CET January 2027 counselling (AIIMS New Delhi): official crossover rules",
+ "checked": "2026-11-19",
+ "notes": {
+  "page": "PDF page number (1-based) of the document at url; matches the printed number except PGIMER Part B (PDF p.10 = printed p.7).",
+  "quote": "verbatim; \" ... \" joins separate passages from the same page. Every passage was re-checked against a fresh text extraction of that page.",
+  "session": "INI-CET round rules are from the July 2026 session (the latest published). The January 2027 seat-allocation brochure is not out as of 19 Nov 2026.",
+  "scope": "State-quota exit rules come from each state's own bulletin and are not covered here (mcc_state_rules_are_states). Per-college leaving penalties/bonds for MCC seats are college data (data/curated/bonds_verified.json), not MCC rules."
+ },
+ "sources": {
+  "mcc_bulletin": {
+   "title": "MCC NEET-PG (MD/MS/DNB) Counselling 2026 Information Bulletin & Counselling Scheme (header: \"PG Bulletin DRAFT - V10 05102026\")",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "listed_at": "https://mcc.nic.in/pg-medical-counselling/",
+   "date": "2026-10-08",
+   "session": "NEET PG 2026 counselling",
+   "sha256": "c3fd152169d36fc74c6ac17ab40f66836e2eb5e877bf7b56b527529f25048564"
+  },
+  "mcc_user_guide": {
+   "title": "MCC Candidate User Guide - NEET PG Counselling 2026",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610121388624358.pdf",
+   "listed_at": "https://mcc.nic.in/pg-medical-counselling/",
+   "date": "2026-10-12",
+   "session": "NEET PG 2026 counselling",
+   "sha256": "be8c1d8be70d36c0f252cf5074da8eb77850f57b5157053cd1a8c6ab910f4499"
+  },
+  "mcc_notice5": {
+   "title": "MCC Notice No. 5 dated 07.11.2026: modified Round-2 schedule",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/11/20261107776874972.pdf",
+   "listed_at": "https://mcc.nic.in/pg-medical-counselling/",
+   "date": "2026-11-07",
+   "session": "NEET PG 2026 counselling",
+   "sha256": "1f2758c2aea2eadd874935ecf7f8a21ad1f3d9490158c9d04d09f7eaf92e511d"
+  },
+  "mcc_notice10": {
+   "title": "MCC Notice No. 10 dated 17.11.2026: Round-2 result on hold (Madras High Court, WP No. 46350 of 2026)",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/11/202611171047091852.pdf",
+   "listed_at": "https://mcc.nic.in/pg-medical-counselling/",
+   "date": "2026-11-17",
+   "session": "NEET PG 2026 counselling",
+   "sha256": "c4fb2f11eb875dad8dede0eddeaa39ce4f965174f0627a166c4e89238ad3e124"
+  },
+  "mcc_schedule_1611": {
+   "title": "MCC AIQ and State Schedule PG 2026 dated 16.11.2026",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/11/202611161679361332.pdf",
+   "listed_at": "https://mcc.nic.in/pg-medical-counselling/",
+   "date": "2026-11-16",
+   "session": "NEET PG 2026 counselling",
+   "sha256": "7af883a7c3dda9cbce626f8aa89ced19c97bace68cf3725db1d4c2f13223a71c"
+  },
+  "partA_27": {
+   "title": "INI-CET Prospectus Part-A, January 2027 session",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789578987801-314196312.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/advertisement/6aaab710c7a01ed08da4242d",
+   "date": "2026-09-16",
+   "session": "INI-CET January 2027",
+   "sha256": "2c659e4b067897382ae0e5b504dfc59cc22d2471fb37b5d6d47be87505d1e5bd"
+  },
+  "B_AIIMS_27": {
+   "title": "INI-CET Prospectus Part-B, January 2027: all participating AIIMS",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579206207-762701864.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/advertisement/6aaab710c7a01ed08da4242d",
+   "date": "2026-09-16",
+   "session": "INI-CET January 2027",
+   "sha256": "da14f92ce88cd6b86502d641c6d5dc3035a91e34d75b02dfc8ed041f79c349fe"
+  },
+  "B_JIPMER_27": {
+   "title": "INI-CET Prospectus Part-B, January 2027: JIPMER Puducherry",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579237671-359119859.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/advertisement/6aaab710c7a01ed08da4242d",
+   "date": "2026-09-16",
+   "session": "INI-CET January 2027",
+   "sha256": "8c9eca9773e663d91113e44b40ea7c741b1b74dad61576934591a5338a4ecbfe"
+  },
+  "B_PGIMER_27": {
+   "title": "INI-CET Prospectus Part-B, January 2027: PGIMER Chandigarh",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579304174-928708850.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/advertisement/6aaab710c7a01ed08da4242d",
+   "date": "2026-09-16",
+   "session": "INI-CET January 2027",
+   "sha256": "1ee899c7ffd46ce3f683bc71e1454238abbb1deec36c4bb06810e2d7786fdcfe"
+  },
+  "B_NIMHANS_27": {
+   "title": "INI-CET Prospectus Part-B, January 2027: NIMHANS Bengaluru",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579276308-747659856.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/advertisement/6aaab710c7a01ed08da4242d",
+   "date": "2026-09-16",
+   "session": "INI-CET January 2027",
+   "sha256": "8c9bb627ae3e8027b48aa31eda9fb11a824de361315cf7a41f4180142e21eacc"
+  },
+  "B_SCTIMST_27": {
+   "title": "INI-CET Prospectus Part-B, January 2027: SCTIMST Thiruvananthapuram",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579347930-137604789.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/advertisement/6aaab710c7a01ed08da4242d",
+   "date": "2026-09-16",
+   "session": "INI-CET January 2027",
+   "sha256": "e98fca8d870471f21fe401cbcf136866482ade2b1a50a5c8f35232fdb978f22f"
+  },
+  "brochure_26": {
+   "title": "Information Brochure for 1st and 2nd round of online seat allocation, INI-CET July 2026 (dated 03.06.2026)",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1781155071406-258631692.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/notification/69c8069d80ef498688f01438",
+   "date": "2026-06-03",
+   "session": "INI-CET July 2026",
+   "sha256": "1f9968f0b76eab81e41a8c7b66ca13b2427f5ce10418b56e2be5f9ba4b17af3d"
+  },
+  "R1_26": {
+   "title": "Result Notification No. 205/2026: 1st round of seat allocation, INI-CET July 2026",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1782302042465-78641957.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/result/69c8069d80ef498688f01438",
+   "date": "2026-06-24",
+   "session": "INI-CET July 2026",
+   "sha256": "b16a6f6ebe0c28e728eba7872e9e76d7acb18dc90adef500e757743e1ae69dcb"
+  },
+  "R2_26": {
+   "title": "Result Notification No. 216/2026: 2nd round of seat allocation, INI-CET July 2026",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1783678134418-448028518.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/result/69c8069d80ef498688f01438",
+   "date": "2026-07-10",
+   "session": "INI-CET July 2026",
+   "sha256": "a0bdf63a140291ce1d7c2584ceb25c27702a40a6dd79600dafae2b7efafe24bf"
+  },
+  "open_brochure_26": {
+   "title": "Information Brochure for open round of seat allocation, INI-CET July 2026 (dated 21.07.2026)",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1785149587532-851666082.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/notification/69c8069d80ef498688f01438",
+   "date": "2026-07-21",
+   "session": "INI-CET July 2026",
+   "sha256": "1fb88606b8b4ce99fc0a06479500f2165897da3f953eda5f8d5dccc3d87b32ff"
+  },
+  "open_result_26": {
+   "title": "Result Notification No. 261/2026: open round of seat allocation, INI-CET July 2026",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1787312366720-490994390.pdf",
+   "listed_at": "https://www.aiimsexams.ac.in/result/69c8069d80ef498688f01438",
+   "date": "2026-08-21",
+   "session": "INI-CET July 2026",
+   "sha256": "c32132ea96fb5f84af25bc9afc0ef83706a90ae94523cf7a0487cfff8ab42b86"
+  }
+ },
+ "rules": [
+  {
+   "id": "mcc_r1_free_exit",
+   "body": "MCC",
+   "applies_when": "Allotted an MCC Round-1 seat",
+   "rule": "Round 1 has a free exit: you may skip joining the Round-1 seat and go straight to Round 2. Deposit forfeiture starts only from Round 2 (mcc_deposit_forfeit_r2_onwards).",
+   "quote": "Candidates who have been allotted a seat in round one (1) can opt for free exit and can directly participate in round two.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 43,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_r1_free_exit_faq",
+   "body": "MCC",
+   "applies_when": "Freeze candidate who does not report for the Round-1 seat",
+   "rule": "Not reporting to a Round-1 seat (freeze) counts as the free exit. Free exit exists only in Round 1.",
+   "quote": "If a candidate does not report at the allotted institute in Round-1 freeze category, this will be considered as 'Free Exit' (option available only in Round-1).",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 54,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_r1_resign_window_2026",
+   "body": "MCC",
+   "applies_when": "Joined a Round-1 seat and wanted to resign without losing the deposit",
+   "rule": "The window to resign a Round-1 seat WITHOUT forfeiting the security deposit closed at 6:00 PM on 09.11.2026 (freeze: in person at the institute; float: online).",
+   "quote": "Resignation from Round-1 seat WITHOUT Forfeiture of Security Deposit ... Upto 06:00 P.M of 09.11.2026",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/11/20261107776874972.pdf",
+   "page": 1,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_notice5"
+  },
+  {
+   "id": "mcc_resign_r1_r2_only",
+   "body": "MCC",
+   "applies_when": "Holding an MCC seat and wanting to resign/exit",
+   "rule": "Resignation is possible only for Round-1 and Round-2 seats, only within the window MCC sets, and you lose all claim to that seat. Round-3 seats cannot be resigned.",
+   "quote": "Candidate can resign/exit the seat and become eligible for next round as per the resignation rules for round 1 and round 2. Candidates cannot resign/ exit Round 3 allotted seats. ... Seat resigned/ surrendered provided resignation is tendered within stipulated time period prescribed by MCC.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 13,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_withdrawal_user_guide",
+   "body": "MCC",
+   "applies_when": "Using the portal option \"Withdrawal from Counselling\"",
+   "rule": "The User Guide says a withdrawal cancels the seat AND bars you from further rounds (online withdrawal exists for float candidates in Rounds 1 and 2 only, p.52). This is worded more strictly than the Bulletin's resignation rule (mcc_resign_r1_r2_only); the two documents do not reconcile it.",
+   "quote": "After withdrawal, the seat allotted to you will be CANCELLED and you will not be allowed to participate in further rounds of counselling.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610121388624358.pdf",
+   "page": 53,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_user_guide"
+  },
+  {
+   "id": "mcc_deposit_forfeit_r2_onwards",
+   "body": "MCC",
+   "applies_when": "Allotted a seat in Round 2, Round 3 or stray and not joining, or surrendering it",
+   "rule": "From Round 2 onwards, not joining or surrendering an allotted seat forfeits the MCC security deposit. Any cancellation of admission also forfeits it.",
+   "quote": "The Security Deposit of candidates who have been allotted a seat in the Second Round or subsequent rounds but do not join the respective institution or surrender the seat due to any unforeseen reason, will be forfeited.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 7,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_deposit_amounts",
+   "body": "MCC",
+   "applies_when": "Any MCC registrant (this is the amount at stake)",
+   "rule": "The security deposit is Rs 25,000 (AIQ, UR/EWS), Rs 10,000 (AIQ, reserved), or Rs 2,00,000 if you registered for Deemed Universities.",
+   "quote": "Any Unreserved candidate opting for AIQ will pay registration fee of Rs 1000/- + Rs. 25,000/- (Refundable Security Deposit.) ... Any candidate opting for Deemed Universities will have to pay registration fee of Rs 5000/- + Rs 2,00,000/- (Refundable Security Deposit)",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 52,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_r2_resign_state_flowchart",
+   "body": "MCC",
+   "applies_when": "Holding an MCC Round-1/2 seat and taking a STATE seat",
+   "rule": "To join a state seat you must surrender the AIQ seat at the AIQ institute. Leaving is free in Round 1 and costs the deposit in Round 2. (The flowchart covers state seats only. It says nothing about INI-CET.)",
+   "quote": "Wants to join State allotted seat, candidate will have to surrender AIQ seat. ... Round 1 - Free exit Round 2 - With Forfeiture",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 15,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_r2_upgrade_loses_r1",
+   "body": "MCC",
+   "applies_when": "Float candidate upgraded in Round 2",
+   "rule": "If you are upgraded in Round 2, your Round-1 seat is cancelled at once. If you then do not join the Round-2 seat, you lose the deposit. You cannot fall back to the Round-1 seat.",
+   "quote": "the seat allotted during the first round will be automatically cancelled immediately (and allotted to somebody else eligible as per merit) and candidate will have to join the college / seat allotted during second round. If candidate does not join the college/seat allotted during the second round, with in stipulated time, as per schedule, his/her Refundable Security Deposit will be forfeited.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 56,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_r2_exit_then_r3",
+   "body": "MCC",
+   "applies_when": "Exited a Round-2 seat with forfeiture",
+   "rule": "You can still take part in Round 3, but you must pay the fees again.",
+   "quote": "Candidates who exit with forfeiture in round 2 can participate in 3 round but with fresh payment of fees.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 59,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_r3_holder_ineligible",
+   "body": "MCC",
+   "applies_when": "Holding an AIQ Round-1/2 seat without opting to upgrade",
+   "rule": "You cannot take part in Round 3 unless you opted to upgrade.",
+   "quote": "Candidates who are holding any seat in Round-1 or Round-2 of AIQ and have not given willingness to upgrade in round 3 will not be eligible.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 59,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_r3_no_resign",
+   "body": "MCC",
+   "applies_when": "Allotted an MCC Round-3 seat",
+   "rule": "A Round-3 seat cannot be resigned once you join it. Not joining it costs the deposit and removes you from all later MCC rounds.",
+   "quote": "Once joined, he cannot upgrade or resign from this third-round seat. ... If any candidate does not join Round 3 seat, he may exit with forfeiture of security deposit and elimination (cannot participate in further rounds of counselling conducted by MCC, DGHS).",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 45,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_r3_no_resign_annexure",
+   "body": "MCC",
+   "applies_when": "Joined an MCC Round-3 seat",
+   "rule": "This repeats the rule: no resignation from a joined Round-3 seat, and no further MCC rounds.",
+   "quote": "If a candidate joins in 3rd round, they shall not be permitted to resign from 3rd round of AIQ/Deemed/Central Universities. They will not be allowed to participate in any further rounds of Counseling after joining in Third Round of AIQ.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 117,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_stray_eligibility",
+   "body": "MCC",
+   "applies_when": "Wanting the MCC stray vacancy round",
+   "rule": "The stray round is only for candidates not holding a seat. The bracket names AIQ, State and Deemed seats only; it does not say whether an INI-CET seat counts.",
+   "quote": "Candidates who are not holding any seat or did not participate in Round-1, Round-2, and Round -3 (AIQ, State, Deemed) can participate in Stray Vacancy Round.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 46,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_stray_state_data_sharing",
+   "body": "MCC",
+   "applies_when": "Holding a state seat after state Round 3",
+   "rule": "States send MCC their post-Round-3 lists, and anyone named on them is removed before the AIQ stray round. This data sharing is between MCC and the states only.",
+   "quote": "Data will be shared between Centre and States after Round 3 of states and if any candidate has his/her name in the list provided by State after round 3, such candidates will be eliminated from counseling before processing for All-India Stray Vacancy Round.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 46,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_stray_must_join",
+   "body": "MCC",
+   "applies_when": "Allotted a stray-round seat",
+   "rule": "You must join a stray-round seat, otherwise you lose the deposit.",
+   "quote": "If a candidate is allotted a seat in Stray round, he/she has to report & join the allotted seat at college/institute else there will be forfeiture of security deposit.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 46,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_originals_needed_to_join",
+   "body": "MCC",
+   "applies_when": "Joining any MCC seat while your originals are with another institute (e.g. an INI)",
+   "rule": "You cannot join an MCC seat without original certificates. A letter saying your originals are deposited at another institute is not accepted.",
+   "quote": "Candidates without original certificates / documents shall not be allowed to take admission in allotted Medical College. ... Candidates who have deposited their original documents with any other Institute / College/ University and come for admission with a certificate stating that \"their original certificates are deposited with the Institute / College / University\" shall not be allowed to take admission in allotted Medical College/Institute.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 51,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_originals_retained",
+   "body": "MCC",
+   "applies_when": "Admitted to an MCC seat",
+   "rule": "The college keeps your original certificates and releases them only on an upgrade or a resignation made within MCC's timelines.",
+   "quote": "all the participating colleges/institutions have been instructed to retain original certificates of admitted students in order to prevent blocking of seat and prevention of multiple admissions by one candidate and release them only on up-gradation of the seat or resignation by the candidate (during the specified timelines).",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 58,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_college_terms_not_mcc",
+   "body": "MCC",
+   "applies_when": "Leaving an MCC-allotted college (bond / leaving penalty)",
+   "rule": "Bonds, leaving penalties and service conditions are set by each college and published on the MCC site. MCC takes no responsibility for them. A college penalty applies on top of any MCC deposit forfeit.",
+   "quote": "The information regarding Stipend /fee structure/ course duration / bond amount / rendering of service in rural / tribal area/other conditions etc. has been provided by Medical Colleges on MCC website. MCC/ DGHS takes no responsibility regarding the above information",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 7,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_round_rules_apply",
+   "body": "MCC",
+   "applies_when": "Any candidate across rounds",
+   "rule": "Each round has its own rules. Once a round starts, its rules apply to everyone, including those admitted earlier.",
+   "quote": "Each round of counselling is a separate round and the rules of each round are different. Once any round commences, the rules of that round will apply to all the candidates even if they were allotted/admitted in the previous round(s) of counselling.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 8,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_refund_after_all_rounds",
+   "body": "MCC",
+   "applies_when": "Expecting the security deposit back",
+   "rule": "Deposits are refunded only after all MCC rounds are over.",
+   "quote": "Refund process will commence only after the completion of all the rounds of Counselling.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 8,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_afms_debarment",
+   "body": "MCC",
+   "applies_when": "Holding an AFMS seat (Priority III-V) allotted via MCC",
+   "rule": "This is the only \"debarment for leaving\" in the Bulletin. Leaving an AFMS seat mid-session bars you from AFMS counselling for three years. It does not bar you from NEET PG.",
+   "quote": "Candidates leaving a seat mid-session after the commencement of course as a result of which a seat gets wasted, will not be considered eligible to participate in the AFMS counselling for three years from the year of joining the seat.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 63,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_state_rules_are_states",
+   "body": "MCC",
+   "applies_when": "State-quota seats",
+   "rule": "State-quota rules come from each state's counselling authority, not MCC.",
+   "quote": "For State Quota, Private medical college seats the candidates are required to contact the appropriate State Government/Admission Authority & Directorate of Medical Education.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 24,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
+   "id": "mcc_r2_on_hold",
+   "body": "MCC",
+   "applies_when": "Round 2 of NEET PG 2026 (as of 19 Nov 2026)",
+   "rule": "The Round-2 result will be declared only after the Madras High Court clarifies its 17.11.2026 interim stay, which also covers joining.",
+   "quote": "there shall be an order of interim stay on all further proceedings in the process of admission and also the joining of the students by CENTAC and MCC. ... the result of Round -2 of PG Counselling 2026 shall be declared only after receipt of the necessary clarification / direction from the Hon'ble High Court of Madras.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/11/202611171047091852.pdf",
+   "page": 1,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_notice10"
+  },
+  {
+   "id": "mcc_schedule_dates",
+   "body": "MCC",
+   "applies_when": "Planning around MCC dates (schedule of 16.11.2026, issued before the 17.11 hold)",
+   "rule": "Last dates of joining: AIQ R2 24 Nov; R3 12 Dec (state R3 18 Dec); stray 31 Dec 2026. The PG session officially starts 20 Nov 2026. This schedule was issued before Notice No. 10 put Round 2 on hold, and MCC has not revised it since.",
+   "quote": "Last date of joining for Round-2 24th Nov., 2026 ... Last date of joining for Round-3 12th Dec., 2026 _ 18th Dec., 2026 ... 31st Dec., 2026 ... Commencement of Academic Session for PG Courses 20th Nov., 2026",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/11/202611161679361332.pdf",
+   "page": 1,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_schedule_1611"
+  },
+  {
+   "id": "aiims_pursuing_pg_excluded",
+   "body": "AIIMS",
+   "applies_when": "Doing or holding an MD/MS (e.g. joined an MCC/state seat) when INI-CET seat allocation happens",
+   "rule": "Anyone who has done, or is pursuing, an MD/MS/MDS/DM/MCh/MD(HA) \"at the time of seat allocation\" will not be considered for INI-CET admission. You sign an undertaking, and a false one cancels your candidature. A confirmed seat needs that undertaking plus all original certificates.",
+   "quote": "Please note that the candidates who have already done/are pursuing MD/MS/MDS/DM- 6yrs/MCh-6yrs & MD (Hospital Administration) in any subject at the time of seat allocation shall not be considered for admission ... if it is found at a later stage that the candidate has given false undertaking at the time of seat allocation, his/her candidature/registration will be cancelled. The confirmed PG seat will be allotted to the candidates only after giving an undertaking as above and after depositing all original certificates.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789578987801-314196312.pdf",
+   "page": 13,
+   "session": "INI-CET January 2027",
+   "doc": "partA_27"
+  },
+  {
+   "id": "aiims_institute_rules_govern",
+   "body": "AIIMS",
+   "applies_when": "Admitted to any INI",
+   "rule": "AIIMS Exam Section runs the allocation only. Admission, and penalties after resignation, follow each INI's rules (Part B).",
+   "quote": "Admission/Seat allocation into any of the participating INI will be governed by the rules and regulation of respective Institute as applicable",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789578987801-314196312.pdf",
+   "page": 4,
+   "session": "INI-CET January 2027",
+   "doc": "partA_27"
+  },
+  {
+   "id": "aiims_rounds_and_dates",
+   "body": "AIIMS",
+   "applies_when": "Timing of INI-CET January 2027",
+   "rule": "Seat-allocation dates, including the open round, are still to be notified. Courses start 1 Jan 2027 and the last date of admission is 28 Feb 2027.",
+   "quote": "Online Seat Allocation including Open Round of seat allocation Will be notified separately ... Date of starting of courses 01st January 2027 ... Last date of admission 28th February, 2027",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789578987801-314196312.pdf",
+   "page": 31,
+   "session": "INI-CET January 2027",
+   "doc": "partA_27"
+  },
+  {
+   "id": "aiims_two_rounds_plus_open",
+   "body": "AIIMS",
+   "applies_when": "Timing of INI-CET January 2027",
+   "rule": "There will be at least two rounds plus an open round. Schedules are \"in due course\".",
+   "quote": "seat allocation shall be conducted for at least Two (2) Rounds ... followed by Open Round. The detailed time schedules will be ... announced in due course of time.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789578987801-314196312.pdf",
+   "page": 17,
+   "session": "INI-CET January 2027",
+   "doc": "partA_27"
+  },
+  {
+   "id": "aiims_last_date_admission",
+   "body": "AIIMS",
+   "applies_when": "Joining an INI-CET seat",
+   "rule": "No one is admitted after the last date of admission. You must join by the date on your offer letter.",
+   "quote": "Last date of admission: shall be as per date mentioned in Important dates, beyond which no candidate will be admitted. Candidate selected & allotted confirmed seat must join by the date given in admission/offer letter.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789578987801-314196312.pdf",
+   "page": 13,
+   "session": "INI-CET January 2027",
+   "doc": "partA_27"
+  },
+  {
+   "id": "aiims_no_refusal_r1",
+   "body": "AIIMS",
+   "applies_when": "Allotted an INI-CET Round-1 seat (July 2026 rules; January 2027 brochure not out yet)",
+   "rule": "A Round-1 seat cannot be refused. You must log in and pick Option 1 (accept, stop) or Option 2 (accept, try Round 2). Not choosing forfeits the seat and leaves only the open round.",
+   "quote": "Options to REFUSE the allocated seat is NOT available. ... Failure to login and selecting an option after seat allocation within date and time specified in the Important Dates link will lead to forfeiture of the allocated seat and render the candidate ineligible for further rounds except open round of Seat Allocation (if any).",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1781155071406-258631692.pdf",
+   "page": 2,
+   "session": "INI-CET July 2026",
+   "doc": "brochure_26"
+  },
+  {
+   "id": "aiims_not_joining_penalty",
+   "body": "AIIMS",
+   "applies_when": "Allotted an INI-CET Round-1 or upgraded seat and not joining it (e.g. staying with MCC)",
+   "rule": "If you do not join your Round-1 seat or upgraded seat, you pay a Rs 3 lakh penalty.",
+   "quote": "Failure to join seat allotted in 1st round or upgraded seat shall lead to impositions of penalty of Rs. 3.00 Lakh.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1781155071406-258631692.pdf",
+   "page": 2,
+   "session": "INI-CET July 2026",
+   "doc": "brochure_26"
+  },
+  {
+   "id": "aiims_report_originals_or_3l",
+   "body": "AIIMS",
+   "applies_when": "Reporting for any INI-CET Round-1 seat (Option 1 or 2)",
+   "rule": "Every allottee must report in person and hand over original certificates OR deposit Rs 3 lakh.",
+   "quote": "The candidates are required to submit original certificates OR deposit Rs. 3.00 Lakh as specified in result notification of the seat allocation of the 1st Round at the time of reporting.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1781155071406-258631692.pdf",
+   "page": 2,
+   "session": "INI-CET July 2026",
+   "doc": "brochure_26"
+  },
+  {
+   "id": "aiims_r1_dd_five_days",
+   "body": "AIIMS",
+   "applies_when": "Option-1 allottee who reported with photocopies + Rs 3 lakh DD",
+   "rule": "Originals were due within five days. Otherwise the admission was cancelled, the Rs 3 lakh forfeited, and no further rounds allowed. For Option 2, the DD is refunded once originals are deposited (no five-day limit is stated there).",
+   "quote": "If original certificates are not deposited, these will have to be submitted within five days otherwise admission will be cancelled, the deposited money will be forfeited, and the candidate will not be eligible for any further participation in seat allocation. ... in the name of the \"AIIMS MAIN GRANT ACCOUNT\". The DD will be refunded when original certificates are deposited.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1782302042465-78641957.pdf",
+   "page": 803,
+   "session": "INI-CET July 2026",
+   "doc": "R1_26"
+  },
+  {
+   "id": "aiims_r2_noshow_dd_forfeit",
+   "body": "AIIMS",
+   "applies_when": "Option-2 candidate allotted in Round 2 who does not report (paid DD in Round 1)",
+   "rule": "The Rs 3 lakh DD is forfeited and the seat vacated. Only the open round remains.",
+   "quote": "and have already submitted a Demand Draft (DD) of Rs. 3 Lakhs only (Rupees Three Lakhs only), the deposited DD of Rs. 3 Lakh shall be forfeited and seat (Institute and Subject/Specialty) allocated shall be vacated.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1783678134418-448028518.pdf",
+   "page": 172,
+   "session": "INI-CET July 2026",
+   "doc": "R2_26"
+  },
+  {
+   "id": "aiims_r2_noshow_originals_buyback",
+   "body": "AIIMS",
+   "applies_when": "Option-2 candidate allotted in Round 2 who does not report (gave originals in Round 1)",
+   "rule": "To get the originals back, you pay Rs 3 lakh by DD. The seat is vacated and only the open round remains.",
+   "quote": "have already submitted original documents, then same can be collected after payment of Rs 3 lakhs only through DD of Rs. 3 Lakh only in the name of the \"AIIMS MAIN GRANT ACCOUNT\" payable at SBI Ansari Nagar, New Delhi from the Institute where the certificates were deposited after realization of security deposit.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1783678134418-448028518.pdf",
+   "page": 173,
+   "session": "INI-CET July 2026",
+   "doc": "R2_26"
+  },
+  {
+   "id": "aiims_new_r2_dd_five_days",
+   "body": "AIIMS",
+   "applies_when": "Joined an INI-CET Round-2 seat on photocopies + DD",
+   "rule": "Originals are due within 5 days of admission. Otherwise the admission is cancelled and the Rs 3 lakh DD forfeited.",
+   "quote": "If original documents at the time of joining have not been submitted, then the original documents should be submitted within 5 days of taking admission, otherwise admission will be treated as cancelled and the deposited DD of Rs. 3 Lakh will be forfeited.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1783678134418-448028518.pdf",
+   "page": 172,
+   "session": "INI-CET July 2026",
+   "doc": "R2_26"
+  },
+  {
+   "id": "aiims_originals_held_3l",
+   "body": "AIIMS",
+   "applies_when": "Confirmed seat at any AIIMS (January 2027)",
+   "rule": "Originals are kept until the course ends. Getting them back early costs Rs 3 lakh once the seat is confirmed, whether or not you join.",
+   "quote": "Original certificates of any candidate who opts for a confirmed seat will be retained in the Academic Section. The same will not be returned to the candidate before completion of the course unless he/she deposits a sum of Rs. 3,00,000/- (Rupees Three Lakh only) once seat has been confirmed irrespective of the fact whether he/she joins the course or not.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579206207-762701864.pdf",
+   "page": 5,
+   "session": "INI-CET January 2027",
+   "doc": "B_AIIMS_27"
+  },
+  {
+   "id": "aiims_leaving_penalty",
+   "body": "AIIMS",
+   "applies_when": "Joined an AIIMS PG seat and leaving (e.g. for an MCC/state seat)",
+   "rule": "Leaving within six months of joining costs Rs 3 lakh; after six months, Rs 5 lakh. You also lose that month's pay.",
+   "quote": "leaves the said course within six months of joining, he/she shall be liable to pay a sum of Rs. 3,00,000/- (Rupees Three Lakh only) and any candidate who joins the PG courses and leaves after six months of joining shall be liable to pay a sum of Rs. 5,00,000/- (Rupees Five Lakh only) as compensation for losses incurred by the AIIMS due to such midstream departure. The emoluments for the month in which his/her resignation from the PG seat becomes effective, shall also stand forfeited.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579206207-762701864.pdf",
+   "page": 5,
+   "session": "INI-CET January 2027",
+   "doc": "B_AIIMS_27"
+  },
+  {
+   "id": "aiims_jodhpur_penalty",
+   "body": "AIIMS",
+   "applies_when": "PG student of AIIMS Jodhpur leaving",
+   "rule": "Jodhpur has its own timing: Rs 3 lakh if you leave during counselling, Rs 5 lakh after the last joining date of the last/open round.",
+   "quote": "leaving the course during counselling he/she shall be liable to pay Rs.3,00,000/- (Rupees Three Lakh only) and after the last date of Joining of last/open counseling, he/she shall be liable to pay a sum of Rs. 5,00,000/- (Rupees Five Lakh only)",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579206207-762701864.pdf",
+   "page": 5,
+   "session": "INI-CET January 2027",
+   "doc": "B_AIIMS_27"
+  },
+  {
+   "id": "aiims_vacated_not_refilled",
+   "body": "AIIMS",
+   "applies_when": "A seat at AIIMS falls vacant through resignation",
+   "rule": "Part B says no seats are added after the result, even vacated ones. (The July 2026 open-round brochure, p.4, did add seats vacated after joining.)",
+   "quote": "No seats will be uploaded after declaration of result even in case of any seats falling vacant due to resignation.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579206207-762701864.pdf",
+   "page": 4,
+   "session": "INI-CET January 2027",
+   "doc": "B_AIIMS_27"
+  },
+  {
+   "id": "aiims_open_round_deemed_resignation",
+   "body": "AIIMS",
+   "applies_when": "Holding a joined INI-CET seat and entering the open round (July 2026 rules)",
+   "rule": "If the open round allots you a new seat, your current seat is automatically vacated (deemed resignation). You pay the institute's Part-B penalty plus any INI-CET penalty, lose accrued salary/stipend, and must also deposit Rs 3 lakh. Registering counts as agreeing.",
+   "quote": "If any Seat is being allocated to them out of choices filled in open round, the original allocated seat (currently holding) shall be automatically vacated (deemed resignation) ... shall be liable to pay penalty as applicable at respective INIs and penalty if any applicable as per INI-CET seat allocation rules. For penalty at respective INIs, please refer to prospectus Part-B of INI-CET. In addition, accrued salary (if any) / stipend shall be forfeited. ... All such candidates are also required to deposit Rs 3.00 Lakh separately",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1785149587532-851666082.pdf",
+   "page": 1,
+   "session": "INI-CET July 2026",
+   "doc": "open_brochure_26"
+  },
+  {
+   "id": "aiims_open_round_not_joining",
+   "body": "AIIMS",
+   "applies_when": "Allotted an open-round seat and not joining",
+   "rule": "The Rs 3 lakh security deposit is forfeited.",
+   "quote": "If the candidate does not join the allocated seat, then the security deposited amount of Rs.3 Lakh will be forfeited and no correspondence will be entertained in this regard.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1785149587532-851666082.pdf",
+   "page": 2,
+   "session": "INI-CET July 2026",
+   "doc": "open_brochure_26"
+  },
+  {
+   "id": "aiims_open_round_result_penalty",
+   "body": "AIIMS",
+   "applies_when": "Allotted an open-round seat and not reporting/joining by the deadline",
+   "rule": "You forfeit the Rs 3 lakh and face the other penalties in the open-round brochure.",
+   "quote": "Failure to report and join by above mentioned date will lead to forfeiture of Rs.3 Lakh deposited and imposition of penalty and other forfeiture as per information brochure for open round of seat allocation.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1787312366720-490994390.pdf",
+   "page": 30,
+   "session": "INI-CET July 2026",
+   "doc": "open_result_26"
+  },
+  {
+   "id": "aiims_open_round_refund",
+   "body": "AIIMS",
+   "applies_when": "Expecting the Rs 3 lakh open-round deposit back",
+   "rule": "Refunds come only after the whole process ends, and only to those not liable to forfeiture.",
+   "quote": "to those candidates who have deposited the amount of Rs. 3 Lakhs as security deposit and are not liable for forfeiture of security deposit as per rules.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1785149587532-851666082.pdf",
+   "page": 3,
+   "session": "INI-CET July 2026",
+   "doc": "open_brochure_26"
+  },
+  {
+   "id": "jipmer_open_round_penalty",
+   "body": "AIIMS",
+   "applies_when": "Admitted at JIPMER in round 1/2 and then allotted in the open round",
+   "rule": "Taking an open-round seat anywhere (including JIPMER) means paying JIPMER's mid-stream departure penalty. JIPMER admission closes 28 Feb 2027.",
+   "quote": "Admission to MD/MS/MDS/6-year MCh courses closes on February 28th, 2027. ... candidate participates and is allotted a seat in any INI (including JIPMER) in the open round/on-the-spot counselling, he/she must pay mid-stream departure penalty.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579237671-359119859.pdf",
+   "page": 11,
+   "session": "INI-CET January 2027",
+   "doc": "B_JIPMER_27",
+   "institute": "JIPMER Puducherry"
+  },
+  {
+   "id": "jipmer_leaving_penalty",
+   "body": "AIIMS",
+   "applies_when": "JIPMER seat: from depositing originals onwards",
+   "rule": "Rs 3 lakh from depositing originals up to joining. Rs 3 lakh plus that month's salary within six months of joining. Rs 5 lakh plus that month's salary after six months.",
+   "quote": "Penalty for mid-stream departure (Applicable from the point of deposition of original certificates) ... Deposition of original certificates to issue of Admission order/joining the department Rs. 3,00,000 (Three Lakhs Only) Within Six Months from the date of Joining Rs. 3,00,000 (Three Lakhs Only) The salary for the month in which his/her resignation from the PG seat becomes effective, shall also stand forfeited. ... Rs. 5,00,000 (Five Lakhs Only) ... After Six Months from the date of",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579237671-359119859.pdf",
+   "page": 16,
+   "session": "INI-CET January 2027",
+   "doc": "B_JIPMER_27",
+   "institute": "JIPMER Puducherry"
+  },
+  {
+   "id": "pgimer_leaving_penalty",
+   "body": "AIIMS",
+   "applies_when": "Joined a PGIMER MD/MS/MDS seat and leaving midway",
+   "rule": "Rs 3 lakh within six months, Rs 5 lakh after, plus that month's salary. (Printed page 7 of 20.)",
+   "quote": "Within six months of joining Rs.3,00,000/- ... After six months of joining Rs.5,00,000/- ... The salary for the month in which his/her resignation from the PG seat become effective, shall also stand forfeited.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579304174-928708850.pdf",
+   "page": 10,
+   "session": "INI-CET January 2027",
+   "doc": "B_PGIMER_27",
+   "institute": "PGIMER Chandigarh"
+  },
+  {
+   "id": "nimhans_leaving_penalty",
+   "body": "AIIMS",
+   "applies_when": "Joined a NIMHANS medical PG seat and leaving",
+   "rule": "Rs 3 lakh if you leave in under 1 month, Rs 5 lakh between 1 and 6 months, Rs 7 lakh after 6 months. Counted from commencement/joining.",
+   "quote": "Less than 1 month of course ... Rs. 3,00,000/- penalty ... After 1 month but less than 6 months ... Rs. 5,00,000/- penalty ... Above 6 months ... Rs. 7,00,000/- penalty ... *Penalty clause shall apply immediately after the date of commencement of course/Date of joining.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579276308-747659856.pdf",
+   "page": 15,
+   "session": "INI-CET January 2027",
+   "doc": "B_NIMHANS_27",
+   "institute": "NIMHANS Bengaluru"
+  },
+  {
+   "id": "sctimst_bond_50l",
+   "body": "AIIMS",
+   "applies_when": "Selected at SCTIMST (non-sponsored)",
+   "rule": "SCTIMST requires a Rs 50 lakh bond. It is payable if you discontinue, as worded below (tied to the INI-CET admission closure date).",
+   "quote": "All the selected residents except under the sponsored category need to furnish a bond for rupees fifty lakhs. The concerned defaulter shall be liable to pay an amount of INR 50,00,000/- (Rupees Fifty Lakhs) if decided to discontinue the program by the next day of the last date of closure of the admission process of INI-CET.",
+   "url": "https://rrpdocuments.aiimsexams.ac.in/1789579347930-137604789.pdf",
+   "page": 10,
+   "session": "INI-CET January 2027",
+   "doc": "B_SCTIMST_27",
+   "institute": "SCTIMST Thiruvananthapuram"
+  }
+ ],
+ "not_found": [
+  {
+   "id": "mcc_on_ini_cet",
+   "body": "MCC",
+   "question": "Does MCC say whether someone holding or joined at an INI-CET (AIIMS/JIPMER/PGIMER/NIMHANS/SCTIMST) seat may register for or take part in NEET PG 2026 rounds, or must resign it first?",
+   "checked_in": [
+    "mcc_bulletin",
+    "mcc_user_guide",
+    "mcc_notice5",
+    "mcc_notice10",
+    "mcc_schedule_1611",
+    "MCC Notices 7, 9 and the 08.10/29.10 schedules"
+   ],
+   "note": "Not stated. The Bulletin mentions AIIMS/JIPMER only for MBBS counselling (p.4)."
+  },
+  {
+   "id": "mcc_next_year_debarment",
+   "body": "MCC",
+   "question": "Is a candidate who leaves or does not join an MCC seat debarred from NEET PG 2027 or its counselling?",
+   "checked_in": [
+    "mcc_bulletin",
+    "mcc_user_guide"
+   ],
+   "note": "Not stated. The Bulletin's only debarments are for filing more than one registration (2.9, p.6) and AFMS-only (mcc_afms_debarment)."
+  },
+  {
+   "id": "mcc_leave_after_windows",
+   "body": "MCC",
+   "question": "What does MCC do if a joined candidate leaves outside a resignation window (e.g. a Round-3 or stray joiner leaving in January 2027 for an INI-CET seat)?",
+   "checked_in": [
+    "mcc_bulletin",
+    "mcc_user_guide"
+   ],
+   "note": "Not stated beyond \"cannot resign/exit Round 3\" and deposit forfeiture. No extra MCC penalty is described. The college's own bond/leaving penalty (MCC college profile) is the documented cost."
+  },
+  {
+   "id": "mcc_stray_resignation",
+   "body": "MCC",
+   "question": "Can a joined stray-round seat be resigned, and on what terms?",
+   "checked_in": [
+    "mcc_bulletin",
+    "mcc_user_guide"
+   ],
+   "note": "Not stated. The resignation rules cover Rounds 1-2 only."
+  },
+  {
+   "id": "mcc_stray_counts_ini_seat",
+   "body": "MCC",
+   "question": "Does an INI-CET seat count as \"holding any seat\" for stray-round eligibility?",
+   "checked_in": [
+    "mcc_bulletin"
+   ],
+   "note": "Not stated. The bracket lists AIQ, State, Deemed only."
+  },
+  {
+   "id": "mcc_schedule_after_hold",
+   "body": "MCC",
+   "question": "Revised R2/R3/stray dates after the 17.11.2026 Madras High Court hold",
+   "checked_in": [
+    "mcc_notice10",
+    "mcc_schedule_1611",
+    "https://mcc.nic.in/pg-medical-counselling/ (checked 19.11.2026)"
+   ],
+   "note": "No revised schedule has been published. Notice No. 10 (17.11.2026) is the latest PG notice."
+  },
+  {
+   "id": "aiims_on_neet_pg",
+   "body": "AIIMS",
+   "question": "Does any INI-CET document mention NEET PG, MCC or state counselling (seats held there, resignation, timing)?",
+   "checked_in": [
+    "partA_27",
+    "B_AIIMS_27",
+    "B_JIPMER_27",
+    "B_PGIMER_27",
+    "B_NIMHANS_27",
+    "B_SCTIMST_27",
+    "brochure_26",
+    "open_brochure_26",
+    "R1_26",
+    "R2_26",
+    "open_result_26",
+    "FAQ online seat allocation, INI-CET July 2026"
+   ],
+   "note": "Not stated. The only cross-counselling rule is the Part-A \"already done/are pursuing\" clause (aiims_pursuing_pg_excluded)."
+  },
+  {
+   "id": "aiims_pursuing_definition",
+   "body": "AIIMS",
+   "question": "What counts as \"pursuing\" an MD/MS: allotted, joined, or joined then resigned? Does resigning an MCC/state seat before INI-CET allocation restore eligibility? Which round's allocation is \"the time of seat allocation\"?",
+   "checked_in": [
+    "partA_27"
+   ],
+   "note": "Not defined."
+  },
+  {
+   "id": "aiims_jan27_round_rules",
+   "body": "AIIMS",
+   "question": "January 2027 seat-allocation brochure, schedule, open-round brochure and round-wise result rules",
+   "checked_in": [
+    "aiimsexams.ac.in January 2027 notification listing (empty when read 19.11.2026)"
+   ],
+   "note": "Not published yet. The round rules above are from the July 2026 session (latest published) and need re-checking when the January 2027 brochure appears."
+  },
+  {
+   "id": "aiims_future_debarment",
+   "body": "AIIMS",
+   "question": "Is a candidate who leaves or does not join an INI-CET seat debarred from a future INI-CET session?",
+   "checked_in": [
+    "partA_27",
+    "B_AIIMS_27",
+    "brochure_26",
+    "open_brochure_26",
+    "R1_26",
+    "R2_26"
+   ],
+   "note": "Not stated. Part A debars only for false information/unfair means (p.6, p.19)."
+  },
+  {
+   "id": "coordination",
+   "body": "MCC+AIIMS",
+   "question": "Any official statement on timing, coordination or data sharing between NEET PG 2026 counselling and INI-CET January 2027 counselling",
+   "checked_in": [
+    "mcc_bulletin",
+    "mcc_schedule_1611",
+    "mcc_notice10",
+    "partA_27",
+    "B_AIIMS_27"
+   ],
+   "note": "None found. MCC shares joined-candidate data with states only (mcc_stray_state_data_sharing). INI-CET says its allocation dates will be \"notified separately\"."
+  }
+ ]
+}

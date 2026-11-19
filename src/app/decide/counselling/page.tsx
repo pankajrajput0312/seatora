@@ -21,6 +21,7 @@ import { meritLists } from "@/features/decide/server/merit";
 import { listNotices, roundStatus, scheduleYear } from "@/features/decide/server/notices";
 import { noticeKinds, type NoticeKind, type Round } from "@/features/decide/types";
 import { activeExam, examGate } from "@/features/exams/active";
+import { CrossoverGuide } from "@/features/exams/crossover-guide";
 import { authorityOf, DEFAULT_EXAM, examYears, exams, sessionExams, yearName, type ExamKey } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Counselling" };
@@ -29,12 +30,14 @@ const tabs = [
   { key: "schedule", label: "Schedule" },
   { key: "announcements", label: "Announcements" },
   { key: "merit", label: "Merit lists" },
+  // INI-CET: the rules where its counselling and NEET PG's meet (features/exams/crossover.ts).
+  { key: "crossover", label: "NEET PG too?" },
 ] as const;
 const noticeRounds = ["R1", "R2", "R3", "stray"] as const;
 const kindLabel: Record<NoticeKind, string> = { notice: "Notice", seat_matrix: "Seat matrix", result: "Result", schedule: "Schedule", bulletin: "Bulletin" };
 // Announcements filters: kind, round, counselling year (no profile keys).
 const schema = z.object({
-  tab: z.enum(["schedule", "announcements", "merit"]).default("schedule"),
+  tab: z.enum(["schedule", "announcements", "merit", "crossover"]).default("schedule"),
   kind: z.enum(noticeKinds).optional(),
   round: z.enum(noticeRounds).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
@@ -70,7 +73,7 @@ export default async function CounsellingPage({ searchParams }: { searchParams: 
   const f = parseSearchParams(sessionExams.includes(exam) ? sessionSchema : schema, params);
   const w = wordsOf(exam);
   // Merit lists are NBEMS's NEET PG results: that tab for an exam with them only.
-  const shown = tabs.filter((t) => t.key !== "merit" || w.E.has.merit);
+  const shown = tabs.filter((t) => (t.key !== "merit" || w.E.has.merit) && (t.key !== "crossover" || w.E.crossover));
   const tab = shown.some((t) => t.key === f.tab) ? f.tab : "schedule";
 
   return (
@@ -85,7 +88,7 @@ export default async function CounsellingPage({ searchParams }: { searchParams: 
         </PageHead>
       )}
       <SubTabs label="Counselling" current={tab} items={shown.map((t) => ({ key: t.key, label: t.label, href: L.to("/decide/counselling", { tab: t.key }) }))} />
-      {tab === "schedule" ? <Schedule L={L} exam={exam} /> : tab === "announcements" ? <Announcements f={f} params={params} L={L} exam={exam} /> : <MeritLists />}
+      {tab === "schedule" ? <Schedule L={L} exam={exam} /> : tab === "announcements" ? <Announcements f={f} params={params} L={L} exam={exam} /> : tab === "crossover" ? <CrossoverGuide /> : <MeritLists />}
     </AppPage>
   );
 }

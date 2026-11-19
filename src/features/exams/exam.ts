@@ -51,6 +51,8 @@ export type Exam = {
   instituteGroups?: { label: string; prefix: string; not?: string }[];
   /** Quotas its seat position notifies apart (INI-CET: Sponsored / Foreign National / Bhutani, AIIMS's own notice), and their one name: seat totals say them apart ("204 open + 53 Sponsored/Foreign National"). */
   apartQuotas?: { quotas: string[]; name: string };
+  /** Its Counselling area has the "Also in NEET PG counselling?" guide (./crossover.ts; INI-CET). */
+  crossover?: boolean;
 };
 
 export const neetPg: Exam = {

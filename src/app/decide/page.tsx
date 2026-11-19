@@ -49,6 +49,13 @@ function ReachedParts({ L, counts, latest }: { L: ReturnType<typeof decideLinks>
   ));
 }
 
+/** INI-CET: the guide to where its counselling and NEET PG's meet (Counselling, "NEET PG too?"). */
+const CrossoverLink = ({ L }: { L: ReturnType<typeof decideLinks> }) => (
+  <p className="text-sm">
+    <Link href={L.to("/decide/counselling", { tab: "crossover" })} className={`${smallLink} text-sky`}>Also in NEET PG counselling? What MCC&apos;s and AIIMS&apos;s rules say where the two meet</Link>
+  </p>
+);
+
 /** The page's h1: the sidebar already says where she is, so it is for screen readers (and focus) only. */
 const title = <h1 id="main-h1" tabIndex={-1} className="sr-only">Home</h1>;
 
@@ -72,6 +79,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <ResidentsPromo L={decideLinks(params)} />
         {noGroup ? <GroupPrompt /> : <SetupCard />}
         <RoundStatusBanner params={params} />
+        {exams[exam].crossover && <CrossoverLink L={decideLinks(params)} />}
         <ToolGroups L={decideLinks(params)} E={await examInfo(exam)} />
       </AppPage>
     );
@@ -178,6 +186,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       </section>
       <ToolGroups L={L} E={await examInfo(exam)} />
       <RoundStatusBanner params={params} />
+        {exams[exam].crossover && <CrossoverLink L={decideLinks(params)} />}
 
       <section aria-labelledby="numbers-h" className="grid gap-2">
         <div className="flex items-center gap-1">

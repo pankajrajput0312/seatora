@@ -209,6 +209,12 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         <>
         {me && known.length > cap && <Paywall feature="compare" eff={me.eff} className="mt-6" />}
         {risk && <p className="mt-3 text-sm">{risk}</p>}
+        {/* INI-CET: the rules where its counselling and NEET PG's meet ("If you leave" for someone in both). */}
+        {E.crossover && fees && (
+          <p className="mt-2 text-sm">
+            <Link href={L.to("/decide/counselling", { tab: "crossover" })} className={`${smallLink} text-sky`}>Also in NEET PG counselling? What MCC&apos;s and AIIMS&apos;s rules say if you leave a seat</Link>
+          </p>
+        )}
         {sharedParts.length > 0 && (
           <section aria-label={`${authorityOf(exam)}'s round rules`} className="mt-3 grid gap-1 rounded-xl border border-border bg-card px-4 py-3 text-sm">
             <p className="font-semibold">{authorityOf(exam)}&apos;s round rules, the same for all {options.length}:</p>
