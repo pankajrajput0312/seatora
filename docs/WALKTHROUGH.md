@@ -126,6 +126,7 @@ Choices is your list, in the order you will type it into the MCC portal. It is n
 - **Copy in MCC order** copies "1. Institute — Course — Quota" lines. **Download CSV** (each choice's latest and deepest closing, fee, stipend, bond and leaving penalty too) and **Print** save it. **Share on WhatsApp** sends the list with a link to it. Keep a copy, because the list lives in this browser only.
 - **Typed into the MCC portal up to #**: as you enter choices on the MCC portal, set this number. Seatora then warns if you move a row that is already typed in ("Check the order in the MCC portal").
 - **Duplicate for next round** copies the list as the start of the next round's list.
+- **Suggest my list** puts your options in one suggested order, each with its reason ("Dream: closed at 23,502 in 2025 R3, 6% before you"): your course order first (Edit, **Your order**: move courses up or down, tick **Equal** for ones you'd take as gladly), then Dream, Target and Safe within each course, within your fee, bond and college-type limits (what they leave out is counted). It comes from past closing ranks, not a prediction. **Add all** or **Add selected** puts them after your choices; **Use this order** puts them first and keeps yours after. Nothing is removed. Trying a rank without saving: Copy or CSV.
 
 Order the list by what you want most, not by your chances. Then type it into the MCC portal, **save and lock it there** before 23:55 IST.
 

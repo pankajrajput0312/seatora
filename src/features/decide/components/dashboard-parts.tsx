@@ -141,7 +141,10 @@ export function TopChoices({ nextRound }: { nextRound?: string | null }) {
     <section aria-labelledby="top-choices" className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-baseline justify-between gap-3">
         <h2 id="top-choices" className="text-title font-semibold">{hydrated ? `Top of ${list.name}` : "Top of your list"}</h2>
-        <Link href={L.choices()} className={`${smallLink} text-sm text-sky`}>Open list</Link>
+        <span className="flex flex-wrap gap-x-4">
+          <Link href={L.to("/decide/choices/suggest")} className={`${smallLink} text-sm text-sky`}>Suggest my list</Link>
+          <Link href={L.choices()} className={`${smallLink} text-sm text-sky`}>Open list</Link>
+        </span>
       </div>
       {!hydrated ? (
         <p className="mt-4 text-sm text-muted-foreground">Loading your list…</p>

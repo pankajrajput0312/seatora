@@ -518,8 +518,11 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
 
       <h2 id="choices-h" tabIndex={-1} className="sr-only">{list.name}</h2>
       {n === 0 ? (
-        <EmptyState title={`${list.name} is empty`} description="Add options with the star on the Options screen or an institute page.">
-          <Link href={L.options()} className={cn(smallLink, "text-sm text-sky")}>Go to Options</Link>
+        <EmptyState title={`${list.name} is empty`} description="Add options with the star on the Options screen or an institute page, or start from a suggested list.">
+          <span className="flex flex-wrap justify-center gap-x-6">
+            <Link href={L.options()} className={cn(smallLink, "text-sm text-sky")}>Go to Options</Link>
+            <Link href={L.to("/decide/choices/suggest")} className={cn(smallLink, "text-sm text-sky")}>Suggest my list</Link>
+          </span>
         </EmptyState>
       ) : (
         <>

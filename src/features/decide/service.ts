@@ -7,6 +7,7 @@ import { typeCategory, type TypeCategory } from "./components/institute/college-
 import { hospitalInfo, type HospitalInfo } from "./components/institute/institute-data";
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
 import { searchMatcher } from "./lib/college-aliases";
+import { SUGGEST_REACH, suggestList } from "./lib/suggest";
 import { anyTermFilter, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
 import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, isStrayRound, LATEST_YEAR, PAST_YEARS, pastOf, r1Reached, reachedFrom, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Latest, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { pairKey, profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
@@ -360,6 +361,15 @@ async function rankOptions(cat: Catalog, opts: Opt[], profile: Profile | null, i
 }
 
 const countsOf = (xs: { reach: Reach }[]) => Object.fromEntries(reachOrder.map((r) => [r, xs.filter((x) => x.reach === r).length])) as Record<Reach, number>;
+/** The same per course ("degree~SPECIALTY", profile.ts pairKey), only the labels it has: which of her courses reach her rank. */
+function countsByCourse(xs: Ranked[]) {
+  const out: Record<string, Partial<Record<Reach, number>>> = {};
+  for (const x of xs) {
+    const c = (out[pairKey(x.o)] ??= {});
+    c[x.reach] = (c[x.reach] ?? 0) + 1;
+  }
+  return out;
+}
 
 /**
  * Seats in `list` that match her courses, quotas, states and seat categories (fee and bond caps aside, as on Seats) but
@@ -607,6 +617,8 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     /** Of the hidden ones, those whose label rests on the provisional latest round alone. */
     hiddenProvisional: hidden.filter((r) => r.provisional).length,
     counts: countsOf(every),
+    /** `counts` per course ("degree~SPECIALTY"): which of her courses reach her rank (Options' "What you can still do"). */
+    courses: countsByCourse(every),
     seatList: lists[0] ?? null,
     seatLists: lists,
     /** With the clear vacancy filter: options shown but for that filter that have seats only in `list`, the round's virtual vacancy list. */
@@ -615,6 +627,37 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
 }
 
 const REACHED: Reach[] = ["reached-latest", "reached-both", "reached-one"];
+/** How many options of one course reached her rank (listOptions `courses`). */
+export const reachedOf = (c: Partial<Record<Reach, number>>) => REACHED.reduce((n, r) => n + (c[r] ?? 0), 0);
+
+/**
+ * None of her courses reached her rank: up to three courses outside her profile that did (same quotas, states, caps and
+ * the view's seats), nearest first: her specialties' other degrees (DNB, Diploma), else any course; each with how many
+ * of its options reached it. Most reached first, then by name.
+ */
+export async function nearestCourses(profile: Profile, f: OptionFilters = {}, exam: ExamKey = DEFAULT_EXAM) {
+  const others = async (p: Profile) =>
+    Object.entries((await listOptions(p, { ...f, search: undefined, reach: undefined }, { page: 1, pageSize: 1 }, exam)).courses)
+      .map(([key, c]) => ({ key, reached: reachedOf(c) }))
+      .filter((x) => x.reached > 0 && !profileHasCourse(profile, { degree: x.key.split("~")[0], specialty: x.key.split("~")[1] }))
+      .sort((a, b) => b.reached - a.reached || a.key.localeCompare(b.key));
+  const wide: Profile = { ...profile, pairs: undefined, degrees: [] };
+  const same = profile.specialties.length ? await others(wide) : [];
+  return (same.length ? same : await others({ ...wide, specialties: [] })).slice(0, 3);
+}
+
+/**
+ * Suggest my list (lib/suggest.ts suggestList): every option in her profile that could be on her list (the view
+ * Options opens on, its labels), read with no cap so her caps (`terms`, else her profile's fee and bond caps) can say
+ * what they leave out; `left` counts each option not suggested by its first reason (closed before her rank and no
+ * allotment in her categories from the labels' counts).
+ */
+export async function suggestOptions(profile: Profile, f: { terms?: TermFilters; govtFirst?: boolean } = {}, exam: ExamKey = DEFAULT_EXAM) {
+  const [r, cat] = await Promise.all([listOptions(profile, { reach: SUGGEST_REACH, terms: {} }, undefined, exam), getCatalog(exam)]);
+  const latest = latestOf(cat.sources, exam);
+  const s = suggestList(r.rows, { rank: profile.rank, latest, order: profile.order, caps: f.terms ?? profileTermFilters(profile), govtFirst: f.govtFirst });
+  return { ...s, latest, view: r.view, seatLists: r.seatLists, left: { ...s.left, closed: r.counts["closed-before"], noData: r.counts["no-data"] } };
+}
 
 /**
  * "Your picture" (Options and Home): of the options `f` lists, the reached ones by the round that first reached her

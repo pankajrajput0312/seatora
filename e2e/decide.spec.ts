@@ -10,7 +10,7 @@ const PROFILE = "rank=42284&cat=OBC&sp=ANAESTHESIOLOGY,FAMILYMEDICINE";
 test("plan routes render real data, never demo data", async ({ page }) => {
   test.setTimeout(120_000);
   for (const [path, h1] of [
-    ["/decide", "Home"], ["/decide/options", "Options"], ["/decide/choices", "Choices"], ["/decide/compare", "Compare"],
+    ["/decide", "Home"], ["/decide/options", "Options"], ["/decide/choices", "Choices"], ["/decide/choices/suggest", "Suggest my list"], ["/decide/compare", "Compare"],
     // Rank scan, last ranks, seats, counselling, institutes, allotments and fees: see "research and counselling routes" below.
   ]) {
     await page.goto(`${path}${path.includes("?") ? "&" : "?"}${PROFILE}`);
@@ -22,7 +22,7 @@ test("plan routes render real data, never demo data", async ({ page }) => {
 test("every route: skip link is the first tab stop, no sideways scroll at 390 px", async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ["/decide", "/decide/options", "/decide/choices", "/decide/compare", "/decide/institutes", "/decide/institutes/government-medical-college-nagpur-440003?tab=courses",
+  for (const path of ["/decide", "/decide/options", "/decide/choices", "/decide/choices/suggest", "/decide/compare", "/decide/institutes", "/decide/institutes/government-medical-college-nagpur-440003?tab=courses",
     "/decide/last-ranks", "/decide/allotments", "/decide/rank-scan", "/decide/fees", "/decide/seats", "/decide/seats?tab=trends", "/decide/counselling",
     "/decide/institutes/ssb-heart-and-multispeciality-hospital-121001?tab=clinical"]) {
     await page.goto(`${path}${path.includes("?") ? "&" : "?"}${PROFILE}`);

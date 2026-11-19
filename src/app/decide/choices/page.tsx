@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ListOrdered } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { AppPage } from "@/features/decide/components/app-page";
 import { HistoryNote, PageHead } from "@/features/decide/components/bits";
 import { ChoicesView } from "@/features/decide/components/choices-view";
@@ -28,6 +31,11 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   return (
     <AppPage>
       <PageHead title="Choices" about={`Your list in the order you'll enter it on the ${authorityOf(exam)} portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons; in the table, pick a choice's number to move it straight there.`} />
+      {/* Her options in a suggested order (Dream, Target, Safe within her course order), each with its reason; added only when she says so. */}
+      <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground" data-print-hide>
+        <Button asChild variant="secondary" className="max-sm:w-full"><Link href={L.to("/decide/choices/suggest")}><ListOrdered className="size-4" aria-hidden />Suggest my list</Link></Button>
+        Your options in a suggested order, each with its reason. Nothing is added until you choose.
+      </p>
       {/* Another exam: "no seats in the lists" only while their round is current (no result yet: its choice filling). */}
       <ChoicesView reachFor={liveReach} view={view} maxLists={me?.eff.limits.choiceLists} hasLists={lists.length > 0} nextRound={nextRound} latest={latestOf(meta.sources, exam)} listsCurrent={exam === DEFAULT_EXAM || optionsView(undefined, lists, meta.sources) === "round"} />
       <div className="mt-4 grid gap-2 text-xs text-muted-foreground">

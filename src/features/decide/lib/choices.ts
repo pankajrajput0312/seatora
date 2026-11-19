@@ -114,10 +114,25 @@ export function toMccText(list: ChoiceList): string {
 /** The CSV's columns after the choice: its closings and terms (`extra`, in this order; blank while not loaded). */
 export const CSV_EXTRA = ["Latest closing", "Deepest closing", ...statKeys.map((k) => statLabel[k])];
 
-export function toCsv(list: ChoiceList, extra: (id: string) => (string | null)[] | null = () => null): string {
+/** `cols`: the extra columns' names (default CSV_EXTRA; Suggest my list: its bucket and reason). */
+export function toCsv(list: ChoiceList, extra: (id: string) => (string | null)[] | null = () => null, cols: string[] = CSV_EXTRA): string {
   const esc = (s: string | null) => `"${(s ?? "").replace(/"/g, '""')}"`;
-  const head = ["Order", "Institute", "State", "PIN", "Course", "Quota", ...CSV_EXTRA].join(",");
-  return [head, ...list.items.map((i, n) => [n + 1, esc(i.institute), esc(i.state), esc(pinOf(i)), esc(i.course), esc(i.quota), ...CSV_EXTRA.map((_, k) => esc(extra(i.id)?.[k] ?? null))].join(","))].join("\n");
+  const head = ["Order", "Institute", "State", "PIN", "Course", "Quota", ...cols].join(",");
+  return [head, ...list.items.map((i, n) => [n + 1, esc(i.institute), esc(i.state), esc(pinOf(i)), esc(i.course), esc(i.quota), ...cols.map((_, k) => esc(extra(i.id)?.[k] ?? null))].join(","))].join("\n");
+}
+
+/** Suggest my list's "Add": `items` after her choices (one already in the list stays where it is); `added`: how many were new. */
+export function addToList(list: ChoiceList, items: ChoiceItem[]): { list: ChoiceList; added: number } {
+  const have = new Set(list.items.map((i) => i.id));
+  const add = items.filter((i, k) => !have.has(i.id) && items.findIndex((x) => x.id === i.id) === k);
+  return { list: { ...list, items: [...list.items, ...add] }, added: add.length };
+}
+
+/** Suggest my list's "Use this order": `items` first, in their order, then her other choices in hers. Nothing is removed. */
+export function putFirst(list: ChoiceList, items: ChoiceItem[]): ChoiceList {
+  const ids = new Set(items.map((i) => i.id));
+  const mine = new Map(list.items.map((i) => [i.id, i]));
+  return { ...list, items: [...items.filter((i, k) => items.findIndex((x) => x.id === i.id) === k).map((i) => mine.get(i.id) ?? i), ...list.items.filter((i) => !ids.has(i.id))] };
 }
 
 /** Mark the first n items as typed into MCC (what's in the portal now). */

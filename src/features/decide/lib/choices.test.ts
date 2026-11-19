@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, otherGroupItems, parseChoices, shareText, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, wholeCourseTotal, wholeCourseWords, type ChoiceItem, type RenamedCollege } from "./choices";
+import { addToList, defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, otherGroupItems, parseChoices, putFirst, shareText, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, wholeCourseTotal, wholeCourseWords, type ChoiceItem, type RenamedCollege } from "./choices";
 import type { ProgrammeTerms } from "../server/terms";
 
 const item = (id: string): ChoiceItem => ({ id, institute: `Inst ${id}`, slug: id, state: "S", course: "DNB Anaesthesiology", quota: "DNB Quota", reachLabel: "", closedEveryRound: false });
@@ -36,6 +36,29 @@ describe("lists", () => {
       '1,"Inst x","S","","DNB Anaesthesiology","DNB Quota","1,234 (2025 R1)","2,000","₹1 L/yr","","1 year","₹10 L","None"',
     );
     expect(toCsv(s.lists[0]).split("\n")[2]).toMatch(/,"S","462001","DNB/);
+  });
+});
+
+describe("Suggest my list into her list", () => {
+  const mine = { id: "l", name: "Round 3 · 2026", items: [item("a"), item("b")], typedIds: ["a"] };
+  it("adds after her choices, never twice, never moving or removing hers", () => {
+    const r = addToList(mine, [item("c"), item("a"), item("d"), item("c")]);
+    expect(r.list.items.map((i) => i.id)).toEqual(["a", "b", "c", "d"]);
+    expect(r.added).toBe(2);
+    expect(r.list.typedIds).toEqual(["a"]);
+  });
+  it("puts the suggestion first in its order and keeps her other choices after it (her own snapshots kept)", () => {
+    const old = { ...item("b"), reachLabel: "hers" };
+    const l = putFirst({ ...mine, items: [item("a"), old, item("x")] }, [item("c"), item("b"), item("c")]);
+    expect(l.items.map((i) => i.id)).toEqual(["c", "b", "a", "x"]);
+    expect(l.items[1].reachLabel).toBe("hers");
+  });
+  it("CSV with its own columns", () => {
+    expect(toCsv(mine, (id) => [id === "a" ? "Dream" : "Safe", "why"], ["Suggested as", "Why"]).split("\n")).toEqual([
+      "Order,Institute,State,PIN,Course,Quota,Suggested as,Why",
+      '1,"Inst a","S","","DNB Anaesthesiology","DNB Quota","Dream","why"',
+      '2,"Inst b","S","","DNB Anaesthesiology","DNB Quota","Safe","why"',
+    ]);
   });
 });
 

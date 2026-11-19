@@ -12,7 +12,7 @@ import type { DecideLinks } from "../lib/links";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { authorityOf, yearName } from "@/features/exams/keys";
 import { useChoices, useCompare, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
-import { latestText, reachWindow, type Latest, type Reach } from "../lib/reach";
+import { latestText, NEVER_ALLOTTED, reachWindow, type Latest, type Reach } from "../lib/reach";
 import { statCells, statLabel, type StatKey } from "../lib/stat-format";
 import { roundShort, type SeatList } from "../types";
 import { Dash, HistoryNote, InstName, Provisional, ReachBadge } from "./bits";
@@ -292,13 +292,15 @@ function sameOf(rows: ListRow[], E: Exam, latest: Latest, pastYears: [number, nu
  */
 /**
  * Options' groups that never read as seats she can get: no allotment on her seat categories (nothing to compare her
- * rank with) and closed before her rank. In the label order (Options' default sort) each is one run of rows, headed by
- * its title and count; `counts`: per label, as the reach chips.
+ * rank with), closed before her rank, and never allotted before (no closing of its own; the round view lists it last).
+ * In the label order (Options' default sort) each is one run of rows, headed by its title and count; `counts`: per
+ * label, as the reach chips.
  */
 type Grouping = { counts: Record<Reach, number> } | null;
-const grouped = ["no-data", "closed-before"] as const satisfies Reach[];
+const grouped = ["no-data", "closed-before", "new"] as const satisfies Reach[];
 const groupOf = (r: ListRow) => (grouped as readonly Reach[]).includes(r.reach) ? (r.reach as (typeof grouped)[number]) : null;
 function groupWords(g: (typeof grouped)[number], { latest, pastYears, includeLatest }: Years) {
+  if (g === "new") return { title: NEVER_ALLOTTED, note: `${authorityOf(latest.exam)} allotted nobody to these in any result Seatora has, so there is no closing rank of their own. Where Seatora has them, each shows what the same course closed at similar colleges (same type and state), for comparison, not a prediction.` };
   return g === "no-data"
     ? { title: "No allotment in your seat categories", note: `${authorityOf(latest.exam)} allotted none of your seat categories on these in ${reachWindow(latest, pastYears, includeLatest, true)}, so there is no closing rank to compare with yours. Not a sign of a seat you can take.` }
     : { title: "Closed before your rank", note: `The closing rank came before yours in every round of ${reachWindow(latest, pastYears, includeLatest)}.` };

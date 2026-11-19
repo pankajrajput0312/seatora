@@ -130,7 +130,7 @@ export const openQuotasNote = `None ticked means ${openQuotas.join(", ")}: the q
 /**
  * Options' two views. "round": the newest round's seat lists first: every option with seats in them (in her courses,
  * quotas and seat categories), new options with no past allotment included, closed-before options shown, sorted by
- * label (reach.ts roundReachOrder: new and no-data before closed-before), then clear vacancy seats, then deepest closing. "all": every option with past allotments, closed-before hidden,
+ * label (reach.ts roundReachOrder: no-data, then closed-before, then new last), then clear vacancy seats, then deepest closing. "all": every option with past allotments, closed-before hidden,
  * by label, then deepest closing. The default comes from the data (service.ts optionsView).
  */
 export const optionsViews = ["round", "all"] as const;

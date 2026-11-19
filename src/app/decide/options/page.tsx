@@ -16,19 +16,21 @@ import { ViewField } from "@/features/decide/components/view-toggle";
 import { chosenView } from "@/features/decide/server/view";
 import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, kindNote, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
-import { StillCanDo } from "@/features/decide/components/still-can-do";
+import { CourseReach, StillCanDo, type CourseHit } from "@/features/decide/components/still-can-do";
 import { YourPicture } from "@/features/decide/components/your-picture";
 import { GroupPrompt } from "@/features/decide/components/dashboard-parts";
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
+import { Button } from "@/components/ui/button";
+import { ListOrdered } from "lucide-react";
 import { iniElsewhere } from "@/features/decide/lib/college-aliases";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, resultsSpan, STRAY_NOT_COUNTED } from "@/features/decide/lib/reach";
 import { readTermFilters, termChips, termValueLabel, untypedOnly } from "@/features/decide/lib/term-filters";
-import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
-import { examGroupCourses, getMeta, listOptions, optionsPicture, optionsView, unlistedSeats } from "@/features/decide/service";
+import { keepProfileParams, orderUnits, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
+import { examGroupCourses, getMeta, listOptions, nearestCourses, optionsPicture, optionsView, reachedOf, unlistedSeats } from "@/features/decide/service";
 import { kindName, optionSorts, optionsViews, roundShort, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { authorityOf, DEFAULT_EXAM, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
@@ -100,6 +102,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // Nothing with the round's seats: how many match without that filter (the empty state offers them).
   const withoutSeats = !r.total && r.seats ? (await listOptions(profile, { ...filters, hasSeats: false }, { page: 1, pageSize: 1 }, exam)).total : 0;
   const L = decideLinks(params);
+  const pairNames = new Map(pairChoices(meta.courses).map((x) => [x.value, x.label]));
+  const pairLabel = (c: string) => pairNames.get(c) ?? c.replace("~", " ");
   const here = (changes: Record<string, string | null>) => L.with("/decide/options", { page: null, ...changes });
   // The All chip counts what it lists: closed-before options only while they are shown.
   const all = reachOrder.reduce((s, x) => s + r.counts[x], 0) - (r.showClosed ? 0 : r.counts["closed-before"]);
@@ -123,6 +127,19 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // None reached: the option that closed deepest in the head year (any round), so the verdict has a number.
   const deepest = labelled > 0 && reached === 0 ? (await listOptions(profile, { ...filters, reach: undefined, showClosed: true, sort: "deep" }, { page: 1, pageSize: 1 }, exam)).rows[0] : undefined;
   const deepestAt = deepest?.byYear[headYear];
+  // Which of her courses reached her rank (r.courses), linked to each on Options; none of hers: the nearest that did.
+  const courseHit = (key: string, n: number): CourseHit => ({ key, name: pairLabel(key), n, href: L.with("/decide/options", { c: key, page: null, reach: null, q: null }) });
+  const hit = Object.entries(r.courses).flatMap(([key, c]) => (reachedOf(c) ? [courseHit(key, reachedOf(c))] : [])).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+  const missed = orderUnits(profile)
+    .filter((u) => !hit.some((h) => h.key === u || h.key.endsWith(`~${u}`)))
+    .map((u) => (u.includes("~") ? pairLabel(u) : (meta.specialties.find((x) => x.code === u)?.name ?? u)));
+  const nearest = labelled > 0 && reached === 0 ? (await nearestCourses(profile, filters, exam)).map((x) => courseHit(x.key, x.reached)) : undefined;
+  const suggestButton = (
+    <Button asChild variant="secondary" className="max-sm:w-full">
+      <Link href={L.to("/decide/choices/suggest")}><ListOrdered className="size-4" aria-hidden />Suggest my list</Link>
+    </Button>
+  );
+  const courseReach = <CourseReach hit={hit} missed={missed} nearest={nearest} rank={`${E.rankWord} ${formatRank(profile.rank)}`} when={reachWindow(latest, PAST_YEARS, !f.prov, true)} />;
   // NEET SS, nothing at all: her courses that are another question group's, said with the way to change it.
   const groupCourses = perGroup(exam) && !labelled ? await examGroupCourses(exam) : null;
   const mine = groupsIn(E, profile.quotas);
@@ -142,7 +159,6 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const sp = kindName("clear", exam) === "Seat position";
   const caption = `Options for ${E.rankWord} ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? (sp ? `; ${round} seat position` : `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added`) : ""}`;
   // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
-  const pairLabel = (c: string) => pairChoices(meta.courses).find((x) => x.value === c)?.label ?? c.replace("~", " ");
   // One name per value, the chip's and the Filters sheet's alike ("any" is any of the round's lists, never with or without).
   const seatsWords = (s: SeatKind | "any") => (s === "any" || sp ? `Has seats in ${sp ? `the ${round} seat position` : `any ${round} list`}` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
   const closedDefault = roundView ? "1" : "0";
@@ -244,6 +260,13 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       {reached > 0 && (
         <YourPicture pic={pic} profile={profile} E={E} latest={latest} includeLatest={!f.prov} L={L} scope={roundView && r.seats ? ` with ${round} seats` : ""} closedHref={here({ reach: "closed-before", closed: "1" })} />
       )}
+      {/* Which of her courses reach her rank (none of them: in What you can still do, below), and her list in a suggested order. */}
+      {reached > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {(missed.length > 0 || hit.length > 1) && <p className="min-w-0 flex-1 basis-80 text-sm">{courseReach}</p>}
+          {suggestButton}
+        </div>
+      )}
 
       {/* Phones: one line (the counts that matter, the rest and the view links behind its (i)); md up as it was. */}
       {sum && (
@@ -266,7 +289,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
                 </>
               )}
               {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}. {listsTip}{" "}
-              Sorted by label (reached, then within 10%, then never allotted before and no allotment in your categories, closed before your rank last), then {round} {sp ? "seats" : "clear vacancy seats"},{" "}
+              Sorted by label (reached, then within 10%, then no allotment in your categories, then closed before your rank, never allotted before last in a group of its own), then {round} {sp ? "seats" : "clear vacancy seats"},{" "}
               {exam === DEFAULT_EXAM ? <>then the deepest {HEAD} closing.</> : <>then, within a reached label, the tightest closing first (the most sought seat that still reached your rank); within any other label, the deepest {HEAD} closing.</>}
               <span className="mt-2 flex flex-col items-start md:hidden">{viewLinks}</span>
             </InfoTip>
@@ -294,7 +317,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
               </Link>
             )}
           </p>
-          <StillCanDo L={L} exam={exam} rank={profile.rank} list={roundView ? lists[0] : undefined} fresh={sum?.fresh ?? 0} counts={r.counts} cap={capNote ? { href: showCapped, words: capWords, n: capped } : undefined} id="still-h" title="What you can still do" />
+          <StillCanDo L={L} exam={exam} rank={profile.rank} list={roundView ? lists[0] : undefined} fresh={sum?.fresh ?? 0} counts={r.counts} cap={capNote ? { href: showCapped, words: capWords, n: capped } : undefined} id="still-h" title="What you can still do" courses={courseReach} />
+          <div>{suggestButton}</div>
         </>
       )}
       {!roundView && lists.length > 0 && (
@@ -308,7 +332,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
 
       {/* The profile filters are URL params, so this visit can differ from the saved profile. The toolbar (pinned on phones): the search box, Filters (the rest, in a sheet) and the count. The form, its buttons and the sheet stay mounted; only the fields remount to show what was applied. */}
       <FilterForm action="/decide/options" role="search" aria-label="Filter options" className={toolbar}>
-        {(["rank", "cat", "pwd", "fee", "bond"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
+        {(["rank", "cat", "pwd", "fee", "bond", "ord"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         {/* NEET SS: no Quota filter; her group's quotas ride along. */}
         {perGroup(exam) && keep.get("quota") && <input type="hidden" name="quota" value={keep.get("quota")!} />}
         {f.reach && <input type="hidden" name="reach" value={f.reach} />}

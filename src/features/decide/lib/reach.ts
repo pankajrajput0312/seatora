@@ -104,8 +104,11 @@ export type ReachInput = Pick<Cutoff, "year" | "closing"> & { round?: Round; cat
  */
 export const reachOrder = ["reached-latest", "reached-both", "reached-one", "within-10", "stray-only", "closed-before", "no-data", "new"] as const;
 export type Reach = (typeof reachOrder)[number];
-/** Options' round view sort: what she can realistically get first; unknown (new, no allotment on her seats) before closed before her rank. */
-export const roundReachOrder: readonly Reach[] = ["reached-latest", "reached-both", "reached-one", "within-10", "stray-only", "new", "no-data", "closed-before"];
+/**
+ * Options' round view sort: what she can realistically get first; then no allotment on her seats and closed before her
+ * rank; never allotted before last, in its own group (no closing of its own, so never at the top of her list).
+ */
+export const roundReachOrder: readonly Reach[] = ["reached-latest", "reached-both", "reached-one", "within-10", "stray-only", "no-data", "closed-before", "new"];
 
 /**
  * Stray and special stray rounds fill leftover seats, often far below the rank that closed R1 to R3, so they never make an
