@@ -24,13 +24,19 @@ export const profileSchema = z.object({
   states: z.array(z.string()),
   maxFeeLakh: z.number().positive().nullable(),
   maxBondYears: z.number().min(0).nullable(),
+  /**
+   * Her order of preference over her courses (the profile dialog's "Your order"), most wanted first: groups of equal
+   * ones, each entry a pair key ("MD~RADIODIAGNOSIS") or a specialty code (every degree of it). Absent: all equal.
+   * Suggest my list reads it (prefRank). The `ord` URL param: groups comma-joined, equal ones "=" joined.
+   */
+  order: z.array(z.array(z.string().max(200).regex(/^[^=,]+$/)).min(1).max(100)).max(100).optional(),
 });
 export type Profile = z.infer<typeof profileSchema>;
 
 export const PROFILE_KEY = "medpath.profile";
-export const profileParamKeys = ["rank", "cat", "pwd", "sp", "deg", "c", "quota", "st", "fee", "bond"] as const;
+export const profileParamKeys = ["rank", "cat", "pwd", "sp", "deg", "c", "quota", "st", "fee", "bond", "ord"] as const;
 /** Profile params that hold several values: repeated (sp=A&sp=B, what GET forms send) or comma-joined (sp=A,B). */
-const listKeys = new Set<string>(["sp", "deg", "c", "quota", "st"]);
+const listKeys = new Set<string>(["sp", "deg", "c", "quota", "st", "ord"]);
 
 /** Choices offered for the fee and bond caps, shared by the profile dialog and page filters. */
 export const FEE_LAKH_CHOICES = [1, 2, 3, 5, 8, 10, 15, 20, 30, 50];
@@ -89,6 +95,34 @@ export function picksOf(p: ProfileCourses, courses: { degree: string; specialty:
   return out;
 }
 
+/** Her courses as she orders them (the dialog's "Your order"): her exact pairs, else her specialties. */
+export const orderUnits = (p: ProfileCourses) => (p.pairs?.length ? p.pairs : p.specialties);
+
+/**
+ * Her preference of a course (Suggest my list): the index of the first group of `order` naming it (its pair key, else
+ * its specialty); a course it doesn't name, or no order, comes after every group.
+ */
+export function prefRank(order: Profile["order"], c: { degree: string; specialty: string }) {
+  const i = order?.findIndex((g) => g.includes(pairKey(c)) || g.includes(c.specialty)) ?? -1;
+  return i < 0 ? (order?.length ?? 0) : i;
+}
+
+/**
+ * `order` kept to `units` (her courses now): an entry stands for the units it names (itself, a specialty's pairs, or a
+ * pair's specialty when she now ticks the specialty), each unit once, empty groups dropped; units it names nowhere come
+ * after, one group each. All equal (one group, or no order): undefined, as a profile says it.
+ */
+export function orderFor(order: Profile["order"], units: string[]): Profile["order"] {
+  if (!order?.length) return undefined;
+  const spec = (u: string) => u.split("~").at(-1)!;
+  const used = new Set<string>();
+  const groups = order
+    .map((g) => units.filter((u) => !used.has(u) && g.some((e) => e === u || e === spec(u) || spec(e) === u)).map((u) => (used.add(u), u)))
+    .filter((g) => g.length);
+  const out = [...groups, ...units.filter((u) => !used.has(u)).map((u) => [u])];
+  return out.length > 1 ? out : undefined;
+}
+
 /** The quotas her profile covers: the ones she ticked, else the exam's open quotas (`open`, exams' `quotas`; default NEET PG's; NEET SS: none, she picks her group). */
 export const profileQuotas = (p: Pick<Profile, "quotas">, open: string[] = openQuotas) => (p.quotas.length ? p.quotas : open);
 
@@ -117,7 +151,9 @@ export function profileInput(p: URLSearchParams) {
   const cat = p.get("cat")?.trim() ?? "Open";
   const known = categoryFromText(cat); // "obc", "UR", "GEN-PwD"
   const pairs = list(p, "c");
+  const order = list(p, "ord").map((g) => g.split("=").map((x) => x.trim()).filter(Boolean)).filter((g) => g.length);
   return {
+    ...(order.length ? { order } : {}),
     rank: num(p.get("rank")?.replace(/[,\s]/g, "")),
     category: known?.category ?? cat,
     pwd: known?.pwd || flag(p.get("pwd")),
@@ -145,7 +181,9 @@ export function profileFromParams(p: URLSearchParams): Profile | null {
   };
   // Pairs item by item: a hand-edited bad one is dropped, the rest kept.
   const pairs = raw.pairs?.filter((x) => pairSchema.safeParse(x).success);
+  const order = raw.order && profileSchema.shape.order.safeParse(raw.order).data;
   return {
+    ...(order ? { order } : {}),
     rank: rank.data,
     category: field("category", "Open"),
     pwd: field("pwd", false),
@@ -172,6 +210,7 @@ export function profileToParams(profile: Profile, base = new URLSearchParams()):
   if (profile.states.length) p.set("st", profile.states.join(","));
   if (profile.maxFeeLakh != null) p.set("fee", String(profile.maxFeeLakh));
   if (profile.maxBondYears != null) p.set("bond", String(profile.maxBondYears));
+  if (profile.order?.length) p.set("ord", profile.order.map((g) => g.join("=")).join(","));
   return p;
 }
 

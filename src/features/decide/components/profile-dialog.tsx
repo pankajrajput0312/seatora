@@ -9,10 +9,11 @@ import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { groupOf, groupsIn, quotaIn, tidyLabel, type Exam } from "@/features/exams/exam";
 import { DEFAULT_EXAM } from "@/features/exams/keys";
-import { BOND_YEAR_CHOICES, coursesFromPicks, feeChoices, pairKey, picksOf, profileSchema, type Profile } from "../profile";
+import { BOND_YEAR_CHOICES, coursesFromPicks, feeChoices, orderFor, orderUnits, pairKey, picksOf, profileSchema, type Profile } from "../profile";
 import { useExamInfo } from "../lib/use-decide-store";
 import { control } from "./ui";
 import { matchesSpecialty } from "../lib/specialty-search";
+import { CourseOrder } from "./course-order";
 
 /** "Open (General/UR)": what Open means, where she picks it and on her rank chip; the stored value stays "Open". */
 export const categoryName = (c: string) => (c === "Open" ? "Open (General/UR)" : c);
@@ -105,7 +106,8 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
         return ticked && !ps.length ? null : { specialties: [...new Set(ps.map((x) => x.split("~")[1]))], degrees: [], ...(ps.length ? { pairs: ps } : {}) };
       })()
     : coursesFromPicks(picked, draft.degrees, meta.courses);
-  const current = () => courses && { ...draft, pairs: undefined, ...courses };
+  // Her order kept to the courses she ticks now (a course added comes last; all equal is no order).
+  const current = () => courses && { ...draft, pairs: undefined, ...courses, order: orderFor(draft.order, orderUnits(courses)) };
 
   const rank = () => Number(rankText.replace(/\D/g, ""));
   const rankError = `Enter your ${E.rankName}: a number from 1 to ${formatRank(profileSchema.shape.rank.maxValue ?? 0)}.`; // the schema's limit
@@ -382,6 +384,13 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
             <>
               {rankStep}
               {courseStep}
+              {courses && orderUnits(courses).length > 1 && (
+                <CourseOrder
+                  units={orderUnits(courses).map((u) => ({ key: u, label: u.includes("~") ? `${u.split("~")[0]} ${meta.specialties.find((x) => x.code === u.split("~")[1])?.name ?? u}` : (meta.specialties.find((x) => x.code === u)?.name ?? u) }))}
+                  value={draft.order}
+                  onChange={(o) => set("order", o)}
+                />
+              )}
               {quotaStep}
               {limits}
             </>

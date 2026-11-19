@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  categoryFromText, coursesFromPicks, feeChoices, keepProfileParams, pairChoices, picksOf, profileCourseFilter, profileFromParams, profileHasCourse, profileInput, profileQuotas,
-  profileSchema, profileToParams, profileWithFilters, toURLSearchParams, type Profile,
+  categoryFromText, coursesFromPicks, feeChoices, keepProfileParams, orderFor, orderUnits, pairChoices, picksOf, prefRank, profileCourseFilter, profileFromParams, profileHasCourse, profileInput,
+  profileQuotas, profileSchema, profileToParams, profileWithFilters, toURLSearchParams, type Profile,
 } from "./profile";
 
 const her: Profile = {
@@ -149,5 +149,36 @@ describe("profileWithFilters (Save as my defaults)", () => {
   it("exact courses replace specialty x degree; none ticked drops them", () => {
     expect(profileWithFilters(base, new URLSearchParams("c=DNB~FAMILYMEDICINE"), new Set(["c"])).pairs).toEqual(["DNB~FAMILYMEDICINE"]);
     expect("pairs" in profileWithFilters({ ...base, pairs: ["MD~PAEDIATRICS"] }, new URLSearchParams(), new Set(["c"]))).toBe(false);
+  });
+});
+
+describe("course order (Suggest my list)", () => {
+  const mds: Profile = { ...her, specialties: ["PROSTHODONTICS", "CONSERVATIVEDENTISTRY", "PERIODONTOLOGY"], order: [["PROSTHODONTICS", "CONSERVATIVEDENTISTRY"], ["PERIODONTOLOGY"]] };
+  it("rides in the URL as ord (groups comma-joined, equal ones = joined), round-trips, and links keep it", () => {
+    const p = profileToParams(mds);
+    expect(p.get("ord")).toBe("PROSTHODONTICS=CONSERVATIVEDENTISTRY,PERIODONTOLOGY");
+    expect(profileFromParams(p)).toEqual(mds);
+    expect(keepProfileParams(toURLSearchParams({ rank: "1", ord: ["A=B", "C"] })).get("ord")).toBe("A=B,C");
+    expect(profileFromParams(new URLSearchParams("rank=1&ord=A=B,C"))?.order).toEqual([["A", "B"], ["C"]]);
+    // A bad order is dropped, the profile kept; none at all is no field.
+    expect(profileFromParams(new URLSearchParams(`rank=1&ord=${"X,".repeat(101)}`))).not.toHaveProperty("order");
+    expect(profileFromParams(new URLSearchParams("rank=1"))).not.toHaveProperty("order");
+  });
+  it("prefRank: the group naming a course (its pair, else its specialty); unnamed or no order after every group", () => {
+    const c = (degree: string, specialty: string) => ({ degree, specialty });
+    expect(prefRank(mds.order, c("MDS", "CONSERVATIVEDENTISTRY"))).toBe(0);
+    expect(prefRank(mds.order, c("MDS", "PERIODONTOLOGY"))).toBe(1);
+    expect(prefRank(mds.order, c("MDS", "ORTHODONTICS"))).toBe(2);
+    expect(prefRank([["MS~ORTHOPAEDICS"], ["ORTHOPAEDICS"]], c("DNB", "ORTHOPAEDICS"))).toBe(1);
+    expect(prefRank(undefined, c("MD", "X"))).toBe(0);
+  });
+  it("orderFor keeps an order to her courses now: specialties and pairs stand for each other, new ones last, all equal is none", () => {
+    expect(orderUnits({ specialties: ["A"], degrees: [], pairs: ["MD~A"] })).toEqual(["MD~A"]);
+    expect(orderFor([["B"], ["A"]], ["A", "B", "C"])).toEqual([["B"], ["A"], ["C"]]);
+    expect(orderFor([["B"], ["A"]], ["MD~A", "DNB~A", "MD~B"])).toEqual([["MD~B"], ["MD~A", "DNB~A"]]);
+    expect(orderFor([["MD~B"], ["DNB~A"]], ["A", "B"])).toEqual([["B"], ["A"]]);
+    expect(orderFor([["A", "B"]], ["A", "B"])).toBeUndefined();
+    expect(orderFor([["Z"]], ["A"])).toBeUndefined();
+    expect(orderFor(undefined, ["A", "B"])).toBeUndefined();
   });
 });
