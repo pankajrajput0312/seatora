@@ -1,6 +1,7 @@
 /**
  * What each plan costs, in paise. The order route reads it; the browser never sends an amount. `wasAmount` is display
- * only: the struck-through "was" price beside every price ("~~₹499~~ ₹199").
+ * only and never charged: Decide's home box still strikes it ("~~₹499~~ ₹199"); the public pages, the plan cards and the
+ * buy buttons state the price alone (components/marketing/price-line.tsx).
  */
 export const PLANS = {
   season_pass: { amount: 19900, wasAmount: 49900, currency: "INR", description: "Season Pass" },

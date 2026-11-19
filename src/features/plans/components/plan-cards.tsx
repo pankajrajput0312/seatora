@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { Check, X } from "lucide-react";
 import { getCurrentUser } from "@/features/auth/lib/session";
-import { freeLine } from "@/components/marketing/free-price";
+import { passLine } from "@/components/marketing/price-line";
 import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import { SEASON_PASS_UNTIL } from "@/features/payments/grant";
 import { PLANS } from "@/features/payments/plans";
@@ -69,13 +69,13 @@ export async function PlanCards({ className, coupon }: { className?: string; cou
 export function PlanCardsView({ current, free, got, invite, cta, freeCta, className }: {
   current: Plan | null; free: Date | null; got?: string | null; invite?: { name: string; amount: number } | null; cta: React.ReactNode; freeCta?: React.ReactNode; className?: string;
 }) {
-  const { amount: list, wasAmount: was } = PLANS.season_pass;
+  const list = PLANS.season_pass.amount;
   const season = longDate(SEASON_PASS_UNTIL);
   // "Valid till 31 Mar 2027" only where she pays (or has paid): the free upgrade ends with the free period.
   const line = got
     ? free && `Your free pass ends ${shortDate(free)}. After that you return to the Free plan (your list stays) unless you pay ${formatPaise(invite?.amount ?? list)} once. We never charge automatically.` // the free claim; a pass says it all
     : free
-      ? invite ? "No card now, no auto-renew." : freeLine(free)
+      ? invite ? "No card now, no auto-renew." : passLine(free)
       : invite ? `Once, no auto-renew, valid till ${season}.` : `${formatPaise(discountedPrice(list))} with an invite, valid till ${season}.`;
   const yours = <span className="rounded-full bg-[#5ccfe6] px-2 py-0.5 text-xs font-bold text-[#0b0e12]">Your plan</span>;
   return (
@@ -87,18 +87,12 @@ export function PlanCardsView({ current, free, got, invite, cta, freeCta, classN
           {free && <span className="ml-auto rounded-full bg-[#5fd36f] px-2.5 py-0.5 text-xs font-bold text-[#0b0e12]">Free till {shortDate(free)}</span>}
         </div>
         <div className="flex flex-1 flex-col p-4">
+          {/* The price it costs (her invite's), in and after the free period: the free period is the ribbon and the line. */}
           {got ? (
             <p className="numeric text-xl font-extrabold">{got}</p>
-          ) : free ? (
-            <p className="flex items-baseline gap-2">
-              <span className="numeric text-4xl font-extrabold">₹0</span>
-              <span className="text-sm text-muted-foreground">now</span>
-            </p>
           ) : (
             <p className="flex flex-wrap items-baseline gap-x-2">
-              <span className="sr-only">Was {formatPaise(was)}, now {formatPaise(invite?.amount ?? list)}</span>
-              <s aria-hidden className="numeric text-lg text-muted-foreground">{formatPaise(was)}</s>
-              <span aria-hidden className="numeric text-4xl font-extrabold">{formatPaise(invite?.amount ?? list)}</span>
+              <span className="numeric text-4xl font-extrabold">{formatPaise(invite?.amount ?? list)}</span>
               <span className="text-sm text-muted-foreground">{invite ? `with ${invite.name}'s invite` : "once, no auto-renew"}</span>
             </p>
           )}

@@ -3,8 +3,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
-import { business } from "@/config/business";
-import { FreePrice } from "@/components/marketing/free-price";
+import { istDateTime, priceLine, PriceLine } from "@/components/marketing/price-line";
 import { askConfig } from "@/features/ask/config";
 import { getCurrentUser } from "@/features/auth/lib/session";
 import { couponCodeSchema } from "@/features/payments/coupons";
@@ -12,7 +11,7 @@ import { CouponBanner } from "@/features/payments/components/season-pass-button"
 import { paymentsOn, PLANS } from "@/features/payments/plans";
 import { couponCheck } from "@/features/payments/service";
 import { PlanCards } from "@/features/plans/components/plan-cards";
-import { freeNow, longDate, shortDate } from "@/features/plans/plans";
+import { freeNow, longDate } from "@/features/plans/plans";
 import { SEASON_PASS_UNTIL } from "@/features/payments/grant";
 import { TrackView } from "@/features/funnel/components/beacon";
 import { InviteBanner } from "@/features/referrals/components/invite-banner";
@@ -21,7 +20,7 @@ import { quote } from "@/features/referrals/service";
 
 export const metadata: Metadata = {
   title: "Pricing — Seatora NEET PG 2026 Season Pass",
-  description: `The Seatora NEET PG 2026 Season Pass: ${formatPaise(PLANS.season_pass.amount)} (was ${formatPaise(PLANS.season_pass.wasAmount)}) ${business.period}, paid once, with no subscription or auto-renewal. Free and Season Pass limits compared.`,
+  description: `${priceLine(null)} Paid once, with no subscription or auto-renewal. Free and Season Pass limits compared.`,
 };
 
 /** Rendered per request: her price (a referral, or ?coupon=CODE), her Season Pass, and whether the free period and payments are on. */
@@ -42,7 +41,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         {q.inviter && <InviteBanner inviter={q.inviter} className="mt-4" />}
         <CouponBanner b={banner || null} className="mt-4" />
         <p className="mt-3 text-lg font-semibold">
-          <FreePrice />
+          <PriceLine />
         </p>
         <p className="mt-3 text-muted-foreground">
           Online NEET PG counselling planner for MCC All India counselling: Round 2 seats, past closing ranks, fees, stipends and bonds, and
@@ -52,31 +51,28 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
           <h2 id="plans-h" className="text-lg font-medium">Free and Season Pass</h2>
           <PlanCards className="mt-3" coupon={coupon} />
           <p className="mt-3 text-sm text-muted-foreground">
-            Limits reset at 00:00 IST. {free && `Everything has Season Pass limits till ${shortDate(free)}. `}
+            Limits reset at 00:00 IST. {free && `Every account has Season Pass limits until ${istDateTime(free)}. `}
             {!askOpen && "Ask Seatora is in beta and opens to members later."}
           </p>
         </section>
-        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-16">16 November 2026</time></p>
+        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-19">19 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
           <section>
             <h2>What you pay</h2>
             {paying ? (
               <p className="mt-2">
-                {free ? `Till ${shortDate(free)} the Season Pass is free: upgrade with no payment and no card, or pay now to keep it all season. After that it costs ` : <>The Season Pass costs <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> </>}
-                {formatPaise(q.listAmount)} {business.period}, paid once by card or UPI through Razorpay ({formatPaise(discountedPrice(q.listAmount))} with a friend&apos;s
-                referral link), and runs till {longDate(SEASON_PASS_UNTIL)}. There is no subscription and nothing renews automatically. Prices are in Indian Rupees (INR).
+                {free ? `Until ${istDateTime(free)} every account has full access free, with no payment and no card. To keep it after that, pay ` : "Full access costs "}
+                {formatPaise(q.listAmount)} once by card or UPI through Razorpay ({formatPaise(discountedPrice(q.listAmount))} with a friend&apos;s referral
+                link). It covers the 2026 counselling season and runs until {longDate(SEASON_PASS_UNTIL)}. There is no subscription and nothing renews
+                automatically. Prices are in Indian Rupees (INR).
               </p>
             ) : (
               <p className="mt-2">
-                {free ? (
-                  `Till ${shortDate(free)} you can upgrade to the Season Pass free, with no card. After that it costs ${formatPaise(PLANS.season_pass.amount)} once.`
-                ) : (
-                  <>Paid passes open soon (regular price <s>{formatPaise(PLANS.season_pass.wasAmount)}</s> {formatPaise(PLANS.season_pass.amount)}).</>
-                )}{" "}
-                Nothing is charged right now, there is no subscription and nothing renews automatically. Any price is in Indian Rupees (INR).
+                {free ? `Until ${istDateTime(free)} every account has full access free, with no card. After that it costs ` : "Full access will cost "}
+                {formatPaise(PLANS.season_pass.amount)} once for the 2026 season (until {longDate(SEASON_PASS_UNTIL)}); paid passes open soon. Nothing is
+                charged right now, there is no subscription and nothing renews automatically. Any price is in Indian Rupees (INR).
               </p>
             )}
-            <p className="mt-2">{business.season}</p>
           </section>
           <section>
             <h2>What you get</h2>

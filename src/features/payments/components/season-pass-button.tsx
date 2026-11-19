@@ -8,7 +8,7 @@ import { quote } from "@/features/referrals/service";
 import { cn } from "@/lib/cn";
 import type { CouponBannerInfo } from "../coupons";
 import { SEASON_PASS_UNTIL } from "../grant";
-import { paymentsOn, PLANS } from "../plans";
+import { paymentsOn } from "../plans";
 import { priceFor } from "../service";
 import { BuySeasonPass } from "./buy-season-pass";
 import { ApplyCoupon, CouponForm } from "./coupon-form";
@@ -18,10 +18,10 @@ import { ApplyCoupon, CouponForm } from "./coupon-form";
  * state on the server (plans.ts passState):
  * - a Season Pass beyond the free period, or staff: "Season Pass active till 31 Mar 2027";
  * - in the free period, not upgraded: "Upgrade free till 20 Nov" (the free claim), and under it "Or keep it till 31 Mar
- *   2027, paid once:" with an outlined "Upgrade for ~~₹499~~ ₹199" (its own "Have a coupon?");
+ *   2027, paid once:" with an outlined "Upgrade for ₹199" (its own "Have a coupon?");
  * - in the free period, upgraded free (the card above says "Active · free till 20 Nov"): "Keep it till 31 Mar 2027, paid
- *   once:" and "Upgrade for ~~₹499~~ ₹199". CouponForm in place of a paid button while payments are off;
- * - after it: "Upgrade for ~~₹499~~ ₹199" ("Upgrade for ~~₹499~~ ₹159 with Rahul's invite" with a referrer: her own, or the /r/
+ *   once:" and "Upgrade for ₹199". CouponForm in place of a paid button while payments are off;
+ * - after it: "Upgrade for ₹199" ("Upgrade for ~~₹199~~ ₹159 with Rahul's invite" with a referrer: her own, or the /r/
  *   cookie's code; "… with coupon X" with a coupon), or "Payments open soon" and "Have a coupon?";
  * - signed out: the same words, to /signup?next=/pricing#buy;
  * - a valid 100% ?coupon= (any of these but a pass): "Apply DRTARAL: free till 31 Mar 2027" in their place (ApplyCoupon;
@@ -29,7 +29,7 @@ import { ApplyCoupon, CouponForm } from "./coupon-form";
  * `className`: the primary button; `noteClassName`: text (and the secondary button's colour). Each Upgrade carries
  * data-upgrade: a click is an upgrade_click at the nearest data-placement (docs/FUNNEL.md). `coupon`: the page's
  * ?coupon=, applied to the price (or filled into "Have a coupon?") and kept through sign-up. `freeLabel`: the free
- * claim's words in place of "Upgrade for ~~₹499~~ ₹0" (Decide's home: "Get free Season Pass", its price shown beside it).
+ * claim's words in place of "Upgrade for ₹0" (Decide's home: "Get free Season Pass", its price shown beside it).
  */
 export async function SeasonPassButton({ className, noteClassName, coupon, freeLabel }: { className?: string; noteClassName?: string; coupon?: string | null; freeLabel?: string }) {
   const user = await getCurrentUser();
@@ -41,7 +41,6 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
   const free = freeNow();
   const code = (await cookies()).get(REF_COOKIE)?.value ?? null;
   const q = paymentsOn() ? await quote(user?.id ?? null, code) : null;
-  const was = formatPaise(PLANS.season_pass.wasAmount); // struck beside every price
   const claimLabel = free && (freeLabel ?? <span>Upgrade free till {shortDate(free)}</span>);
 
   const c = coupon ? await priceFor(user?.id ?? null, coupon) : null; // ?coupon=: priced as if she had typed it
@@ -56,7 +55,7 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
         {applyLabel || claimLabel ||
           (q ? (
             <span>
-              Upgrade for {q.amount < PLANS.season_pass.wasAmount && <s className="mr-1 opacity-70">{was}</s>}
+              Upgrade for {q.amount < q.listAmount && <s className="mr-1 opacity-70">{formatPaise(q.listAmount)}</s>}
               {formatPaise(q.amount)}
               {q.inviter ? ` with ${q.inviter}'s invite` : ""}
             </span>

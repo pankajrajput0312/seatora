@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
-import { SeasonPassPrice } from "@/components/marketing/free-price";
+import { SeasonPassPrice } from "@/components/marketing/price-line";
 import { business } from "@/config/business";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export default function RefundPolicyPage() {
       <article className="max-w-prose">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Legal</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight">Refund &amp; Cancellation Policy</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-16">16 November 2026</time></p>
+        <p className="mt-3 text-sm text-muted-foreground">Last updated: <time dateTime="2026-11-19">19 November 2026</time></p>
         <div className="mt-8 grid gap-6 leading-relaxed text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h2]:text-foreground">
           <section>
             <h2>Price</h2>

@@ -1,17 +1,5 @@
 import { Crew } from "./crew";
 
-/** Among Us-style "total tasks completed" bar: fills as you scroll the page (pure CSS scroll timeline). */
-export function TaskBar() {
-  return (
-    <div aria-hidden className="pointer-events-none fixed top-[4.75rem] left-4 z-30 hidden w-60 rounded-md border border-border bg-background/90 p-2.5 shadow-overlay backdrop-blur-md xl:block">
-      <p className="mb-1.5 font-pixel text-xs text-foreground">Counselling tasks completed</p>
-      <div className="h-3 border-2 border-black bg-muted/90">
-        <div className="task-fill h-full bg-leaf" />
-      </div>
-    </div>
-  );
-}
-
 /** A starfield strip where a crewmate drifts past, spinning. */
 export function SpaceBand() {
   const stars = Array.from({ length: 40 }, (_, i) => ({ left: `${(i * 29) % 100}%`, top: `${(i * 47) % 100}%`, delay: `${(i % 11) * 0.3}s` }));

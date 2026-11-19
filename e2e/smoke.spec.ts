@@ -33,10 +33,11 @@ test("landing page renders key sections", async ({ page }) => {
   for (const id of new Set(hashes)) await expect(page.locator(`#${id}`), `#${id}`).toBeAttached();
 });
 
-test("the Season Pass shows as free in one line (then ₹199 once), a free sign-up, and the policy links", async ({ page }) => {
+test("the price in one line with its dates (free, then ₹199 once), a free sign-up, and the policy links", async ({ page }) => {
   await page.goto("/pricing");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Seatora NEET PG 2026 Season Pass");
-  await expect(page.getByText(/^Free till \d+ \w+\. Then ₹199 once — no auto-renew, no card now\.$/).first()).toBeVisible();
+  await expect(page.getByText(/^Free account forever\. Full access(: | free until \d\d:\d\d IST, \d+ \w+ \d{4}; then )₹199 once for the 2026 season \(until \d+ \w+ \d{4}\)\.$/).first()).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(/₹499|₹0 now/);
   await expect(page.locator('main a[href="/signup"]', { hasText: "Create free account" })).toHaveCount(2);
   await expect(page.locator('main a[href^="mailto:"]')).toHaveCount(0);
   await expect(page.locator("header a", { hasText: "Get Seatora — Free" }).first()).toBeAttached();
@@ -47,14 +48,28 @@ test("the Season Pass shows as free in one line (then ₹199 once), a free sign-
   }
 });
 
-test("resident finder takes a rank and shows hospitals or an honest empty state", async ({ page }) => {
+test("the rank check answers a rank with no sign-in, and sign-up says what it opens", async ({ page }) => {
+  needsDb();
   await page.goto("/");
-  const finder = page.locator("#preview");
-  const input = finder.locator("input[inputmode=numeric]");
-  await input.pressSequentially("5000");
-  await input.blur();
-  await expect(input).toHaveValue("5,000");
-  await expect(finder.getByText("Residents are being added.").or(finder.getByRole("heading", { level: 3 }).first())).toBeVisible();
+  const check = page.locator("#rank");
+  await check.getByLabel("Your All India Rank").fill("18,500");
+  await check.getByLabel("Category").selectOption("OBC");
+  await check.getByRole("button", { name: "Show seats" }).click();
+  await expect(page).toHaveURL(/\/neet-pg\/rank\?rank=18%2C500&cat=OBC$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("AIR 18,500, OBC");
+  const cta = page.getByRole("link", { name: /^Sign up free to see all [\d,]+$/ });
+  await expect(cta).toHaveAttribute("href", "/signup?next=%2Fdecide%2Foptions%3Frank%3D18500%26cat%3DOBC");
+  await cta.click();
+  await expect(page.getByText("Create a free account to see your options for AIR 18,500 (OBC).")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" }).and(page.locator("main a"))).toHaveCount(1); // once, under the form
+});
+
+test("a visitor's planner link in the footer goes to sign-up, never to the sign-in page", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator('footer a[href="/neet-pg"]')).toHaveCount(1);
+  await page.locator("footer").getByRole("link", { name: "Your options" }).click();
+  await expect(page).toHaveURL(/\/signup\?next=%2Fdecide%2Foptions$/);
+  await expect(page.getByText("Create a free account to see your options.")).toBeVisible();
 });
 
 test("sign-up needs the invited email and the invite code; nothing is created otherwise", async ({ page }) => {
@@ -86,7 +101,9 @@ test("the invited account signs up (or in), signs out, and signs back in", async
   await page.goto("/account");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Hi, .+\.$/);
   await expect(page.getByText(invited.email)).toBeVisible();
-  await expect(page.locator('header a[href="/decide"]:not(dialog a)', { hasText: /^My planner$/ })).toHaveCount(1); // (the phone menu <dialog> has its own)
+  // Signed in: "Open my planner" once, and no "Sign in" or "Create free account" (the phone menu <dialog> has its own).
+  await expect(page.locator('header a[href="/decide"]:not(dialog a)', { hasText: /^Open my planner/ })).toHaveCount(1);
+  await expect(page.locator("header a:not(dialog a)", { hasText: /^(Sign in|My planner)$/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/$/);

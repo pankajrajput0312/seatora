@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Info } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { Cta } from "@/components/marketing/cta";
+import { RankForm } from "@/components/marketing/rank-check";
 import { accessFaq, Faq } from "@/components/marketing/faq";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { SourceLabel } from "@/components/ui/source-label";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { fmtDay } from "@/features/decide/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
-import { badgeOf, fmtIST, roundName, stepName } from "@/features/decide/lib/round-status";
+import { alertOf, badgeOf, fmtIST, fmtNote, roundName, stepName } from "@/features/decide/lib/round-status";
 import { kindName, type Round } from "@/features/decide/types";
 import { crossover } from "../crossover";
 import { authorityOf, DEFAULT_EXAM, sessionExams, type ExamKey } from "../keys";
@@ -29,14 +30,19 @@ const signupFirst = (next: string) => `/signup?${new URLSearchParams({ next })}`
 type Ladder = NonNullable<LandingData["closing"]>;
 type Step = NonNullable<LandingData["status"]>["steps"][number];
 
-/** A round's steps with their badges; one "Every step" line when they all have the same one. */
+/**
+ * A round's steps with their badges; one "Every step" line when they all have the same one, and one "Result" line when
+ * the provisional and final results do (MCC held both with one notice: "Result, On hold", not two rows of it).
+ */
 const collapse = (steps: Step[]) => {
-  const xs = steps.map((s) => ({ name: stepName[s.step], b: badgeOf(s) }));
-  return xs.length > 1 && xs.every((x) => x.b.text === xs[0].b.text) ? [{ name: "Every step", b: xs[0].b }] : xs;
+  const xs = steps.map((s) => ({ name: stepName[s.step], b: badgeOf(s), result: s.step.endsWith("_result") }));
+  if (xs.length > 1 && xs.every((x) => x.b.text === xs[0].b.text)) return [{ name: "Every step", b: xs[0].b }];
+  const results = xs.filter((x) => x.result);
+  return results.length > 1 && results.every((x) => x.b.text === results[0].b.text) ? [...xs.filter((x) => !x.result), { name: "Result", b: results[0].b }] : xs;
 };
 
 /** One seat's closing rank in each round, as bars on one scale (0 to its deepest), every value labelled; a real table. */
-function Rounds({ c, caption }: { c: Ladder; caption: string }) {
+export function Rounds({ c, caption }: { c: Ladder; caption: string }) {
   const max = Math.max(...c.rounds.map((r) => r.closing));
   return (
     <table className="w-full text-sm">
@@ -70,7 +76,7 @@ function Rounds({ c, caption }: { c: Ladder; caption: string }) {
 }
 
 /** One figure from the data: what it is, the figure, its documents, and where Decide shows the rest. */
-function Note({ title, children, sources, href, action }: { title: string; children: React.ReactNode; sources: { name: string; url: string | null; year: string }[]; href: string; action: string }) {
+export function Note({ title, children, sources, href, action }: { title: string; children: React.ReactNode; sources: { name: string; url: string | null; year: string }[]; href: string; action: string }) {
   return (
     <article className="flex flex-col border-t border-border pt-5">
       <h3 className="text-lg font-medium leading-snug">{title}</h3>
@@ -85,20 +91,27 @@ function Note({ title, children, sources, href, action }: { title: string; child
   );
 }
 
+/** What a landing page's pieces share: the counselling body, Decide's links, and sign-up first for a visitor. */
+function linksOf(d: LandingData) {
+  const who = authorityOf(d.exam);
+  const L = decideLinks(d.exam === DEFAULT_EXAM ? "" : `exam=${d.exam}`);
+  // A staff-only exam's page is read by signed-in staff only: straight into Decide.
+  const viaSignup = d.E.public ? signupFirst : (href: string) => href;
+  const lastRanks = (c: Ladder) => viaSignup(L.lastRanks(c.courseSlug, { inst: c.college.slug, quota: c.rawQuota, category: "Open" }));
+  return { who, L, viaSignup, lastRanks };
+}
+
 export async function ExamLanding({ exam }: { exam: ExamKey }) {
   await landingGate(exam);
   const d = await landingData(exam);
   const w = landingWords[exam];
   const { E, counts: k } = d;
-  const who = authorityOf(exam);
+  const { who, L, viaSignup, lastRanks } = linksOf(d);
   const body = who === "AIIMS" ? "AIIMS New Delhi" : "MCC";
-  const L = decideLinks(exam === DEFAULT_EXAM ? "" : `exam=${exam}`);
-  // A staff-only exam's page is read by signed-in staff only: straight into Decide.
-  const viaSignup = E.public ? signupFirst : (href: string) => href;
-  const years = sessionExams.includes(exam) ? "sessions" : "counselling years";
-  const lastRanks = (c: Ladder) => viaSignup(L.lastRanks(c.courseSlug, { inst: c.college.slug, quota: c.rawQuota, category: "Open" }));
   const step = (r: Round) => E.roundWords?.[r] ?? roundName[r];
   const faqs = [...commonFaqs(d), ...w.faqs(d), accessFaq];
+  const held = d.status && alertOf(d.status.steps);
+  const heldStep = held && d.status!.steps.find((s) => s.url === held.url);
 
   return (
     <>
@@ -114,14 +127,16 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
                 {w.notCovered}
               </p>
             )}
-            <div className="mt-6 flex flex-wrap gap-3 sm:mt-8">
-              <Button asChild size="lg" className="w-full sm:w-auto">
-                <Link href={viaSignup(L.options())}>See options for your rank</Link>
-              </Button>
-              <Button asChild size="lg" variant="ghost" className="w-full sm:w-auto">
-                <Link href="#get-seatora">Season Pass</Link>
-              </Button>
-            </div>
+            {/* NEET PG: where her rank got in last year, no sign-up (/neet-pg/rank); another exam's staff go to Options. */}
+            {exam === DEFAULT_EXAM ? (
+              <RankForm className="mt-6 max-w-xl sm:mt-8" />
+            ) : (
+              <div className="mt-6 flex flex-wrap gap-3 sm:mt-8">
+                <Button asChild size="lg" className="w-full sm:w-auto">
+                  <Link href={viaSignup(L.options())}>See options for your rank</Link>
+                </Button>
+              </div>
+            )}
           </div>
 
           {d.closing && (
@@ -143,68 +158,7 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
         </Container>
       </section>
 
-      <section aria-labelledby="inside-h" className="border-b border-border">
-        <Container className="py-16 md:py-24">
-          <h2 id="inside-h" className="text-2xl font-semibold tracking-tight md:text-3xl">What&apos;s inside for {E.label}</h2>
-          <p className="numeric mt-5 max-w-4xl text-xl leading-snug text-foreground md:text-3xl md:leading-tight">
-            {n(k.institutes)} institutes, {n(k.courses)} courses and {n(k.allotments)} allotments across {k.years} {years}, {k.first} to {k.last}, with {n(k.seatLists)} seat lists.
-          </p>
-          <div className="mt-12 grid gap-x-12 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
-            {d.deemed && (
-              <Note title={`${d.deemed.quota}, ${d.deemed.year}`} sources={[]} href={lastRanks(d.deemed)} action="Open in Last ranks">
-                <p className="mb-3">{d.deemed.course} at {d.deemed.college.name}, Open seats: the most-allotted seat in this quota.</p>
-                <Rounds c={d.deemed} caption={`Closing rank by round: ${d.deemed.course}, ${d.deemed.college.name}, ${d.deemed.quota}, ${d.deemed.year}`} />
-              </Note>
-            )}
-            {d.groups.length > 0 && (
-              <Note title={`${d.groups.length} question groups in ${E.latestYear}`} sources={d.groupSource ? [{ name: d.groupSource.name, url: d.groupSource.url, year: String(E.latestYear) }] : []} href={viaSignup(L.options())} action="Pick your group in Options">
-                <p className="mb-3">Your rank is compared only with your group&apos;s seats. Courses MCC allotted under each:</p>
-                <ul className="numeric grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-foreground">
-                  {d.groups.slice(0, 6).map((g) => (
-                    <li key={g.group} className="contents"><span>{g.group}</span><span className="text-right text-muted-foreground">{g.courses}</span></li>
-                  ))}
-                </ul>
-                {d.groups.length > 6 && <p className="mt-2">and {d.groups.length - 6} more.</p>}
-              </Note>
-            )}
-            {E.crossover && (
-              <Note
-                title="Also in NEET PG counselling?"
-                sources={crossover.bottomLine[0].refs.flatMap(([id]) => {
-                  const r = [...crossover.stages.flatMap((s) => s.rules), ...crossover.over].find((x) => x.id === id);
-                  return r ? [{ name: `${crossover.sources[r.doc]?.title ?? r.doc}, page ${r.page}`, url: r.url, year: r.session }] : [];
-                })}
-                href={viaSignup(L.to("/decide/counselling", { tab: "crossover" }))}
-                action="Read every rule where the two meet"
-              >
-                <p className="text-foreground">{crossover.bottomLine[0].text}</p>
-              </Note>
-            )}
-            {d.fee && (
-              <Note title="Fee, stipend and bond for one seat" sources={d.fee.sources} href={viaSignup(L.institute(d.fee.college.slug, "fees"))} action="See this institute's fees">
-                <p className="mb-3">{d.fee.course}, {d.fee.college.name}, {d.fee.quota}.</p>
-                <dl className="numeric grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-                  {d.fee.cells.map((c) => (
-                    <div key={c.label} className="contents">
-                      <dt>{c.label}</dt>
-                      <dd className="text-right text-foreground">{c.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </Note>
-            )}
-            {d.seats && (
-              <Note title={`The newest seat list: ${d.seats.roundName}, ${d.seats.yearName}`} sources={[{ name: `${who} ${kindName(d.seats.kind, exam).toLowerCase()} list, ${d.seats.roundName}`, url: d.seats.url, year: d.seats.yearName }]} href={viaSignup(L.seats({ list: d.seats.key }))} action="Open this seat list">
-                <p>
-                  <span className="numeric text-2xl font-medium text-foreground">{n(d.seats.seats)}</span> seats in {who}&apos;s {kindName(d.seats.kind, exam).toLowerCase()} list
-                  {d.seats.apart ? <>, {n(d.seats.apart)} of them {E.apartQuotas?.name ?? "notified apart"}</> : null}
-                  {d.seats.publishedAt ? <>, published {fmtDay(d.seats.publishedAt)}</> : null}.
-                </p>
-              </Note>
-            )}
-          </div>
-        </Container>
-      </section>
+      <Inside d={d} title={`What's inside for ${E.label}`} />
 
       <section aria-labelledby="how-h" className="border-b border-border">
         <Container className="py-16 md:py-24">
@@ -264,8 +218,24 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
           {d.status ? (
             <>
               <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted-foreground">
-                The {d.status.year}{sessionExams.includes(exam) ? "" : " counselling"}, from {who}&apos;s notices as of {fmtIST(d.status.asOf)}. A step moves on only when a notice or a printed date says so.
+                The {d.status.year}{sessionExams.includes(exam) ? "" : " counselling"}, from {who}&apos;s notices. Seatora last checked them at{" "}
+                <span className="text-foreground">{fmtIST(d.status.asOf)}</span>
+                {d.latestNotice && <>; the latest is dated <span className="text-foreground">{fmtIST(d.latestNotice)}</span></>}. A step moves on only when a
+                notice or a printed date says so.
               </p>
+              {/* A held step in words, with the notice that holds it: its title alone ("Notice for result of Round-2") reads like the result. */}
+              {held && heldStep && (
+                <p className="mt-6 flex max-w-prose gap-2 rounded-md bg-sun/10 px-3 py-2.5 text-sm leading-relaxed text-sun">
+                  <Info className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                  <span>
+                    <span className="font-medium">{held.text}</span> (
+                    <a href={held.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:no-underline">
+                      {who} notice{heldStep.date ? ` of ${fmtIST(heldStep.date)}` : ""}<span className="sr-only"> (opens in a new tab)</span>
+                    </a>
+                    ){heldStep.note ? `: ${fmtNote(heldStep.note)}` : ""}.
+                  </span>
+                </p>
+              )}
               <div className="mt-8 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
                 {[...new Set(d.status.steps.map((s) => s.round))].map((r) => (
                   <div key={r} className="border-t border-border pt-4">
@@ -289,13 +259,24 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
                     {d.notices.map((x) => (
                       <li key={x.url} className="grid gap-1 py-3 sm:grid-cols-[7rem_1fr] sm:gap-4">
                         <span className="numeric text-muted-foreground">{fmtDay(x.date)}</span>
-                        <a href={x.url!} target="_blank" rel="noopener noreferrer" className="underline decoration-foreground/25 underline-offset-4 hover:text-sky">{x.title}<span className="sr-only"> (opens in a new tab)</span></a>
+                        <span>
+                          <a href={x.url!} target="_blank" rel="noopener noreferrer" className="underline decoration-foreground/25 underline-offset-4 hover:text-sky">{x.title}<span className="sr-only"> (opens in a new tab)</span></a>
+                          {held && x.url === held.url && <Badge tone="warning" className="ml-2">{held.text}</Badge>}
+                        </span>
                       </li>
                     ))}
                   </ul>
                 </>
               )}
-              <Link href={viaSignup(L.to("/decide/counselling"))} className={`${link} mt-2`}>See the full schedule</Link>
+              {/* The schedule is public on MCC's site: linked there, never behind a sign-up. */}
+              <p className="mt-2 flex flex-wrap gap-x-6">
+                {d.schedule && (
+                  <a href={d.schedule.url!} target="_blank" rel="noopener noreferrer" className={link}>
+                    {who}&apos;s schedule: {d.schedule.title} ({fmtIST(d.schedule.date)})<span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                )}
+                <a href={d.site.url} target="_blank" rel="noopener noreferrer" className={link}>Every notice on {d.site.name}<span className="sr-only"> (opens in a new tab)</span></a>
+              </p>
             </>
           ) : (
             <p className="mt-3 max-w-prose text-base leading-relaxed text-muted-foreground">
@@ -309,5 +290,86 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
       <Faq items={faqs} title={`Questions about ${E.label} counselling.`} />
       <Cta />
     </>
+  );
+}
+
+/**
+ * What the exam's data holds, in real figures: the counts and a few examples, each with its document. `closing`: the
+ * most-allotted seat's ladder first (the home page, whose hero has no ladder; the exam page's hero has it).
+ */
+export function Inside({ d, title, closing = false, children }: { d: LandingData; title: string; closing?: boolean; children?: React.ReactNode }) {
+  const { E, counts: k } = d;
+  const { who, L, viaSignup, lastRanks } = linksOf(d);
+  const years = sessionExams.includes(d.exam) ? "sessions" : "counselling years";
+  return (
+    <section aria-labelledby="inside-h" className="border-b border-border">
+      <Container className="py-16 md:py-24">
+        <h2 id="inside-h" className="text-2xl font-semibold tracking-tight md:text-3xl">{title}</h2>
+        <p className="numeric mt-5 max-w-4xl text-xl leading-snug text-foreground md:text-3xl md:leading-tight">
+          {n(k.institutes)} institutes, {n(k.courses)} courses and {n(k.allotments)} allotments across {k.years} {years}, {k.first} to {k.last}, with {n(k.seatLists)} seat lists.
+        </p>
+        <div className="mt-12 grid gap-x-12 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
+          {closing && d.closing && (
+            <Note title={`Closing rank by round, ${d.closing.year}`} sources={[]} href={lastRanks(d.closing)} action="Open in Last ranks">
+              <p className="mb-3">{d.closing.course} at {d.closing.college.name}, {d.closing.quota}, Open seats: the most-allotted seat in this quota. Each round links to its result PDF.</p>
+              <Rounds c={d.closing} caption={`Closing rank by round: ${d.closing.course}, ${d.closing.college.name}, ${d.closing.year}`} />
+            </Note>
+          )}
+          {d.deemed && (
+            <Note title={`${d.deemed.quota}, ${d.deemed.year}`} sources={[]} href={lastRanks(d.deemed)} action="Open in Last ranks">
+              <p className="mb-3">{d.deemed.course} at {d.deemed.college.name}, Open seats: the most-allotted seat in this quota.</p>
+              <Rounds c={d.deemed} caption={`Closing rank by round: ${d.deemed.course}, ${d.deemed.college.name}, ${d.deemed.quota}, ${d.deemed.year}`} />
+            </Note>
+          )}
+          {d.groups.length > 0 && (
+            <Note title={`${d.groups.length} question groups in ${E.latestYear}`} sources={d.groupSource ? [{ name: d.groupSource.name, url: d.groupSource.url, year: String(E.latestYear) }] : []} href={viaSignup(L.options())} action="Pick your group in Options">
+              <p className="mb-3">Your rank is compared only with your group&apos;s seats. Courses MCC allotted under each:</p>
+              <ul className="numeric grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-foreground">
+                {d.groups.slice(0, 6).map((g) => (
+                  <li key={g.group} className="contents"><span>{g.group}</span><span className="text-right text-muted-foreground">{g.courses}</span></li>
+                ))}
+              </ul>
+              {d.groups.length > 6 && <p className="mt-2">and {d.groups.length - 6} more.</p>}
+            </Note>
+          )}
+          {E.crossover && (
+            <Note
+              title="Also in NEET PG counselling?"
+              sources={crossover.bottomLine[0].refs.flatMap(([id]) => {
+                const r = [...crossover.stages.flatMap((s) => s.rules), ...crossover.over].find((x) => x.id === id);
+                return r ? [{ name: `${crossover.sources[r.doc]?.title ?? r.doc}, page ${r.page}`, url: r.url, year: r.session }] : [];
+              })}
+              href={viaSignup(L.to("/decide/counselling", { tab: "crossover" }))}
+              action="Read every rule where the two meet"
+            >
+              <p className="text-foreground">{crossover.bottomLine[0].text}</p>
+            </Note>
+          )}
+          {d.fee && (
+            <Note title="Fee, stipend and bond for one seat" sources={d.fee.sources} href={viaSignup(L.institute(d.fee.college.slug, "fees"))} action="See this institute's fees">
+              <p className="mb-3">{d.fee.course}, {d.fee.college.name}, {d.fee.quota}.</p>
+              <dl className="numeric grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+                {d.fee.cells.map((c) => (
+                  <div key={c.label} className="contents">
+                    <dt>{c.label}</dt>
+                    <dd className="text-right text-foreground">{c.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Note>
+          )}
+          {d.seats && (
+            <Note title={`The newest seat list: ${d.seats.roundName}, ${d.seats.yearName}`} sources={[{ name: `${who} ${kindName(d.seats.kind, d.exam).toLowerCase()} list, ${d.seats.roundName}`, url: d.seats.url, year: d.seats.yearName }]} href={viaSignup(L.seats({ list: d.seats.key }))} action="Open this seat list">
+              <p>
+                <span className="numeric text-2xl font-medium text-foreground">{n(d.seats.seats)}</span> seats in {who}&apos;s {kindName(d.seats.kind, d.exam).toLowerCase()} list
+                {d.seats.apart ? <>, {n(d.seats.apart)} of them {E.apartQuotas?.name ?? "notified apart"}</> : null}
+                {d.seats.publishedAt ? <>, published {fmtDay(d.seats.publishedAt)}</> : null}.
+              </p>
+            </Note>
+          )}
+        </div>
+        {children}
+      </Container>
+    </section>
   );
 }

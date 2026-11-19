@@ -1,16 +1,18 @@
 import { Plus } from "lucide-react";
 import { Container } from "@/components/layout/container";
-import { FreePrice } from "./free-price";
+import Link from "next/link";
+import { PriceLine } from "./price-line";
 import { SectionHeading } from "./section-heading";
 
 export type FaqItem = { q: string; a: React.ReactNode };
 
-/** "How do I get access?": the Season Pass and its price (the exam landing pages end on it too). */
+/** "How do I get access?": the price line (the exam landing pages end on it too). */
 export const accessFaq: FaqItem = {
   q: "How do I get access?",
   a: (
     <>
-      A free account opens the planner straight away. The Seatora NEET PG 2026 Season Pass, for the whole 2026 counselling season. <FreePrice /> See the Pricing page for what each plan gives.
+      Create a free account and the planner opens straight away. <PriceLine /> The{" "}
+      <Link href="/pricing" className="text-sky underline underline-offset-4">Pricing page</Link> lists what each plan gives.
     </>
   ),
 };
@@ -18,7 +20,7 @@ export const accessFaq: FaqItem = {
 const faqs: FaqItem[] = [
   {
     q: "Which counselling does Seatora cover?",
-    a: "All India Quota through MCC first, including central and deemed institutes, with state counselling added authority by authority. Each page shows which counselling the data comes from.",
+    a: "MCC's All India counselling for NEET PG: the All India Quota, deemed and central universities, and DNB seats, with their allotments, seat lists, notices and residents. State quota counselling isn't covered; a state filter shows the All India seats in that state.",
   },
   {
     q: "Will it tell me which college I'll get?",

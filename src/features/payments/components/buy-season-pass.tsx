@@ -8,7 +8,6 @@ import { beacon } from "@/features/funnel/components/beacon";
 import { applyCode } from "@/features/referrals/actions";
 import { formatPaise } from "@/features/referrals/lib";
 import { cn } from "@/lib/cn";
-import { PLANS } from "../plans";
 
 // Razorpay Standard Checkout for the Season Pass: the order route sets the amount, the modal takes the payment, verify
 // confirms it (the webhook covers a closed tab). checkout.js loads only where this button is shown to a signed-in buyer.
@@ -39,7 +38,8 @@ export type Offer = {
 
 /**
  * For a signed-in buyer; use through SeasonPassButton, which knows her state and price. The button reads
- * "<verb> for ~~₹499~~ ₹159 with Rahul's invite" (struck: PLANS' display-only wasAmount), or "… ₹0 with coupon DRTARAL".
+ * "<verb> for ₹199", "<verb> for ~~₹199~~ ₹159 with Rahul's invite" (struck: the list price, when discounted), or "… ~~₹199~~ ₹0
+ * with coupon DRTARAL".
  * "Have a coupon or invite code?" shows until a coupon is applied; `initial` opens it with ?coupon='s code and its error.
  * A 100% coupon grants the pass with no Razorpay call.
  */
@@ -57,7 +57,7 @@ export function BuySeasonPass({ offer: initialOffer, verb, initial, className, n
   // One span, so the button's flex keeps it one line of text (wrapping as words, not as columns).
   const label = (
     <span>
-      {verb} for {offer.amount < PLANS.season_pass.wasAmount && <s className="mr-1 opacity-70">{formatPaise(PLANS.season_pass.wasAmount)}</s>}
+      {verb} for {offer.amount < offer.listAmount && <s className="mr-1 opacity-70">{formatPaise(offer.listAmount)}</s>}
       {formatPaise(offer.amount)}
       {offer.inviter ? ` with ${offer.inviter}'s invite` : offer.coupon ? ` with coupon ${offer.coupon}` : ""}
     </span>

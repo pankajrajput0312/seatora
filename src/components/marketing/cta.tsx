@@ -1,8 +1,8 @@
+import { AuthLink, PlannerCta } from "@/components/layout/auth-link";
 import { Container } from "@/components/layout/container";
-import { PeekingCrew } from "./crew-extras";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { FreePrice } from "./free-price";
+import { PeekingCrew } from "./crew-extras";
+import { PriceLine } from "./price-line";
 
 export function Cta() {
   return (
@@ -14,14 +14,15 @@ export function Cta() {
             Make your next career decision with clarity.
           </h2>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground">
-            Seatora NEET PG 2026 Season Pass, for the whole 2026 counselling season. <FreePrice className="font-semibold text-foreground" /> Create a free account and start straight away.
+            <PriceLine className="font-semibold text-foreground" />
           </p>
+          {/* Signed in: "Open my planner" alone, never "Create free account" or "Sign in". */}
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg" className="w-full sm:w-auto">
-              <Link href="/signup">Create free account</Link>
+              <PlannerCta label="Create free account" />
             </Button>
             <Button asChild size="lg" variant="ghost" className="w-full sm:w-auto">
-              <Link href="/login">Sign in</Link>
+              <AuthLink />
             </Button>
           </div>
         </div>
