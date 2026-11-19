@@ -74,3 +74,34 @@ describe("gotLine and inviteLine", () => {
     expect(inviteLine("Sneha", 15900, 19900, null)).toBe("₹159 with Sneha's invite");
   });
 });
+
+describe("the free period's end (FREE_FOR_ALL_UNTIL 2026-11-20T23:59:59+05:30), each kind of account", () => {
+  const env = { FREE_FOR_ALL_UNTIL: "2026-11-20T23:59:59+05:30" };
+  const at2358 = new Date("2026-11-20T18:28:00Z");
+  const at0001 = new Date("2026-11-20T18:31:00Z"); // 00:01 IST on the 21st
+  const season = new Date("2027-03-31T18:29:59Z");
+  const accounts = {
+    never: { role: "FREE" as const, premiumUntil: null },
+    claimed: { role: "FREE" as const, premiumUntil: new Date("2026-11-20T18:29:59Z") }, // what claimFreePass sets
+    paid: { role: "FREE" as const, premiumUntil: season }, // a payment or a 100% coupon (grantPlan)
+    premium: { role: "PREMIUM" as const, premiumUntil: null },
+    admin: { role: "ADMIN" as const, premiumUntil: null },
+  };
+  const at = (now: Date) => Object.fromEntries(Object.entries(accounts).map(([k, a]) => [k, [effectivePlan(a, now, env).limits.institutes, planLine(a, now, env)]]));
+  it("23:58 IST: Season Pass limits for everyone; 00:01 IST: the free upgrade and never-claimed are Free, nobody who paid loses anything", () => {
+    expect(at(at2358)).toEqual({
+      never: [Infinity, "Free plan"],
+      claimed: [Infinity, "Season Pass · free till 20 Nov"],
+      paid: [Infinity, "Season Pass · till 31 Mar 2027"],
+      premium: [Infinity, "Season Pass"],
+      admin: [Infinity, "Admin"],
+    });
+    expect(at(at0001)).toEqual({
+      never: [10, "Free plan"],
+      claimed: [10, "Free plan"],
+      paid: [Infinity, "Season Pass · till 31 Mar 2027"],
+      premium: [Infinity, "Season Pass"],
+      admin: [Infinity, "Admin"],
+    });
+  });
+});
