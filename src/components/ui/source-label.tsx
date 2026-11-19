@@ -10,12 +10,12 @@ export const sourceTypeLabels: Record<SourceType, { text: string; tone: "success
   UNVERIFIED_COMMUNITY: { text: "Unverified", tone: "warning" },
 };
 
-/** Required next to any displayed college, cutoff, fee or announcement data. */
+/** Required next to any displayed college, cutoff, fee or announcement data. Wraps as text (long document names); no year: none shown. */
 export function SourceLabel({ provenance }: { provenance: Pick<Provenance, "sourceName" | "sourceUrl" | "sourceType" | "academicYear"> }) {
   const { text, tone } = sourceTypeLabels[provenance.sourceType];
   return (
-    <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-      <Badge tone={tone}>{text}</Badge>
+    <span className="text-xs leading-relaxed text-muted-foreground">
+      <Badge tone={tone} className="mr-2">{text}</Badge>
       {provenance.sourceUrl ? (
         <a href={provenance.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-sky">
           {provenance.sourceName}
@@ -23,7 +23,7 @@ export function SourceLabel({ provenance }: { provenance: Pick<Provenance, "sour
       ) : (
         provenance.sourceName
       )}
-      <span className="numeric">· {provenance.academicYear}</span>
+      {provenance.academicYear && <span className="numeric whitespace-nowrap">, {provenance.academicYear}</span>}
     </span>
   );
 }

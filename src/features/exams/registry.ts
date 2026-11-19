@@ -23,6 +23,7 @@ export const exams: Record<ExamKey, Exam> = {
   "neet-ss": {
     key: "neet-ss",
     label: "NEET SS",
+    public: false,
     latestYear: 2025,
     pastYears: [2023, 2024],
     rounds: ["R1", "R2", "stray", "special_stray"],
@@ -44,6 +45,7 @@ export const exams: Record<ExamKey, Exam> = {
   "neet-mds": {
     key: "neet-mds",
     label: "NEET MDS",
+    public: false,
     latestYear: 2026,
     pastYears: [2024, 2025],
     rounds,
@@ -66,6 +68,7 @@ export const exams: Record<ExamKey, Exam> = {
   "ini-cet": {
     key: "ini-cet",
     label: "INI-CET",
+    public: false,
     latestYear: 20267,
     pastYears: [20257, 20261],
     rounds: ["R1", "R2", "R3"],

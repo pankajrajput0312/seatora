@@ -3,7 +3,19 @@ import { Container } from "@/components/layout/container";
 import { FreePrice } from "./free-price";
 import { SectionHeading } from "./section-heading";
 
-const faqs = [
+export type FaqItem = { q: string; a: React.ReactNode };
+
+/** "How do I get access?": the Season Pass and its price (the exam landing pages end on it too). */
+export const accessFaq: FaqItem = {
+  q: "How do I get access?",
+  a: (
+    <>
+      A free account opens the planner straight away. The Seatora NEET PG 2026 Season Pass, for the whole 2026 counselling season. <FreePrice /> See the Pricing page for what each plan gives.
+    </>
+  ),
+};
+
+const faqs: FaqItem[] = [
   {
     q: "Which counselling does Seatora cover?",
     a: "All India Quota through MCC first, including central and deemed institutes, with state counselling added authority by authority. Each page shows which counselling the data comes from.",
@@ -20,23 +32,17 @@ const faqs = [
     q: "Where do residents' names come from?",
     a: "From MCC's official admitted-candidates lists, with the All India Rank from that year's NBEMS NEET PG result where it is known. Seatora shows a name, course and year only. It holds no contact details, and hides a name if that person asks.",
   },
-  {
-    q: "How do I get access?",
-    a: (
-      <>
-        A free account opens the planner straight away. The Seatora NEET PG 2026 Season Pass, for the whole 2026 counselling season. <FreePrice /> See the Pricing page for what each plan gives.
-      </>
-    ),
-  },
+  accessFaq,
 ];
 
-export function Faq() {
+/** The home page's questions, or a page's own (`items`, `title`). */
+export function Faq({ items = faqs, title = "Questions aspirants ask us." }: { items?: FaqItem[]; title?: string }) {
   return (
     <section id="faq" className="scroll-mt-16 border-b border-border">
       <Container className="grid gap-12 py-20 md:py-28 lg:grid-cols-[1fr_1.5fr]">
-        <SectionHeading eyebrow="FAQ" title="Questions aspirants ask us." />
+        <SectionHeading eyebrow="FAQ" title={title} />
         <div className="divide-y divide-border border-y border-border">
-          {faqs.map((f) => (
+          {items.map((f) => (
             <details key={f.q} className="group">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-base font-medium [&::-webkit-details-marker]:hidden">
                 {f.q}

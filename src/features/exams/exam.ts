@@ -9,6 +9,11 @@ export type ExamHas = Record<"residents" | "fees" | "bonds" | "clinical" | "seat
 export type Exam = {
   key: ExamKey;
   label: string;
+  /**
+   * Open to the public: its landing page (/<key>) renders for everyone and is in the sitemap. False: staff (OWNER,
+   * ADMIN) only, everyone else a 404, noindex (features/exams/landing). The one switch the owner flips to open an exam.
+   */
+  public: boolean;
   /** The years the reach labels count: the latest year (R1 to its newest round) and the two before it. */
   latestYear: number;
   pastYears: [number, number];
@@ -60,6 +65,7 @@ export type Exam = {
 export const neetPg: Exam = {
   key: "neet-pg",
   label: "NEET PG",
+  public: true,
   latestYear: LATEST_YEAR,
   pastYears: PAST_YEARS,
   rounds,
