@@ -17,6 +17,7 @@ import { chosenView } from "@/features/decide/server/view";
 import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, kindNote, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { StillCanDo } from "@/features/decide/components/still-can-do";
+import { YourPicture } from "@/features/decide/components/your-picture";
 import { GroupPrompt } from "@/features/decide/components/dashboard-parts";
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
@@ -27,11 +28,11 @@ import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
 import { readTermFilters, termChips, termValueLabel, untypedOnly } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
-import { getMeta, listOptions, optionsView, unlistedSeats } from "@/features/decide/service";
+import { examGroupCourses, getMeta, listOptions, optionsPicture, optionsView, unlistedSeats } from "@/features/decide/service";
 import { kindName, optionSorts, optionsViews, roundShort, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { authorityOf, DEFAULT_EXAM, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
-import { quotaIn } from "@/features/exams/exam";
+import { groupsIn, quotaIn } from "@/features/exams/exam";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
@@ -52,6 +53,8 @@ const filtersSchema = z.object({
   view: z.enum(optionsViews).optional(),
   /** types.ts optionSorts; absent = by label. */
   sort: z.enum(optionSorts).optional(),
+  /** "1": every card's Details open. */
+  details: z.literal("1").optional(),
   page: pageValue.default(1),
 });
 const sortLabels = (last: string): Record<OptionSort, string> => ({
@@ -79,11 +82,13 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms, sort: f.sort };
   // A college type picked: the options it left out only because their type is not known (counted, never silently).
   const typeless = untypedOnly(terms);
-  const [meta, r, view, untyped] = await Promise.all([
+  const [meta, r, view, untyped, pic] = await Promise.all([
     getMeta(exam),
     listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }, exam),
     chosenView(params, "options"),
     typeless ? listOptions(profile, { ...filters, terms: typeless }, { page: 1, pageSize: 1 }, exam).then((x) => x.total) : 0,
+    // "Your picture": the same options the reach chips count (search, view, seats and terms as here).
+    optionsPicture(profile, filters, exam),
   ]);
   // The sorts' year: the latest complete one (NEET PG: its later past year, as before).
   const HEAD = yearName(exam, headYearIn(exam, meta.sources)); // as the exam names it (INI-CET: "Jan 2026")
@@ -114,6 +119,19 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // Every option labelled (closed-before ones too, shown or not), and those that reached her rank in R1 to R3 of a counted year.
   const labelled = reachOrder.reduce((s, x) => s + r.counts[x], 0);
   const reached = r.counts["reached-latest"] + r.counts["reached-both"] + r.counts["reached-one"];
+  const headYear = headYearIn(exam, meta.sources);
+  // None reached: the option that closed deepest in the head year (any round), so the verdict has a number.
+  const deepest = labelled > 0 && reached === 0 ? (await listOptions(profile, { ...filters, reach: undefined, showClosed: true, sort: "deep" }, { page: 1, pageSize: 1 }, exam)).rows[0] : undefined;
+  const deepestAt = deepest?.byYear[headYear];
+  // NEET SS, nothing at all: her courses that are another question group's, said with the way to change it.
+  const groupCourses = perGroup(exam) && !labelled ? await examGroupCourses(exam) : null;
+  const mine = groupsIn(E, profile.quotas);
+  const outside = groupCourses
+    ? (profile.pairs?.length ? profile.pairs : profile.specialties).flatMap((c) => {
+        const groups = Object.entries(groupCourses).filter(([, cs]) => cs.some((x) => x === c || x.endsWith(`~${c}`))).map(([g]) => g);
+        return groups.length && !groups.some((g) => mine.includes(g)) ? [{ c, groups }] : [];
+      })
+    : [];
   const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
   const keep = keepProfileParams(params);
   // Same profile and filters for /api/v1/options, where "Show more" reads the next pages (and the CSV).
@@ -220,6 +238,9 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       >
         Labelled by your rank against past closing ranks.
       </PageHead>
+      {reached > 0 && (
+        <YourPicture pic={pic} profile={profile} E={E} latest={latest} includeLatest={!f.prov} L={L} scope={roundView && r.seats ? ` with ${round} seats` : ""} closedHref={here({ reach: "closed-before", closed: "1" })} />
+      )}
 
       {/* Phones: one line (the counts that matter, the rest and the view links behind its (i)); md up as it was. */}
       {sum && (
@@ -242,8 +263,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
                 </>
               )}
               {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}. {listsTip}{" "}
-              Sorted by label (reached, then within 10%, then never allotted before and no allotment in your categories, closed before your rank last), then {round} {sp ? "seats" : "clear vacancy seats"}, then the deepest{" "}
-              {HEAD} closing.
+              Sorted by label (reached, then within 10%, then never allotted before and no allotment in your categories, closed before your rank last), then {round} {sp ? "seats" : "clear vacancy seats"},{" "}
+              {exam === DEFAULT_EXAM ? <>then the deepest {HEAD} closing.</> : <>then, within a reached label, the tightest closing first (the most sought seat that still reached your rank); within any other label, the deepest {HEAD} closing.</>}
               <span className="mt-2 flex flex-col items-start md:hidden">{viewLinks}</span>
             </InfoTip>
           </p>
@@ -256,6 +277,13 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           {/* The current results (her courses and filters), never "N options – good": none of them reached her rank. */}
           <p className="flex flex-wrap items-center gap-x-3 text-body">
             <span className="font-semibold">None of these reached {`${E.rankWord} `}{n(profile.rank)}: {n(0)} of {n(labelled)} options in a past round ({counted}).</span>
+            {deepest && deepestAt && (
+              <span>
+                In {HEAD} the deepest any closed was {n(deepestAt.closing)} ({roundShort(deepestAt.round, exam)}, {deepestAt.category} seat) at{" "}
+                <Link href={L.institute(deepest.college.slug)} className={smallLink}>{deepest.college.name}</Link>, {deepest.course.degree} {deepest.course.name}
+                {deepestAt.closing < profile.rank && <>: {n(profile.rank - deepestAt.closing)} ranks before yours</>}.
+              </span>
+            )}
             {r.counts["closed-before"] > 0 && !f.reach && (
               // One tap either way; closed ones are never hidden without saying so.
               <Link href={here({ closed: r.showClosed ? "0" : "1" })} className={`${smallLink} text-sky`}>
@@ -283,6 +311,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         {f.reach && <input type="hidden" name="reach" value={f.reach} />}
         {f.closed && <input type="hidden" name="closed" value={f.closed} />}
         {f.view && <input type="hidden" name="view" value={f.view} />}
+        {f.details && <input type="hidden" name="details" value="1" />}
         <ViewField />
         <ToolbarSearch>
           <Fragment key={params.toString()}>
@@ -385,6 +414,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           includeLatest={!f.prov}
           seatLists={lists}
           view={view}
+          details={!!f.details}
+          detailsHref={here({ details: f.details ? null : "1", page: f.page > 1 ? String(f.page) : null })}
           // Label order: the options with no allotment on her seat categories (and those closed before her rank) under their own heading.
           grouping={!f.sort || f.sort === "label" ? { counts: r.counts } : null}
           historyMore={
@@ -409,6 +440,14 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <Link href={here({ closed: "1" })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Show the {formatRank(r.hiddenClosed)} closed ones</Link>
             <Link href={L.to("/decide", { editProfile: 1 })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Edit your profile</Link>
           </span>
+        </EmptyState>
+      ) : outside.length ? (
+        // NEET SS: her courses are another question group's, so nothing here can be hers.
+        <EmptyState
+          title={`${outside.length === 1 ? "This course is" : "These courses are"} in another question group`}
+          description={`${outside.map((o) => `${pairLabel(o.c.includes("~") ? o.c : (meta.specialties.find((x) => x.code === o.c)?.name ?? o.c))} is in the ${o.groups.join(" and the ")}`).join("; ")}; your profile is set to the ${mine.join(" and the ") || "no question group"}. A rank is within one question group, so pick that group's courses, or change your group.`}
+        >
+          <Link href={L.to("/decide", { editProfile: 1 })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Change your question group or courses</Link>
         </EmptyState>
       ) : (
         <EmptyState

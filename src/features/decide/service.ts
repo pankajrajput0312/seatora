@@ -3,16 +3,18 @@ import { createHash } from "node:crypto";
 import { cache } from "react";
 import { ALL_CATEGORIES, DEFAULT_EXAM, seatCategoriesFor, seatPositionExams, type ExamKey } from "@/features/exams/keys";
 import { examYears, exams, groupOf, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
+import { typeCategory, type TypeCategory } from "./components/institute/college-type";
 import { hospitalInfo, type HospitalInfo } from "./components/institute/institute-data";
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
 import { searchMatcher } from "./lib/college-aliases";
 import { anyTermFilter, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
-import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, pastOf, reachedFrom, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Latest, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
+import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, isStrayRound, LATEST_YEAR, PAST_YEARS, pastOf, reachedFrom, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Latest, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { pairKey, profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
 import { hasOption, listSeats, optionSeats, pickLists, seatLists, type OptionSeats } from "./server/seats";
 import { bucketOfDegree, collegeTerms, courseTerms, type Programme, type ProgrammeTerms } from "./server/terms";
+import { feeBasis } from "./lib/stat-format";
 import { optionId, rounds, seatKinds, type OptionSort, type Allotment, type Category, type College, type Course, type Cutoff, type Notice, type OptionsView, type Round, type SeatKind, type SeatList, type Source, type Term } from "./types";
 
 // Data comes from Postgres (MCC import, prisma/import-mcc.ts) through ./server; the small, slow-changing part (colleges,
@@ -125,7 +127,15 @@ export type OptionRow = {
   seatsUnsplit?: SeatKind[];
   /** NEET SS: the option is another question group's than hers, so her rank isn't compared with it (`reach` "no-data"). */
   otherGroup?: true;
+  /** Options' never-allotted rows (reach "new"): other colleges' closings for comparison, never this option's (withSimilar). */
+  similar?: Similar;
 };
+
+/**
+ * The same course and quota at colleges of the same type (College type, as inferred) in the same state: their deepest
+ * closing on her seat categories in `year`, R1 to `last` (never a stray round), as a range over `colleges` colleges.
+ */
+export type Similar = { type: TypeCategory; state: string; year: number; last: Round; min: number; max: number; colleges: number };
 
 export type RowHospital = Pick<HospitalInfo, "type" | "beds" | "mccProfileUrl"> | null;
 /** Rows with their institute's type, beds and MCC profile (hospitalInfo, read once per catalog; empty in tests). */
@@ -312,12 +322,19 @@ function optMatches(cat: Catalog, o: Pick<Opt, "college" | "degree" | "specialty
 /** College types, read only when a type filter needs them. */
 const typesFor = (tf: TermFilters | null | undefined, exam: ExamKey) => (tf?.types?.length || tf?.untyped ? hospitalInfo(exam) : Promise.resolve(undefined));
 
-type Ranked = { o: Opt; reach: Reach; provisional: boolean; deepest: ReachInput | undefined };
+/** `at`: another exam's "reached" option, the closing its label rests on (reachEvidence), for byLabel. */
+type Ranked = { o: Opt; reach: Reach; provisional: boolean; deepest: ReachInput | undefined; at?: number };
+const isReached = (r: Reach) => r === "reached-latest" || r === "reached-both" || r === "reached-one";
+/**
+ * Within one label: another exam's "reached" options the tightest closing first (the most sought seat that still
+ * reached her rank: `at`), every other label and NEET PG's (as before) the head year's deepest first.
+ */
+const byLabel = (a: Ranked, b: Ranked) => (a.at != null && b.at != null ? a.at - b.at : (b.deepest?.closing ?? 0) - (a.deepest?.closing ?? 0));
 
 /**
  * Every option given, labelled, deepest closing of the later past year first within a label (`deepest`, with its round
- * and seat category). From one SQL row per option (findReachInputs), never every cutoff: a profile with no course
- * ticked covers ~11,800 options, and only a page of them is built in full.
+ * and seat category; another exam's reached ones byLabel). From one SQL row per option (findReachInputs), never every
+ * cutoff: a profile with no course ticked covers ~11,800 options, and only a page of them is built in full.
  */
 async function rankOptions(cat: Catalog, opts: Opt[], profile: Profile | null, includeProvisional: boolean): Promise<Ranked[]> {
   const { pastYears, latestYear } = exams[cat.exam];
@@ -331,13 +348,15 @@ async function rankOptions(cat: Catalog, opts: Opt[], profile: Profile | null, i
     ...(head !== pastYears[1] && { headYear: head }),
   });
   const latest = latestOf(cat.sources, cat.exam);
-  const ranked = opts.map((o) => {
+  const window = { latest, pastYears: pastOf(latest), includeLatest: includeProvisional };
+  const ranked = opts.map((o): Ranked => {
     const list = inputs.get(o.id) ?? [];
     const label = profile ? labelOf(profile.rank, list, includeProvisional, latest) : { reach: "no-data" as const, provisional: false };
     const deepest = list.filter((c) => c.year === head).reduce<ReachInput | undefined>((a, c) => (!a || c.closing > a.closing ? c : a), undefined);
-    return { o, ...label, deepest };
+    const at = cat.exam !== DEFAULT_EXAM && isReached(label.reach) ? reachEvidence(list, label.reach, window)?.closing : undefined;
+    return { o, ...label, deepest, ...(at != null && { at }) };
   });
-  return ranked.sort((a, b) => reachOrder.indexOf(a.reach) - reachOrder.indexOf(b.reach) || (b.deepest?.closing ?? 0) - (a.deepest?.closing ?? 0));
+  return ranked.sort((a, b) => reachOrder.indexOf(a.reach) - reachOrder.indexOf(b.reach) || byLabel(a, b));
 }
 
 const countsOf = (xs: { reach: Reach }[]) => Object.fromEntries(reachOrder.map((r) => [r, xs.filter((x) => x.reach === r).length])) as Record<Reach, number>;
@@ -442,6 +461,40 @@ function withSeats(rows: OptionRow[], lists: SeatList[], seats: Map<string, Opti
   });
 }
 
+/**
+ * Never-allotted rows (reach "new") with `similar`: the same course and quota at the other colleges of their type in
+ * their state, from those colleges' own closings (her seat categories, the head year, R1 to R3: stray rounds left out).
+ * A row whose type or state isn't known, or with no such college, gets none.
+ */
+async function withSimilar(cat: Catalog, rows: OptionRow[], profile: Profile | null): Promise<OptionRow[]> {
+  const kindOf = (t: RowHospital | undefined) => (t?.type ? typeCategory[t.type.value] : undefined);
+  const fresh = rows.filter((r) => r.reach === "new" && r.college.state && kindOf(r.hospital));
+  if (!profile || !fresh.length) return rows;
+  const info = await hospitalInfo(cat.exam);
+  const groupOfOpt = (o: Pick<Opt, "college" | "degree" | "specialty" | "quota">, kind = kindOf(info.get(o.college))) =>
+    kind && `${o.degree}|${o.specialty}|${o.quota}|${cat.collegeByKey.get(o.college)?.state}|${kind}`;
+  const wanted = new Set(fresh.map((r) => groupOfOpt({ college: r.college.key, degree: r.course.degree, specialty: r.course.specialty, quota: r.quota }, kindOf(r.hospital))));
+  const peers = cat.options.filter((o) => wanted.has(groupOfOpt(o)));
+  if (!peers.length) return rows;
+  const year = headYearIn(cat.exam, cat.sources);
+  const byOpt = groupByOption(await cutoffsOnce(cat, JSON.stringify({ cs: [...new Set(peers.map((o) => o.cs))], categories: eligibleCategories(profile.category, profile.pwd), years: [year] } satisfies CutoffQuery)));
+  const deep = new Map<string, { closing: number; last: Round }[]>();
+  for (const o of peers) {
+    const main = (byOpt.get(o.id) ?? []).filter((c) => !isStrayRound(c.round));
+    if (!main.length) continue;
+    const g = groupOfOpt(o)!;
+    deep.set(g, [...(deep.get(g) ?? []), { closing: Math.max(...main.map((c) => c.closing)), last: main.map((c) => c.round).sort((a, b) => rounds.indexOf(b) - rounds.indexOf(a))[0] }]);
+  }
+  return rows.map((r) => {
+    const kind = fresh.includes(r) ? kindOf(r.hospital) : undefined;
+    const xs = kind && deep.get(groupOfOpt({ college: r.college.key, degree: r.course.degree, specialty: r.course.specialty, quota: r.quota }, kind)!);
+    if (!kind || !xs?.length) return r;
+    const cl = xs.map((x) => x.closing);
+    const last = xs.map((x) => x.last).sort((a, b) => rounds.indexOf(b) - rounds.indexOf(a))[0];
+    return { ...r, similar: { type: kind, state: r.college.state!, year, last, min: Math.min(...cl), max: Math.max(...cl), colleges: xs.length } };
+  });
+}
+
 /** Choices: saved options (ids, new ones too), labelled, with their seats in each list of the newest round, as on Options. Unknown ids are left out. */
 export async function choiceOptions(ids: string[], profile: Profile | null, exam: ExamKey = DEFAULT_EXAM) {
   const cat = await getCatalog(exam);
@@ -499,7 +552,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   const asNew = (o: Opt): Ranked => ({ o, reach: "new", provisional: false, deepest: undefined });
   const ranked: Ranked[] = [...labelled, ...fresh.filter(text).map(asNew)];
   const clear = (x: Ranked) => by.get(x.o.id)?.clear ?? 0;
-  if (round) ranked.sort((a, b) => roundReachOrder.indexOf(a.reach) - roundReachOrder.indexOf(b.reach) || clear(b) - clear(a) || (b.deepest?.closing ?? 0) - (a.deepest?.closing ?? 0));
+  if (round) ranked.sort((a, b) => roundReachOrder.indexOf(a.reach) - roundReachOrder.indexOf(b.reach) || clear(b) - clear(a) || byLabel(a, b));
   // Her sort (stable: ties keep the label order); a missing value last either way.
   const key: Record<Exclude<OptionSort, "label">, (x: Ranked) => number | null | undefined> = {
     deep: (x) => (x.deepest ? -x.deepest.closing : null),
@@ -539,7 +592,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     : 0;
   return {
     ...page,
-    rows: withSeats(built, lists, seats, profile, cat.exam),
+    rows: await withSimilar(cat, withSeats(built, lists, seats, profile, cat.exam), profile),
     view,
     showClosed,
     seats: kind,
@@ -560,6 +613,36 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     virtualOnly: virtualList ? { list: virtualList, options: virtualOnly } : null,
   };
 }
+
+const REACHED: Reach[] = ["reached-latest", "reached-both", "reached-one"];
+
+/**
+ * "Your picture" (Options and Home): of the options `f` lists, the reached ones by the round that first reached her
+ * rank (OptionRow.reachFrom: Round 1, or only a later one), `counts` as the reach chips; the cheapest reached one by
+ * its fee a year (the college's own yearly figure: never the NBEMS ceiling or an amount at admission alone), and the government one (college type, as inferred)
+ * with the deepest closing its label rests on (`at`: reachEvidence, R1 to R3 of the counted years). History only.
+ */
+export async function optionsPicture(profile: Profile, f: OptionFilters = {}, exam: ExamKey = DEFAULT_EXAM) {
+  const [r, cat] = await Promise.all([listOptions(profile, { ...f, reach: REACHED, sort: undefined }, undefined, exam), getCatalog(exam)]);
+  const latest = latestOf(cat.sources, exam);
+  const window = { latest, pastYears: pastOf(latest), includeLatest: f.includeProvisional ?? true };
+  // A fee a year only: never the NBEMS ceiling, never an amount at admission whose later years differ or aren't stated.
+  const fee = (x: OptionRow) => (x.fees.years[0]?.fee?.kind === "maximum" || feeBasis(x.fees) !== "yearly" ? null : feeValue.fee1(x.fees));
+  const cheapest = r.rows.reduce<OptionRow | null>((a, x) => (fee(x) != null && (!a || fee(x)! < fee(a)!) ? x : a), null);
+  const govt = r.rows.flatMap((row) => {
+    if (!row.hospital?.type || typeCategory[row.hospital.type.value] !== "govt") return [];
+    const at = reachEvidence(Object.entries(row.grid).flatMap(([y, g]) => Object.entries(g).map(([round, c]) => ({ year: +y, round: round as Round, closing: c!.closing }))), row.reach, window);
+    return at ? [{ row, at }] : [];
+  });
+  return {
+    r1: r.rows.filter((x) => x.reachFrom?.round === "R1").length,
+    later: r.rows.filter((x) => x.reachFrom && x.reachFrom.round !== "R1").length,
+    counts: r.counts,
+    cheapest,
+    safest: govt.reduce<(typeof govt)[number] | null>((a, x) => (!a || x.at.closing > a.at.closing ? x : a), null),
+  };
+}
+export type OptionsPicture = Awaited<ReturnType<typeof optionsPicture>>;
 
 /** Compare: options by id (new ones too), labelled; unknown ids are left out. */
 /** Compare: the ids as rows (unknown ones left out), with their seats in each list of the newest round (`seatsBy`, as Choices). */
@@ -764,9 +847,11 @@ const STRIP_DOTS = 1500;
  * shallowest closing; `strip` (one point per option with a closing in the later past year) and `trend` cover the
  * first courses of it (see STRIP_COURSES).
  */
-export async function dashboard(profile: Profile, exam: ExamKey = DEFAULT_EXAM) {
+/** `tf`: the term filters Home's counts use (readTermFilters), else her profile's caps, so the charts count what the counts do. */
+export async function dashboard(profile: Profile, exam: ExamKey = DEFAULT_EXAM, tf: TermFilters = profileTermFilters(profile)) {
   const cat = await getCatalog(exam);
-  const ranked = await rankOptions(cat, cat.options.filter((o) => optMatches(cat, o, profile)), profile, true);
+  const types = await typesFor(tf, exam);
+  const ranked = await rankOptions(cat, cat.options.filter((o) => optMatches(cat, o, profile, tf, types)), profile, true);
   const last = headYearIn(exam, cat.sources);
   const byCourse = new Map<string, { course: Course; points: StripPoint[]; opts: Opt[] }>();
   for (const { o, deepest: d } of ranked) {

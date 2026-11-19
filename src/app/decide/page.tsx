@@ -17,9 +17,10 @@ import { fmtIST, nextChoiceFilling, nextDate, nextFilling, roundName, stepName, 
 import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { roundStatus } from "@/features/decide/server/notices";
 import { readTermFilters, termValueLabel } from "@/features/decide/lib/term-filters";
-import { eligibleCategories, latestText, pastOf, reachLabel, reachOrder, reachWindow, type Latest, type Reach } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
-import { dashboard, getMeta, listOptions, type StripPoint } from "@/features/decide/service";
+import { dashboard, getMeta, listOptions, optionsPicture, type StripPoint } from "@/features/decide/service";
+import { YourPicture } from "@/features/decide/components/your-picture";
 import { kindName, roundShort } from "@/features/decide/types";
 import { QuotaName, RoundShort } from "@/features/decide/components/round-name";
 import { activeExam, examInfo } from "@/features/exams/active";
@@ -36,17 +37,6 @@ function At({ p }: { p: StripPoint | null }) {
       <span className="block text-xs text-muted-foreground">{p.category}, <RoundShort round={p.round} />, <QuotaName quota={p.quota} /></span>
     </>
   );
-}
-
-/** "5 in 2026 R1, 12 in 2024 and 2025, 10 in 2024 or 2025": the reached total as Options' own label tabs, each a link to it. */
-function ReachedParts({ L, counts, latest }: { L: ReturnType<typeof decideLinks>; counts: Record<Reach, number>; latest: Latest }) {
-  const parts = (["reached-latest", "reached-both", "reached-one"] as const).filter((x) => counts[x] > 0);
-  return parts.map((x, i) => (
-    <Fragment key={x}>
-      {i > 0 && ", "}
-      <Link href={L.options({ reach: x })} className={smallLink}><span className="numeric">{formatRank(counts[x])}</span> {reachLabel(x, latest, pastOf(latest)).replace(/^Reached /, "")}</Link>
-    </Fragment>
-  ));
 }
 
 /** INI-CET: the guide to where its counselling and NEET PG's meet (Counselling, "NEET PG too?"). */
@@ -88,7 +78,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const { latestYear: LATEST_YEAR, pastYears: PAST_YEARS } = exams[exam];
   // Her caps as Options reads them (an absent maxfee / bondyrs is hers; nd=keep keeps the ones not published).
   const { params: tp, filters: terms } = readTermFilters(params, profile);
-  const [d, meta, r, rs] = await Promise.all([dashboard(profile, exam), getMeta(exam), listOptions(profile, { terms }, { page: 1, pageSize: 1 }, exam), roundStatus(LATEST_YEAR, exam)]);
+  // The charts count what the numbers count: the same term filters (her caps, or the page's).
+  const [d, meta, r, rs, pic, E] = await Promise.all([dashboard(profile, exam, terms), getMeta(exam), listOptions(profile, { terms }, { page: 1, pageSize: 1 }, exam), roundStatus(LATEST_YEAR, exam), optionsPicture(profile, { terms }, exam), examInfo(exam)]);
   const L = decideLinks(params);
   const list = r.view === "round" ? r.seatLists[0] : undefined;
   const roundWords = list && roundName[list.round];
@@ -105,7 +96,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const labelSources = <DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR }]} />;
   // Her fee / bond caps leave out options whose figure is not declared (in words only, or missing): say so, with the way back.
   const caps = [profile.maxFeeLakh != null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && termValueLabel.bondyrs(profile.maxBondYears)].flatMap((c) => (c ? [c[0].toLowerCase() + c.slice(1)] : [])).join(", ");
-  const leftOut = r.unknownTerms > 0 ? ` Your caps (${caps}) leave out ${formatRank(r.unknownTerms)} more without a published figure (in words only, or none published).` : "";
+  const leftOut = r.unknownTerms > 0 ? ` ${caps ? `Your caps (${caps})` : "Your fee, bond or type limits"} leave out ${formatRank(r.unknownTerms)} more without a published figure (in words only, or none published).` : "";
   // The next-step card names a round only from MCC's schedule: the choice filling open now, else the next one scheduled.
   const steps = rs && stepsNow(rs, new Date());
   const filling = steps && nextFilling(steps);
@@ -124,6 +115,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const capWords = caps && tp.maxfee == null && tp.bondyrs == null ? `your cap (${caps})` : "your fee, bond or type limits";
   const showCapped = L.with("/decide/options", { fee: null, bond: null, maxfee: "any", bondyrs: "any", ctype: null, minstip: null, maxbond: null, maxleave: null, nd: null });
   const capCause = exam !== DEFAULT_EXAM && (capped > 0 || r.unknownTerms > 0);
+  // While the counts above are the round's (options with seats in its lists), the charts are every option with past
+  // allotments: said in view, so a median past her rank never reads against "none reached" up there.
+  const chartScope = list && <span className="basis-full">All {formatRank(d.total)} options in your courses with past allotments, with seats in {lists} or not</span>;
   const capNote = capCause && (
     <p role="status" className="flex flex-wrap items-center gap-x-3 rounded-md border border-sun/40 bg-sun/10 px-3 py-2 text-sm">
       {capped > 0 && (
@@ -146,6 +140,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {title}
       <HeldStrip />
       <ResidentsPromo L={L} />
+      {reached > 0 && <YourPicture pic={pic} profile={profile} E={E} latest={latest} L={L} scope={list ? ` with seats in ${lists}` : ""} closedHref={L.options({ reach: "closed-before", closed: true })} />}
       {/* Desktop: the box above holds the only two buttons (the Season Pass, Search residents) and the tools follow; Options
           is a tool there and its numbers are below, so this card is for phones (and always when nothing is left to show). */}
       <section aria-labelledby="next-step-h" className={`rounded-xl border border-border bg-card p-4 sm:p-5 ${total ? "md:hidden" : ""}`}>
@@ -161,12 +156,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   : <>{filling.scheduled?.from ? "from" : "on"} <span className="numeric">{fmtIST(nextDate(filling)!)}</span>{filling.scheduled?.tentative && " (tentative)"}</>}
               </p>
             )}
-            <p className="mt-1 text-body text-muted-foreground">
+            {/* Your picture (above) has the counts once she reached anything. */}
+            {reached === 0 && <p className="mt-1 text-body text-muted-foreground">
               <span className="numeric">{formatRank(total)}</span> {total === 1 ? "option" : "options"} {list ? `with seats in ${by}'s latest seat lists, in your courses` : "in your profile"};{" "}
-              {/* The parts are Options' own label tabs, so each number is one she can open there. */}
-              <span className="numeric">{formatRank(reached)}</span> reached your rank in a past round
-              {reached > 0 && <>{" "}(<ReachedParts L={L} counts={r.counts} latest={latest} />)</>}.
-            </p>
+              none reached your rank in a past round.
+            </p>}
             <Button asChild size="lg" className="mt-3 min-h-11 max-sm:w-full"><Link href={L.options()}>Open Options</Link></Button>
           </>
         ) : capCause ? (
@@ -184,7 +178,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </>
         )}
       </section>
-      <ToolGroups L={L} E={await examInfo(exam)} />
+      <ToolGroups L={L} E={E} />
       <RoundStatusBanner params={params} />
         {exams[exam].crossover && <CrossoverLink L={decideLinks(params)} />}
 
@@ -277,6 +271,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-mark" />Closed at or after your rank in {head}</span>
             <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-muted-foreground/60" />Closed before your rank</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-3 w-0.5 bg-foreground" />Your rank</span>
+            {chartScope}
           </>
         }
         table={
@@ -318,6 +313,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <ChartCard
         source={<DataSource used={[{ year: HEAD }]} />}
         title={`How closing ranks moved through ${head}`}
+        legend={chartScope}
         subtitle={`Median closing rank per round across your options, on ${seats} seats, in ${head}.${d.trend.length < d.summary.length ? ` The ${d.trend.length} courses with the most options.` : ""}`}
         table={
           <table className="w-full text-sm">

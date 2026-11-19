@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { feeBandText, feeRange, statCells, statLabel, yearValue, type Level, type StatCell, type StatKey } from "../lib/stat-format";
+import { bondFlag, feeBandText, feeRange, statCells, statLabel, yearValue, type Level, type StatCell, type StatKey } from "../lib/stat-format";
 import type { ProgrammeTerms } from "../server/terms";
 import { NBEMS_BOND_RULES, termDocs } from "./fees";
 import { InfoTip } from "./info-tip";
@@ -137,6 +137,40 @@ export function StatHead({ k }: { k: StatKey }) {
   );
 }
 
+/** A card summary's three items, in the order she weighs them: Fee, the bond flag (lib/stat-format.ts bondFlag), Stipend. */
+export type SummaryKey = "fee" | "bond" | "stipend";
+export const summaryKeys: SummaryKey[] = ["fee", "bond", "stipend"];
+/** Each item as one string (the value with its marker): a list compares them to say once what every card shares. */
+export function summaryText(cells: StatCell[]): Record<SummaryKey, string> {
+  const text = (c: StatCell) => (c.marker ? `${c.short} ${c.marker}` : c.short);
+  return { fee: text(cells[0]), bond: bondFlag(cells).text, stipend: text(cells[1]) };
+}
+
+/**
+ * One line of a card's terms (summaryText's items but `hide`'s): "Fee ₹1.7 L/yr", "Bond 2 yr · ₹50 L", "Stipend
+ * ₹85,000/mo", coloured as the cells. No (i)s: the cells, with every figure's words and sources, are under the card's
+ * Details. `data-terms`: hidden for an exam with no fee data.
+ */
+export function TermSummary({ cells, hide, className }: { cells: StatCell[]; hide?: Partial<Record<SummaryKey, unknown>>; className?: string }) {
+  const [fee, stipend] = cells;
+  const flag = bondFlag(cells);
+  const item = (k: SummaryKey, label: React.ReactNode, value: React.ReactNode) =>
+    !hide?.[k] && (
+      <div key={k} className="flex min-w-0 items-baseline gap-1.5">
+        <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
+        <dd>{value}</dd>
+      </div>
+    );
+  const items = [
+    item("fee", "Fee", <><Value c={fee} /><Marker c={fee} /></>),
+    // The flag names itself ("No bond", "Bond 2 yr · ₹50 L"): its label is for screen readers.
+    item("bond", <span className="sr-only">Bond and penalties</span>, <span className={cn("numeric font-semibold", flag.level ? levelClass[flag.level] : "text-muted-foreground")}>{flag.text}</span>),
+    item("stipend", "Stipend", <><Value c={stipend} /><Marker c={stipend} /></>),
+  ].filter(Boolean);
+  if (!items.length) return null;
+  return <dl data-terms className={cn("flex flex-wrap gap-x-4 gap-y-1 text-sm", className)}>{items}</dl>;
+}
+
 /**
  * card (default): a ruled strip of five cells, short values ("₹50 L"), value over its label and (i); at 390px Fee and
  * Stipend share the first row, the bond cells the second. table: five `<td>`s (`data-col`: the cell key) with full
@@ -145,14 +179,15 @@ export function StatHead({ k }: { k: StatKey }) {
  * Table cells break only after a range's dash, their marker on its own line; `tdClassName`'s padding wins over theirs.
  * `of`: the row ("AIIMS Delhi, MD Anaesthesiology"), so each (i) button is named "About fee, AIIMS Delhi, …".
  */
-export function TermStatCells({ t, variant = "card", short, of, className, tdClassName, years, total }: { t: ProgrammeTerms; variant?: "card" | "table" | "compact"; short?: boolean; of?: string; className?: string; tdClassName?: string; years?: boolean; total?: boolean }) {
-  const cells = statCells(t);
+export function TermStatCells({ t, variant = "card", short, of, className, tdClassName, years, total, keys, wrap }: { t: ProgrammeTerms; variant?: "card" | "table" | "compact"; short?: boolean; of?: string; className?: string; tdClassName?: string; years?: boolean; total?: boolean; /** Table cells in this order (Options: summary first). */ keys?: StatKey[]; /** Table values wrap at their spaces (a narrow column). */ wrap?: boolean }) {
+  const all = statCells(t);
+  const cells = variant !== "card" && keys ? keys.map((k) => all.find((c) => c.key === k)!) : all;
   if (variant !== "card") {
     // The default padding at zero specificity, so a caller's px-/py- wins whatever the CSS order.
     const td = cn("text-right align-top [:where(&)]:px-3 [:where(&)]:py-2", tdClassName);
     return cells.flatMap((c) => [
       <td key={c.key} data-col={c.key} className={td}>
-        <StatCellView c={c} t={t} of={of} short={short || variant === "compact"} tip={variant === "table"} />
+        <StatCellView c={c} t={t} of={of} short={short || variant === "compact"} tip={variant === "table"} wrap={wrap} />
       </td>,
       // `years`: Fee and Stipend's years 2 and 3 as columns of their own (YearHeads), after year 1's cell.
       ...(years && (c.key === "fee" || c.key === "stipend") ? [2, 3].map((y) => <YearCell key={`${c.key}${y}`} t={t} pick={c.key as "fee" | "stipend"} year={y} className={td} />) : []),

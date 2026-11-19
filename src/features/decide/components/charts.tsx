@@ -72,20 +72,45 @@ const ticks = (max: number, n = 4) => Array.from({ length: n + 1 }, (_, i) => Ma
 type StripPoint = { name: string; quota: string; closing: number; round: Round; category: string };
 
 /**
+ * Where a strip's parts go: wide (from md) the course name left of its line; narrow (phones) the name over its line, at a
+ * width where the text draws at 12px or more and the axis keeps its numbers in view (no sideways scroll).
+ */
+type Geo = { W: number; L: number; R: number; rowH: number; top: number; lineY: number; above: boolean; ticks: number; font: number };
+// Text sizes are viewBox units: wide, at the 860px minimum width (scale 0.86) the 14-unit labels draw at 12px or more;
+// narrow, 340 units fill a phone card (about 310px), so 13 units draw at about 12px.
+const WIDE: Geo = { W: 1000, L: 250, R: 44, rowH: 46, top: 28, lineY: 23, above: false, ticks: 4, font: 14 };
+const NARROW: Geo = { W: 340, L: 0, R: 12, rowH: 46, top: 30, lineY: 32, above: true, ticks: 2, font: 13 };
+/** Wide, with a course name longer than the left column holds (NEET MDS's "… Pathology and Oral Microbiology"): names over their lines. */
+const WIDE_ABOVE: Geo = { ...WIDE, L: 0, top: 34, lineY: 32, above: true };
+/** About the characters a 14-unit name fits in WIDE's 250-unit column. */
+const WIDE_LABEL = 30;
+
+type StripProps = { rank: number; rows: { course: string; points: StripPoint[] }[]; year?: number };
+
+/**
  * Dot strip per course: each option's 2025 deepest closing rank, with a line at your rank. A picture with one summary
  * label: dots are not focusable (hundreds of tab stops); the hover tooltip finds the nearest dot, and ChartCard's
- * table view carries the numbers for keyboard and screen-reader use.
+ * table view carries the numbers for keyboard and screen-reader use. Phones get the narrow layout (NARROW), md up the wide.
  */
-export function RankStrip({ rank, rows, year: y = 2025 }: { rank: number; rows: { course: string; points: StripPoint[] }[]; year?: number }) {
+export function RankStrip(p: StripProps) {
+  return (
+    <>
+      <div className="md:hidden"><Strip {...p} g={NARROW} /></div>
+      <div className="max-md:hidden"><Strip {...p} g={p.rows.some((r) => r.course.length > WIDE_LABEL) ? WIDE_ABOVE : WIDE} /></div>
+    </>
+  );
+}
+
+function Strip({ rank, rows, year: y = 2025, g }: StripProps & { g: Geo }) {
   const [tip, setTip] = useState<Tip>(null);
   const E = useExamInfo(); // each quota as the exam's MCC words it
   const year = yearName(E.key, y);
   const all = rows.flatMap((r) => r.points.map((p) => p.closing));
   const max = niceMax(Math.max(rank * 1.2, ...all));
-  // Text sizes are viewBox units: at the 860px minimum width (scale 0.86) the 14-unit labels draw at 12px or more.
-  const W = 1000, L = 250, R = 44, rowH = 46, top = 28;
+  const { W, L, R, rowH, top } = g;
   const H = top + rows.length * rowH + 28;
   const x = (v: number) => L + (v / max) * (W - L - R);
+  const cyOf = (i: number) => top + i * rowH + g.lineY;
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const box = e.currentTarget.getBoundingClientRect();
     const s = box.width / W;
@@ -97,30 +122,35 @@ export function RankStrip({ rank, rows, year: y = 2025 }: { rank: number; rows: 
       const d = Math.abs(x(p.closing) - vx);
       if (d < dist) [best, dist] = [p, d];
     }
-    setTip(best && { x: x(best.closing) * s, y: (top + i * rowH + rowH / 2) * s, value: formatRank(best.closing), label: best.name, sub: `${quotaIn(E, best.quota)} · ${year} ${roundShort(best.round, E.key)} · ${best.category} seat` });
+    setTip(best && { x: x(best.closing) * s, y: cyOf(i) * s, value: formatRank(best.closing), label: best.name, sub: `${quotaIn(E, best.quota)} · ${year} ${roundShort(best.round, E.key)} · ${best.category} seat` });
   };
   const summary = rows.map((r) => `${r.course}: ${r.points.length} options, ${r.points.filter((p) => p.closing >= rank).length} closed at or after your rank`).join("; ");
+  const ts = ticks(max, g.ticks);
+  // The "You" label stays inside the chart: right of the line, or left of it past the middle.
+  const youLeft = g.W < 500 && x(rank) > W * 0.6;
   return (
     <div role="region" aria-label="Where your rank sits (chart)" tabIndex={0} className="relative overflow-x-auto overflow-y-hidden" onPointerLeave={() => setTip(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[860px]" role="img" aria-label={`${year} deepest closing rank of each option, with your rank ${formatRank(rank)} marked. ${summary}.`} onPointerMove={onMove}>
-        {ticks(max).map((t) => (
+      <svg viewBox={`0 0 ${W} ${H}`} className={cn("w-full", g.W > 500 && "min-w-[860px]")} role="img" aria-label={`${year} deepest closing rank of each option, with your rank ${formatRank(rank)} marked. ${summary}.`} onPointerMove={onMove}>
+        {ts.map((t, i) => (
           <g key={t}>
             <line x1={x(t)} x2={x(t)} y1={top - 8} y2={H - 24} className="stroke-border" strokeWidth={1} />
-            <text x={x(t)} y={H - 8} textAnchor="middle" className="numeric fill-muted-foreground text-[14px]">{formatRank(t)}</text>
+            <text x={x(t)} y={H - 8} textAnchor={g.L === 0 ? (i === 0 ? "start" : i === ts.length - 1 ? "end" : "middle") : "middle"} className="numeric fill-muted-foreground" style={{ fontSize: g.font }}>{formatRank(t)}</text>
           </g>
         ))}
         {rows.map((r, i) => {
-          const cy = top + i * rowH + rowH / 2;
+          const cy = cyOf(i);
           return (
             <g key={r.course}>
-              <text x={0} y={cy + 5} className="fill-foreground text-[14px] font-medium">{r.course}</text>
+              {!g.above && <text x={0} y={cy + 5} className="fill-foreground font-medium" style={{ fontSize: g.font }}>{r.course}</text>}
               <line x1={L} x2={W - R} y1={cy} y2={cy} className="stroke-border" strokeWidth={1} />
-              {r.points.map((p, j) => <circle key={j} cx={x(p.closing)} cy={cy} r={5} strokeWidth={2} className={cn("stroke-card", p.closing >= rank ? "fill-mark" : "fill-muted-foreground/60")} />)}
+              {r.points.map((p, j) => <circle key={j} cx={x(p.closing)} cy={cy} r={g.W < 500 ? 4 : 5} strokeWidth={g.W < 500 ? 1.5 : 2} className={cn("stroke-card", p.closing >= rank ? "fill-mark" : "fill-muted-foreground/60")} />)}
             </g>
           );
         })}
         <line x1={x(rank)} x2={x(rank)} y1={top - 20} y2={H - 24} className="stroke-foreground" strokeWidth={2} />
-        <text x={x(rank) + 6} y={top - 10} className="numeric fill-foreground text-[14px] font-bold">You, {formatRank(rank)}</text>
+        {/* A phone's names sit over the rank line, with a halo of the card colour, so the line never cuts them. */}
+        {g.above && rows.map((r, i) => <text key={r.course} x={0} y={cyOf(i) - 12} className="fill-foreground stroke-card font-medium [paint-order:stroke]" strokeWidth={4} style={{ fontSize: g.font }}>{r.course}</text>)}
+        <text x={youLeft ? x(rank) - 6 : x(rank) + 6} y={top - 10} textAnchor={youLeft ? "end" : "start"} className="numeric fill-foreground font-bold" style={{ fontSize: g.font }}>You, {formatRank(rank)}</text>
       </svg>
       <Tooltip tip={tip} setTip={setTip} />
     </div>

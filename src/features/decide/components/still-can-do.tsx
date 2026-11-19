@@ -33,7 +33,7 @@ export function StillCanDo({ L, rank, list, fresh, counts, title, id, exam = DEF
       <h2 id={id} className="text-title font-semibold">{title}</h2>
       <ul className="mt-2 grid list-disc gap-1.5 pl-5 text-sm">
         {list && fresh > 0 && (
-          <li><Link href={L.options({ reach: "new" })} className="underline hover:text-sky">{formatRank(fresh)} {fresh === 1 ? "option" : "options"} in {authorityOf(exam)}&apos;s {kindName("clear", exam) === "Seat position" ? "seat position" : `${roundName[list.round]} seat lists`} never allotted before</Link>: no closing rank to compare. Look at them.</li>
+          <li><Link href={L.options({ reach: "new" })} className="underline hover:text-sky">{formatRank(fresh)} {fresh === 1 ? "option" : "options"} in {authorityOf(exam)}&apos;s {kindName("clear", exam) === "Seat position" ? "seat position" : `${roundName[list.round]} seat lists`} never allotted before</Link>: no closing rank of their own. Each one shows what the same course closed at colleges of its type in its state, for comparison, not a prediction.</li>
         )}
         {/* INI-CET has one seat position a session: no virtual vacancy list. */}
         {list && kindName("clear", exam) !== "Seat position" && <li><Link href={L.to("/decide/options", { seats: "virtual" })} className={smallLink}>Virtual vacancy seats</Link>: seats held now that free up when someone upgrades this round. Fill them as choices too.</li>}

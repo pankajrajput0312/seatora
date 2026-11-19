@@ -3,7 +3,8 @@ import type { BondDetails, PenaltyDetails } from "@/features/cutoffs/lib/import-
 import { normalizeProgramme, type Programme } from "../server/terms";
 import type { FeeTableRecord, Term } from "../types";
 import { termsWords } from "./choices";
-import { feeRange, inrApprox, inrCard, inrFull, inrL, inrRange, inrShort, statCells, yearValue, type StatCell, type StatKey } from "./stat-format";
+import { bondFlag, feeRange, inrApprox, inrCard, inrFull, inrL, inrRange, inrShort, statCells, yearValue, type StatCell, type StatKey } from "./stat-format";
+import { summaryText } from "../components/stat-cells";
 
 // Terms shaped as the bundle has them (server/terms.test.ts), through the real normalizer, then the cells.
 const MCC = { name: "MCC institute profile (college declaration)", url: "https://mcc.admissions.nic.in/Counseling/Handler/ViewInstituteProfileDetailsDynamic.ashx?boardId=140012521&InstituteId=700359", type: "OFFICIAL" as const };
@@ -544,3 +545,29 @@ describe("colour levels (display only; the colour key)", () => {
   });
 });
 const statKeysAll = ["fee", "stipend", "bond", "bondInr", "leaving"] as const;
+
+describe("a card's summary: the bond flag and the three items (bondFlag, summaryText)", () => {
+  const list = (p: Programme, terms: Term[]) => statCells(normalizeProgramme(p, terms));
+  it("a bond: its years and what skipping it costs, coloured as its strongest cell", () => {
+    expect(bondFlag(list("MD/MS", [bond("MD", "Service bond: 1 year · ₹50 L", 5000000, { status: "documented", years: "1" })]))).toEqual({ text: "Bond 1 yr · ₹50 L", level: "heavy" });
+    const raj = bond("MD", "Service bond: 1 + 3 years · ₹25 L–₹1.5 Cr by subject", 15000000, { status: "documented", years: "1 + 3", by_subject: { ANAESTHESIOLOGY: 5000000, PATHOLOGY: 2500000, GENERALSURGERY: 15000000 } });
+    expect(bondFlag(list("MD/MS", [raj]))).toEqual({ text: "Bond 4 yr · ₹25 L–₹1.5 Cr", level: "heavy" });
+  });
+  it("no answer: the bond cell's own word, never read as no bond; a leaving penalty figure after it", () => {
+    expect(bondFlag(list("MD/MS", [bond("MD", "Not declared by the college", null, { status: "not_declared", reason: "not_declared_no_document" })]))).toEqual({ text: "No bond declared" });
+    expect(bondFlag(list("MD/MS", [bond("MD", "Bond document on MCC not read: a scan; see the document", null, { status: "unknown", reason: "bond document not read", doc_url: "https://mcc.admissions.nic.in/x?Type=BM" })])).text).toBe("Bond doc not read");
+    expect(bondFlag(list("MD/MS", [])).text).toBe("Bond not published");
+    const leave = penalty("MD", { items: [{ kind: "leaving_penalty", applies_to: "PG degree", inr: 3500000, when: "discontinues PG course", quote: null, source_url: MCC.url }] });
+    expect(bondFlag(list("MD/MS", [leave]))).toEqual({ text: "Bond not published · Leaving ₹35 L", level: "heavy" });
+  });
+  it("no bond: green, unless a leaving penalty is heavy", () => {
+    const none = bond("DNB", "No bond (NBEMS rule for private DNB hospitals)", 0, { status: "no_bond_rule" }, NBEMS);
+    expect(bondFlag(list("DNB", [none]))).toEqual({ text: "No bond", level: "good" });
+    const leave = penalty("DNB", { items: [{ kind: "leaving_penalty", applies_to: "DNB", inr: 3000000, when: "leaves the seat", quote: null, source_url: MCC.url }] });
+    expect(bondFlag(list("DNB", [none, leave]))).toEqual({ text: "No bond · Leaving ₹30 L", level: "heavy" });
+  });
+  it("summaryText: each item as one string, a marker with its value", () => {
+    const t = list("MD/MS", fees("MD", [rec("MD/MS", { fee_per_year: [fee(41000), fee(41000), fee(41000)], stipend_per_month: [{ amount: 136008, currency: "INR", kind: "stipend", src: 1 }, null, null] as never })]));
+    expect(summaryText(t)).toEqual({ fee: t[0].marker ? `${t[0].short} ${t[0].marker}` : t[0].short, bond: "Bond not published", stipend: t[1].short });
+  });
+});

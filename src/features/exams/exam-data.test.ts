@@ -84,3 +84,23 @@ describe("NEET SS: group-aware reach", () => {
     expect(d.trend[0].points.map((p) => p.round)).toEqual(["R1", "R2", "stray"]);
   });
 });
+
+describe("another exam's Options, answer first: tightest reached first, and Your picture's counts", () => {
+  // A: Round 1 reached her rank (2025 R1 closed at 250). B: Round 1 closed before it (150), Round 2 reached it (600).
+  const two: DecideData = {
+    ...data,
+    cutoffs: [cut(A, "DM", "CARDIOLOGY", 2025, "R1", MED, 250), cut(B, "DM", "CARDIOLOGY", 2025, "R1", MED, 150), cut(B, "DM", "CARDIOLOGY", 2025, "R2", MED, 600)],
+  };
+  beforeAll(() => setTestCatalog(two, "neet-ss"));
+
+  it("within a reached label the tightest closing first (NEET PG keeps the deepest first)", async () => {
+    const r = await svc.listOptions(medical, { view: "all" }, undefined, "neet-ss");
+    expect(r.rows.map((x) => [x.college.key, x.reach])).toEqual([[A, "reached-latest"], [B, "reached-latest"]]);
+  });
+
+  it("Your picture: reached in Round 1 vs only in a later round, from each row's first reaching round", async () => {
+    const p = await svc.optionsPicture(medical, { view: "all" }, "neet-ss");
+    expect([p.r1, p.later, p.counts["closed-before"]]).toEqual([1, 1, 0]);
+    expect([p.cheapest, p.safest]).toEqual([null, null]); // no fee records, no college types in this catalog
+  });
+});
