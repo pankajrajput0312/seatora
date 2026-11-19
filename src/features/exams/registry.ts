@@ -5,9 +5,9 @@ import "server-only";
 import { latestRound, type Latest } from "@/features/decide/lib/reach";
 import { baseCategories, roundLabel, rounds, type Round, type Source } from "@/features/decide/types";
 import { completeYear, examShows, groupsIn, isRestricted, neetPg, roundNameFrom, type Exam, type ExamHas } from "./exam";
-import { DEFAULT_EXAM, isExam, ranksPerGroup, type ExamKey } from "./keys";
+import { DEFAULT_EXAM, isExam, ranksPerGroup, separateRankList, type ExamKey } from "./keys";
 
-export { DEFAULT_EXAM, EXAM_COOKIE, examKeys, isExam, markerKey, ranksPerGroup, scopedKey, sessionExams, yearName, type ExamKey } from "./keys";
+export { DEFAULT_EXAM, EXAM_COOKIE, examKeys, isExam, markerKey, rankListOf, ranksPerGroup, scopedKey, sessionExams, yearName, type ExamKey } from "./keys";
 export { groupOf, pageNeeds, type Exam, type ExamHas } from "./exam";
 
 // The bundle contract's required files: cutoffs and allotments. An adapter turns a flag on once its bundle has the data.
@@ -60,13 +60,15 @@ export const exams: Record<ExamKey, Exam> = {
     quotaNames: { "Deemed/Paid Seats": "Self-Financed Merit Seat", "Deemed/Paid": "Self-Financed Merit Seat" },
     has: { ...resultsOnly, seats: true },
   },
-  // AIIMS New Delhi's seat allocation results. Two sessions a year: a year is a session code (keys.ts yearName).
+  // AIIMS New Delhi's seat allocation results (bundle 19 Nov 2026: January 2023 to July 2026, eight sessions, each
+  // 1st Round, 2nd Round and the Open Round; seat positions; the institutes' fee and bond terms). Two sessions a year: a
+  // year is a session code (keys.ts yearName). MDS ranks on its own list (keys.ts separateRankList).
   "ini-cet": {
     key: "ini-cet",
     label: "INI-CET",
     latestYear: 20267,
     pastYears: [20257, 20261],
-    rounds: ["R1", "R2", "R3", "stray"],
+    rounds: ["R1", "R2", "R3"],
     categories: baseCategories,
     pwd: true,
     quotas: ["Open"],
@@ -75,9 +77,10 @@ export const exams: Record<ExamKey, Exam> = {
     rankWord: "Rank",
     rankName: "INI-CET rank",
     perGroup: false,
-    exampleRank: "1,500",
+    exampleRank: "500",
     resultsName: "AIIMS seat allocation results",
-    has: resultsOnly,
+    // Its notices and round steps are imported but not shown: the Schedule page is MCC's (NEET PG's) for now.
+    has: { ...resultsOnly, seats: true },
   },
 };
 
@@ -112,3 +115,16 @@ export const restrictedQuota = (exam: ExamKey, quota: string) => isRestricted(ex
 export const examFor = (asked: string | null | undefined, staff: boolean): ExamKey => (staff && isExam(asked) ? asked : DEFAULT_EXAM);
 
 export const showsPage = (exam: ExamKey, href: string) => examShows(exams[exam], href);
+
+/**
+ * The rank list Rank journey and Rank scan read (keys.ts separateRankList): ?list= ("main", or the list's degree in
+ * lower case: "mds"), else her courses' when every one is that degree, else the main list (""). Null: the exam has one list.
+ */
+export function rankListIn(exam: ExamKey, asked: string | null, herDegrees: string[]): string | null {
+  const own = separateRankList[exam];
+  if (!own) return null;
+  if (asked === "main" || asked === own.toLowerCase()) return asked === "main" ? "" : own;
+  return herDegrees.length > 0 && herDegrees.every((d) => d === own) ? own : "";
+}
+/** The degree an exam ranks on a list of its own (INI-CET: "MDS"), else undefined. */
+export const separateRankListOf = (exam: ExamKey) => separateRankList[exam];

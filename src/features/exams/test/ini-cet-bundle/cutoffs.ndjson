@@ -1,4 +1,5 @@
 {"ikey": "INIFIXTUREINSTITUTEONE#110029", "degree": "MD", "specialty": "GENERALMEDICINE", "year": 20261, "round": "R1", "quota": "Open", "category": "Open", "opening": 5, "closing": 5, "n": 1, "src": "aiims/20261/R1.pdf"}
+{"ikey": "INIFIXTUREINSTITUTEONE#110029", "degree": "MDS", "specialty": "ORTHODONTICS", "year": 20261, "round": "R1", "quota": "Open", "category": "Open", "opening": 5, "closing": 5, "n": 1, "src": "aiims/20261/R1.pdf"}
 {"ikey": "INIFIXTUREINSTITUTETWO#605006", "degree": "MD", "specialty": "GENERALMEDICINE", "year": 20261, "round": "R1", "quota": "Open", "category": "Open", "opening": 30, "closing": 30, "n": 1, "src": "aiims/20261/R1.pdf"}
 {"ikey": "INIFIXTUREINSTITUTEONE#110029", "degree": "MCh", "specialty": "NEUROSURGERY", "year": 20261, "round": "R1", "quota": "Open", "category": "OBC", "opening": 60, "closing": 60, "n": 1, "src": "aiims/20261/R1.pdf"}
 {"ikey": "INIFIXTUREINSTITUTETWO#605006", "degree": "MD", "specialty": "GENERALMEDICINE", "year": 20261, "round": "R1", "quota": "Sponsored", "category": "Open", "opening": 120, "closing": 120, "n": 1, "src": "aiims/20261/R1.pdf"}

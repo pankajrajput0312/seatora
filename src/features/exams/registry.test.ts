@@ -5,8 +5,8 @@ import { CHOICES_KEY, COMPARE_KEY } from "@/features/decide/lib/choices";
 import { PROFILE_KEY, profileQuotas } from "@/features/decide/profile";
 import { baseCategories, openQuotas, openQuotasNote, quotaScopeNote, rounds, type Source } from "@/features/decide/types";
 import { completeYear, examShows, headYearOf, neetPg, quotaIn, roundIn, roundNamesOf, tidyLabel } from "./exam";
-import { DEFAULT_EXAM, examFor, examKeys, exams, examYears, groupOf, groupsOf, headYearIn, isExam, latestOf, markerKey, pageNeeds, restrictedQuota, roundNameIn, scopedKey, showsPage, yearName } from "./registry";
-import { sessionOf } from "./keys";
+import { DEFAULT_EXAM, examFor, examKeys, exams, examYears, groupOf, groupsOf, headYearIn, isExam, latestOf, markerKey, pageNeeds, restrictedQuota, roundNameIn, scopedKey, rankListIn, showsPage, yearName } from "./registry";
+import { rankListOf, sessionOf } from "./keys";
 import { yearsOf } from "@/features/decide/server/catalog";
 
 const src = (year: number, round: Source["round"], name = "", provisional = false): Source => ({ key: `${year}/${round}`, url: null, year, round, provisional, name });
@@ -170,7 +170,9 @@ describe("INI-CET: two sessions a year, a year is a session code", () => {
     expect(E).toMatchObject({ label: "INI-CET", rankWord: "Rank", rankName: "INI-CET rank", categories: baseCategories, pwd: true, perGroup: false });
     expect(E.scopeNote).toBe("Seatora covers INI-CET counselling by AIIMS New Delhi (AIIMS, JIPMER, PGIMER, NIMHANS, SCTIMST seats).");
     expect(E.quotasNote).toContain(E.scopeNote);
-    expect(E.has.allotments && !E.has.residents && !E.has.notices && !E.has.scoreRank && !E.has.merit).toBe(true);
+    expect(E.has.allotments && E.has.seats && !E.has.residents && !E.has.notices && !E.has.scoreRank && !E.has.merit && !E.has.beds).toBe(true);
+    // its bundle (19 Nov 2026): January 2023 to July 2026, each session's 1st, 2nd and Open Round
+    expect([E.latestYear, E.pastYears, E.rounds]).toEqual([20267, [20257, 20261], ["R1", "R2", "R3"]]);
     for (const h of ["/decide/residents", "/decide/counselling", "/decide/rank-tools"]) expect(showsPage("ini-cet", h)).toBe(false);
     expect(restrictedQuota("ini-cet", "Sponsored")).toBe(true);
     expect(E.quotas.every((q) => !restrictedQuota("ini-cet", q))).toBe(true);
@@ -207,5 +209,15 @@ describe("INI-CET: two sessions a year, a year is a session code", () => {
     // NEET PG's: its years, labels and round names as ever
     expect(yearsOf([src(2025, "R1"), src(2026, "R1", "", true)]).map((x) => x.label)).toEqual(["2026 (R1, provisional)", "2025"]);
     expect(resultsSpan([{ year: 2026, rounds: ["R1"] }, { year: 2024, rounds: ["R1"] }])).toBe("2024 to 2026 R1");
+  });
+});
+
+describe("INI-CET's MDS rank list (keys.ts separateRankList)", () => {
+  it("MDS is a list of its own on INI-CET only", () => {
+    expect([rankListOf("ini-cet", "MDS"), rankListOf("ini-cet", "MD"), rankListOf("ini-cet", "DM"), rankListOf("neet-mds", "MDS"), rankListOf("neet-pg", "MD")]).toEqual(["MDS", "", "", "", ""]);
+  });
+  it("her list: asked, else her courses' when all are MDS, else the main one; none for other exams", () => {
+    expect([rankListIn("ini-cet", "mds", []), rankListIn("ini-cet", "main", ["MDS"]), rankListIn("ini-cet", null, ["MDS"]), rankListIn("ini-cet", null, ["MDS", "MD"]), rankListIn("ini-cet", null, [])]).toEqual(["MDS", "", "MDS", "", ""]);
+    expect([rankListIn("neet-pg", "mds", ["MDS"]), rankListIn("neet-mds", null, ["MDS"])]).toEqual([null, null]);
   });
 });

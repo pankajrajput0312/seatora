@@ -9,7 +9,7 @@ import { getCatalog } from "@/features/decide/server/catalog";
 import { seatLists } from "@/features/decide/server/seats";
 import { examShows, roundNamesOf } from "./exam";
 import { EXAM_HEADER } from "./keys";
-import { DEFAULT_EXAM, examFor, exams, headYearIn, type Exam, type ExamKey } from "./registry";
+import { DEFAULT_EXAM, examFor, exams, headYearIn, separateRankListOf, type Exam, type ExamKey } from "./registry";
 
 /**
  * The exam Decide shows on this request: its URL's ?exam= (src/middleware.ts hands it over as a request header; none:
@@ -64,5 +64,20 @@ export async function examGate(href: string) {
         </span>
       </EmptyState>
     </AppPage>
+  );
+}
+
+/**
+ * Which rank list a rank page reads, for an exam with two (INI-CET: MDS on its own, registry rankListIn), and a link to
+ * the other: the same rank there is another candidate. `href(list)`: this page with ?list=.
+ */
+export function RankListNote({ exam, list, href }: { exam: ExamKey; list: string; href: (list: string) => string }) {
+  const own = separateRankListOf(exam);
+  if (!own) return null;
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+      <span>{list ? `The ${own} rank list.` : `The rank list of every course but ${own}.`} {exams[exam].label} ranks {own} on a list of its own, so the same rank on the other list is another candidate.</span>
+      <Link href={href(list ? "main" : own.toLowerCase())} className="inline-flex min-h-11 items-center text-sky underline">{list ? `Every course but ${own}` : `${own} rank list`}</Link>
+    </p>
   );
 }

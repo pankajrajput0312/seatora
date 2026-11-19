@@ -10,5 +10,11 @@
   "specialty": "NEUROSURGERY",
   "name": "Neuro Surgery (6 years)",
   "slug": "mch-neuro-surgery-6-years"
+ },
+ {
+  "degree": "MDS",
+  "specialty": "ORTHODONTICS",
+  "name": "Orthodontics",
+  "slug": "mds-orthodontics"
  }
 ]

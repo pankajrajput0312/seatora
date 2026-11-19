@@ -9,6 +9,10 @@ export const isExam = (s: unknown): s is ExamKey => examKeys.includes(s as ExamK
 
 /** Exams whose ranks are per question group (the group rides in the quota label): a candidate is a rank within a quota. */
 export const ranksPerGroup: readonly ExamKey[] = ["neet-ss"];
+/** Exams that rank one degree on a merit list of its own (INI-CET: MDS): a candidate is a rank within its degree's list. */
+export const separateRankList: Partial<Record<ExamKey, string>> = { "ini-cet": "MDS" };
+/** A seat's rank list: its degree when that degree has a list of its own (INI-CET's MDS), else "" (the exam's one list). */
+export const rankListOf = (exam: ExamKey, degree: string) => (separateRankList[exam] === degree ? degree : "");
 
 /**
  * Exams with two sessions a year (INI-CET: January and July), whose "year" is a session code YYYYM: 20261 = the

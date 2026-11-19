@@ -19,13 +19,13 @@ import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams, rankValue } from "@/features/decide/lib/params";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
-import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
+import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankJourney } from "@/features/decide/service";
 import { roundLabel, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
-import { activeExam, examInfo } from "@/features/exams/active";
-import { groupsOf, perGroup, roundNameIn, yearName } from "@/features/exams/registry";
+import { activeExam, examInfo, RankListNote } from "@/features/exams/active";
+import { groupsOf, perGroup, rankListIn, rankListOf, roundNameIn, yearName } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Rank journey" };
@@ -50,7 +50,9 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
   const rank = invalid ? null : (f.air ?? profile?.rank ?? null);
   // Default: the newest year with results.
   const year = meta.years.find((y) => y.year === f.year) ?? meta.years[0];
-  const rows = rank && year ? await withRowInfo(await rankJourney(year.year, rank, exam, group), exam) : [];
+  // INI-CET ranks MDS on a list of its own: one candidate is one list's rank (registry rankListIn; null: one list).
+  const list = rankListIn(exam, params.get("list"), profile ? meta.courses.filter((c) => profileHasCourse(profile, c)).map((c) => c.degree) : []);
+  const rows = (rank && year ? await withRowInfo(await rankJourney(year.year, rank, exam, group), exam) : []).filter((a) => list == null || rankListOf(exam, a.degree) === list);
   const none = year ? year.rounds.filter((r) => !rows.some((a) => a.round === r)) : [];
   const courseOf = new Map(meta.courses.map((c) => [`${c.degree}|${c.specialty}`, c]));
   const provisional = (round: string) => meta.sources.some((s) => s.year === year?.year && s.round === round && s.provisional);
@@ -79,7 +81,9 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
           <input name="air" inputMode="numeric" defaultValue={typed ?? rank ?? ""} placeholder={`e.g. ${E.exampleRank}`} aria-invalid={invalid || undefined} aria-describedby={invalid ? "air-error" : undefined} className={`${control} numeric`} />
         </Field>
         <Field label="Year"><Select name="year" value={year ? String(year.year) : undefined} options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
+        {list != null && params.get("list") && <input type="hidden" name="list" value={params.get("list")!} />}
       </FilterBar>
+      {list != null && <RankListNote exam={exam} list={list} href={(l) => L.with("/decide/rank-journey", { list: l })} />}
 
       {invalid ? (
         <p id="air-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example {E.exampleRank}.</p>

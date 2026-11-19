@@ -50,7 +50,7 @@ import {
   type MccCollegeV2,
 } from "../src/features/cutoffs/lib/import-schema.ts";
 import { noticeKinds, roundSteps, seatKinds, stepStatuses } from "../src/features/decide/types.ts";
-import { DEFAULT_EXAM, examKeys, isExam, markerKey, ranksPerGroup, sessionExams } from "../src/features/exams/keys.ts";
+import { DEFAULT_EXAM, examKeys, isExam, markerKey, rankListOf, ranksPerGroup, sessionExams } from "../src/features/exams/keys.ts";
 
 const args = process.argv.slice(2);
 const examAt = args.indexOf("--exam");
@@ -260,8 +260,9 @@ for (const [k, { n, min, max, want }] of cells)
 const grouped = ranksPerGroup.includes(exam);
 const PREV_ROUND: Record<string, string> = { R2: "R1", R3: "R2" };
 const seatOf = (a: { ikey: string; degree: string; specialty: string; quota: string }) => [a.ikey, a.degree, a.specialty, a.quota].join("|");
-const who = (a: { year: number; rank: number }, round: string, quota: string) => `${a.year}|${round}|${a.rank}${grouped ? `|${quota}` : ""}`;
-const byRank = new Map(allotments.map((a) => [who(a, a.round, a.quota), a]));
+// INI-CET ranks MDS on a list of its own (keys.ts rankListOf): a candidate is a rank within its degree's list.
+const who = (a: { year: number; rank: number }, round: string, quota: string, degree: string) => `${a.year}|${round}|${a.rank}${grouped ? `|${quota}` : ""}|${rankListOf(exam, degree)}`;
+const byRank = new Map(allotments.map((a) => [who(a, a.round, a.quota, a.degree), a]));
 const allottedSeats = new Set(grouped ? allotments.map((a) => `${a.year}|${a.round}|${seatOf(a)}`) : []);
 if (v2 && byRank.size !== allotments.length) fail(`allotments.ndjson: ${allotments.length - byRank.size} rank(s) allotted twice in one year and round`);
 allotments.forEach((a, i) => {
@@ -270,7 +271,7 @@ allotments.forEach((a, i) => {
   const prev = { ikey: a.prev_ikey, degree: a.prev_degree!, specialty: a.prev_specialty!, quota: a.prev_quota! };
   if (!collegeKeys.has(prev.ikey)) fail(`${at}: unknown previous college ${prev.ikey}`);
   if (!courseSlug.has(`${prev.degree}|${prev.specialty}`)) fail(`${at}: unknown previous course ${prev.degree} ${prev.specialty}`);
-  const held = byRank.get(who(a, PREV_ROUND[a.round], prev.quota));
+  const held = byRank.get(who(a, PREV_ROUND[a.round], prev.quota, prev.degree));
   if (grouped && !held && allottedSeats.has(`${a.year}|${PREV_ROUND[a.round]}|${seatOf(prev)}`)) return; // moved group
   if (!held || seatOf(held) !== seatOf(prev)) fail(`${at}: previous seat ${seatOf(prev)} is not rank ${a.rank}'s ${a.year} ${PREV_ROUND[a.round]} allotment (${held ? seatOf(held) : "none"})`);
 });

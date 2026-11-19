@@ -205,7 +205,7 @@ describe.skipIf(!local || !existsSync(join(pgBundle, "manifest.json")))("multi-e
     expect(options.total).toBeGreaterThan(0);
     expect(new Set(allotments.rows.map((a: { year: number }) => a.year))).toEqual(new Set([20261, 20267]));
     expect(roundNamesOf(meta.sources)).toEqual({ "20261|R3": "Open Round" }); // as examInfo names its rounds
-    expect((await rows("ini-cet")).Allotment).toBe(10);
+    expect((await rows("ini-cet")).Allotment).toBe(11); // MDS rank 5 and MD rank 5: two candidates (two rank lists)
   });
 
   for (const exam of ["neet-mds", "neet-ss", "ini-cet"] as const) {
@@ -228,7 +228,7 @@ describe.skipIf(!local || !existsSync(join(pgBundle, "manifest.json")))("multi-e
       expect(mine.FeesStructured).toBe(fees);
       if (fees) {
         const f = await fresh(async () => (await import("@/features/decide/service")).listFees({}, undefined, exam));
-        expect(new Set(f.rows.map((r) => r.terms.programme))).toEqual(new Set(exam === "neet-mds" ? ["MDS"] : ["DM/MCh", "DrNB SS"]));
+        expect(new Set(f.rows.map((r) => r.terms.programme))).toEqual(new Set(exam === "neet-mds" ? ["MDS"] : exam === "ini-cet" ? ["MD/MS", "MDS", "DM/MCh"] : ["DM/MCh", "DrNB SS"]));
         expect(f.rows.some((r) => r.terms.years.some((y) => y.fee || y.stipend))).toBe(true);
       }
       if (exam === "ini-cet") {

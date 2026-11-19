@@ -24,14 +24,14 @@ import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankShorthand } from "@/features/decide/lib/params";
 import { readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
-import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
+import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankScan } from "@/features/decide/service";
 import { statKeys } from "@/features/decide/lib/stat-format";
 import { roundLabel, rounds } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
-import { activeExam, examInfo } from "@/features/exams/active";
-import { groupsOf, perGroup, roundNameIn, yearName } from "@/features/exams/registry";
+import { activeExam, examInfo, RankListNote } from "@/features/exams/active";
+import { groupsOf, perGroup, rankListIn, rankListOf, roundNameIn, yearName } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Rank scan" };
@@ -82,7 +82,10 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const allCats = scatPicked.includes("all");
   const cats = allCats ? null : scatPicked.length ? scatPicked : mineCats.length ? mineCats : null;
   const courseSlug = new Map(meta.courses.map((c) => [`${c.degree}|${c.specialty}`, c.slug]));
+  // INI-CET ranks MDS on a list of its own: ranks near hers on her list only (registry rankListIn; null: one list).
+  const list = rankListIn(exam, params.get("list"), profile ? meta.courses.filter((c) => profileHasCourse(profile, c)).map((c) => c.degree) : []);
   const wanted = (a: { degree: string; specialty: string; category: string; round: string }) =>
+    (list == null || rankListOf(exam, a.degree) === list) &&
     (!round || a.round === round) &&
     (!cf.slugs || cf.slugs.has(courseSlug.get(`${a.degree}|${a.specialty}`) ?? "")) &&
     (!degrees.length || degrees.includes(a.degree)) &&
@@ -143,6 +146,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         <FilterDropdown label="Course" name="course" search options={cf.choices} selected={cf.selected} none={cf.none} info={cf.mine.length ? "None ticked means your courses. Tick All courses for every one." : undefined} />
         <FilterDropdown label="Degree" name="degree" options={meta.degrees.map((d) => ({ value: d, label: d }))} selected={degrees} none="Any degree" />
         {params.get("grp") === "all" && <input type="hidden" name="grp" value="all" />}
+        {list != null && params.get("list") && <input type="hidden" name="list" value={params.get("list")!} />}
         {E.categories.length > 1 && <FilterDropdown
           label="Seat category"
           name="scat"
@@ -154,6 +158,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         <TermFilterControls f={tp.params} caps={profile} fees={E.has.fees} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
+      {list != null && <RankListNote exam={exam} list={list} href={(l) => L.with(R, { list: l, page: null })} />}
 
       {invalid ? (
         <p id="scan-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a rank between 1 and 3,00,000, for example {E.exampleRank} (25k or 2.5 lakh work too).</p>

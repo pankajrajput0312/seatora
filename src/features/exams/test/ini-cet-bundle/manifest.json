@@ -8,20 +8,20 @@
    "sha256": "5d007853b1d72020af7d0fbb2910a9e1cc737132a3072771d2792688100f4b12"
   },
   "courses.json": {
-   "count": 2,
-   "sha256": "640ff2480011e3ee59f55f83a782c7d81f76d90321accb2213382ce20ebb1048"
+   "count": 3,
+   "sha256": "85a19dd9c4f9b1606e2695770cda637b17c76a5154c5b5279106bd6776994a2f"
   },
   "colleges.ndjson": {
    "count": 2,
    "sha256": "27067f81972ffc328744699c07ce7390140b08b581151cecc7bc7a95aa1b8d14"
   },
   "cutoffs.ndjson": {
-   "count": 10,
-   "sha256": "95e7997bd1afd1065458cb9a96088725ce04f21d7cd5234f18636be4a2d12851"
+   "count": 11,
+   "sha256": "a3af3b849f2e57d2a331ef77eba51ae9c44c98aeb1792abdabfa7ed9e876b6c5"
   },
   "allotments.ndjson": {
-   "count": 10,
-   "sha256": "f1632f1fd152279af563e6d9b8b186a99314552ba1b7120f76063c3162ce2ac3"
+   "count": 11,
+   "sha256": "88ab7c774d814ef028ce7e553e971055c337a613ab619408d9a4b89b97a7eedd"
   }
  },
  "excluded_unparsed_course_rows": 0,

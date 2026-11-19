@@ -33,12 +33,14 @@ export type Programme = keyof typeof programmes;
 export const programmeNames = Object.keys(programmes) as Programme[];
 /** The programmes an exam's courses can be: the Fees page offers only these. */
 export const examProgrammes = (exam: ExamKey): Programme[] =>
-  exam === "neet-mds" ? ["MDS"] : exam === "neet-ss" ? ["DM/MCh", "DrNB SS"] : ["MD/MS", "Diploma", "DNB", "NBEMS Diploma", "MCh", "MPH"];
+  exam === "neet-mds" ? ["MDS"] : exam === "neet-ss" ? ["DM/MCh", "DrNB SS"] : exam === "ini-cet" ? ["MD/MS", "MDS", "DM/MCh"] : ["MD/MS", "Diploma", "DNB", "NBEMS Diploma", "MCh", "MPH"];
 
 /** A course's programme. NEET MDS: every course is MDS's; NEET SS: D.M. and M.Ch. one, DrNB the other (NEET PG's 6-year MCh is its own). */
 export function programmeOfDegree(degree: string, exam: ExamKey = DEFAULT_EXAM): Programme {
   if (exam === "neet-mds") return "MDS";
   if (exam === "neet-ss") return degree === "DrNB" ? "DrNB SS" : "DM/MCh";
+  // INI-CET (its bundle's fee table: the institutes' prospectus): MD/MS, MDS, and the 6-year DM / MCh.
+  if (exam === "ini-cet") return degree === "MDS" ? "MDS" : degree === "DM" || degree === "MCh" ? "DM/MCh" : "MD/MS";
   if (degree === "MD" || degree === "MS") return "MD/MS";
   if (degree === "DrNB") return "DNB";
   return degree in programmes ? (degree as Programme) : /^(DNB|NBEMS)/.test(degree) ? "DNB" : "MD/MS";
