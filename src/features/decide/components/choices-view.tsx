@@ -336,7 +336,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
               href={L.institute(item.slug)}
               external={lr?.hospital?.mccProfileUrl ? { href: lr.hospital.mccProfileUrl, label: `MCC profile: ${item.institute}` } : undefined}
               subtitle={item.course}
-              meta={[item.state ?? "State not listed", lr && <TypeBadge key="type"M type={lr.hospital?.type} of={item.institute} />, lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />]}
+              meta={[item.state ?? "State not listed", lr && <TypeBadgeM key="type" type={lr.hospital?.type} of={item.institute} />, lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />]}
               footer={
                 <>
                   {E.has.fees && (lr ? <StatCellsM t={lr.fees} of={name(item)} /> : loading && <Skeleton className="h-[7.75rem] rounded-none sm:h-[4.5rem]" />)}
