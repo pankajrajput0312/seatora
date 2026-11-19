@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { cache } from "react";
-import { DEFAULT_EXAM, seatCategoriesFor, seatPositionExams, type ExamKey } from "@/features/exams/keys";
+import { ALL_CATEGORIES, DEFAULT_EXAM, seatCategoriesFor, seatPositionExams, type ExamKey } from "@/features/exams/keys";
 import { examYears, exams, groupOf, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
 import { hospitalInfo, type HospitalInfo } from "./components/institute/institute-data";
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
@@ -121,6 +121,8 @@ export type OptionRow = {
   seatsBelow?: SeatsBelow[];
   /** INI-CET (one seat position a session): the option's seats in every category, beside `seatsBy` (hers): "4 in your categories of 6". */
   seatsAllBy?: SeatsBy;
+  /** INI-CET: the list kinds whose seats here are all one course total not split by category (JIPMER's "All"): "10 (not split by category)". */
+  seatsUnsplit?: SeatKind[];
   /** NEET SS: the option is another question group's than hers, so her rank isn't compared with it (`reach` "no-data"). */
   otherGroup?: true;
 };
@@ -432,7 +434,10 @@ function withSeats(rows: OptionRow[], lists: SeatList[], seats: Map<string, Opti
     const cats = Object.fromEntries(lists.map((l, i) => [l.kind, mine[i].filter((c) => c.seats > 0).map((c) => c.category)]));
     return {
       ...r, seats: seatsBy.clear ?? null, seatsBy, seatsBelow: r.reachBy ? seatsBelow(r.reach, r.reachBy, cats, r.reachAt) : [],
-      ...(profile && seatPositionExams.includes(exam) && { seatsAllBy: seatsByKind(lists, seats.get(r.id)).by }),
+      ...(profile && seatPositionExams.includes(exam) && ((all) => ({
+        seatsAllBy: all.by,
+        seatsUnsplit: lists.filter((_, i) => all.mine[i].some((c) => c.seats > 0) && all.mine[i].every((c) => c.seats === 0 || c.category === ALL_CATEGORIES)).map((l) => l.kind),
+      }))(seatsByKind(lists, seats.get(r.id)))),
     };
   });
 }

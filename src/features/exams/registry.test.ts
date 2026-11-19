@@ -247,7 +247,7 @@ describe("INI-CET's words for seat lists, rounds, seats and institutes (tester f
   it("MDS's own list on links; institute groups by key", () => {
     expect([rankListParam("ini-cet", "MDS"), rankListParam("ini-cet", "MS"), rankListParam("neet-pg", "MDS")]).toEqual(["mds", "main", undefined]);
     const E = exams["ini-cet"];
-    expect(["AIIMSNEWDELHI#110029", "AIIMSBHOPAL#462020", "JIPMERPUDUCHERRY#605006", "PGIMERCHANDIGARH#160012", "NIMHANSBENGALURU#560029", "SCTIMSTTRIVANDRUM#695011", "X"].map((k) => instituteGroupOf(E, k))).toEqual(["AIIMS New Delhi", "New AIIMS", "JIPMER", "PGIMER", "NIMHANS", "SCTIMST", null]);
+    expect(["AIIMSNEWDELHI#110029", "AIIMSBHOPAL#462020", "AIIMSRISHIKESH#249203", "AIIMSNAGPUR#441124", "JIPMERPUDUCHERRY#605006", "PGIMERCHANDIGARH#160012", "NIMHANSBENGALURU#560029", "SCTIMSTTRIVANDRUM#695011", "X"].map((k) => instituteGroupOf(E, k))).toEqual(["AIIMS New Delhi", "AIIMS (2012)", "AIIMS (2012)", "New AIIMS", "JIPMER", "PGIMER", "NIMHANS", "SCTIMST", null]);
     expect(instituteGroupOf(exams["neet-pg"], "AIIMSNEWDELHI#110029")).toBeNull();
   });
   it("a contract's years in words; the lowest leaving penalty where no bond penalty exists (INI-CET only)", () => {
@@ -259,6 +259,12 @@ describe("INI-CET's words for seat lists, rounds, seats and institutes (tester f
     const r = (lo: number, hi: number) => { const x = t(hi) as unknown as { bond: { leavingAmount: { min: number } } }; x.bond.leavingAmount.min = lo; return x as never; };
     expect(lowestRisk([{ name: "A", t: r(300000, 500000) }, { name: "B", t: r(300000, 500000) }], true)).toMatch(/^Leaving penalty: all the same \(₹3/);
     expect(lowestRisk([{ name: "A", t: r(200000, 600000) }, { name: "B", t: r(300000, 500000) }], true)).toMatch(/^Can't tell: their leaving penalties overlap/);
+    // the same range in other steps (JIPMER's from depositing the originals): not "all the same", the extra step named
+    const steps = (ws: [number, string][]) => { const x = r(300000, 500000) as unknown as { bond: { leaving: unknown[] } }; x.bond.leaving = ws.map(([inr, text]) => ({ inr, text })); return x as never; };
+    const aiims = steps([[300000, "MD/MS (6 yr), leaving within six months of joining"], [500000, "MD/MS (6 yr), leaving after six months of joining"]]);
+    const jipmer = steps([[300000, "all, from deposit of original certificates to joining"], [300000, "all, within six months of joining, plus that month's salary"], [500000, "all, after six months of joining, plus that month's salary"]]);
+    expect(lowestRisk([{ name: "A", t: aiims }, { name: "B", t: aiims }], true)).toMatch(/^Leaving penalty: all the same \(₹3 L within six months of joining, ₹5 L after six months of joining\)/);
+    expect(lowestRisk([{ name: "A", t: aiims }, { name: "J", t: jipmer }], true)).toBe("Leaving penalty: ₹3 L–₹5 L at each, not in the same steps (J also has ₹3 L from deposit of original certificates to joining); none of these publishes a bond penalty figure.");
     expect(lowestRisk([{ name: "A", t: r(200000, 400000) }, { name: "B", t: r(300000, 500000) }], true)).toMatch(/^Lowest leaving penalty here: A/);
   });
 });

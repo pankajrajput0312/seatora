@@ -97,7 +97,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without(PATH, c.key, c.value) : L.with(PATH, { [c.key]: null, page: null }) })),
   ];
   const clear = L.with(PATH, { q: null, state: null, course: null, grp: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
-  // INI-CET: the institute's group as a small tag ("AIIMS New Delhi", "New AIIMS", "JIPMER"…), the Institute filter's words.
+  // INI-CET: the institute's group as a small tag ("AIIMS New Delhi", "AIIMS (2012)", "New AIIMS", "JIPMER"…), the Institute filter's words.
   const groupTag = (key: string) => {
     const g = instituteGroupOf(E, key);
     return g ? <Badge key="grp" className="w-fit">{g}</Badge> : null;

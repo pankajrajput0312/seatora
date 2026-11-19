@@ -282,12 +282,12 @@ function stipendCell(t: ProgrammeTerms): StatCell {
     ...yearLines(t, "stipend", " a month"),
     ...(below ? [{ text: below.nbems ? `${BELOW_MIN} of ${inrFull(below.nbems.inr)} a month.` : `${BELOW_MIN}.`, warn: true as const, src: below.nbems?.src }] : []),
     // INI-CET: the entry pay plus NPA and allowances (its record's basis); every other exam's words as before.
-    ...(s.plusDa ? [{ text: t.exam === "ini-cet" ? "Plus NPA and DA (allowances), as the prospectus prints it: the figure is the entry pay." : "Plus DA (dearness allowance), as the college declared." }] : []),
+    ...(t.exam === "ini-cet" ? (s.plus ? [{ text: `Plus ${s.plus === "NPA/DA" ? "NPA and DA (allowances)" : s.plus} on top of this pay, as the prospectus prints it.` }] : []) : s.plusDa ? [{ text: "Plus DA (dearness allowance), as the college declared." }] : []),
     ...(s.kind === "minimum" ? [{ text: NBEMS_MIN }] : s.kind === "nmc" ? [{ text: NMC }] : []),
   ];
   // Always a month, one money style: "₹35,000/mo", "₹1.05 L/mo", "≥ ₹43,000/mo" (full: "From ₹43,000/mo").
   const min = s.kind === "minimum";
-  return levelOf({ ...c, short: `${min ? "≥ " : ""}${inrCard(s.inr)}/mo`, full: `${min ? "From " : ""}${inrFull(s.inr)}/mo`, marker: s.below ? "below NBEMS min" : t.exam === "ini-cet" && s.plusDa ? "+ NPA/DA" : null, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
+  return levelOf({ ...c, short: `${min ? "≥ " : ""}${inrCard(s.inr)}/mo`, full: `${min ? "From " : ""}${inrFull(s.inr)}/mo`, marker: s.below ? "below NBEMS min" : t.exam === "ini-cet" && s.plus ? `+ ${s.plus}` : null, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
 }
 
 /**
@@ -342,8 +342,8 @@ function noBondTip(t: ProgrammeTerms): TipLine[] {
 }
 
 function bondCell(t: ProgrammeTerms): StatCell {
-  const c = { key: "bond", label: statLabel.bond, about: "service bond" } as const;
   const b = t.bond;
+  const c = { key: "bond", label: statLabel.bond, about: b.toComplete ? "bond to complete the course" : "service bond" } as const;
   if (b.status === "none") {
     const caveat = !!(b.caveat || b.stateRule);
     return levelOf({ ...c, short: "No bond", full: "No bond", marker: null, tone: null, tip: noBondTip(t) }, caveat ? undefined : "good", undefined);
@@ -422,7 +422,7 @@ function bondInrCell(t: ProgrammeTerms): StatCell {
   if (b.status === "none") return levelOf({ ...c, short: "None", full: "None", marker: null, tone: b.caveat || b.stateRule ? null : "muted", tip: [{ text: "No bond, so no bond amount." }, ...noBondTip(t)] }, b.caveat || b.stateRule ? undefined : "good", undefined);
   if (b.status !== "declared") return bondMissing(t, c);
   const a = b.amount;
-  const head: TipLine = { text: "What you pay if you do not serve the bond (bond penalty)." };
+  const head: TipLine = { text: b.toComplete ? "What you pay if you leave before completing the course (bond penalty)." : "What you pay if you do not serve the bond (bond penalty)." };
   const parts = b.amounts.length > 1 || (b.amounts[0] && b.amounts[0].inr !== a.max) ? [{ text: "The bond record:" }, ...partLines(b.amounts, b.src)] : [];
   const other: TipLine[] = b.otherAmounts ? [{ text: "Figures for other courses or quotas are in the bond's own words (the college's Fees tab)." }] : [];
   // The state rule's amounts, as its years (the college's own document is older): cited to the rule.
@@ -492,7 +492,7 @@ export function bondPlain(t: ProgrammeTerms): string {
   const leave = b.leaving.length ? money(b.leavingAmount, b.leaving.map((p) => p.text)) : "not published";
   const parts = [`Leave after joining: ${leave}.`];
   if (b.status === "declared") {
-    parts.push(`Skip ${b.years == null ? "the bond's" : `the ${yrs(b.years)}'`} service: ${money(b.amount, [b.text, b.quote])}.`);
+    parts.push(b.toComplete ? `Bond to complete the course: ${money(b.amount, [b.text, b.quote])}.` : `Skip ${b.years == null ? "the bond's" : `the ${yrs(b.years)}'`} service: ${money(b.amount, [b.text, b.quote])}.`);
     if (b.yearsText && !sameYears(b.yearsText, b.years)) parts.push(`The years are written more than one way (${b.yearsText}): confirm with the college.`);
     if (b.basis === "state_rule" || b.yearsFrom) parts.push("Years from the state's rule, not the college's own bond document: confirm with the college.");
   } else if (b.status === "none") parts.push(b.caveat || b.stateRule ? "No bond on record, with a caveat (below): confirm with the college." : "No bond: no service to serve, nothing to pay for one.");

@@ -535,7 +535,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
   const term = "text-xs font-semibold text-muted-foreground";
   return (
     <section aria-labelledby={`${id} ${of}`} className="grid min-w-0 content-start gap-4 rounded-lg border border-border bg-muted/30 p-4">
-      <h4 id={id} className="text-sm font-semibold">Service bond</h4>
+      <h4 id={id} className="text-sm font-semibold">{bond.toComplete ? "Bond to complete the course" : "Service bond"}</h4>
       <div className="text-sm">
         {declared ? (
           <>

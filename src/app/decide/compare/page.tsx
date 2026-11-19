@@ -16,7 +16,7 @@ import { EmptyState, smallLink, tbl } from "@/features/decide/components/ui";
 import { MAX_COMPARE } from "@/features/decide/lib/choices";
 import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams } from "@/features/decide/lib/params";
-import { deepestOf, eligibleCategories, LATER_ROUNDS_NOTE, latestText, pastOf } from "@/features/decide/lib/reach";
+import { deepestOf, eligibleCategories, LATER_ROUNDS_NOTE, latestText, pastOf, seatsOfWords } from "@/features/decide/lib/reach";
 import { inrFull } from "@/features/decide/lib/stat-format";
 import { lowestRisk } from "@/features/decide/lib/term-filters";
 import { kindName, rounds, type SeatList } from "@/features/decide/types";
@@ -147,8 +147,8 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             <span className="grid text-xs">
               {lists.map((l) => (
                 <span key={l.key}><span className="text-muted-foreground">{kindName(l.kind, exam)}:</span> <span className="numeric font-semibold">{r.seatsBy?.[l.kind] != null ? formatRank(r.seatsBy[l.kind]!) : "—"}</span>
-                  {/* INI-CET: hers out of the option's own ("4 in your categories of 6"). */}
-                  {r.seatsAllBy?.[l.kind] != null && <span className="text-muted-foreground"> in your categories of <span className="numeric">{formatRank(r.seatsAllBy[l.kind]!)}</span></span>}
+                  {/* INI-CET: hers out of the option's own ("4 in your categories of 6"; a course total "(not split by category)"). */}
+                  {seatsOfWords(r, l.kind) && <span className="text-muted-foreground">{seatsOfWords(r, l.kind)}</span>}
                 </span>
               ))}
             </span>
@@ -217,7 +217,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         )}
         {sharedParts.length > 0 && (
           <section aria-label={`${authorityOf(exam)}'s round rules`} className="mt-3 grid gap-1 rounded-xl border border-border bg-card px-4 py-3 text-sm">
-            <p className="font-semibold">{authorityOf(exam)}&apos;s round rules, the same for all {options.length}:</p>
+            <p className="font-semibold">{authorityOf(exam)}&apos;s round rules, the same for {options.length === 2 ? "both" : `all ${options.length}`}:</p>
             <ul className="grid list-disc gap-1 pl-5 text-xs">
               {sharedParts.map((p, i) => <li key={i}>{p.text}<Sup n={p.src ?? options[0].fees.bond.src} sources={options[0].fees.sources} /></li>)}
             </ul>

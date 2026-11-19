@@ -63,6 +63,8 @@ export type FigureKind = "declared" | "maximum" | "minimum" | "nmc" | "published
  */
 export type Figure = {
   inr: number; kind: FigureKind; src: number; min?: number; atAdmission?: true; above?: true; below?: true; plusDa?: true; note?: string; noteSrc?: number;
+  /** INI-CET: what the pay is on top of, from the record's basis words ("NPA/DA", "allowances"): the stipend cell's marker. */
+  plus?: string;
   declared?: number; nbems?: { inr: number; src: number };
   /** Another exam: the record prices some subjects apart and this course isn't one of them, so it may differ ("may vary by subject"). */
   varies?: true;
@@ -134,6 +136,8 @@ export type Bond = {
   stateRule: string | null;
   /** The years are the state rule's (`stateRule`), not the college's own document's. */
   yearsFrom?: "state_rule";
+  /** INI-CET: a bond to complete the course (the record's words, SCTIMST), not a service bond after it. */
+  toComplete?: true;
   /** Years of service for this programme (All India figure first; added up where the record joins them, `yearsSum`); 0 = no bond; null when not stated. */
   years: number | null;
   /** The years added up, as "1 + 3" (Karnataka: compulsory service + the undertaking); null when one figure. */
@@ -548,7 +552,8 @@ function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url
   const said = aiims && st.status === "not_declared"
     ? ["No document read states a service bond after the course.", d.note ? `${d.note[0].toUpperCase()}${d.note.slice(1)}${/[.!?"”)]$/.test(d.note) ? "" : "."} Leaving the course early costs the leaving penalty.` : null].filter(Boolean).join(" ")
     : null;
-  const base = { ...notDeclared(), ...st, stateRule: d.state_rule?.text ?? null, appliesTo, text: said ?? text, quote: d.quote || null, caveat, src: own, doc, ...(why && { why }) };
+  const toComplete = aiims && /^bond to complete the course\b/i.test(text);
+  const base = { ...notDeclared(), ...st, stateRule: d.state_rule?.text ?? null, appliesTo, text: said ?? text, quote: d.quote || null, caveat, src: own, doc, ...(why && { why }), ...(toComplete && { toComplete: true as const }) };
   // "No bond" only where nothing may still bind: one where a state law's service may apply is unknown (cells, filters, CSV).
   if (st.status === "none") return mayApply ? { ...base, status: "not_declared", basis: null } : { ...base, years: 0 };
   if (unknown) return base;
@@ -641,7 +646,17 @@ const yearsTotal = (years: { fee: Figure | null }[]) => (years.every((y) => y.fe
 /** The NBEMS annual DNB course fee (no GST): the most a DNB hospital may charge. */
 const NBEMS_FEE = 125000;
 
-function fromRecords(r: FeeTableRecord | undefined, src: (s: FeeTableRecord["sources"][number]) => number) {
+/**
+ * INI-CET: what a stipend is paid on top of, from its record's own words: NPA (with DA or HRA) "NPA/DA", else
+ * "allowances" ("plus other allowances as applicable"), else DA where the record says plus DA. Null when it says none.
+ */
+function plusOf(s: { basis?: string | null; plus_da?: boolean | null }) {
+  const b = s.basis ?? "";
+  if (/\bNPA\b/.test(b)) return "NPA/DA";
+  if (/allowance/i.test(b)) return "allowances";
+  return s.plus_da ? "DA" : null;
+}
+function fromRecords(r: FeeTableRecord | undefined, src: (s: FeeTableRecord["sources"][number]) => number, aiims = false) {
   if (!r) return null;
   const at = (n: number) => src(r.sources.find((s) => s.n === n)!); // the importer checks every cited n is listed
   const numbers = r.fee_display === "numbers";
@@ -687,7 +702,7 @@ function fromRecords(r: FeeTableRecord | undefined, src: (s: FeeTableRecord["sou
     const nb = s.below_nbems_minimum ? r.stipend_nbems_minimum?.[i] : undefined;
     return {
       inr: s.inr, kind: s.minimum ? "minimum" : s.kind === "nmc_list" ? "nmc" : "declared", src: at(s.src),
-      ...(s.below_nbems_minimum && { below: true as const }), ...(nb && { nbems: { inr: nb.inr, src: at(nb.src) } }), ...(s.plus_da && { plusDa: true as const }),
+      ...(s.below_nbems_minimum && { below: true as const }), ...(nb && { nbems: { inr: nb.inr, src: at(nb.src) } }), ...(s.plus_da && { plusDa: true as const }), ...(aiims && plusOf(s) && { plus: plusOf(s)! }),
     };
   });
   const w = numbers ? r.fee_whole_course : null;
@@ -749,7 +764,7 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     feeT = stT = undefined;
   }
   const recs = recordsOf(programme, feeT, stT);
-  const read = recs ? fromRecords(recordFor(recs, quota), (s) => add({ label: s.label, url: s.url, year: typeof s.year === "number" ? s.year : null, mccId: s.mcc_id ?? null, sharedBy: 1, type: "OFFICIAL" })) : null;
+  const read = recs ? fromRecords(recordFor(recs, quota), (s) => add({ label: s.label, url: s.url, year: typeof s.year === "number" ? s.year : null, mccId: s.mcc_id ?? null, sharedBy: 1, type: "OFFICIAL" }), aiims) : null;
   // A fee in the profile's own words only (verbatim): no figure; the quota's record's words as published ("see terms"),
   // read from its MCC profile page; none in words: said so (the export may then have no FEE term, only the STIPEND one).
   let notesSrc: number | undefined;

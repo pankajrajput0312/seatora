@@ -47,8 +47,10 @@ export type Exam = {
   roundWords?: Partial<Record<Round, string>>;
   /** Rank scan and Allotments' default read her quotas only (the open ones when she ticked none, as Options): INI-CET's Foreign National, Sponsored, IP… seats are not hers. */
   quotaScoped?: boolean;
-  /** Institutes's groups (INI-CET: AIIMS New Delhi, the new AIIMS, JIPMER…), each its colleges' key prefix (`not`: one it leaves out); the Institutes filter. */
-  instituteGroups?: { label: string; prefix: string; not?: string }[];
+  /** Institutes's groups (INI-CET: AIIMS New Delhi, the 2012 AIIMS, the newer AIIMS, JIPMER…), each its colleges' key prefixes (the first group that matches wins); the Institutes filter. */
+  instituteGroups?: { label: string; prefixes: string[] }[];
+  /** College key → what the brochure printed where the address carries the institute's own PIN instead (INI-CET bundle manifest counts.address_pin_from_the_institute, e.g. "Part A printed 801505"). */
+  pinNotes?: Record<string, string>;
   /** Quotas its seat position notifies apart (INI-CET: Sponsored / Foreign National / Bhutani, AIIMS's own notice), and their one name: seat totals say them apart ("204 open + 53 Sponsored/Foreign National"). */
   apartQuotas?: { quotas: string[]; name: string };
   /** Its Counselling area has the "Also in NEET PG counselling?" guide (./crossover.ts; INI-CET). */
@@ -74,7 +76,7 @@ export const neetPg: Exam = {
 };
 
 /** The exam's institute group of a college key (Exam.instituteGroups; the first that matches), else null. */
-export const instituteGroupOf = (E: Pick<Exam, "instituteGroups">, key: string) => E.instituteGroups?.find((g) => key.startsWith(g.prefix) && !(g.not && key.startsWith(g.not)))?.label ?? null;
+export const instituteGroupOf = (E: Pick<Exam, "instituteGroups">, key: string) => E.instituteGroups?.find((g) => g.prefixes.some((p) => key.startsWith(p)))?.label ?? null;
 
 /** The question group a NEET SS quota label names: "All India (Medical Group)" → "Medical Group"; null without one. */
 export const groupOf = (quota: string) => /\((.+)\)$/.exec(quota)?.[1] ?? null;

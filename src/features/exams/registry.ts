@@ -86,13 +86,24 @@ export const exams: Record<ExamKey, Exam> = {
     apartQuotas: { quotas: ["Sponsored/Foreign National", "Sponsored", "Foreign National", "Bhutani National"], name: "Sponsored/Foreign National" },
     // Its institutes by family (college keys: neetpg-planner tools/exams/ini_cet identity.json).
     instituteGroups: [
-      { label: "AIIMS New Delhi", prefix: "AIIMSNEWDELHI" },
-      { label: "New AIIMS", prefix: "AIIMS", not: "AIIMSNEWDELHI" },
-      { label: "JIPMER", prefix: "JIPMER" },
-      { label: "PGIMER", prefix: "PGIMER" },
-      { label: "NIMHANS", prefix: "NIMHANS" },
-      { label: "SCTIMST", prefix: "SCTIMST" },
+      { label: "AIIMS New Delhi", prefixes: ["AIIMSNEWDELHI"] },
+      // The six AIIMS opened in 2012; every other AIIMS falls to "New AIIMS" below.
+      { label: "AIIMS (2012)", prefixes: ["AIIMSBHOPAL", "AIIMSBHUBANESWAR", "AIIMSJODHPUR", "AIIMSPATNA", "AIIMSRAIPUR", "AIIMSRISHIKESH"] },
+      { label: "New AIIMS", prefixes: ["AIIMS"] },
+      { label: "JIPMER", prefixes: ["JIPMER"] },
+      { label: "PGIMER", prefixes: ["PGIMER"] },
+      { label: "NIMHANS", prefixes: ["NIMHANS"] },
+      { label: "SCTIMST", prefixes: ["SCTIMST"] },
     ],
+    // The bundle manifest's counts.address_pin_from_the_institute, as is (exams.db.test.ts checks they match).
+    pinNotes: {
+      "AIIMSBILASPUR#174037": "Part A printed no PIN",
+      "AIIMSGORAKHPUR#273008": "Part A printed no PIN",
+      "AIIMSJAMMU#181134": "Part A printed 180001",
+      "AIIMSMANGALAGIRI#522503": "Part A printed 522 203",
+      "AIIMSPATNA#801507": "Part A printed 801505",
+      "AIIMSRISHIKESH#249203": "Part A printed 2498201",
+    },
     // Its Schedule follows the session its round status is about (notices.ts scheduleYear: January 2027), the last
     // session's notices beside it as how that one ran.
     has: { ...resultsOnly, seats: true, notices: true },

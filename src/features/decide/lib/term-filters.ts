@@ -235,12 +235,17 @@ export function lowestRisk(items: { name: string; t: ProgrammeTerms }[], byLeavi
     if (none.length) return `Can't tell: ${names(none)} ${none.length === 1 ? "publishes" : "publish"} no leaving penalty figure, so there is no fair lowest.`;
     const lo = (x: (typeof xs)[number]) => x.t.bond.leavingAmount.min ?? x.leave!;
     const range = (x: (typeof xs)[number]) => (lo(x) === x.leave ? money(x.leave!) : `${money(lo(x))}–${money(x.leave!)}`);
-    // The parts' own words (AIIMS: "₹3 L within six months of joining, ₹5 L after"), from the option's leaving rows.
-    const words = (x: (typeof xs)[number]) => {
-      const ps = x.t.bond.leaving.filter((p) => p.inr != null);
-      return ps.length > 1 ? ps.map((p) => `${money(p.inr!)} ${p.text.split(", ").at(-1)!.replace(/^leaving /, "")}`).join(", ") : range(x);
-    };
-    if (xs.every((x) => lo(x) === lo(xs[0]) && x.leave === xs[0].leave)) return `Leaving penalty: all the same (${words(xs[0])}); none of these publishes a bond penalty figure.`;
+    // The parts' own words (AIIMS: "₹3 L within six months of joining, ₹5 L after"), from the option's leaving rows: each
+    // row "who, when[, more]" ("all, within six months of joining, plus that month's salary") as its amount and when.
+    const steps = (x: (typeof xs)[number]) => x.t.bond.leaving.filter((p) => p.inr != null).map((p) => { const w = p.text.split(", "); return `${money(p.inr!)} ${(w[1] ?? w[0]).replace(/^leaving /, "")}`; });
+    const words = (x: (typeof xs)[number]) => (steps(x).length > 1 ? steps(x).join(", ") : range(x));
+    if (xs.every((x) => lo(x) === lo(xs[0]) && x.leave === xs[0].leave)) {
+      if (xs.every((x) => words(x) === words(xs[0]))) return `Leaving penalty: all the same (${words(xs[0])}); none of these publishes a bond penalty figure.`;
+      // The same lowest and highest, not the same steps (JIPMER's from depositing the originals): the steps not all have.
+      const common = steps(xs[0]).filter((w) => xs.every((x) => steps(x).includes(w)));
+      const more = xs.map((x) => ({ x, ws: steps(x).filter((w) => !common.includes(w)) })).filter((m) => m.ws.length);
+      return `Leaving penalty: ${range(xs[0])} at each, not in the same steps (${more.map((m) => `${m.x.name} ${common.length ? "also has" : "has"} ${m.ws.join(", ")}`).join("; ")}); none of these publishes a bond penalty figure.`;
+    }
     const best = xs.filter((x) => xs.every((y) => lo(x) <= lo(y) && x.leave! <= y.leave!));
     if (!best.length) return `Can't tell: their leaving penalties overlap (${xs.map((x) => `${x.name} ${range(x)}`).join("; ")}), so there is no fair lowest.`;
     return `Lowest leaving penalty here: ${names(best)} (${range(best[0])}); none of these publishes a bond penalty figure.`;

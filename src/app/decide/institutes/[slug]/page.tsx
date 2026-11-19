@@ -140,6 +140,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const HEAD = headYearIn(exam, meta.sources);
   const yn = (y: number) => yearName(exam, y); // as the exam names it (INI-CET: "Jan 2026")
   const by = authorityOf(exam); // MCC; INI-CET: AIIMS
+  const pinNote = E.pinNotes?.[college.key]; // INI-CET: "Part A printed 801505" where the institute's own PIN replaced the brochure's
   const onePosition = kindName("clear", exam) === "Seat position"; // INI-CET: one seat list a session
   const w = (s: string) => inExamWords(exam, s); // a sentence in the exam's words (NEET PG, SS, MDS: as written)
   const head = yn(HEAD);
@@ -294,7 +295,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             ))}
             {college.address && (
               <span className="inline-flex items-center gap-0.5 text-muted-foreground">
-                Address<InfoTip label="address">{college.address} (as printed by {by})</InfoTip>
+                Address<InfoTip label="address">{pinNote ? `${college.address} (PIN from the institute's own site; ${by}'s ${pinNote})` : <>{college.address} (as printed by {by})</>}</InfoTip>
               </span>
             )}
             {info?.mccProfileUrl && (
@@ -309,7 +310,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             )}
           </p>
           {/* On paper the tip doesn't open: the address prints in full. */}
-          {college.address && <p className="hidden text-sm print:block">Address as printed by {by}: {college.address}</p>}
+          {college.address && <p className="hidden text-sm print:block">{pinNote ? `Address (PIN from the institute's own site; ${by}'s ${pinNote}): ${college.address}` : <>Address as printed by {by}: {college.address}</>}</p>}
         </div>
       </div>
 

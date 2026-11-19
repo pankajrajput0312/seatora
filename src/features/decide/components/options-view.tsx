@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { formatInrShort } from "../lib/format";
 import type { DecideLinks } from "../lib/links";
-import { LATER_ROUNDS_NOTE, pastOf, reachLabel, seatsBelowNotes, type Deepest, type Latest } from "../lib/reach";
+import { LATER_ROUNDS_NOTE, pastOf, reachLabel, seatsBelowNotes, seatsOfWords, type Deepest, type Latest } from "../lib/reach";
 import type { ChoiceItem } from "../lib/choices";
 import type { OptionRow } from "../service";
 import { kindName, rounds, type Round, type SeatList, type Term } from "../types";
@@ -66,7 +66,10 @@ export function SeatsLink({ n, list, L, at, name, end }: { n: number | null | un
 /** One option's seats in that one list (`n`, default its clear vacancy `seats`), linking to them on Seats; "—" when none. */
 export function SeatsCell({ r, list, L, n = r.seats, end = true }: { r: ListRow; list: SeatList; L: DecideLinks; n?: number | null; end?: boolean }) {
   const E = useExamInfo(); // client only (Options rows): the quota as the exam's MCC words it
-  return <SeatsLink n={n} list={list} L={L} at={{ inst: r.college.slug, course: r.course.slug, quota: r.quota }} name={`${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} end={end} />;
+  const link = <SeatsLink n={n} list={list} L={L} at={{ inst: r.college.slug, course: r.course.slug, quota: r.quota }} name={`${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} end={end} />;
+  // INI-CET: what her seats are of ("6 in your categories of 8", "10 (not split by category)").
+  const of = n != null && seatsOfWords(r, list.kind);
+  return of ? <span className={end ? "block text-right" : undefined}>{link}<span className="text-xs text-muted-foreground">{of}</span></span> : link;
 }
 
 /** Under an option's label: the lists whose seats here are all on seat categories with another label (OptionRow.seatsBelow). */

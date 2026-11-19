@@ -1,4 +1,5 @@
 import { formatRank } from "@/features/cutoffs/lib/format";
+import type { SeatsBy } from "@/features/decide/service";
 import { authorityOf, DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
 import { kindName, roundLabel, rounds, roundShort, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind, type Source } from "../types";
 
@@ -295,3 +296,7 @@ export function bestClosing(grid: Record<number, Partial<Record<Round, { closing
     .filter((x) => x >= 0 && (!cl.min || x >= cl.min) && (!cl.max || x <= cl.max));
   return Math.max(-1, ...inRange);
 }
+
+/** INI-CET: after her seats in one list, what they are of: " (not split by category)" (a course total), " in your categories of 8"; else null. */
+export const seatsOfWords = (r: { seatsAllBy?: SeatsBy; seatsUnsplit?: SeatKind[] }, kind: SeatKind) =>
+  r.seatsUnsplit?.includes(kind) ? " (not split by category)" : r.seatsAllBy?.[kind] != null ? ` in your categories of ${formatRank(r.seatsAllBy[kind]!)}` : null;

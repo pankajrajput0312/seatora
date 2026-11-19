@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { roundNamesOf } from "./exam";
+import { exams } from "./registry";
 import { sessionOf, yearName } from "./keys";
 import { pgOutputs, SHARED_KEY } from "./test/pg-outputs";
 
@@ -235,6 +236,8 @@ describe.skipIf(!local || !existsSync(join(pgBundle, "manifest.json")))("multi-e
         ini = out;
         // A year is a session code, named as a session on every label.
         expect(out.meta.years.every((y: { year: number; label: string }) => sessionOf(y.year) && y.label.startsWith(yearName("ini-cet", y.year)))).toBe(true);
+        // The registry's PIN notes (institute page address tip) are the bundle's, as is.
+        expect(exams["ini-cet"].pinNotes).toEqual(m.counts?.address_pin_from_the_institute ?? {});
       }
       if (exam === "neet-ss") {
         ss = out;

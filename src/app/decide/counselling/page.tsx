@@ -16,7 +16,7 @@ import { ActiveFilters, EmptyState, Field, FilterBar, Pager, rangeLabel, Select,
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { badgeOf, clockNote, fmtIST, fmtNote, roundName, stepName, stepsNow, type StepNow } from "@/features/decide/lib/round-status";
-import { toURLSearchParams } from "@/features/decide/profile";
+import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { meritLists } from "@/features/decide/server/merit";
 import { listNotices, roundStatus, scheduleYear } from "@/features/decide/server/notices";
 import { noticeKinds, type NoticeKind, type Round } from "@/features/decide/types";
@@ -88,7 +88,7 @@ export default async function CounsellingPage({ searchParams }: { searchParams: 
         </PageHead>
       )}
       <SubTabs label="Counselling" current={tab} items={shown.map((t) => ({ key: t.key, label: t.label, href: L.to("/decide/counselling", { tab: t.key }) }))} />
-      {tab === "schedule" ? <Schedule L={L} exam={exam} /> : tab === "announcements" ? <Announcements f={f} params={params} L={L} exam={exam} /> : tab === "crossover" ? <CrossoverGuide /> : <MeritLists />}
+      {tab === "schedule" ? <Schedule L={L} exam={exam} /> : tab === "announcements" ? <Announcements f={f} params={params} L={L} exam={exam} /> : tab === "crossover" ? <CrossoverGuide profile={profileFromParams(params)} /> : <MeritLists />}
     </AppPage>
   );
 }
