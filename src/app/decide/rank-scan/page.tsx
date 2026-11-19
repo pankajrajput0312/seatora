@@ -27,7 +27,7 @@ import { readTermFilters, splitByTerms, termChips, termValueLabel } from "@/feat
 import { profileFromParams, profileHasCourse, profileQuotas, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankScan } from "@/features/decide/service";
 import { statKeys } from "@/features/decide/lib/stat-format";
-import { roundLabel, rounds } from "@/features/decide/types";
+import { roundLabel, rounds, roundShort } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
 import { activeExam, examInfo, RankListNote } from "@/features/exams/active";
@@ -89,13 +89,15 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const list = rankListIn(exam, params.get("list"), profile ? meta.courses.filter((c) => profileHasCourse(profile, c)).map((c) => c.degree) : []);
   const wanted = (a: { degree: string; specialty: string; category: string; round: string }) =>
     (list == null || rankListOf(exam, a.degree) === list) &&
-    (!round || a.round === round) &&
     (!cf.slugs || cf.slugs.has(courseSlug.get(`${a.degree}|${a.specialty}`) ?? "")) &&
     (!degrees.length || degrees.includes(a.degree)) &&
     (!cats || cats.includes(a.category));
   const scanned = rank && year ? await withRowInfo((await rankScan(rank, year.year, window, exam, group ?? mineQ)).flatMap((g) => g.rows).filter(wanted), exam) : [];
   // Fee, stipend, bond, leaving and type filters on each allotment's course and quota (lib/term-filters.ts).
-  const { kept, unknown } = splitByTerms(scanned, tp.filters, (a) => a.fees, (a) => a.hospital?.type?.value);
+  // Every round's rows first (the By round line counts each), then the round picked.
+  const terms = splitByTerms(scanned, tp.filters, (a) => a.fees, (a) => a.hospital?.type?.value);
+  const inRound = <T extends { round: string }>(xs: T[]) => (round ? xs.filter((a) => a.round === round) : xs);
+  const [kept, unknown] = [inRound(terms.kept), inRound(terms.unknown)];
   type Row = (typeof kept)[number];
   const you = rank ? youMarks(kept, rank) : new Set<Row>();
   const page = Math.min(Math.max(1, Math.ceil(kept.length / pageSize)), f.page ?? 1);
@@ -121,6 +123,31 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const course = (a: Row) => courseOf.get(`${a.degree}|${a.specialty}`);
   const courseName = (a: Row) => `${a.degree} ${course(a)?.name ?? a.specialty}`;
   const youText = rank ? `Your rank, ${formatRank(rank)}, falls here` : "";
+  // Every round the year had, stray and special stray too, each with its count in this range (a stray round fills
+  // leftover seats, often at ranks far past R1 to R3's, so it may have none here: its allotments a tap away), then the
+  // latest year's next round when it has no result yet ("only up to Round 3" says why).
+  const notYet = year && year.year === meta.years[0]?.year && year.rounds.length ? E.rounds.find((r) => rounds.indexOf(r) > rounds.indexOf(year.rounds.at(-1)!)) : undefined;
+  const roundsLine =
+    year && rank ? (
+      <nav aria-label={`Rounds of ${yearWords}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span className="text-muted-foreground">By round:</span>
+        {round && <Link href={L.with(R, { round: null, page: null })} className={`${smallLink} text-sky`}>All rounds</Link>}
+        {year.rounds.map((rd) => {
+          const n = terms.kept.filter((a) => a.round === rd).length;
+          return n ? (
+            <Link key={rd} href={L.with(R, { round: rd, page: null })} aria-current={rd === round ? "true" : undefined} className={`${smallLink} ${rd === round ? "font-semibold" : "text-sky"}`}>
+              {roundOf(rd)} <span className="numeric ml-1">{formatRank(n)}</span><span className="sr-only"> allotments</span>
+            </Link>
+          ) : (
+            <span key={rd} className="inline-flex min-h-11 items-center gap-x-1">
+              {roundOf(rd)}: none in this range ·
+              <Link href={L.allotments({ year: year.year, round: rd })} className={`${smallLink} text-sky`}>its allotments</Link>
+            </span>
+          );
+        })}
+        {notYet && <span className="inline-flex min-h-11 items-center text-muted-foreground">{roundShort(notYet, exam)}: no {yearWords} result yet</span>}
+      </nav>
+    ) : null;
 
   return (
     <AppPage className="grid grid-cols-1 gap-3">
@@ -191,6 +218,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
             </AboutData>
             {groups.length > 0 && <ViewToggle page={VIEW} view={view} />}
           </div>
+          {roundsLine}
           {groups.length === 0 && (
             // The real controls: a wider range, every course, every seat category (her profile's are the default).
             <EmptyState title="No allotments in this range" description={`No seat ${cf.slugs ? "in your courses " : ""}was allotted to ranks ${formatRank(Math.max(1, rank - window))}–${formatRank(rank + window)} in ${yearWords}, or none passed the filters.`}>
