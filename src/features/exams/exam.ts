@@ -35,8 +35,8 @@ export type Exam = {
   roundNames?: Record<string, string>;
   /** From its data: the latest year whose counselling is complete (headlines: "Allotments 2025", "2025 deepest"). */
   headYear?: number;
-  /** A quota MCC words otherwise from year `from` on (display only; the data keeps `quota`): `before` up to then, `after` from it. */
-  quotaWords?: { quota: string; from: number; before: string; after: string }[];
+  /** A quota as MCC words it now, one name everywhere (display only; the data, filters and links keep the key). */
+  quotaNames?: Record<string, string>;
   /** Label typos in its bundle (a course or question group name), shown as `to` (display only). */
   typos?: [from: string, to: string][];
 };
@@ -115,10 +115,7 @@ export const headYearOf = (E: Pick<Exam, "headYear" | "pastYears">) => E.headYea
 /** A label with the exam's bundle typos tidied (Exam.typos; display only, the data as it is). */
 export const tidyLabel = (E: Pick<Exam, "typos">, s: string) => (E.typos ?? []).reduce((x, [from, to]) => x.split(from).join(to), s);
 /**
- * A quota as the exam's MCC PDFs word it, display only (filters, links and the data keep the key): Exam.quotaWords by
- * `year` (none: the latest wording), its typos tidied. NEET PG (neither): as it is.
+ * A quota as the exam's MCC words it, display only (filters, links and the data keep the key): Exam.quotaNames, one name
+ * in every year and on every page, else its typos tidied. NEET PG (neither): as it is.
  */
-export function quotaIn(E: Pick<Exam, "quotaWords" | "typos">, quota: string, year?: number) {
-  const w = E.quotaWords?.find((x) => x.quota === quota);
-  return w ? ((year ?? Infinity) >= w.from ? w.after : w.before) : tidyLabel(E, quota);
-}
+export const quotaIn = (E: Pick<Exam, "quotaNames" | "typos">, quota: string) => E.quotaNames?.[quota] ?? tidyLabel(E, quota);

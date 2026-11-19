@@ -61,6 +61,8 @@ export type FigureKind = "declared" | "maximum" | "minimum" | "nmc" | "published
 export type Figure = {
   inr: number; kind: FigureKind; src: number; min?: number; atAdmission?: true; above?: true; below?: true; plusDa?: true; note?: string; noteSrc?: number;
   declared?: number; nbems?: { inr: number; src: number };
+  /** Another exam: the record prices some subjects apart and this course isn't one of them, so it may differ ("may vary by subject"). */
+  varies?: true;
   /**
    * Read out of the MCC profile's own fee words (fee_parsed, a verbatim record): `quote` the exact words it stands in,
    * `field` the form field ("Year 2", "Annual fees"). The words stay one tap away ("see text").
@@ -845,7 +847,8 @@ function withFeeVariant(cat: Catalog, t: ProgrammeTerms, college: string, degree
   const norm = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
   const want = norm(`${degree} ${specialty}`);
   const hit = v.find((x) => norm(x.applies_to) === want) ?? v.find((x) => norm(x.applies_to).endsWith(norm(specialty)));
-  if (!hit) return t;
+  // Another exam: a figure for the programme where some subjects have their own says it may vary (NEET PG: as before).
+  if (!hit) return cat.exam === DEFAULT_EXAM ? t : { ...t, years: t.years.map((y) => (y.fee && y.fee.min == null ? { ...y, fee: { ...y.fee, varies: true as const } } : y)) };
   const years = t.years.map((y, i) => {
     const f = hit.per_year[i];
     if (!f || !y.fee) return y;

@@ -145,7 +145,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
     if (!shown) {
       landing.current = "/decide/options";
       navigating();
-      return router.push(`/decide/options?${profileToParams(p)}`);
+      return router.push(`/decide/options?${profileToParams(p, new URLSearchParams(ex === DEFAULT_EXAM ? "" : { exam: ex }))}`);
     }
     const next = profileToParams(p, new URLSearchParams(sp.toString()));
     next.delete("editProfile");
@@ -223,21 +223,31 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
   ]
     .map((sec) => ({ ...sec, items: sec.items.filter(shows) }))
     .filter((sec) => sec.items.length);
-  // Staff's exam switcher: ?exam= goes to /decide/exam (src/middleware.ts), which sets the seatora_exam cookie for staff
-  // only (app/decide/exam/route.ts). The URL's profile and page filters are this exam's: they go, and the next exam's
-  // saved profile comes in (none: none). A page that exam lacks opens Home; an institute page, the institutes (its slug
-  // may be another exam's).
+  // Staff's exam switcher, through /decide/exam (app/decide/exam/route.ts: the staff cookie, ?exam= in the URL for any
+  // exam but NEET PG, an institute the exam lacks → its institutes). The URL's profile and page filters are this exam's:
+  // they go, and the next exam's saved profile comes in (none: none). A page that exam lacks opens Home.
   const pickExam = (k: ExamKey) => {
     const saved = profileSchema.safeParse(readLocal<unknown>(scopedKey(PROFILE_KEY, k), null));
     const next = saved.success ? profileToParams(saved.data) : new URLSearchParams();
-    next.set("exam", k);
     const lacks = choices?.find((c) => c.key === k)?.lacks ?? [];
-    const path = pathname.startsWith("/decide/institutes/") ? "/decide/institutes" : lacks.includes(pathname) ? "/decide" : pathname;
+    const path = lacks.includes(pathname) ? "/decide" : pathname;
     navigating();
-    // A full load: the layout (this shell's exam, the dialog's courses, every saved store) is the next exam's too; a
-    // client navigation keeps the layout as it was.
-    location.replace(`${path}?${next}`);
+    // A full load (the layout: this shell's exam, the dialog's courses, every saved store, is the next exam's too), and a
+    // new history entry, so Back returns to this exam's page as it was.
+    location.assign(`/decide/exam?${new URLSearchParams({ k, next: `${path}${next.size ? `?${next}` : ""}` })}`);
   };
+  // Staff: the URL names the exam this shell shows. A client navigation whose link lost ?exam= gets it back (the page would
+  // read NEET PG's data under this exam's shell); one naming another exam is loaded whole.
+  useEffect(() => {
+    if (!choices) return;
+    const asked = sp.get("exam") ?? DEFAULT_EXAM;
+    if (asked === ex) return;
+    const next = new URLSearchParams(sp.toString());
+    if (!sp.has("exam")) {
+      next.set("exam", ex);
+      router.replace(`${pathname}?${next}`, { scroll: false });
+    } else location.assign(`${pathname}?${next}`);
+  }, [choices, sp, ex, pathname, router]);
 
   return (
     <>

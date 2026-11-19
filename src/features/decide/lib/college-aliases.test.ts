@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { iniCetIn, searchAlternatives, searchMatcher } from "./college-aliases";
+import { iniCetIn, iniWord, searchAlternatives, searchMatcher } from "./college-aliases";
 
 const kem = "Seth Gordhandas Sunderdas Medical College Maharashtra Mumbai, Acharya Donde Marg Parel MUMBAI, 400012 MD Radio-Diagnosis";
 
@@ -30,5 +30,21 @@ describe("college search", () => {
   it("names an INI-CET institute (not in MCC's lists)", () => {
     expect(iniCetIn("AIIMS Delhi")).toBe("AIIMS");
     expect(iniCetIn("maulana")).toBeNull();
+  });
+});
+
+describe("curated names (round 2)", () => {
+  const m = (q: string, name: string) => searchMatcher(q)!(name);
+  it("King Edward, IPGMER, RML / PGIMER Dr RML, MAIDS find their colleges", () => {
+    expect(m("King Edward", "Seth Gordhandas Sunderdas Medical College")).toBe(true);
+    expect(m("king edward memorial radio", "Seth Gordhandas Sunderdas Medical College radio")).toBe(true);
+    expect(m("IPGMER", "IPGME&R and SSKM Hospital Kolkata")).toBe(true);
+    expect(m("RML", "Atal Bihari Vajpayee Institute of Medical Sciences and Dr. RML Hospital")).toBe(true);
+    expect(m("PGIMER", "Atal Bihari Vajpayee Institute of Medical Sciences and Dr. RML Hospital")).toBe(true);
+    expect(m("MAIDS", "Maulana Azad Institute and Dental Science, New Delhi")).toBe(true);
+  });
+  it("INI institutes are named; PGIMER only as Chandigarh's", () => {
+    expect([iniCetIn("aiims delhi"), iniCetIn("JIPMER"), iniCetIn("nimhans"), iniCetIn("PGIMER Chandigarh"), iniCetIn("PGIMER"), iniCetIn("pgimer rml")]).toEqual(["AIIMS", "JIPMER", "NIMHANS", "PGIMER Chandigarh", null, null]);
+    expect([iniWord("neet-ss"), iniWord("neet-pg"), iniWord("neet-mds")]).toEqual(["INI-SS", "INI-CET", "INI-CET"]);
   });
 });

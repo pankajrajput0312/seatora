@@ -29,7 +29,7 @@ import { getDecideData, getMeta, listFees, type FeeSort } from "@/features/decid
 import { examProgrammes, programmes } from "@/features/decide/server/terms";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examGate } from "@/features/exams/active";
-import { DEFAULT_EXAM } from "@/features/exams/registry";
+import { DEFAULT_EXAM, exams } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Fees & bond" };
 const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
@@ -158,6 +158,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       <PageHead
         title="Fees, stipend and bond"
         about={
+          exam === DEFAULT_EXAM ? (
           <>
             <strong>Fee</strong>: a year (/yr; year 1&apos;s may be paid at admission), from the college&apos;s MCC profile (the table: years 1 to 3).
             &quot;At admission (Year 1)&quot;: MCC&apos;s form gives the amount paid at admission, and later years differ or are not stated. &quot;Up to ₹1.25 L&quot;: a DNB
@@ -175,6 +176,14 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             (the filters count it as not published).
             <br />Sorting: — and figures without a number go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
           </>
+          ) : (
+            <>
+              <strong>Fee</strong>: a year (/yr; year 1&apos;s may be paid at admission), as the college declared it on its MCC institute profile ({exams[exam].label}). &quot;Varies by subject&quot;, &quot;On college website&quot;, &quot;Not stated&quot;: the profile gives no one figure for these seats; its words are in the (i).
+              <br /><strong>Stipend</strong>: a month (/mo), as declared.
+              <br /><strong>Bond</strong>: from MCC&apos;s institute list; a bond document Seatora has not read yet is &quot;not checked&quot;. MCC&apos;s Round 2 forfeit is on each institute&apos;s Fees tab.
+              <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. Sorting: — and figures without a number go last either way.
+            </>
+          )
         }
       >
         — means none published.

@@ -18,6 +18,27 @@ export const rankValue = z.preprocess(
   z.coerce.number({ error: "Enter a rank from 1 to 3,00,000, e.g. 42,284" }).int().min(1).max(300000),
 );
 
+/**
+ * A rank typed into a range filter: "40,000", "40k", "4.5L" / "4.5 lakh" (a whole rank, 1 or more). Null when empty;
+ * "bad" when it is no rank (negative, zero, words).
+ */
+export function rankText(v: string | undefined): number | null | "bad" {
+  const t = (v ?? "").trim().toLowerCase().replace(/[,\s]/g, "");
+  if (!t) return null;
+  const m = /^(\d+(?:\.\d+)?)(k|l|lakh|lac|lakhs)?$/.exec(t);
+  if (!m) return "bad";
+  const n = Math.round(Number(m[1]) * (m[2] === "k" ? 1e3 : m[2] ? 1e5 : 1));
+  return n >= 1 ? n : "bad";
+}
+/** A closing-rank range from two typed ends: each read by rankText, swapped when typed the wrong way round (`swapped`). */
+export function rankRange(from: string | undefined, to: string | undefined) {
+  const [a, b] = [rankText(from), rankText(to)];
+  const bad = [a === "bad" && from, b === "bad" && to].filter((x): x is string => !!x);
+  const [min, max] = [a === "bad" ? null : a, b === "bad" ? null : b];
+  const swapped = min != null && max != null && min > max;
+  return { min: (swapped ? max : min) ?? undefined, max: (swapped ? min : max) ?? undefined, swapped, bad };
+}
+
 /** 1-based page number for server-side pagination. */
 export const pageValue = z.coerce.number().int().min(1).max(100000);
 

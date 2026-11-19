@@ -533,6 +533,9 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     noState,
     /** Options this view would show but for a filtered fee, stipend, bond or leaving value that is not declared (nd=keep adds them). */
     unknownTerms: open(inView([...labelledUnknown, ...freshUnknown.filter(text).map(asNew)]).filter(inReach)).length,
+    // Another exam: options in her profile (and search) whose declared figure fails her caps or the term filters, so
+    // a cap never empties the list unsaid (NEET PG's answer is as before).
+    ...(cat.exam !== DEFAULT_EXAM && { capped: tf && anyTermFilter(tf) ? cat.options.filter((o) => inProfile(cat, o, profile) && text(o)).length - opts.length - unknownOpts.length : 0 }),
     hiddenClosed: hidden.length,
     /** Of the hidden ones, those whose label rests on the provisional latest round alone. */
     hiddenProvisional: hidden.filter((r) => r.provisional).length,

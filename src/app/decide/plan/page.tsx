@@ -43,10 +43,13 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
           Create a free account to use the planner, or <Link href={`/login?${new URLSearchParams({ next: PATH })}`} className="text-sky underline">sign in</Link>.
         </p>
       )}
-      <section data-placement="plan_page" aria-labelledby="plans-h" className="grid gap-3">
-        <h2 id="plans-h" className="text-lg font-semibold">Plans</h2>
-        <PlanCards coupon={coupon} />
-      </section>
+      {/* Staff have no limits: the plans' limits ("200 residents searches a day") would contradict it. */}
+      {!eff?.staff && (
+        <section data-placement="plan_page" aria-labelledby="plans-h" className="grid gap-3">
+          <h2 id="plans-h" className="text-lg font-semibold">Plans</h2>
+          <PlanCards coupon={coupon} />
+        </section>
+      )}
       <Link href="/decide/refer" className={`${smallLink} text-sm text-sky`}>
         Refer a friend: {REFERRAL_PERCENT}% off for them, {REFERRAL_PERCENT}% for you
       </Link>

@@ -32,9 +32,16 @@ const ALIASES: Record<string, string[]> = {
   sgpgi: ["sanjay gandhi post"],
   sgpgims: ["sanjay gandhi post"],
   tmc: ["tata memorial", "thanjavur medical"],
+  ipgmer: ["ipgme&r"], // IPGME&R and SSKM Hospital, Kolkata
+  ipgme: ["ipgme&r"],
+  rml: ["atal bihari vajpayee institute"], // ABVIMS and Dr. RML Hospital, Delhi (once PGIMER Dr RML); the name has "RML" too
+  pgimer: ["atal bihari vajpayee institute"], // PGIMER Dr RML, Delhi (PGIMER Chandigarh is INI-CET's)
+  maids: ["maulana azad institute"], // Maulana Azad Institute of Dental Sciences, Delhi (NEET MDS)
 };
+/** Names of more than one word people type for a short name ("King Edward" for KEM). */
+const PHRASES: [RegExp, string][] = [[/\bking\s+edward(\s+memorial)?\b/g, "kem"]];
 
-/** Admitted through INI-CET, not MCC's NEET PG counselling, so in none of MCC's lists in the data. */
+/** Admitted through INI-CET (INI-SS for super-speciality), not MCC's counselling, so in none of MCC's lists in the data. PGIMER: Chandigarh's (Delhi's, Dr RML, is MCC's). */
 const INI_CET = new Set(["aiims", "jipmer", "pgimer", "nimhans", "sctimst"]);
 
 /**
@@ -42,7 +49,7 @@ const INI_CET = new Set(["aiims", "jipmer", "pgimer", "nimhans", "sctimst"]);
  * replaced by the words it stands for ("kem radio" → [kem, radio] or [gordhandas, sunderdas, radio]). Lowercase.
  */
 export function searchAlternatives(q: string | undefined): string[][] {
-  const words = q?.toLowerCase().split(/[\s,]+/).filter(Boolean) ?? [];
+  const words = PHRASES.reduce((x, [re, to]) => x.replace(re, to), q?.toLowerCase() ?? "").split(/[\s,]+/).filter(Boolean);
   let alts: string[][] = [[]];
   for (const w of words) {
     const as = [w, ...(ALIASES[w] ?? [])].map((a) => a.split(/\s+/));
@@ -62,4 +69,10 @@ export function searchMatcher(q: string | undefined): ((text: string) => boolean
 }
 
 /** The INI-CET institute a search names ("AIIMS"), if any: the empty state says why it is not here. */
-export const iniCetIn = (q: string | undefined) => q?.toLowerCase().split(/[\s,]+/).find((w) => INI_CET.has(w))?.toUpperCase() ?? null;
+export const iniCetIn = (q: string | undefined) => {
+  const words = q?.toLowerCase().split(/[\s,]+/) ?? [];
+  const w = words.find((x) => INI_CET.has(x) && (x !== "pgimer" || words.includes("chandigarh")));
+  return w ? (w === "pgimer" ? "PGIMER Chandigarh" : w.toUpperCase()) : null;
+};
+/** What admits the institute `iniCetIn` names for this exam instead of MCC: INI-SS for NEET SS, else INI-CET. */
+export const iniWord = (exam: string) => (exam === "neet-ss" ? "INI-SS" : "INI-CET");

@@ -145,7 +145,7 @@ describe("from the data: round names, the complete year, quota words (exams/exam
   });
   it("quota and group words as MCC prints them, display only; NEET PG's as they are", () => {
     const mds = exams["neet-mds"];
-    expect([quotaIn(mds, "Deemed/Paid Seats", 2025), quotaIn(mds, "Deemed/Paid Seats", 2026), quotaIn(mds, "Deemed/Paid Seats"), quotaIn(mds, "All India")]).toEqual(["Management/Paid Seats", "Self-Financed Merit Seat", "Self-Financed Merit Seat", "All India"]);
+    expect([quotaIn(mds, "Deemed/Paid Seats"), quotaIn(mds, "All India")]).toEqual(["Self-Financed Merit Seat", "All India"]);
     expect(quotaIn(exams["neet-ss"], "All India (Ent Group)")).toBe("All India (ENT Group)");
     expect(tidyLabel(exams["neet-ss"], "Plastic and Reconstructructive Surgery")).toBe("Plastic and Reconstructive Surgery");
     expect(tidyLabel(neetPg, "Plastic and Reconstructructive Surgery")).toBe("Plastic and Reconstructructive Surgery");

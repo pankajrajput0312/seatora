@@ -11,6 +11,8 @@ import { useChoicesFor, useDecideLinks, useExam, useExamInfo, useSavedProfile } 
 import { profileFromParams } from "../profile";
 import { navigating } from "./nav-pending";
 import { EmptyState, smallLink, StatCell } from "./ui";
+import { otherGroupItems } from "../lib/choices";
+import { groupsIn, quotaIn } from "@/features/exams/exam";
 
 /**
  * The saved profile, for a page the server rendered without one (the shell then puts it into the address, and the
@@ -69,6 +71,8 @@ export function GroupPrompt() {
  */
 export function SetupCard() {
   const [saved, hydrated] = useSavedForPrompt();
+  const L = useDecideLinks();
+  const exam = useSearchParams().get("exam");
   const steps = useExamInfo().perGroup ? ["Rank and question group", "Courses"] : STEPS;
   if (!hydrated || saved) return <p role="status" className="text-body text-muted-foreground">Loading your saved rank and courses…</p>;
   return (
@@ -83,7 +87,7 @@ export function SetupCard() {
           </li>
         ))}
       </ol>
-      <Button asChild size="lg" className="mt-4 min-h-11 max-sm:w-full"><Link href="/decide?editProfile=1">Set your rank</Link></Button>
+      <Button asChild size="lg" className="mt-4 min-h-11 max-sm:w-full"><Link href={exam ? L.to("/decide", { editProfile: 1 }) : "/decide?editProfile=1"}>Set your rank</Link></Button>
     </section>
   );
 }
@@ -113,6 +117,10 @@ export function TopChoices({ nextRound }: { nextRound?: string | null }) {
   const L = useDecideLinks();
   const list = state.lists.find((l) => l.id === state.activeId) ?? state.lists[0];
   const top = list.items.slice(0, 5);
+  // NEET SS: a choice of another question group than hers is flagged (her rank isn't one there).
+  const E = useExamInfo();
+  const sp = useSearchParams();
+  const others = new Set(otherGroupItems(top, E.perGroup ? groupsIn(E, profileFromParams(new URLSearchParams(sp.toString()))?.quotas ?? []) : []));
   return (
     <section aria-labelledby="top-choices" className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-baseline justify-between gap-3">
@@ -132,7 +140,8 @@ export function TopChoices({ nextRound }: { nextRound?: string | null }) {
               <span className="numeric w-6 text-right text-sm font-bold">{i + 1}</span>
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium">{c.institute}</span>
-                <span className="block text-xs text-muted-foreground">{c.course}, {c.quota}</span>
+                <span className="block text-xs text-muted-foreground">{c.course}, {quotaIn(E, c.quota)}</span>
+                {others.has(c) && <span className="mt-0.5 block text-xs font-medium text-sun">Another question group: your rank isn&apos;t one there</span>}
               </span>
             </li>
           ))}

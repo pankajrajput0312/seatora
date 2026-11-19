@@ -20,7 +20,7 @@ import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { GroupPrompt } from "@/features/decide/components/dashboard-parts";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
-import { iniCetIn } from "@/features/decide/lib/college-aliases";
+import { iniCetIn, iniWord } from "@/features/decide/lib/college-aliases";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -143,6 +143,26 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/options", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
   const clearAll = here({ q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, sort: null, ...(perGroup(exam) ? {} : { quota: null }), st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
+  // Another exam (most of its MCC profiles give no fee figure): a cap never empties the list unsaid.
+  const capped = "capped" in r ? (r.capped ?? 0) : 0;
+  const caps = [profile.maxFeeLakh != null && tp.maxfee == null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && tp.bondyrs == null && termValueLabel.bondyrs(profile.maxBondYears)].filter(Boolean).join(", ");
+  const capWords = caps ? `your cap (${caps})` : "the fee, stipend, bond or type filters";
+  const capNote = exam !== DEFAULT_EXAM && (capped > 0 || r.unknownTerms > 0) && (
+    <p role="status" className="flex flex-wrap items-center gap-x-3 rounded-md border border-sun/40 bg-sun/10 px-3 py-2 text-sm">
+      {capped > 0 && (
+        <span>
+          <span className="numeric font-semibold">{formatRank(capped)}</span> {capped === 1 ? "option" : "options"} in your profile hidden by {capWords}.{" "}
+          <Link href={here({ fee: null, bond: null, maxfee: "any", bondyrs: "any", ctype: null, minstip: null, maxbond: null, maxleave: null })} className={`${smallLink} text-sky`}>Show them</Link>
+        </span>
+      )}
+      {r.unknownTerms > 0 && (
+        <span>
+          <span className="numeric font-semibold">{formatRank(r.unknownTerms)}</span> more with no published figure for {capWords}.{" "}
+          <Link href={here({ nd: "keep" })} className={`${smallLink} text-sky`}>Include not published</Link>
+        </span>
+      )}
+    </p>
+  );
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const n = (x: number) => <span className="numeric font-semibold">{formatRank(x)}</span>;
@@ -297,6 +317,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         <ToolbarCount total={r.total} noun="options" />
       </FilterForm>
       <ActiveFilters items={active} clear={clearAll} />
+      {/* Another exam: what her fee / bond cap (or a term filter) hides is said up front, with the way back. */}
+      {capNote}
 
       {/* One row that scrolls sideways (never wraps), the closed-before toggle its last chip. */}
       <nav aria-label="Filter by reach" className="chip-row flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] *:shrink-0 *:whitespace-nowrap">
@@ -370,7 +392,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       ) : (
         <EmptyState
           title="No options match"
-          description={iniCetIn(f.q) ? `${iniCetIn(f.q)} admits through INI-CET, not MCC's NEET PG counselling, so it is not in MCC's data.` : `${f.q ? `Nothing here matches “${f.q}”. ` : ""}Clear the search, the label and the Filters sheet's page filters, or add courses, quotas or states in your profile (Edit beside your rank).`}
+          description={iniCetIn(f.q) ? `${iniCetIn(f.q)} admits through ${iniWord(exam)}, not MCC's ${E.label} counselling, so it is not in MCC's data.` : `${f.q ? `Nothing here matches “${f.q}”. ` : ""}Clear the search, the label and the Filters sheet's page filters, or add courses, quotas or states in your profile (Edit beside your rank).${exam !== DEFAULT_EXAM && capped + r.unknownTerms > 0 ? ` ${formatRank(capped + r.unknownTerms)} are hidden by ${capWords} (above).` : ""}`}
         >
           <span className="flex flex-wrap justify-center gap-x-6">
             <Link href={here({ q: null, reach: null, closed: "1", seats: roundView ? "all" : null, ...Object.fromEntries(termKeys.map((k) => [k, null])) })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Clear search and page filters</Link>
@@ -392,7 +414,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           {n(r.noState)} more with {round} seats left out by the state filter: no state in Decide&apos;s data.
         </p>
       )}
-      {r.unknownTerms > 0 && (
+      {r.unknownTerms > 0 && exam === DEFAULT_EXAM && (
         <p className="text-sm text-muted-foreground">
           {n(r.unknownTerms)} more left out: no published figure for a filtered fee, stipend, bond or leaving penalty.{" "}
           <Link href={here({ nd: "keep" })} className={`${smallLink} text-sky`}>Include them</Link>

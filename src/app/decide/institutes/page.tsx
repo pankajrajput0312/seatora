@@ -28,6 +28,7 @@ import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { headYearIn, latestOf } from "@/features/exams/registry";
 import { quotaIn } from "@/features/exams/exam";
+import { iniCetIn, iniWord } from "@/features/decide/lib/college-aliases";
 
 export const metadata: Metadata = { title: "Institutes" };
 const PAGE_SIZE = 24; // splits evenly into 2, 3 and 4 columns; small enough for a phone to paint fast
@@ -163,7 +164,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
             return (
               <tr key={r.college.key} className={tbl.row}>
                 <th scope="row" className={`${tbl.td} sticky left-0 z-[1] min-w-56 max-w-80 border-r border-border bg-card text-left font-medium ${tbl.pin}`}>
-                  <Link href={L.institute(r.college.slug)} title={r.college.name} className={`hover:text-sky hover:underline ${tbl.clamp}`}>{r.college.name}</Link>
+                  <Link href={L.institute(r.college.slug)} title={r.college.name} className={`wrap-anywhere hover:text-sky hover:underline ${tbl.clamp}`}>{r.college.name}</Link>
                 </th>
                 <td className={tbl.td}>{r.college.state ?? <Dash />}</td>
                 <td className={`${tbl.td} whitespace-nowrap`}>{h?.type ? <TypeBadge type={h.type} of={r.college.name} /> : <Dash />}</td>
@@ -225,6 +226,8 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
       </div>
       </div>
 
+      {/* A search naming an INI institute (AIIMS, JIPMER, NIMHANS, PGIMER Chandigarh): why it isn't here, every exam. */}
+      {iniCetIn(f.q) && <p role="note" className="text-sm text-muted-foreground">{iniCetIn(f.q)} admits through {iniWord(exam)}, not MCC&apos;s {E.label} counselling, so it is not in MCC&apos;s data.</p>}
       {res.total === 0 ? <EmptyState title="No institutes match these filters." href={L.to(PATH, { maxfee: "any", bondyrs: "any" })} /> : <ViewPanes page="institutes" view={view} cards={cards} table={table} />}
 
       <Pager page={res.page} pageSize={res.pageSize} total={res.total} href={(n) => L.page(PATH, n)} focusId="results" label="Institutes" />

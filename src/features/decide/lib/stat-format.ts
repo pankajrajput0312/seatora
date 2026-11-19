@@ -252,7 +252,7 @@ function feeCell(t: ProgrammeTerms): StatCell {
     ...c,
     short: (f.kind === "maximum" ? "≤ " : "") + v + per,
     full: (f.kind === "maximum" ? "Up to " : "") + v + per,
-    marker: f.min != null ? RANGE_HINT : null, tone: null, tip,
+    marker: f.min != null ? RANGE_HINT : f.varies ? "may vary by subject" : null, tone: null, tip,
   };
   const [low, high] = FEE_BANDS[t.programme as keyof typeof FEE_BANDS] ?? [];
   if (f.kind === "maximum" || basis === "admission" || low == null) return cell;

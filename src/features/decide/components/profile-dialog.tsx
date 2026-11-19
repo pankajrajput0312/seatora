@@ -240,6 +240,13 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
         onChange={pickSpecialties}
       />
       {find.trim() && !meta.specialties.some((sp) => matchesSpecialty(find, sp.name)) && <p role="status" className="text-sm text-muted-foreground">No specialty matches “{find.trim()}”.</p>}
+      {/* NEET SS: a course typed that only another question group has says which group (her rank is her group's). */}
+      {grouped && find.trim() && (() => {
+        const elsewhere = meta.specialties.filter((sp) => matchesSpecialty(find, sp.name) && !offered(sp.code).length);
+        const groupsOfCode = (code: string) => Object.entries(meta.groupCourses ?? {}).filter(([, cs]) => cs.some((c) => c.endsWith(`~${code}`))).map(([g]) => tidyLabel(E, g));
+        const lines = elsewhere.flatMap((sp) => (groupsOfCode(sp.code).length ? [`${sp.name} is in the ${groupsOfCode(sp.code).join(" and the ")}`] : [])).slice(0, 3);
+        return lines.length > 0 && <p role="status" className="text-sm text-muted-foreground">{lines.join("; ")}{group ? `, not your ${tidyLabel(E, group)}` : ""}.</p>;
+      })()}
       {Object.keys(picked).length ? (
         <fieldset>
           <legend className="text-sm font-medium">Degrees</legend>

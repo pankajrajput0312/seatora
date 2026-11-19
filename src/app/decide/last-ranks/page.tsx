@@ -19,7 +19,7 @@ import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
-import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
+import { pageValue, parseSearchParams, rankRange } from "@/features/decide/lib/params";
 import { statKeys } from "@/features/decide/lib/stat-format";
 import { anyTermFilter, readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, profileQuotas, toURLSearchParams } from "@/features/decide/profile";
@@ -58,10 +58,6 @@ const schema = z.object({
   page: pageValue.optional(),
 });
 
-const rankNumber = (v?: string) => {
-  const n = Number((v ?? "").replace(/[^\d]/g, ""));
-  return Number.isInteger(n) && n > 0 ? n : undefined;
-};
 
 type Col = { year: number; rounds: Round[]; provisional: boolean };
 
@@ -169,7 +165,9 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   // The closing-rank filter: a typed range, else her rank's preset (the profile's AIR). NEET SS: her rank compares only
   // with her question group's quotas, so with another group's (or every quota) there is no "would have got".
   const myRank = !perGroup(exam) || (quotas?.length && quotas.every((q) => mineQ.includes(q))) ? profile?.rank : undefined;
-  const rmin = rankNumber(f.rmin), rmax = rankNumber(f.rmax);
+  // Typed ends read as people type them (40,000, 40k, 4.5L), swapped when reversed; what isn't a rank is said and ignored.
+  const range = rankRange(f.rmin, f.rmax);
+  const { min: rmin, max: rmax } = range;
   const closing = rmin || rmax ? { min: rmin, max: rmax } : myRank && f.rk === "reached" ? { min: myRank } : myRank && f.rk === "near" ? { min: Math.round(myRank * 0.9), max: Math.round(myRank * 1.1) } : undefined;
   const closingLabel = !closing ? null
     : rmin || rmax ? `Closing ${rmin && rmax ? `${formatRank(rmin)}–${formatRank(rmax)}` : rmin ? `${formatRank(rmin)} or later` : `up to ${formatRank(rmax!)}`}`
@@ -329,12 +327,18 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
             <Select name="rk" value={f.rk} all="Any closing rank" options={[{ value: "reached", label: `Would have got ${E.rankWord} ${formatRank(myRank)}` }, { value: "near", label: `Near ${E.rankWord} ${formatRank(myRank)} (±10%)` }]} />
           </Field>
         )}
-        <Field label="Closing rank from"><input name="rmin" inputMode="numeric" defaultValue={f.rmin ?? ""} placeholder={exam === DEFAULT_EXAM ? "e.g. 40,000" : `e.g. ${E.exampleRank}`} className={`${control} numeric`} /></Field>
-        <Field label="Closing rank to"><input name="rmax" inputMode="numeric" defaultValue={f.rmax ?? ""} placeholder="e.g. 60,000" className={`${control} numeric`} /></Field>
+        <Field label="Closing rank from"><input name="rmin" defaultValue={f.rmin ?? ""} placeholder={exam === DEFAULT_EXAM ? "e.g. 40,000 or 40k" : `e.g. ${E.exampleRank}`} className={`${control} numeric`} /></Field>
+        <Field label="Closing rank to"><input name="rmax" defaultValue={f.rmax ?? ""} placeholder={exam === DEFAULT_EXAM ? "e.g. 60,000 or 0.6L" : "e.g. 5k"} className={`${control} numeric`} /></Field>
         <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
         {E.has.fees && <TermFilterControls f={tp.params} caps={profile} />}
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
+      {(range.swapped || range.bad.length > 0) && (
+        <p role="status" className="text-sm text-sun">
+          {range.bad.length > 0 && <>“{range.bad.join("”, “")}” isn&apos;t a rank (a whole number from 1, or 40k / 4.5L), so it was left out. </>}
+          {range.swapped && "The closing-rank range was the wrong way round, so it reads from the lower to the higher."}
+        </p>
+      )}
 
       {inst && at < 0 && (
         <p className="rounded-lg border border-border bg-card px-4 py-2 text-sm">

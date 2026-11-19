@@ -216,7 +216,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                     <th key={k} rowSpan={2} scope="col" data-col={k} className={cn(th, "text-right")} aria-sort={(sort === "fee" && k === "fee") || (sort === "bond" && k === "bond") ? "ascending" : undefined}>{statLabel[k]}</th>
                   ))}
                   {groups.map((g) => (
-                    <th key={g.key} colSpan={2} scope="colgroup" data-col={g.key} className={cn(th, "border-l border-border text-center")}>{g.label} seats</th>
+                    <th key={g.key} colSpan={g.virtual ? 2 : 1} scope="colgroup" data-col={g.key} className={cn(th, "border-l border-border text-center")}>{g.label} seats</th>
                   ))}
                   {E.has.beds && (
                     <th rowSpan={2} scope="col" data-col="beds" className={cn(th, "text-right")} title={SELF_REPORTED}>
@@ -232,7 +232,8 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                   {groups.map((g) => (
                     <Fragment key={g.key}>
                       <th scope="col" data-col={g.key} className={cn(th, "border-l border-border text-right")} aria-sort={g.clear?.key === firstClear ? sorted("seats", "descending") : undefined}><span className="sr-only">{g.label} </span>Clear</th>
-                      <th scope="col" data-col={g.key} className={cn(th, "text-right")}><span className="sr-only">{g.label} </span>Virtual</th>
+                      {/* A round with no virtual vacancy list has no Virtual column. */}
+                      {g.virtual && <th scope="col" data-col={g.key} className={cn(th, "text-right")}><span className="sr-only">{g.label} </span>Virtual</th>}
                     </Fragment>
                   ))}
                   {years.map((y) =>
@@ -270,7 +271,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                       </th>
                       <td data-col="course" className={td}>{courseOf(r)}</td>
                       <td data-col="quota" className={td}>
-                        {r.quota ?? "Not printed"}
+                        {r.quota != null ? quotaIn(E, r.quota) : "Not printed"}
                         {r.quota != null && isRestricted(E, r.quota) && <Badge tone="warning" className="mt-1">Restricted</Badge>}
                       </td>
                       <td data-col="category" className={cn(td, "whitespace-nowrap")}>{r.category}</td>
@@ -281,7 +282,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                             {g.clear && r.byList[g.clear.key] != null ? <span className="font-semibold text-leaf">{formatRank(r.byList[g.clear.key])}</span> : <Dash />}
                             <AddedBadges r={r} added={g.added} />
                           </td>
-                          <td data-col={g.key} className={num}>{g.virtual && r.byList[g.virtual.key] != null ? <span className="font-semibold text-sun">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>
+                          {g.virtual && <td data-col={g.key} className={num}>{r.byList[g.virtual.key] != null ? <span className="font-semibold text-sun">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>}
                         </Fragment>
                       ))}
                       {E.has.beds && (
@@ -373,7 +374,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
               </section>
 
               <section aria-labelledby="row-closing" className="grid gap-2">
-                <h3 id="row-closing" className="font-semibold">Closing ranks on {r.quota ?? "this quota"}, {r.category} seats</h3>
+                <h3 id="row-closing" className="font-semibold">Closing ranks on {r.quota != null ? quotaIn(E, r.quota) : "this quota"}, {r.category} seats</h3>
                 <p className="text-xs text-muted-foreground">The highest {E.rankName} MCC allotted in that round; allotments made in brackets (not seats). Each round links its MCC result PDF. {LATER_ROUNDS_NOTE}</p>
                 <div className="overflow-x-auto overflow-y-hidden">
                   <table className="text-sm">

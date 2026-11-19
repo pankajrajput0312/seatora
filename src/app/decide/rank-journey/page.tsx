@@ -176,7 +176,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
                           </span>
                           <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                             {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.collegeName} />}
-                            <span><QuotaName quota={a.quota} year={a.year} /> · Seat: {a.category}{a.candidateCategory && ` · Candidate: ${a.candidateCategory}`}</span>
+                            <span><QuotaName quota={a.quota} /> · Seat: {a.category}{a.candidateCategory && ` · Candidate: ${a.candidateCategory}`}</span>
                           </span>
                         </td>
                         <td className={`${td} min-w-36 max-w-60`}>

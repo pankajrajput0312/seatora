@@ -203,9 +203,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                       <span>
                         <Link href={L.institute(r.college.slug)} className="hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
                         {/* The quota is the first row; screen readers hear it with each cell's column name. */}
-                        <span className="block text-xs font-normal text-muted-foreground">{courseName(r)}<span className="sr-only">, {r.quota}</span></span>
+                        <span className="block text-xs font-normal text-muted-foreground">{courseName(r)}<span className="sr-only">, {quotaIn(E, r.quota)}</span></span>
                       </span>
-                      <RemoveFromCompare id={r.id} label={`${r.college.name}, ${courseName(r)}, ${r.quota}`} nextFocus={options[i + 1]?.id ?? options[i - 1]?.id ?? null} />
+                      <RemoveFromCompare id={r.id} label={`${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} nextFocus={options[i + 1]?.id ?? options[i - 1]?.id ?? null} />
                     </div>
                   </th>
                 ))}

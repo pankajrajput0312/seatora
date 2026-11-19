@@ -55,7 +55,7 @@ export function SeatsLink({ n, list, L, at, name, end }: { n: number | null | un
   if (n == null) return <Dash />;
   return (
     <Link href={L.seats({ list: list.key, ...at })} className={`${smallLink} numeric min-w-11 font-semibold ${seatKindClass[list.kind]} ${end ? "justify-end" : ""}`}>
-      {formatRank(n)}<span className="sr-only"> seats in the {list.year} <RoundName year={list.year} round={list.round} /> {seatKindLabel[list.kind].toLowerCase()} list: {name}</span>
+      {formatRank(n)}<span className="sr-only"> {n === 1 ? "seat" : "seats"} in the {list.year} <RoundName year={list.year} round={list.round} /> {seatKindLabel[list.kind].toLowerCase()} list: {name}</span>
     </Link>
   );
 }

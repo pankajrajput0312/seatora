@@ -11,6 +11,7 @@ import { ScrollTable } from "../scroll-table";
 import { smallLink, tbl } from "../ui";
 import { reportedCount, SELF_REPORTED, sourceName, ValueSource } from "./hospital-bits";
 import type { AllotmentMix, ClinicalAt, ValueMeta } from "./institute-data";
+import { QuotaName } from "../round-name";
 
 // Institute page parts (src/app/decide/institutes/[slug]), server-rendered.
 
@@ -56,7 +57,7 @@ export function CollegeSeatTable({ rows, caption }: { rows: SeatRow[]; caption: 
           {rows.map((r, i) => (
             <tr key={i} className={tbl.row}>
               <th scope="row" className={cn(td, "text-left font-medium")}>{r.degree} {r.course?.name ?? r.specialty}</th>
-              <td className={td}>{r.quota ?? <Dash />}</td>
+              <td className={td}>{r.quota ? <QuotaName quota={r.quota} /> : <Dash />}</td>
               <td className={td}>{r.category}</td>
               <td className={cn(tbl.num, "px-3 max-sm:px-2 md:px-4")}>{formatRank(r.seats)}</td>
             </tr>
@@ -94,7 +95,7 @@ export function AllotmentMixTable({ mix, name }: { mix: AllotmentMix; name: stri
           <tbody key={g.quota}>
             <tr className="border-b border-border bg-muted/40">
               {/* The row-wide cell can't pin, its words can: they stay at the left edge as the grid scrolls. */}
-              <th scope="rowgroup" colSpan={mix.columns.length + 1} className={cn(cell, "text-left text-xs font-semibold text-muted-foreground")}><span className="sticky left-2 inline-block">{g.quota}</span></th>
+              <th scope="rowgroup" colSpan={mix.columns.length + 1} className={cn(cell, "text-left text-xs font-semibold text-muted-foreground")}><span className="sticky left-2 inline-block"><QuotaName quota={g.quota} /></span></th>
             </tr>
             {g.rows.map((r) => (
               <tr key={r.category} className={tbl.row}>

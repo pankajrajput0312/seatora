@@ -27,18 +27,32 @@ describe("middleware: seatora_aid", () => {
   });
 });
 
-describe("middleware: ?exam= never sets the exam cookie", () => {
-  it("sends a Decide page with ?exam= to /decide/exam, the page without it as next; no seatora_exam for anyone", async () => {
-    const res = await visit({ "user-agent": chrome, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA" }, "/decide/options?rank=500&exam=neet-ss&sp=X");
+describe("middleware: the URL's ?exam=", () => {
+  const ua = { "user-agent": chrome };
+  const header = (res: Response) => res.headers.get("x-middleware-request-x-seatora-exam");
+  it("without the staff cookie: to /decide/exam with the page as asked; no exam cookie set, no exam header", async () => {
+    const res = await visit({ ...ua, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA" }, "/decide/options?rank=500&exam=neet-ss&sp=X");
     expect(res.status).toBe(307);
-    const to = new URL(res.headers.get("location")!);
+    const to = new URL(res.headers.get("location")!, "http://test");
     expect(to.pathname).toBe("/decide/exam");
-    expect(Object.fromEntries(to.searchParams)).toEqual({ k: "neet-ss", next: "/decide/options?rank=500&sp=X" });
-    expect(res.cookies.get("seatora_exam")).toBeUndefined();
+    expect(Object.fromEntries(to.searchParams)).toEqual({ k: "neet-ss", next: "/decide/options?rank=500&exam=neet-ss&sp=X" });
     expect(res.headers.get("set-cookie") ?? "").not.toMatch(/seatora_exam/);
-    // without ?exam=, as before (the gate: off in tests)
-    const plain = await visit({ "user-agent": chrome, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA" }, "/decide/options?rank=500");
-    expect(plain.headers.get("location")).toBeNull();
-    expect(plain.headers.get("set-cookie") ?? "").not.toMatch(/seatora_exam/);
+    // an exam that isn't one goes there too, even with the cookie
+    expect((await visit({ ...ua, cookie: "seatora_exam=neet-ss" }, "/decide?exam=nope")).status).toBe(307);
+  });
+  it("with it: on to the page, the exam handed over as a header; the cookie follows the URL's exam", async () => {
+    const res = await visit({ ...ua, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA; seatora_exam=neet-mds" }, "/decide/options?rank=500&exam=neet-ss");
+    expect(res.headers.get("location")).toBeNull();
+    expect(header(res)).toBe("neet-ss");
+    expect(res.cookies.get("seatora_exam")?.value).toBe("neet-ss");
+    // the same exam: no cookie written
+    const same = await visit({ ...ua, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA; seatora_exam=neet-ss" }, "/decide/seats?exam=neet-ss");
+    expect([header(same), same.headers.get("set-cookie")]).toEqual(["neet-ss", null]);
+  });
+  it("no ?exam=: no exam header, whatever the request sent or the cookie says (NEET PG)", async () => {
+    const res = await visit({ ...ua, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA; seatora_exam=neet-ss", "x-seatora-exam": "neet-ss" }, "/decide/options?rank=500");
+    expect(res.headers.get("location")).toBeNull();
+    expect(header(res)).toBeNull();
+    expect(res.headers.get("set-cookie") ?? "").not.toMatch(/seatora_exam/);
   });
 });

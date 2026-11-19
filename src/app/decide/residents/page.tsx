@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { siteConfig } from "@/config/site";
@@ -151,14 +152,20 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
       <div className={toolbarRow}>
         {/* Phones: the toolbar says the count; this line is for md up (and the focus after a page or a removed chip). */}
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground max-md:sr-only">
-          <span className="numeric font-semibold text-foreground">{formatRank(total)}</span> residents
+          <span className="numeric font-semibold text-foreground">{formatRank(total)}</span> {total === 1 ? "resident" : "residents"}
         </p>
         {total > 0 && <ViewToggle page="residents" view={view} />}
       </div>
       </div>
 
       {total === 0 ? (
-        <EmptyState title="No residents match these filters" description={emptyWhy} href={clear} action="Clear filters" />
+        // Clear filters keeps the name searched for; a name not found in her courses may be in another.
+        <EmptyState title="No residents match these filters" description={emptyWhy}>
+          <span className="flex flex-wrap justify-center gap-x-6">
+            {query.q && inCourses && <Link href={here({ course: "all", page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Search all courses</Link>}
+            <Link href={L.to("/decide/residents", { course: "all", q: query.q })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Clear filters</Link>
+          </span>
+        </EmptyState>
       ) : (
         <ViewPanes
           page="residents"

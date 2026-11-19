@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, parseChoices, shareText, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, type ChoiceItem, type RenamedCollege } from "./choices";
+import { defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, otherGroupItems, parseChoices, shareText, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, type ChoiceItem, type RenamedCollege } from "./choices";
 
 const item = (id: string): ChoiceItem => ({ id, institute: `Inst ${id}`, slug: id, state: "S", course: "DNB Anaesthesiology", quota: "DNB Quota", reachLabel: "", closedEveryRound: false });
 
@@ -102,5 +102,17 @@ describe("shareText", () => {
     expect(shareText(list, (id) => (id === "x" ? "Fee ₹1.71 L/yr; Bond period 1 year" : null), "https://seatora.test")).toBe(
       "My NEET PG choice list (Round 3 · 2026), in order:\n1. Inst x — DNB Anaesthesiology, DNB Quota. Fee ₹1.71 L/yr; Bond period 1 year\n2. Inst y — DNB Anaesthesiology, DNB Quota\n\nMade with Seatora: https://seatora.test",
     );
+  });
+});
+
+describe("otherGroupItems (NEET SS)", () => {
+  it("the choices outside her question groups; none without a group", () => {
+    const q = (id: string, quota: string) => ({ ...item(id), quota });
+    const xs = [q("a", "All India (Medical Group)"), q("b", "Tamil Nadu All India (Medical Group)"), q("c", "All India (Surgical Group)"), q("d", "DNB Quota")];
+    expect(otherGroupItems(xs, ["Medical Group"]).map((i) => i.id)).toEqual(["c", "d"]);
+    expect(otherGroupItems(xs, [])).toEqual([]);
+  });
+  it("the share text names the exam", () => {
+    expect(shareText({ ...defaultChoices.lists[0], items: [item("a")] }, () => null, "https://x", "NEET SS")).toMatch(/^My NEET SS choice list/);
   });
 });

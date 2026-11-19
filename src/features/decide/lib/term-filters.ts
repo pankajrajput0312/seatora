@@ -221,6 +221,8 @@ export function lowestRisk(items: { name: string; t: ProgrammeTerms }[]): string
   const leaveText = (l: number | null) => (l == null ? "leaving penalty not published" : `leaving ${money(l)}`);
   const left = xs.length - known.length;
   const notCounted = left ? ` ${left} with no bond figure not counted.` : "";
+  // A winner needs two figures to weigh: one option with a figure is no comparison.
+  if (known.length === 1) return `Can't tell: only ${known[0].name} publishes a bond figure, so there is nothing to compare it with.`;
   if (known.length) {
     const min = Math.min(...known.map((x) => x.bond!));
     const best = known.filter((x) => x.bond === min);
@@ -228,6 +230,7 @@ export function lowestRisk(items: { name: string; t: ProgrammeTerms }[]): string
     return `Lowest risk here: ${names(best)} (${min === 0 ? "no bond" : `bond penalty ${money(min)}`}${leaves.length === 1 ? `, ${leaveText(leaves[0])}` : ""}), from the bond and leaving penalties shown.${notCounted}`;
   }
   const withLeave = xs.filter((x) => x.leave != null);
+  if (withLeave.length < 2) return `Can't tell: only ${names(withLeave)} publishes a leaving penalty, and none of these a bond figure.`;
   const min = Math.min(...withLeave.map((x) => x.leave!));
   return `Lowest risk here: ${names(withLeave.filter((x) => x.leave === min))} (leaving ${money(min)}); no bond figure is published for any of these.`;
 }

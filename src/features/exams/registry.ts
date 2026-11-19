@@ -49,14 +49,14 @@ export const exams: Record<ExamKey, Exam> = {
     categories: baseCategories,
     pwd: true,
     quotas: ["All India", "Deemed/Paid Seats"],
-    quotasNote: `None ticked means All India and Self-Financed Merit Seat (MCC's "Management/Paid Seats" up to 2025): the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible. ${mdsScope}`,
+    quotasNote: `None ticked means All India and Self-Financed Merit Seat (MCC called it "Management/Paid Seats" up to 2025): the quotas anyone can take. Tick a restricted quota (Armed Forces, NRI, minority, a university's own) only if you are eligible. ${mdsScope}`,
     scopeNote: mdsScope,
     rankWord: "AIR",
     rankName: "All India Rank",
     perGroup: false,
     exampleRank: "2,500",
-    // MCC's MDS results word the paid quota "Management/Paid Seats" up to 2025, "Self-Financed Merit Seat" from 2026.
-    quotaWords: [{ quota: "Deemed/Paid Seats", from: 2026, before: "Management/Paid Seats", after: "Self-Financed Merit Seat" }],
+    // MCC's MDS wording for the paid quota now (its results said "Management/Paid Seats" up to 2025): one name everywhere.
+    quotaNames: { "Deemed/Paid Seats": "Self-Financed Merit Seat", "Deemed/Paid": "Self-Financed Merit Seat" },
     has: { ...resultsOnly, seats: true },
   },
 };

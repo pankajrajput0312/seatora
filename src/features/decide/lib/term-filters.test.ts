@@ -169,7 +169,8 @@ describe("lowestRisk (Compare)", () => {
     expect(lowestRisk([{ name: "A", t: known }, { name: "B", t: noBond }, { name: "C", t: blank }])).toBe(
       "Lowest risk here: B (no bond, leaving penalty not published), from the bond and leaving penalties shown. 1 with no bond figure not counted.",
     );
-    expect(lowestRisk([{ name: "A", t: known }])).toBe("Lowest risk here: A (bond penalty ₹20 L, leaving ₹5 L), from the bond and leaving penalties shown.");
+    // one figure is no comparison: no winner named
+    expect(lowestRisk([{ name: "A", t: known }, { name: "C", t: blank }])).toBe("Can't tell: only A publishes a bond figure, so there is nothing to compare it with.");
   });
   it("all unknown, or all none: said plainly", () => {
     expect(lowestRisk([{ name: "A", t: blank }, { name: "B", t: blank }])).toBe("Can't tell: none of these publishes a bond or leaving penalty figure.");

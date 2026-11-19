@@ -10,8 +10,14 @@ export const isExam = (s: unknown): s is ExamKey => examKeys.includes(s as ExamK
 /** Exams whose ranks are per question group (the group rides in the quota label): a candidate is a rank within a quota. */
 export const ranksPerGroup: readonly ExamKey[] = ["neet-ss"];
 
-/** Staff's pick of exam (?exam= sets it, src/middleware.ts); ignored for everyone else (server/active.tsx). */
+/**
+ * Set by app/decide/exam/route.ts for staff only (their last exam): a browser that has it may carry ?exam= past the
+ * middleware (src/middleware.ts); one without it is sent through that route first. Never read for the exam itself.
+ */
 export const EXAM_COOKIE = "seatora_exam";
+/** The request's exam as its URL names it (?exam=), put on the request by src/middleware.ts (features/exams/active.tsx reads it). */
+export const EXAM_HEADER = "x-seatora-exam";
+export const examCookie = () => ({ httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/decide", maxAge: 60 * 60 * 24 * 365 });
 
 /** The data-version marker an import writes last (server/catalog.ts dataVersion); NEET PG keeps its old key. */
 export const markerKey = (exam: ExamKey) => (exam === DEFAULT_EXAM ? "import/mcc" : `import/${exam}`);

@@ -8,12 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { duplicateList, markTypedUpTo, move, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
+import { duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
 import { pastOf, reachWindow, seatsBelowNotes, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
-import { quotaIn, roundIn } from "@/features/exams/exam";
+import { groupsIn, quotaIn, roundIn } from "@/features/exams/exam";
 import { useChoices, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
-import { keepProfileParams } from "../profile";
+import { keepProfileParams, profileFromParams } from "../profile";
 import type { ProgrammeTerms } from "../server/terms";
 import type { RowHospital, SeatsBy } from "../service";
 import type { SeatList } from "../types";
@@ -177,8 +177,17 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     setRemoved(null);
   };
 
+  // NEET SS: choices of another question group (her rank isn't one there) are left out of Copy, Share and CSV unless she
+  // includes them, and the page says how many.
+  const groups = E.perGroup ? groupsIn(E, profileFromParams(url)?.quotas ?? []) : [];
+  const others = otherGroupItems(items, groups);
+  const [withOthers, setWithOthers] = useState(false);
+  const kept = withOthers || !others.length ? list.items : list.items.filter((i) => !others.includes(i));
+  // Exports name each quota as MCC words it (NEET MDS's paid quota; NEET PG's as it is).
+  const out = { ...list, items: kept.map((i) => ({ ...i, quota: quotaIn(E, i.quota) })) };
   const copy = async () => {
-    const text = toMccText(list);
+    const text = toMccText(out);
+    const n = out.items.length;
     try {
       await navigator.clipboard.writeText(text);
       // What went to the clipboard, at a glance: the first three lines and how many more.
@@ -192,7 +201,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
 
   // A phone: its share sheet (WhatsApp among them); else WhatsApp's own link. Fee, bond and penalties once loaded.
   const share = async () => {
-    const text = shareText(list, (id) => (current?.[id] && E.has.fees ? termsWords(current[id].fees) || null : null), location.origin, E.label);
+    const text = shareText(out, (id) => (current?.[id] && E.has.fees ? termsWords(current[id].fees) || null : null), location.origin, E.label);
     if (navigator.share && matchMedia("(pointer: coarse)").matches) {
       try {
         return await navigator.share({ text });
@@ -208,7 +217,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
 
   const download = () => {
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([toCsv(list)], { type: "text/csv" }));
+    a.href = URL.createObjectURL(new Blob([toCsv(out)], { type: "text/csv" }));
     a.download = `${list.name.replace(/\W+/g, "-").toLowerCase()}.csv`;
     a.click();
   };
@@ -297,7 +306,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       </span>
     );
   const flagLines = (flags: string[]) => flags.map((f) => <span key={f} className="block text-xs text-sun">{f}</span>);
-  const listName = `${list.name} choice list, ${n} items`;
+  const listName = `${list.name} choice list, ${n} ${n === 1 ? "item" : "items"}`;
 
   const cards = (
     <ol id="choices-list" tabIndex={-1} aria-label={listName} className="grid max-w-4xl gap-3">
@@ -454,6 +463,14 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
           </span>
         </label>
       </div>
+      {others.length > 0 && (
+        <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-sun" data-print-hide>
+          {withOthers
+            ? `Copy, Share and CSV include the ${others.length} ${others.length === 1 ? "choice" : "choices"} from another question group (your rank isn't one there).`
+            : `${others.length} ${others.length === 1 ? "choice" : "choices"} from another question group left out of Copy, Share and CSV: your rank isn't one there.`}
+          <Button variant="ghost" className="min-h-11 text-sky underline" onClick={() => setWithOthers(!withOthers)}>{withOthers ? "Leave them out" : "Include them"}</Button>
+        </p>
+      )}
       {copyMsg && (
         <div className="text-sm" data-print-hide>
           <p>{copyMsg.text}</p>

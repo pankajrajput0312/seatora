@@ -6,7 +6,7 @@ import { ChevronDown, Info, ListFilter, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { countFromPage, FILTER_TOTAL, formQuery, tally, type Tally } from "../lib/filter-count";
 import { useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams, profileToParams, profileWithFilters } from "../profile";
@@ -18,8 +18,15 @@ import { navigating } from "./nav-pending";
  * full load. ponytail: next/form's client navigation never commits as of e387871 (no same-route client navigation does);
  * back to next/form once that is fixed.
  */
-export function FilterForm(props: ComponentProps<"form"> & { action: string }) {
-  return <form method="get" {...props} onSubmit={(e) => e.currentTarget.querySelector<HTMLDialogElement>("dialog[open]")?.close()} />;
+export function FilterForm({ children, ...props }: ComponentProps<"form"> & { action: string }) {
+  // Staff on another exam: its ?exam= goes with the fields (a form sends only them).
+  const exam = useSearchParams().get("exam");
+  return (
+    <form method="get" {...props} onSubmit={(e) => e.currentTarget.querySelector<HTMLDialogElement>("dialog[open]")?.close()}>
+      {exam && <input type="hidden" name="exam" value={exam} />}
+      {children}
+    </form>
+  );
 }
 
 /**

@@ -264,7 +264,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             {roundSeats.map(({ list, n }) => (
               <span key={list.key} className="inline-flex items-center gap-0.5">
                 <Link href={L.to(`/decide/institutes/${slug}`, { tab: "seats" })} className="inline-flex min-h-11 items-center hover:underline">
-                  <span className="text-muted-foreground">{list.year} {roundIn(E, list.year, list.round)} {list.kind}:</span>&nbsp;<span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{n > 0 ? formatRank(n) : "None"}</span>
+                  <span className="text-muted-foreground">{list.year} {roundIn(E, list.year, list.round)} {list.kind}:</span>&nbsp;{n > 0 ? <span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{formatRank(n)}</span> : <span className="numeric text-muted-foreground">0 seats</span>}
                   <span className="sr-only"> seats: see Seats</span>
                 </Link>
                 <InfoTip label={listSeats(list)}>
@@ -595,7 +595,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                           </td>
                           <td className={`${tbl.td} whitespace-nowrap max-md:hidden`}><span className="numeric">{a.year}</span> {roundIn(E, a.year, a.round)} <Provisional when={a.provisional} /></td>
                           <td className={`${tbl.td} max-md:px-2`}><Link href={L.lastRanks(a.courseSlug, { inst: slug })} className="hover:text-sky hover:underline">{a.courseName}</Link></td>
-                          <td className={`${tbl.td} max-md:px-2`}><QuotaName quota={a.quota} year={a.year} /></td>
+                          <td className={`${tbl.td} max-md:px-2`}><QuotaName quota={a.quota} /></td>
                           <td className={`${tbl.td} max-md:px-2`}>{a.category}</td>
                           <td className={`${tbl.td} text-muted-foreground max-md:px-2`}>{a.remark}</td>
                         </tr>
@@ -631,10 +631,19 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             </>
           )}
           <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
-            &quot;—&quot; means not stated, never zero; NBEMS maximum and minimum are NBEMS&apos;s limits.
+            {exam === DEFAULT_EXAM ? <>&quot;—&quot; means not stated, never zero; NBEMS maximum and minimum are NBEMS&apos;s limits.</> : <>&quot;—&quot; means not stated, never zero.</>}
             <InfoTip label="fees and bond">
-              One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type (All India, Deemed/Paid, NRI, DNB Quota) where the MCC profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead, never a figure. NBEMS maximum and minimum are NBEMS&apos;s limits, not the college&apos;s figures. A dash means not stated (not in the MCC profile fields we import; the profile may say more), never zero.
-              Leaving the course after joining is the college&apos;s or state&apos;s penalty from its bond document; resigning from Round 2 is MCC&apos;s separate forfeit.
+              {exam === DEFAULT_EXAM ? (
+                <>
+                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type (All India, Deemed/Paid, NRI, DNB Quota) where the MCC profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead, never a figure. NBEMS maximum and minimum are NBEMS&apos;s limits, not the college&apos;s figures. A dash means not stated (not in the MCC profile fields we import; the profile may say more), never zero.
+                  Leaving the course after joining is the college&apos;s or state&apos;s penalty from its bond document; resigning from Round 2 is MCC&apos;s separate forfeit.
+                </>
+              ) : (
+                <>
+                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type where the college&apos;s MCC institute profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead (a figure they state, beside them). A dash means not stated (the profile may say more), never zero.
+                  The bond is from MCC&apos;s institute list (a document Seatora has not read is &quot;not checked&quot;); resigning from Round 2 is MCC&apos;s separate forfeit.
+                </>
+              )}
             </InfoTip>
           </p>
           {college.state && <p className="text-sm"><Link href={L.fees({ state: college.state })} className={`${smallLink} text-sky`}>Compare fees with other institutes in {college.state}</Link></p>}
@@ -672,7 +681,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                 <FilterDropdown label="Course" name="rcourse" search options={residentCourseOptions} selected={rCourses} none="All courses" />
                 <FilterDropdown label="Year" name="ryear" options={residentYearOptions} selected={rYears.map(String)} none="All years" />
               </FiltersPanel>
-              <span className="ml-auto self-center text-sm text-muted-foreground"><span className="numeric font-semibold text-foreground">{formatRank(residentRows.length)}</span> residents</span>
+              <span className="ml-auto self-center text-sm text-muted-foreground"><span className="numeric font-semibold text-foreground">{formatRank(residentRows.length)}</span> {residentRows.length === 1 ? "resident" : "residents"}</span>
             </FilterForm>
           )}
           {residents.total === 0 ? (

@@ -108,8 +108,9 @@ export { SetRankPrompt } from "./dashboard-parts";
 export function InstName({ name, state }: { name: string; state?: string | null }) {
   return (
     <>
-      <span className="max-md:hidden">{name}</span>
-      <span className="md:hidden"><span aria-hidden title={name}>{shortName(name, state)}</span><span className="sr-only">{name}</span></span>
+      {/* A long unbroken name ("Modakkallur(PO),Kerla") breaks inside its cell, never over the next one (names only). */}
+      <span className="wrap-anywhere max-md:hidden">{name}</span>
+      <span className="wrap-anywhere md:hidden"><span aria-hidden title={name}>{shortName(name, state)}</span><span className="sr-only">{name}</span></span>
     </>
   );
 }

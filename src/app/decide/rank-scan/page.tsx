@@ -209,7 +209,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                           ...(you.has(a) ? [<li key="you" className="rounded-md bg-sky/10 px-4 py-1.5 text-xs font-semibold text-sky lg:col-span-2">{youText}</li>] : []),
                           <li key={i} className="grid min-w-0">
                             <ResultCard
-                              chips={[a.quota, `${a.category} seat`, a.remark]}
+                              chips={[<QuotaName key="q" quota={a.quota} />, `${a.category} seat`, a.remark]}
                               stat={{
                                 label: "Rank",
                                 value: <span className="numeric inline-flex min-h-11 items-center">{formatRank(a.rank)}</span>,
@@ -255,7 +255,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                                 <span className="block"><Link href={courseLink(a)} className={subLink}>{courseName(a)}</Link></span>
                                 <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                                   {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.collegeName} />}
-                                  <span><QuotaName quota={a.quota} year={a.year} />{a.remark && ` · ${a.remark}`}</span>
+                                  <span><QuotaName quota={a.quota} />{a.remark && ` · ${a.remark}`}</span>
                                 </span>
                               </td>
                               <TermStatCells t={a.fees} variant="compact" of={of(a)} tdClassName={termCol.td} />

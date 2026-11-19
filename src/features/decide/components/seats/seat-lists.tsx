@@ -19,6 +19,7 @@ import { seatCourse as courseOf } from "./seat-cards";
 import { ScrollTable } from "../scroll-table";
 import { roundNameFrom } from "@/features/exams/exam";
 import { RoundName } from "../round-name";
+import { QuotaName } from "../round-name";
 
 // Seats page parts (src/app/decide/seats): one MCC seat list at a time, never added to another list.
 
@@ -70,7 +71,7 @@ export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; cu
       {latest && group(latest, true)}
       {earlier.length > 0 && (
         <details open={lists.some((l) => l.key === current && groupOf(l) !== latest)} className="open:basis-full max-md:shrink-0">
-          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm text-sky underline">Earlier<span className="max-md:sr-only"> rounds: {earlier.join(", ")}</span></summary>
+          <summary className="inline-flex min-h-11 cursor-pointer items-center gap-x-1 text-sm text-sky underline"><span className="whitespace-nowrap">Earlier</span><span className="max-md:sr-only">rounds: {earlier.join(", ")}</span></summary>
           <div className="mt-2 grid gap-2">{earlier.map((g) => group(g))}</div>
         </details>
       )}
@@ -180,7 +181,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L, late
                 <th scope="row" className={cn(td, sticky, "text-left font-normal")}>
                   <Link href={L.institute(r.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
                   <span className="block text-xs text-muted-foreground">
-                    {courseOf(r)}, {r.quota ?? "quota not printed"}, {r.college.state ?? "state not listed"}
+                    {courseOf(r)}, {r.quota != null ? <QuotaName quota={r.quota} /> : "quota not printed"}, {r.college.state ?? "state not listed"}
                   </span>
                   <span className="mt-1 flex flex-wrap gap-1">
                     {r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />}

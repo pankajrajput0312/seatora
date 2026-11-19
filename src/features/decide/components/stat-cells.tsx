@@ -4,6 +4,7 @@ import type { ProgrammeTerms } from "../server/terms";
 import { NBEMS_BOND_RULES, termDocs } from "./fees";
 import { InfoTip } from "./info-tip";
 import { SourceRef } from "./page-sources";
+import { PgOr } from "./round-name";
 
 // One course's terms as number cells: Fee | Stipend | Bond | Bond ₹ | Leaving (lib/stat-format.ts says what each shows).
 // Server- and client-safe (no "use client"; InfoTip and SourceRef are the client parts). Sources go to the page's one
@@ -95,6 +96,15 @@ const columnNote: Record<StatKey, string> = {
   leaving: "The college's or state's penalty for leaving the seat or course after joining. ≤, ≥, + and the short phrases (Per state rule, No money penalty…): as for Bond penalty. —: none published. Colour: red ₹25 L or more.",
 };
 
+/** The same for another exam's MCC institute profiles (NEET MDS, NEET SS): no NBEMS, DNB or MD/MS rules, no fee colours. */
+const columnNoteOther: Record<StatKey, string> = {
+  fee: "Year 1 fee for this course and quota, as the college's MCC institute profile declares it: /yr a fee a year (year 1’s may be paid at admission); at admission (Year 1): the amount the profile gives for admission. Varies by subject, On college website, Not stated: the profile gives no one figure for these seats (its words are in the institute’s Fees tab). A range: the profile gives only the range across subjects. —: none published. No colour: there are no fee bands for these courses.",
+  stipend: "Year 1 stipend a month (/mo), as the college's MCC institute profile declares it. Not stated: no figure published. —: none published.",
+  bond: "Service bond years (1Y: one year). Not checked: MCC lists a bond document for the college that Seatora has not read yet; check it before you lock your choices. Not published: no bond declared. —: not checked. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey not published.",
+  bondInr: columnNote.bondInr,
+  leaving: columnNote.leaving,
+};
+
 /** Year 2 or 3's fee or stipend in a table column: the full figure, its marker under it; a 2-year course's year 3 says so. */
 function YearCell({ t, pick, year, className }: { t: ProgrammeTerms; pick: "fee" | "stipend"; year: number; className: string }) {
   const v = yearValue(t, pick, year);
@@ -121,7 +131,7 @@ export function StatHead({ k }: { k: StatKey }) {
     <span data-terms className="inline-flex items-center gap-0.5">
       {statLabel[k]}
       <InfoTip label={`${statLabel[k]} column`}>
-        {columnNote[k]} Each figure&apos;s exact words and sources: the cards, or the institute&apos;s Fees tab.
+        <PgOr pg={columnNote[k]} other={columnNoteOther[k]} /> Each figure&apos;s exact words and sources: the cards, or the institute&apos;s Fees tab.
       </InfoTip>
     </span>
   );

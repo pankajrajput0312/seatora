@@ -2,6 +2,7 @@
 import { z } from "zod";
 import type { ProgrammeTerms } from "../server/terms";
 import { statCells } from "./stat-format";
+import { groupOf } from "@/features/exams/exam";
 
 export type ChoiceItem = {
   id: string; // option id
@@ -79,6 +80,12 @@ export function shareText(list: ChoiceList, terms: (id: string) => string | null
   });
   return [`My ${exam} choice list (${list.name}), in order:`, ...lines, "", `Made with Seatora: ${url}`].join("\n");
 }
+
+/**
+ * NEET SS: the choices of another question group than hers (`groups`, from her quotas): her rank isn't one there, so
+ * Copy, Share and CSV leave them out unless asked. None when she has no group (or another exam).
+ */
+export const otherGroupItems = (items: ChoiceItem[], groups: string[]) => (groups.length ? items.filter((i) => !groups.includes(groupOf(i.quota) ?? "")) : []);
 
 /** The PIN in the item's college key (types.ts optionId: "NAME…#PIN~degree~specialty~quota"); null when the key has none. */
 export const pinOf = (i: Pick<ChoiceItem, "id">) => /#(\d{6})~/.exec(i.id)?.[1] ?? null;

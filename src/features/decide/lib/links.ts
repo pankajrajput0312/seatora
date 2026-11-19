@@ -16,6 +16,10 @@ const href = (path: string, p: URLSearchParams, hash = "") => {
 export function decideLinks(params: URLSearchParams | string = "") {
   const src = new URLSearchParams(params);
   const keep = keepProfileParams(src);
+  // Staff on another exam: the exam rides in every link (its URL names it; NEET PG's never has one).
+  const exam = src.get("exam");
+  if (exam) keep.set("exam", exam);
+  const own = (k: string) => k === "exam" || (profileParamKeys as readonly string[]).includes(k);
   /** Profile params + `extra` (empty values dropped). */
   const to = (path: string, extra: Extra = {}, hash = "") => {
     const p = new URLSearchParams(keep);
@@ -25,7 +29,7 @@ export function decideLinks(params: URLSearchParams | string = "") {
   /** Every current param (page filters too) with `changes` applied; null or "" removes a param. */
   const withChanges = (path: string, changes: Extra = {}, hash = "") => {
     const p = new URLSearchParams(keep);
-    for (const [k, v] of src) if (!(profileParamKeys as readonly string[]).includes(k)) p.append(k, v);
+    for (const [k, v] of src) if (!own(k)) p.append(k, v);
     for (const [k, v] of Object.entries(changes)) {
       if (v == null || v === "") p.delete(k);
       else p.set(k, String(v));
@@ -36,7 +40,7 @@ export function decideLinks(params: URLSearchParams | string = "") {
   const without = (path: string, key: string, value: string) => {
     const profile = (profileParamKeys as readonly string[]).includes(key);
     const p = new URLSearchParams(keep);
-    for (const [k, v] of src) if (!(profileParamKeys as readonly string[]).includes(k)) p.append(k, v);
+    for (const [k, v] of src) if (!own(k)) p.append(k, v);
     const rest = p.getAll(key).flatMap((v) => (profile ? v.split(",") : [v])).filter((v) => v !== value);
     p.delete(key);
     p.delete("page");

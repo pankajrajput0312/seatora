@@ -12,6 +12,7 @@ import { TermStatCells } from "../stat-cells";
 import { TypeBadge } from "../type-badge";
 import type { SeatLine } from "./find-seats";
 import { RoundName } from "../round-name";
+import { QuotaName } from "../round-name";
 
 // Seat rows as compact cards (the Seats page's Cards view, every view: matrix, one list, compare): the round, quota and
 // seat category on top, the picked list's seats as the big number, the institute, course and its other lists' seats,
@@ -60,7 +61,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
             key={`${k}|${i}`}
             chips={[
               <>{own.year} · <RoundName year={own.year} round={own.round} /></>,
-              r.quota ?? "Quota not printed",
+              r.quota != null ? <QuotaName key="q" quota={r.quota} /> : "Quota not printed",
               r.quota != null && isRestricted(exam, r.quota) && <Badge tone="warning">Restricted</Badge>,
               `${r.category} seat`,
             ]}

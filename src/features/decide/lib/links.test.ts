@@ -48,3 +48,12 @@ it("remembers a page's own filters (not the profile, not the page number) and br
   expect(withFilters("/decide/options?rank=1", "")).toBe("/decide/options?rank=1");
   expect(withFilters("/decide/options?rank=1", null)).toBe("/decide/options?rank=1");
 });
+
+it("staff's ?exam= rides in every link, once; NEET PG's links have none; remembered page filters never keep it", () => {
+  const L = decideLinks("rank=300&exam=neet-ss&quota=All+India+(Medical+Group)&q=x&page=2");
+  expect(L.to("/decide/seats")).toBe("/decide/seats?rank=300&quota=All+India+%28Medical+Group%29&exam=neet-ss");
+  expect(L.with("/decide/options", { q: "y" })).toBe("/decide/options?rank=300&quota=All+India+%28Medical+Group%29&exam=neet-ss&q=y&page=2");
+  expect(L.without("/decide/options", "q", "x")).toBe("/decide/options?rank=300&quota=All+India+%28Medical+Group%29&exam=neet-ss");
+  expect(decideLinks("rank=300&q=x").to("/decide")).toBe("/decide?rank=300");
+  expect(pageFilters("rank=300&exam=neet-ss&q=x")).toBe("q=x");
+});

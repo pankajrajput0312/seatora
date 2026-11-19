@@ -15,7 +15,12 @@ export function RoundNames({ years, round }: { years: number[]; round: Round }) 
   return [...new Set(years.map((y) => roundIn(E, y, round)))].join(" / ");
 }
 
-/** A quota as the exam's MCC PDFs word it (exams/exam.ts quotaIn; NEET PG: as it is). Server or client. */
-export function QuotaName({ quota, year }: { quota: string; year?: number }) {
-  return quotaIn(useExamInfo(), quota, year);
+/** A quota as the exam's MCC words it (exams/exam.ts quotaIn; NEET PG: as it is). Server or client. */
+export function QuotaName({ quota }: { quota: string }) {
+  return quotaIn(useExamInfo(), quota);
+}
+
+/** NEET PG's words, or (another exam: no NBEMS, DNB or MD/MS rules apply to it) `other`. Server or client. */
+export function PgOr({ pg, other }: { pg: React.ReactNode; other: React.ReactNode }) {
+  return useExamInfo().key === "neet-pg" ? pg : other;
 }

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
 import { sourceTypeLabels } from "@/components/ui/source-label";
 import { formatINR } from "@/features/cutoffs/lib/format";
@@ -8,6 +9,7 @@ import type { Amount, Figure, ProgrammeTerms, TermPart, TermSource } from "../se
 import { termLabel } from "../types";
 import { SourceRef } from "./page-sources";
 import { smallLink } from "./ui";
+import { QuotaName } from "./round-name";
 
 // Fees, stipend and bond as ProgrammeTerms (server/terms.ts) renders them. Server-safe and client-safe on purpose (no
 // "use client", type-only server imports): the institute and Fees pages render them on the server, Options rows in the browser.
@@ -217,6 +219,8 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
   const pYear = (i: number) => p?.per_year[i] ?? (i === 0 ? p?.at_admission : undefined);
   const feeCol = !!n || Array.from({ length: g.years }, (_, i) => pYear(i)).some(Boolean);
   const name = `${g.groups.join(" + ")} seats`;
+  // Shown as the exam's MCC words each seat type (NEET MDS's paid seats); the caption keeps the plain words.
+  const shown = <>{g.groups.map((x, i) => <Fragment key={x}>{i > 0 && " + "}<QuotaName quota={x} /></Fragment>)} seats</>;
   const fees = n?.perYear ?? [];
   const st = g.stipendPerMonth;
   // ponytail: stipend words the export calls "(no figure)" but that hold figures (one record: "35000/mth / 37000/mth"),
@@ -268,7 +272,7 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
   return (
     <section aria-labelledby={`${id} ${of}`} className="grid content-start gap-2">
       <h4 id={id} className="text-sm font-semibold">
-        {name}
+        {shown}
         {/* The MCC quotas, when the group covers more than its own (All India: also "IP University"). */}
         {g.quotas.length > g.groups.length && <span className="font-normal text-muted-foreground"> · {g.quotas.join(", ")}</span>}
       </h4>

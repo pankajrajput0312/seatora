@@ -1,6 +1,6 @@
 import "server-only";
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { cache } from "react";
 import { staffUser } from "@/features/auth/lib/session";
 import { AppPage } from "@/features/decide/components/app-page";
@@ -8,15 +8,17 @@ import { EmptyState } from "@/features/decide/components/ui";
 import { getCatalog } from "@/features/decide/server/catalog";
 import { seatLists } from "@/features/decide/server/seats";
 import { examShows, roundNamesOf } from "./exam";
-import { DEFAULT_EXAM, EXAM_COOKIE, examFor, exams, headYearIn, type Exam, type ExamKey } from "./registry";
+import { EXAM_HEADER } from "./keys";
+import { DEFAULT_EXAM, examFor, exams, headYearIn, type Exam, type ExamKey } from "./registry";
 
 /**
- * The exam Decide shows on this request: staff (OWNER, ADMIN) get the one they picked (the seatora_exam cookie, set only
- * for staff by app/decide/exam/route.ts); everyone else always NEET PG, whatever the cookie says. No account read
- * without a pick. Decide pages and their server components only: API v1, Ask and WhatsApp name no exam.
+ * The exam Decide shows on this request: its URL's ?exam= (src/middleware.ts hands it over as a request header; none:
+ * NEET PG), for staff (OWNER, ADMIN) only; everyone else always NEET PG, whatever the URL says (the middleware sends
+ * them away from ?exam= anyway). No account read without one. Decide pages, their server components and actions only:
+ * API v1, Ask and WhatsApp name no exam.
  */
 export const activeExam = cache(async (): Promise<ExamKey> => {
-  const asked = (await cookies()).get(EXAM_COOKIE)?.value;
+  const asked = (await headers()).get(EXAM_HEADER);
   if (!asked || asked === DEFAULT_EXAM) return DEFAULT_EXAM;
   return examFor(asked, !!(await staffUser().catch(() => null)));
 });

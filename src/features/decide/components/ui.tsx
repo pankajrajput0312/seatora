@@ -26,8 +26,8 @@ export const tbl = {
   num: "px-3 py-2 text-right align-top text-[0.875rem] font-semibold tabular-nums md:text-[15px]",
   /** A ScrollTable's thead: the sheet behind it and its ruled line (a shadow: no row borders in a pinned header). */
   head: "bg-card shadow-[0_1px_0_var(--color-border)]",
-  /** Phones: a pinned row-header column is narrow (about a third of the screen), so the rest of the row shows beside it; a long unbroken name ("Modakkallur(PO),Kerla") breaks inside it, never over the next cell. */
-  pin: "wrap-anywhere max-md:w-[8.5rem] max-md:min-w-[8.5rem] max-md:max-w-[8.5rem]",
+  /** Phones: a pinned row-header column is narrow (about a third of the screen), so the rest of the row shows beside it. */
+  pin: "max-md:w-[8.5rem] max-md:min-w-[8.5rem] max-md:max-w-[8.5rem]",
   /** Phones: a name in a pinned column on two lines at most (the full name in its title and for screen readers). */
   clamp: "max-md:line-clamp-2",
 };

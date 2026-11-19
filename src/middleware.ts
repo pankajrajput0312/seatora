@@ -1,11 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { EXAM_COOKIE, EXAM_HEADER, examCookie, isExam } from "@/features/exams/keys";
 import { AID_COOKIE, AID_MAX_AGE_S, isAid, isBot } from "@/features/funnel/lib";
 import { ACCESS_COOKIE, accessCookieUser, siteGate } from "@/lib/site-access";
 
 // Two jobs. 1. The seatora_aid device cookie (docs/FUNNEL.md) on page requests that lack it, bots aside; it is also put
-// on this request, so the page or route handler sees it the first time. A Decide page asked with ?exam= goes to
-// /decide/exam (app/decide/exam/route.ts): staff get that exam's seatora_exam cookie there, everyone else just the same
-// page without ?exam= (this sets no exam cookie for anyone). 2. The access gate for /decide and /api/v1: a
+// on this request, so the page or route handler sees it the first time. A Decide request's exam is its URL's ?exam=
+// (none: NEET PG), handed to the page as the x-seatora-exam request header (only staff's pages heed it:
+// features/exams/active.tsx). A browser without the seatora_exam cookie (which app/decide/exam/route.ts sets for staff
+// only) is sent through that route first: staff come back with it, everyone else to the page without ?exam= (and
+// without another exam's profile params). 2. The access gate for /decide and /api/v1: a
 // valid seatora_access cookie, which only a member's sign-in sets (any account with SEATORA_OPEN_ACCESS=1, else an
 // allowlisted one). Server Actions can be POSTed to any route, so Decide actions re-check access themselves. See
 // docs/ARCHITECTURE.md "Access gate".
@@ -16,18 +19,23 @@ export async function middleware(req: NextRequest) {
   const api = req.nextUrl.pathname.startsWith("/api/");
   const aid = !api && !isAid(req.cookies.get(AID_COOKIE)?.value) && !isBot(req.headers.get("user-agent")) ? newAid() : null;
   if (aid) req.cookies.set(AID_COOKIE, aid);
-  const res = req.nextUrl.pathname.startsWith("/decide") && req.nextUrl.searchParams.has("exam") ? examPick(req) : await gate(req, api);
-  if (aid) res.cookies.set(AID_COOKIE, aid, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: AID_MAX_AGE_S });
-  return res;
+  req.headers.delete(EXAM_HEADER); // only this middleware sets it
+  const decide = req.nextUrl.pathname.startsWith("/decide") && req.nextUrl.pathname !== "/decide/exam";
+  const exam = decide ? req.nextUrl.searchParams.get("exam") : null;
+  const known = req.cookies.get(EXAM_COOKIE)?.value;
+  // ?exam= without the staff cookie (or an exam that isn't one): through /decide/exam first.
+  if (exam != null && !(isExam(exam) && isExam(known))) return withAid(redirect(req, `/decide/exam?${new URLSearchParams({ k: exam, next: req.nextUrl.pathname + req.nextUrl.search })}`), aid);
+  if (exam != null) req.headers.set(EXAM_HEADER, exam);
+  const res = await gate(req, api);
+  // Staff's cookie follows the exam their URL names (a link, Back): the last one used.
+  if (exam != null && exam !== known) res.cookies.set(EXAM_COOKIE, exam, examCookie());
+  return withAid(res, aid);
 }
 
-/** ?exam= on a Decide page: to /decide/exam with the exam and the page without it (the gate checks that request). */
-function examPick(req: NextRequest) {
-  const u = req.nextUrl.clone();
-  const exam = u.searchParams.get("exam") ?? "";
-  u.searchParams.delete("exam");
-  return redirect(req, `/decide/exam?${new URLSearchParams({ k: exam, next: u.pathname + u.search })}`);
-}
+const withAid = (res: NextResponse, aid: string | null) => {
+  if (aid) res.cookies.set(AID_COOKIE, aid, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: AID_MAX_AGE_S });
+  return res;
+};
 
 async function gate(req: NextRequest, api: boolean) {
   const path = req.nextUrl.pathname;

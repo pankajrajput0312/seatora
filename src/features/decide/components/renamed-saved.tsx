@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { collegeKeyOf, nameFirstList, renameOptionId, renameSaved, type RenamedCollege } from "../lib/choices";
-import { useChoices, useCompare } from "../lib/use-decide-store";
+import { examRetiredKeys } from "@/app/decide/retired-actions";
+import { DEFAULT_EXAM } from "@/features/exams/keys";
+import { useChoices, useCompare, useExam } from "../lib/use-decide-store";
 import { navigating } from "./nav-pending";
 
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
@@ -29,6 +31,7 @@ export function RenamedSaved({ listName }: { listName?: string | null }) {
   const router = useRouter();
   const pathname = usePathname();
   const [renamed, setRenamed] = useState(0);
+  const exam = useExam();
 
   useEffect(() => {
     if (!hydrated || checked) return;
@@ -37,7 +40,8 @@ export function RenamedSaved({ listName }: { listName?: string | null }) {
     if (!keys.length) return;
     checked = true;
     (async () => {
-      const body = (await (await fetch("/api/v1/retired-keys")).json()) as { ok: boolean; data?: Record<string, RenamedCollege> };
+      // NEET PG: the API, as ever; another exam (staff): its own keys, through a server action that reads the URL's exam.
+      const body = exam === DEFAULT_EXAM ? ((await (await fetch("/api/v1/retired-keys")).json()) as { ok: boolean; data?: Record<string, RenamedCollege> }) : { ok: true, data: (await examRetiredKeys()) ?? undefined };
       if (!body.ok || !body.data) throw new Error("retired keys unavailable");
       const map = body.data;
       const hashed = new Map(await Promise.all(keys.map(async (k) => [k, `sha256:${await sha256(k)}`] as const)));
@@ -65,7 +69,7 @@ export function RenamedSaved({ listName }: { listName?: string | null }) {
     })().catch(() => {
       checked = false; // try again on the next page
     });
-  }, [hydrated, choices, compare, sp, router, pathname, setChoices, setCompare]);
+  }, [hydrated, choices, compare, sp, router, pathname, setChoices, setCompare, exam]);
 
   return (
     <div role="status" className={renamed ? "px-4 pt-4 md:px-6 xl:px-10" : undefined} data-print-hide>

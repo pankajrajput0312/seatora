@@ -107,7 +107,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
     // Her profile's default (no filter set): one chip saying so; × shows every allotment (the latest round).
     fromProfile && { label: `From your profile: ${fromProfile.courses.length ? `${fromProfile.courses.length === 1 ? courseLabel(fromProfile.courses[0]) : `your ${fromProfile.courses.length} courses`}, ` : ""}ranks ${formatRank(fromProfile.from)}–${formatRank(fromProfile.to)}${fromProfile.quotas ? `, ${groupsOf(exam, fromProfile.quotas).join(", ")}` : ""}`, param: "course", href: showAll },
     ...(fromProfile ? [] : f.course ?? []).map((c) => ({ label: courseLabel(c), param: "course", href: L.without("/decide/allotments", "course", c) })),
-    filters.quota && { label: `Quota: ${filters.quota}`, param: "aq", href: here({ aq: null }) },
+    filters.quota && { label: `Quota: ${quotaIn(E, filters.quota)}`, param: "aq", href: here({ aq: null }) },
     filters.category && { label: `${filters.category} seats`, param: "acat", href: here({ acat: null }) },
     filters.state && { label: `State: ${filters.state}`, href: here({ state: null }) },
     ranks && { label: ranks, param: "from", href: here({ from: null, to: null }) },
@@ -141,7 +141,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
           key={i}
           chips={[
             <span key="r" className="inline-flex items-center gap-1.5"><span className="numeric">{a.year} · {roundOf(a)}</span><Provisional when={a.provisional} /></span>,
-            a.quota,
+            <QuotaName key="q" quota={a.quota} />,
             `${a.category} seat`,
             // Only when it differs from the seat's (the PDF prints an Open candidate as "General").
             a.candidateCategory && a.candidateCategory.replace(/^General\b/, "Open") !== a.category && `${a.candidateCategory} candidate`,
@@ -189,7 +189,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <thead className={tbl.head}><tr className="text-left">
           {/* Phones: the round and the institute (course, at one institute) ride in the pinned Rank cell, so a row swiped
               sideways still says whose seat it is; their own columns go. */}
-          <th scope="col" className={`${th} ${stick} text-right max-md:text-left ${tbl.pin}`}>Rank<span className="md:hidden">, round, {inst ? "course" : "institute"}</span></th>
+          <th scope="col" className={`${th} ${stick} text-right max-md:text-left md:whitespace-nowrap ${tbl.pin}`}>Rank<span className="md:hidden">, round, {inst ? "course" : "institute"}</span></th>
           <th scope="col" className={`${th} max-md:hidden`}>Round</th>
           <th scope="col" className={`${th} ${inst ? "max-md:hidden" : ""}`}>{inst ? "Course" : "Institute"}</th>
           {/* The five numbers right after the institute, before what the card's header row has (quota, category). */}
@@ -204,7 +204,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <tbody>
           {rows.map((a, i) => (
             <tr key={i} className={tbl.row}>
-              <td className={`${td} ${stick} text-right max-md:text-left ${tbl.pin}`}>
+              <td className={`${td} ${stick} text-right max-md:text-left md:whitespace-nowrap ${tbl.pin}`}>
                 {rankLink(a, "numeric inline-flex min-h-6 min-w-6 items-center justify-end text-[15px] font-semibold hover:text-sky hover:underline max-md:justify-start")}
                 <span className="block text-xs md:hidden"><span className="numeric">{a.year}</span> {roundOf(a)} <Provisional when={a.provisional} /></span>
                 <span title={inst ? a.courseName : a.college.name} className={`block text-xs text-muted-foreground md:hidden ${tbl.clamp}`}>{inst ? a.courseName : a.college.name}</span>
@@ -238,7 +238,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
               </td>
               {/* Compact: one (i) a column (its header), not 250 a page; each card's (i)s have the exact words. */}
               <TermStatCells t={a.fees} variant="compact" of={of(a)} tdClassName="px-3 py-2" />
-              <td data-col="quota" className={short}><QuotaName quota={a.quota} year={a.year} /></td>
+              <td data-col="quota" className={short}><QuotaName quota={a.quota} /></td>
               <td data-col="seat" className={short}>{a.category}</td>
               {E.categories.length > 1 && <td data-col="cand" className={short}>{a.candidateCategory ?? <Dash />}</td>}
               <td data-col="option" className={`${short} numeric text-right`}>{a.optionNo != null ? formatRank(a.optionNo) : <Dash />}</td>
