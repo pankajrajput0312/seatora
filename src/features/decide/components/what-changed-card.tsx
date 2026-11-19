@@ -131,7 +131,7 @@ export function WhatChangedCard({ items, courses }: { items: VisitItem[]; course
                 return <li key={r.k}>{link(r.url, title, title)}</li>;
               })}
             </ul>
-            <Link href={L.options()} className={`${smallLink} text-sm text-sky`}>Your options, labelled with it</Link>
+            <Link href={L.options()} className={`${smallLink} text-sm text-sky`}>Your options&apos; reach, with it</Link>
           </div>
         )}
       </div>

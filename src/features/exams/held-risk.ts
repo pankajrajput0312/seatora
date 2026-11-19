@@ -1,6 +1,6 @@
 // "What you risk" for someone holding a seat (Home, Options, Choice list): plain lines built only from the counselling
 // body's own rules that ./crossover.ts holds with their verbatim quotes (MCC's NEET PG 2026 documents; AIIMS's INI-CET
-// ones), each line naming the rules it rests on. A question the documents leave open says "not stated", never a guess.
+// ones), each line naming the rules it rests on. A question the documents leave open says "not published", never a guess.
 // NEET SS and NEET MDS: no round rules in Seatora yet (covered: false; her college's own terms still show). Server-only,
 // like crossover.ts: INI-CET's words reach staff's pages only.
 import "server-only";
@@ -74,15 +74,15 @@ function mcc(i: RiskInput): RiskLine[] {
     (early || i.round === "R3") && { key: "stray", text: "The stray vacancy round is for candidates not holding a seat: while you hold yours, you can't take part.", rules: of("mcc_stray_eligibility") },
     early && { key: "resign", text: `You can resign your Round ${n} seat and stay in the next round only under MCC's resignation rules and within the time MCC sets.`, rules: of("mcc_resign_r1_r2_only") },
     i.round === "R1" && { key: "r1-window", text: "Resigning a Round 1 seat without forfeiting the deposit was possible only until 6:00 PM on 9 Nov 2026.", rules: of("mcc_r1_resign_window_2026") },
-    i.round === "stray" && { key: "stray-resign", text: "Whether a joined stray-round seat can be resigned, and on what terms: not stated.", rules: [], gap: gap("mcc_stray_resignation") },
-    (i.round === "R3" || i.round === "stray" || i.round === "special_stray") && { key: "leave-late", text: "What MCC does if you leave after its resignation windows: not stated beyond the deposit.", rules: [], gap: gap("mcc_leave_after_windows") },
+    i.round === "stray" && { key: "stray-resign", text: "Whether a joined stray-round seat can be resigned, and on what terms: not published.", rules: [], gap: gap("mcc_stray_resignation") },
+    (i.round === "R3" || i.round === "stray" || i.round === "special_stray") && { key: "leave-late", text: "What MCC does if you leave after its resignation windows: not published beyond the deposit.", rules: [], gap: gap("mcc_leave_after_windows") },
     i.quota === "Armed Forces Medical" && { key: "afms", text: said("mcc_afms_debarment"), rules: of("mcc_afms_debarment") },
     { key: "originals", text: "Your college keeps your original certificates and releases them only for an upgrade, or a resignation within MCC's timelines.", rules: of("mcc_originals_retained") },
     { key: "college", text: "Your college's fee, bond and service terms are the college's own, given to MCC; MCC takes no responsibility for them. They are below.", rules: of("mcc_college_terms_not_mcc") },
     early && { key: "withdraw", text: said("mcc_withdrawal_user_guide"), rules: of("mcc_withdrawal_user_guide", "mcc_resign_r1_r2_only") },
     { key: "rounds-apply", text: "Each round has its own rules, and once a round starts they apply to you too, though you were admitted in an earlier round.", rules: of("mcc_round_rules_apply") },
     { key: "refund", text: said("mcc_refund_after_all_rounds"), rules: of("mcc_refund_after_all_rounds") },
-    { key: "next-year", text: "Whether leaving or not joining an MCC seat bars you from next year's NEET PG counselling: not stated.", rules: [], gap: gap("mcc_next_year_debarment") },
+    { key: "next-year", text: "Whether leaving or not joining an MCC seat bars you from next year's NEET PG counselling: not published.", rules: [], gap: gap("mcc_next_year_debarment") },
   ];
   return lines.filter((l): l is RiskLine => !!l && (l.rules.length > 0 || !!l.gap));
 }

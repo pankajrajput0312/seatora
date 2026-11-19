@@ -7,6 +7,7 @@ import { quotaIn, type Exam } from "@/features/exams/exam";
 import { checkedOn, docName, fromJuly2026, riskLines, type RiskLine } from "@/features/exams/held-risk";
 import type { ExamKey } from "@/features/exams/keys";
 import { authorityOf } from "@/features/exams/registry";
+import { CHOICE_LIST } from "../lib/choices";
 import { heldParts } from "../lib/held";
 import type { DecideLinks } from "../lib/links";
 import { fmtIST, roundName } from "../lib/round-status";
@@ -22,6 +23,8 @@ import { InfoTip } from "./info-tip";
 import { typeCategory } from "./institute/college-type";
 import { SourceRef } from "./page-sources";
 import { TermStatCells } from "./stat-cells";
+import { CourseKindTag, QuotaTerm, RoundTerm } from "./term";
+import { NOT_PUBLISHED } from "../lib/stat-format";
 import { smallLink } from "./ui";
 
 // "I already hold a seat": her seat (profile.held, the address's `held`) and what she risks by upgrading from it, each
@@ -41,13 +44,13 @@ function cites(l: RiskLine) {
   return [...by].map(([d, ps]) => `${d}, p. ${[...new Set(ps)].join(", ")}`).join("; ");
 }
 
-/** A line's (i): each rule's body, document, page and exact words with its link; a "not stated" line, what was checked. */
+/** A line's (i): each rule's body, document, page and exact words with its link; a "not published" line, what was checked. */
 function LineTip({ l }: { l: RiskLine }) {
   return (
     <InfoTip label={`source: ${l.text.slice(0, 60)}`}>
       {l.gap && (
         <span className="block">
-          <span className="font-semibold">Not stated.</span> {l.gap.note} Checked in: {l.gap.checked.join("; ")}.
+          <span className="font-semibold">{NOT_PUBLISHED}.</span> {l.gap.note.replace(/^Not stated\.?\s*/, "")} Checked in: {l.gap.checked.join("; ")}.
         </span>
       )}
       {l.rules.map((r) => (
@@ -69,7 +72,7 @@ function Line({ l }: { l: RiskLine }) {
       </span>
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted-foreground">
         {l.rules.length > 0 && <span>{cites(l)}</span>}
-        {l.gap && <Badge tone="warning">Not stated</Badge>}
+        {l.gap && <Badge tone="warning">{NOT_PUBLISHED}</Badge>}
         {l.asOf && <Badge tone="warning">As of {fmtIST(checkedOn, true)}</Badge>}
         {l.rules.some(fromJuly2026) && <Badge tone="warning">From the July 2026 brochure: January 2027&apos;s is not out yet</Badge>}
       </span>
@@ -99,7 +102,7 @@ async function counsellingLines(row: OptionRow, exam: ExamKey) {
 function Prompt({ E }: { E: Exam }) {
   return (
     <section aria-label="Your current seat" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-border bg-card px-4 py-2" data-print-hide>
-      <p className="min-w-0 flex-1 basis-60 text-body">Already hold a {E.label} seat? Set it to see the options that beat it and what you risk by upgrading.</p>
+      <p className="min-w-0 flex-1 basis-60 text-body">Already hold a {E.label} seat? Set it to see the options that beat it, and what you risk by upgrading before you change your {CHOICE_LIST}.</p>
       <HeldPicker current={null} />
     </section>
   );
@@ -149,7 +152,7 @@ export async function HeldSeat({ profile, exam, L, where, row: given, toggle }: 
           {forfeit && !money.some((m) => m.label.startsWith("Forfeited")) && <li>{forfeit.label}: <span className="numeric font-semibold">{forfeit.value}</span>{forfeit.doc && <SourceRef doc={forfeit.doc} />}</li>}
           {money.map((m) => (
             <li key={m.label}>
-              {m.label}: {m.value ? <span className="numeric font-semibold">{m.value}</span> : "amount not stated"}
+              {m.label}: {m.value ? <span className="numeric font-semibold">{m.value}</span> : "amount not published"}
               {m.text && <span className="text-muted-foreground"> (&ldquo;{m.text}&rdquo;)</span>}
               {m.doc && <SourceRef doc={m.doc} />}
             </li>
@@ -186,7 +189,7 @@ export async function HeldSeat({ profile, exam, L, where, row: given, toggle }: 
           <h2 id={`held-${where}`} className="text-title font-semibold">
             <Link href={L.institute(row.college.slug)} className="hover:underline">{row.college.name}</Link>
           </h2>
-          <p className="text-body">{row.course.degree} {row.course.name} · {quotaIn(E, row.quota)} · joined in {roundIn(E, held.round)}</p>
+          <p className="text-body">{row.course.degree} {row.course.name} <CourseKindTag specialty={row.course.specialty} /> · <QuotaTerm quota={row.quota} shown={quotaIn(E, row.quota)} /> · joined in <RoundTerm shown={roundIn(E, held.round)} /></p>
         </div>
         <HeldPicker current={{ name, round: held.round }} />
       </div>
