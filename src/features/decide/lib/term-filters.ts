@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { formatInrShort } from "./format";
-import { inrL, noneDeclared } from "./stat-format";
+import { inrL, noneDeclared, yearlyFee } from "./stat-format";
 import { parseSearchParams } from "./params";
 import { asCategory, typeCategories, typeCategoryLabel, typesIn, type CollegeType, type TypeCategory } from "../components/institute/college-type";
 import { BOND_YEAR_CHOICES, FEE_LAKH_CHOICES, type Profile } from "../profile";
@@ -116,6 +116,8 @@ export const untypedOnly = (f: TermFilters | null | undefined): TermFilters | nu
 /** The number each sort, cap and CSV uses; null = not declared, or declared in words only. Ranges: the highest (cautious) figure. */
 export const feeValue = {
   fee1: (t: ProgrammeTerms) => t.years[0]?.fee?.inr ?? null,
+  /** The fee a year every sort and comparison reads (stat-format yearlyFee): never an amount at admission alone. */
+  yearly: (t: ProgrammeTerms) => yearlyFee(t)?.inr ?? null,
   feetotal: (t: ProgrammeTerms) => t.wholeCourseFee,
   stip1: (t: ProgrammeTerms) => t.years[0]?.stipend?.inr ?? null,
   /** 0 = no bond on record, null = not declared or not stated (or "no bond" where a state law's service may still apply). */

@@ -68,7 +68,7 @@ const sortLabels = (last: string): Record<OptionSort, string> => ({
   label: "Reach (reached first)",
   deep: `${last} closing: deepest first`,
   tight: `${last} closing: tightest first`,
-  fee: "Fee, year 1: lowest first",
+  fee: "Fee a year: lowest first",
   stipend: "Stipend, year 1: highest first",
 });
 

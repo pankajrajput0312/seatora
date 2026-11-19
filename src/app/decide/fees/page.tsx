@@ -36,7 +36,7 @@ const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
 const schema = feesParamsSchema.extend({ page: pageValue.default(1) });
 /** The table's stat columns (TermStatCells order) and the sort each header sets. */
 const sortOf: Record<StatKey, Exclude<FeeSort, "name">> = { fee: "fee1", stipend: "stip1", bond: "bondyrs", bondInr: "bond", leaving: "leave" };
-const sortLabel: Record<FeeSort, string> = { fee1: "fee, year 1", stip1: "stipend, year 1", bondyrs: "bond years", bond: "bond penalty", leave: "leaving penalty", feetotal: "whole-course fee", name: "institute name" };
+const sortLabel: Record<FeeSort, string> = { fee1: "fee a year", stip1: "stipend, year 1", bondyrs: "bond years", bond: "bond penalty", leave: "leaving penalty", feetotal: "whole-course fee", name: "institute name" };
 /** Stipend sorts highest first by default, the rest lowest first. */
 const natural = (k: FeeSort) => (k === "stip1" ? "desc" : "asc");
 const arrow = (on: boolean, dir: string) => (on ? <span aria-hidden="true">{dir === "asc" ? " ↑" : " ↓"}</span> : null);

@@ -212,7 +212,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
         footer={
           <>
             <div className="grid gap-1 px-4 py-2 empty:hidden">
-              {E.has.fees && <TermSummary cells={statCells(r.fees)} hide={same} />}
+              {E.has.fees && <TermSummary t={r.fees} hide={same} />}
               {E.has.fees && <BeCareful cells={statCells(r.fees)} />}
               <R1Trend r={r} latest={latest} pastYears={pastYears} />
               <SimilarNote r={r} />
@@ -263,7 +263,8 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
 /** Above the cards: what every one of them shares (Same), said once. */
 function Shared({ same }: { same: Same }) {
   const E = useExamInfo();
-  const items: [keyof Same, string][] = [["quota", "Quota"], ["category", "Seat category"], ["fee", "Fee"], ["bond", ""], ["stipend", "Stipend"]];
+  // The cost parts name themselves ("3-year fee ₹1.26 L", "no bond"): no label of their own.
+  const items: [keyof Same, string][] = [["quota", "Quota"], ["category", "Seat category"], ["fee", ""], ["stipend", ""], ["bond", ""], ["leaving", ""]];
   const shown = items.filter(([k]) => same[k] && (E.has.fees || !(summaryKeys as string[]).includes(k)));
   if (!shown.length) return null;
   return (
@@ -272,7 +273,7 @@ function Shared({ same }: { same: Same }) {
       <dl className="flex flex-wrap gap-x-4 gap-y-1">
         {shown.map(([k, label]) => (
           <div key={k} className="flex items-baseline gap-1.5">
-            <dt className={label ? "text-xs text-muted-foreground" : "sr-only"}>{label || "Bond and penalties"}</dt>
+            <dt className={label ? "text-xs text-muted-foreground" : "sr-only"}>{label || k}</dt>
             <dd className="font-semibold">{same[k]}</dd>
           </div>
         ))}
@@ -286,7 +287,7 @@ function sameOf(rows: ListRow[], E: Exam, latest: Latest, pastYears: [number, nu
   if (rows.length < 2) return {};
   const texts = rows.map((r) => {
     const c = cardClosing(r, latest.year, pastYears, includeLatest);
-    return { quota: quotaIn(E, r.quota), category: c ? `${c.d.category}` : undefined, ...summaryText(statCells(r.fees)) };
+    return { quota: quotaIn(E, r.quota), category: c ? `${c.d.category}` : undefined, ...summaryText(r.fees) };
   });
   const one = (k: keyof Same) => {
     const xs = texts.map((t) => t[k]).filter((x): x is string => x != null);

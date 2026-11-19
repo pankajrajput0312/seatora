@@ -15,7 +15,7 @@ import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
 import { hasOption, listSeats, optionSeats, pickLists, seatLists, type OptionSeats } from "./server/seats";
 import { bucketOfDegree, collegeTerms, courseTerms, type Programme, type ProgrammeTerms } from "./server/terms";
-import { feeBasis } from "./lib/stat-format";
+import { yearlyFee } from "./lib/stat-format";
 import { optionId, rounds, seatKinds, type OptionSort, type Allotment, type Category, type College, type Course, type Cutoff, type Notice, type OptionsView, type Round, type SeatKind, type SeatList, type Source, type Term } from "./types";
 
 // Data comes from Postgres (MCC import, prisma/import-mcc.ts) through ./server; the small, slow-changing part (colleges,
@@ -576,7 +576,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   const key: Record<Exclude<OptionSort, "label">, (x: Ranked) => number | null | undefined> = {
     deep: (x) => (x.deepest ? -x.deepest.closing : null),
     tight: (x) => x.deepest?.closing,
-    fee: (x) => feeValue.fee1(optTerms(cat, x.o)),
+    fee: (x) => feeValue.yearly(optTerms(cat, x.o)),
     stipend: (x) => { const v = feeValue.stip1(optTerms(cat, x.o)); return v == null ? null : -v; },
   };
   if (f.sort && f.sort !== "label") {
@@ -686,7 +686,7 @@ export async function optionsPicture(profile: Profile, f: OptionFilters = {}, ex
   // Without a provisional latest R1 (Options' "leave out provisional"), the year before it.
   const year = f.includeProvisional === false && latest.provisional && latest.round === "R1" ? pastOf(latest)[1] : latest.year;
   // A fee a year only: never the NBEMS ceiling, never an amount at admission whose later years differ or aren't stated.
-  const fee = (x: OptionRow) => (x.fees.years[0]?.fee?.kind === "maximum" || feeBasis(x.fees) !== "yearly" ? null : feeValue.fee1(x.fees));
+  const fee = (x: OptionRow) => { const y = yearlyFee(x.fees); return y && y.kind !== "maximum" ? y.inr : null; };
   const cheapest = r.rows.reduce<OptionRow | null>((a, x) => (fee(x) != null && (!a || fee(x)! < fee(a)!) ? x : a), null);
   const govt = r.rows.filter((row) => row.hospital?.type && typeCategory[row.hospital.type.value] === "govt");
   const inR1 = govt.flatMap((row) => {
@@ -1168,7 +1168,9 @@ export async function listFees(f: FeeFilters, pg?: PageQuery, exam: ExamKey = DE
   const name = (a: FeeRow, b: FeeRow) => a.college.name.localeCompare(b.college.name);
   rows.sort((a, b) => {
     if (by === "name") return sign * name(a, b);
-    const [x, y] = [feeValue[by](a.terms), feeValue[by](b.terms)];
+    // The fee sort reads the fee a year (an amount at admission is never sorted as one); the CSV's fee1 stays year 1's.
+    const v = by === "fee1" ? feeValue.yearly : feeValue[by];
+    const [x, y] = [v(a.terms), v(b.terms)];
     return x == null || y == null ? (x == null ? 1 : 0) - (y == null ? 1 : 0) || name(a, b) : sign * (x - y) || name(a, b);
   });
   return { ...paged(rows, pg), undeclared: rows.filter((r) => nothingDeclared(r.terms)).length, unknownTerms: unknown.length };

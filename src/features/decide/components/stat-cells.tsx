@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { beCareful, bondFlag, feeBandText, feeRange, MISSING_WORDS, NOT_PUBLISHED, statCells, statLabel, yearValue, type Level, type StatCell, type StatKey } from "../lib/stat-format";
+import { beCareful, costKeys, costLine, feeBandText, feeRange, MISSING_WORDS, NOT_PUBLISHED, statCells, statLabel, yearValue, type CostKey, type Level, type StatCell, type StatKey } from "../lib/stat-format";
 import type { ProgrammeTerms } from "../server/terms";
 import { NBEMS_BOND_RULES, termDocs } from "./fees";
 import { InfoTip } from "./info-tip";
@@ -153,38 +153,33 @@ export function BeCareful({ cells, className }: { cells: StatCell[]; className?:
   );
 }
 
-/** A card summary's three items, in the order she weighs them: Fee, the bond flag (lib/stat-format.ts bondFlag), Stipend. */
-export type SummaryKey = "fee" | "bond" | "stipend";
-export const summaryKeys: SummaryKey[] = ["fee", "bond", "stipend"];
-/** Each item as one string (the value with its marker): a list compares them to say once what every card shares. */
-export function summaryText(cells: StatCell[]): Record<SummaryKey, string> {
-  const text = (c: StatCell) => (c.marker ? `${c.short} ${c.marker}` : c.short);
-  return { fee: text(cells[0]), bond: bondFlag(cells).text, stipend: text(cells[1]) };
+/** A card summary's parts (lib/stat-format.ts costLine), in its order. */
+export type SummaryKey = CostKey;
+export const summaryKeys: SummaryKey[] = [...costKeys];
+/** Each part as one string: a list compares them to say once what every card shares. */
+export function summaryText(t: ProgrammeTerms, cells?: StatCell[]): Partial<Record<SummaryKey, string>> {
+  return Object.fromEntries(Object.entries(costLine(t, cells)).map(([k, v]) => [k, v.text]));
 }
 
 /**
- * One line of a card's terms (summaryText's items but `hide`'s): "Fee ₹1.7 L/yr", "Bond 2 yr · ₹50 L", "Stipend
- * ₹85,000/mo", coloured as the cells. No (i)s: the cells, with every figure's words and sources, are under the card's
- * Details. `data-terms`: hidden for an exam with no fee data.
+ * A card's cost in one plain line (costLine's parts but `hide`'s): "3-year fee ₹1.26 L · stipend ₹1.06 L/mo · bond 2 yr
+ * or ₹40 L · leaving: barred next year", each part coloured as its cells. No (i)s: the cells, with every figure's words
+ * and sources, are under the card's Details. `data-terms`: hidden for an exam with no fee data.
  */
-export function TermSummary({ cells, hide, className }: { cells: StatCell[]; hide?: Partial<Record<SummaryKey, unknown>>; className?: string }) {
-  const [fee, stipend] = cells;
-  const flag = bondFlag(cells);
-  const item = (k: SummaryKey, label: React.ReactNode, value: React.ReactNode) =>
-    !hide?.[k] && (
-      <div key={k} className="flex min-w-0 items-baseline gap-1.5">
-        <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
-        <dd>{value}</dd>
-      </div>
-    );
-  const items = [
-    item("fee", "Fee", <><Value c={fee} /><Marker c={fee} /></>),
-    // The flag names itself ("No bond", "Bond 2 yr · ₹50 L"): its label is for screen readers.
-    item("bond", <span className="sr-only">Bond and penalties</span>, <span className={cn("numeric font-semibold", flag.level ? levelClass[flag.level] : "text-muted-foreground")}>{flag.text}</span>),
-    item("stipend", "Stipend", <><Value c={stipend} /><Marker c={stipend} /></>),
-  ].filter(Boolean);
-  if (!items.length) return null;
-  return <dl data-terms className={cn("flex flex-wrap gap-x-4 gap-y-1 text-sm", className)}>{items}</dl>;
+export function TermSummary({ t, cells, hide, className }: { t: ProgrammeTerms; cells?: StatCell[]; hide?: Partial<Record<SummaryKey, unknown>>; className?: string }) {
+  const parts = Object.entries(costLine(t, cells)).filter(([k]) => !hide?.[k as SummaryKey]);
+  if (!parts.length) return null;
+  return (
+    <p data-terms className={cn("text-sm", className)}>
+      {parts.map(([k, v], i) => (
+        <span key={k}>
+          {i > 0 && <span aria-hidden className="text-muted-foreground"> · </span>}
+          {i > 0 && <span className="sr-only">, </span>}
+          <span className={cn("numeric", v.level ? cn("font-semibold", levelClass[v.level]) : v.text.includes("₹") ? "font-semibold" : "text-muted-foreground")}>{v.text}</span>
+        </span>
+      ))}
+    </p>
+  );
 }
 
 /**

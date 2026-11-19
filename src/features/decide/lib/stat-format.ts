@@ -217,6 +217,17 @@ export function feeBasis(t: Pick<ProgrammeTerms, "years" | "programme" | "exam">
   if (!f.atAdmission) return (OTHER_EXAM.has(t.programme) || !!t.exam) && later.some((g) => g && (g.inr !== f.inr || g.min !== f.min)) ? "year1" : "yearly";
   return later.length && later.every((g) => g && !g.atAdmission && g.inr === f.inr && g.min === f.min && g.kind === f.kind) ? "yearly" : "admission";
 }
+/**
+ * The fee a year, the one every sort, comparison and "cheapest" reads: year 1's when it is a yearly figure (feeBasis);
+ * else the later years' (an amount at admission, or a Year 1 figure that differs, is said beside it, never sorted as the
+ * yearly fee); null when there is none (an amount at admission alone).
+ */
+export function yearlyFee(t: Pick<ProgrammeTerms, "years" | "programme" | "exam">): Figure | null {
+  const f = t.years[0]?.fee;
+  if (!f) return null;
+  return feeBasis(t) === "yearly" ? f : (t.years.slice(1).find((y) => y.fee && !y.fee.atAdmission)?.fee ?? null);
+}
+
 /** "On MCC" after a college's own document (NEET PG, SS, MDS: MCC hosts it); INI-CET's are its own. */
 const onBy = (t: Pick<ProgrammeTerms, "exam">) => (authorityOf(t.exam) === "MCC" ? " on MCC" : "");
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
@@ -257,19 +268,24 @@ function feeCell(t: ProgrammeTerms): StatCell {
   // A year's fee says so, cards too: "₹1.71 L/yr", "₹15–25 L/yr"; an amount at admission only "₹5 L at admission (Year 1)"
   // (feeBasis); the NBEMS ceiling "Up to ₹1.25 L/yr" (cards "≤ ₹1.25 L/yr"), never the college's own. A range's marker
   // says why it is one; everything else a figure leaves out is in the (i).
-  const v = feeRange(f.min, f.inr);
   const basis = feeBasis(t)!;
-  const per = PER[basis];
+  // An amount at admission or a Year 1 figure that differs, with a yearly figure after it: the yearly one is the fee,
+  // the first year's said under it ("₹5 L at admission (Year 1)"), never the other way round.
+  const y = basis === "yearly" ? f : yearlyFee(t);
+  const g = y ?? f;
+  const v = feeRange(g.min, g.inr);
+  const per = y ? PER.yearly : PER[basis];
+  const first = y && y !== f ? `${feeRange(f.min, f.inr)}${PER[basis]}` : null;
   const cell: StatCell = {
     ...c,
-    short: (f.kind === "maximum" ? "≤ " : "") + v + per,
-    full: (f.kind === "maximum" ? "Up to " : "") + v + per,
-    marker: f.min != null || f.varies ? VARIES : null, tone: null, tip,
+    short: (g.kind === "maximum" ? "≤ " : "") + v + per,
+    full: (g.kind === "maximum" ? "Up to " : "") + v + per,
+    marker: first ?? (g.min != null || g.varies ? VARIES : null), tone: null, tip,
   };
   // Fee bands are NEET PG's course types: another exam's figures have none (INI-CET's MD/MS too).
   const [low, high] = t.exam ? [] : (FEE_BANDS[t.programme as keyof typeof FEE_BANDS] ?? []);
-  if (f.kind === "maximum" || basis === "admission" || low == null) return cell;
-  const band = f.above || f.inr >= high ? "high" : f.inr < low ? "low" : null;
+  if (g.kind === "maximum" || !y || low == null) return cell;
+  const band = g.above || g.inr >= high ? "high" : g.inr < low ? "low" : null;
   if (!band) return cell;
   const word = `${band === "high" ? "High" : "Low"} fee for ${t.programme}`;
   return { ...levelOf(cell, band === "high" ? "heavy" : "good", word), tip: [...tip, { text: `${word} (${feeBandText})` }] };
@@ -552,6 +568,32 @@ export function bondPlain(t: ProgrammeTerms): string {
 
 const LEVELS: Level[] = ["good", "caution", "strong", "heavy"];
 
+/** The plain cost line's parts, in its order (a card's one line: costLine). */
+export const costKeys = ["fee", "stipend", "bond", "leaving"] as const;
+export type CostKey = (typeof costKeys)[number];
+const lc = (s: string) => s[0].toLowerCase() + s.slice(1);
+/**
+ * An option's cost in one plain line, from its cells (never a new reading), each part where the data has it: "3-year
+ * fee ₹1.26 L · stipend ₹1.06 L/mo · bond 2 yr or ₹40 L · leaving: barred next year". The whole course's fee where
+ * every year is published (else the fee a year); `level`: the part's strongest colour.
+ */
+export function costLine(t: ProgrammeTerms, cells: StatCell[] = statCells(t)): Partial<Record<CostKey, { text: string; level?: Level }>> {
+  const at = (k: StatKey) => cells.find((c) => c.key === k)!;
+  const [fee, stipend, bond, inr, leaving] = statKeys.map(at);
+  const max = t.years.some((y) => y.fee?.kind === "maximum");
+  const money = (c: StatCell) => c.tone !== "muted" && c.short.includes("₹");
+  const strongest = (cs: StatCell[]) => LEVELS.findLast((l) => cs.some((c) => c.level === l));
+  const bondText =
+    bond.tone === "bond" ? `${bond.short === "Bond" ? lc(bond.full) : `bond ${bond.short.replace(/Y$/, " yr")}`}${money(inr) ? ` or ${inr.short}` : ""}` : bond.short === NOT_KNOWN ? "bond not known" : lc(bond.short);
+  const out: Partial<Record<CostKey, { text: string; level?: Level }>> = {
+    ...(t.wholeCourseFee != null ? { fee: { text: `${t.durationYears}-year fee ${max ? "≤ " : ""}${inrCard(t.wholeCourseFee)}`, level: fee.level } } : !fee.missing && { fee: { text: `fee ${fee.tone === "muted" ? lc(fee.short) : fee.short}`, level: fee.level } }),
+    ...(!stipend.missing && { stipend: { text: `stipend ${stipend.tone === "muted" ? lc(stipend.short) : stipend.short}`, level: stipend.level } }),
+    bond: { text: bondText, level: strongest([bond, ...(money(inr) ? [inr] : [])]) },
+    ...(!leaving.missing && { leaving: { text: `leaving: ${money(leaving) ? leaving.short : lc(leaving.short)}`, level: leaving.level } }),
+  };
+  return out;
+}
+
 /**
  * "Be careful", from the cells' own values and colours (never a new reading): a bond or leaving penalty of ₹25 L or more,
  * a bond of 3 years or more, or a bond that is Not known (ask the college). Each reason in words; empty when none.
@@ -565,23 +607,6 @@ export function beCareful(cells: StatCell[]): string[] {
     leaving.level === "heavy" && `leaving penalty ${leaving.short}`,
     bond.short === NOT_KNOWN && "bond not known: ask the college",
   ].filter((x): x is string => !!x);
-}
-
-/**
- * The bond and its penalties as one flag, for a card's summary line, from the cells' own values (never a new reading),
- * in the cells' three states: "No bond", a stated bond ("Bond 2 yr · ₹50 L": the years and what skipping them costs;
- * "Bond, years not stated"), or "Bond not known" (the cell's "Not known"; why is in its (i) under Details), then a
- * leaving penalty that is a ₹ figure ("Leaving ≤ ₹1.06 Cr"). `level`: the strongest colour of those cells.
- */
-export function bondFlag(cells: StatCell[]): { text: string; level?: Level } {
-  const at = (k: StatKey) => cells.find((c) => c.key === k)!;
-  const [bond, inr, leaving] = [at("bond"), at("bondInr"), at("leaving")];
-  const figure = (c: StatCell) => c.tone !== "muted" && c.short.includes("₹");
-  const head = bond.tone === "bond" ? (bond.short === "Bond" ? bond.full : `Bond ${bond.short.replace(/Y$/, " yr")}`) : bond.short === NOT_KNOWN ? "Bond not known" : bond.short;
-  const parts = [head, figure(inr) && inr.short, figure(leaving) && `Leaving ${leaving.short}`].filter(Boolean);
-  const used = [bond, ...[inr, leaving].filter(figure)];
-  const level = LEVELS.findLast((l) => used.some((c) => c.level === l));
-  return { text: parts.join(" · "), ...(level && { level }) };
 }
 
 /** The five cells of one course's terms, in order: Fee, Stipend, Bond, Bond ₹, Leaving (the bond three lead with bondPlain). */
