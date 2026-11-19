@@ -211,7 +211,8 @@ function Fallback({ docs, sup }: { docs: SourceDoc[]; sup?: boolean }) {
   const ext = (url: string, text: string, sr: string) => (
     <a href={url} target="_blank" rel="noopener noreferrer" className="underline hover:text-sky">{text}<span className="sr-only">{sr} (opens in a new tab)</span></a>
   );
-  const out = docs.map((d, i) => (
+  // One link a document (a list of rows cites its documents once per row).
+  const out = [...new Map(docs.map((d) => [docKey(d), d])).values()].map((d, i) => (
     <span key={docKey(d)}>
       {i > 0 && "; "}
       {d.url ? ext(d.url, sup ? "source" : d.name, sup ? `: ${d.name}` : "") : d.name}
