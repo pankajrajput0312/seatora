@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { activeExam } from "@/features/exams/active";
+import { activeExam, examInfo } from "@/features/exams/active";
 import { authorityOf, exams, yearName, type ExamKey } from "@/features/exams/registry";
 import { decideLinks } from "../lib/links";
 import { alertOf, badgeOf, currentSteps, NOTICE_CLOSED_COOKIE, dueToday, fmtIST, fmtNote, nextDate, roundName, stepName, stepsNow, type StepNow } from "../lib/round-status";
@@ -24,7 +24,7 @@ export function NoticeLink({ s, children, by = "MCC" }: { s: Pick<StepNow, "url"
   );
 }
 
-/** The exam's counselling site (NEET PG, SS, MDS: MCC's PG counselling site; INI-CET: AIIMS's exams site). */
+/** The exam's counselling site (NEET PG: MCC's PG counselling site; NEET SS, MDS: MCC's page for it; INI-CET: AIIMS's exams site). */
 export const siteLink = (exam: ExamKey, className = `${smallLink} text-sky`) => {
   const s = exams[exam].site ?? { url: MCC_PG, name: "MCC PG counselling site" };
   return <a href={s.url} target="_blank" rel="noopener noreferrer" className={className}>{s.name}<span className="sr-only"> (opens in a new tab)</span></a>;
@@ -37,7 +37,8 @@ export const siteLink = (exam: ExamKey, className = `${smallLink} text-sky`) => 
  */
 export async function RoundStatusBanner({ params }: { params: URLSearchParams }) {
   const exam = await activeExam();
-  if (!exams[exam].has.notices) return null;
+  // Another exam: once its data has a round status or notices (examInfo).
+  if (!(await examInfo(exam)).has.notices) return null;
   // NEET PG: LATEST_YEAR, as ever; INI-CET: the session its round status follows (January 2027).
   const year = await scheduleYear(exam);
   const rs = year == null ? null : await roundStatus(year, exam);
@@ -113,7 +114,7 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
 /** Home's top strip while MCC holds a step (alertOf: "Round 2 result on hold"), unless she closed this notice's strip. */
 export async function HeldStrip() {
   const exam = await activeExam();
-  if (!exams[exam].has.notices) return null;
+  if (!(await examInfo(exam)).has.notices) return null;
   const year = await scheduleYear(exam);
   const rs = year == null ? null : await roundStatus(year, exam);
   const a = rs && alertOf(stepsNow(rs, new Date()));

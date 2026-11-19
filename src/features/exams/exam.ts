@@ -91,11 +91,14 @@ export const groupsIn = (E: Pick<Exam, "perGroup">, quotas: readonly string[]) =
 /** A quota only some candidates can take (NEET PG: not in types.ts openQuotas); NEET SS: none (its quotas are question groups). */
 export const isRestricted = (E: Pick<Exam, "perGroup" | "quotas">, quota: string) => !E.perGroup && !E.quotas.includes(quota);
 
-/** Decide pages that need more than cutoffs, and what: without it the nav hides them (DecideShell) and they say so (./active.tsx examGate). */
+/**
+ * Decide pages that need more than cutoffs, and what: without it the nav hides them (DecideShell) and they say so
+ * (./active.tsx examGate). Not Schedule: every exam has one, its round status and notices once its data has them, else
+ * where its counselling body publishes them (app/decide/counselling).
+ */
 export const pageNeeds: Record<string, keyof ExamHas> = {
   "/decide/residents": "residents",
   "/decide/seats": "seats",
-  "/decide/counselling": "notices",
   "/decide/rank-tools": "scoreRank",
   "/decide/fees": "fees",
   "/decide/allotments": "allotments",

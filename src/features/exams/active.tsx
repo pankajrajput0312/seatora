@@ -6,6 +6,7 @@ import { staffUser } from "@/features/auth/lib/session";
 import { AppPage } from "@/features/decide/components/app-page";
 import { EmptyState } from "@/features/decide/components/ui";
 import { getCatalog } from "@/features/decide/server/catalog";
+import { listNotices, scheduleYear } from "@/features/decide/server/notices";
 import { seatLists } from "@/features/decide/server/seats";
 import { examShows, roundNamesOf } from "./exam";
 import { EXAM_HEADER } from "./keys";
@@ -25,7 +26,7 @@ export const activeExam = cache(async (): Promise<ExamKey> => {
 
 /**
  * The exam as its pages show it: its registry entry with what its data says. Another exam: `has.fees` (and bonds) once
- * its import has fee terms (a bundle with a fee table), its rounds' names as that year's MCC PDFs call them, and the
+ * its import has fee terms (a bundle with a fee table), `has.notices` once it has a round status or notices, its rounds' names as that year's MCC PDFs call them, and the
  * latest complete year (headlines). NEET PG: the registry's, exactly as before.
  */
 export const examInfo = cache(async (exam: ExamKey): Promise<Exam> => {
@@ -33,14 +34,15 @@ export const examInfo = cache(async (exam: ExamKey): Promise<Exam> => {
   if (exam === DEFAULT_EXAM) return E;
   const [cat, lists] = await Promise.all([getCatalog(exam), seatLists(exam)]);
   const fees = E.has.fees || cat.terms.length > 0;
-  return { ...E, has: { ...E.has, fees, bonds: E.has.bonds || fees }, roundNames: roundNamesOf([...cat.sources, ...lists]), headYear: headYearIn(exam, cat.sources) };
+  // Its round status and notices once its import has them (notices.json / round_status.json): Home's Today / Next strip.
+  const notices = E.has.notices || (await scheduleYear(exam)) != null || (await listNotices({}, exam)).length > 0;
+  return { ...E, has: { ...E.has, fees, bonds: E.has.bonds || fees, notices }, roundNames: roundNamesOf([...cat.sources, ...lists]), headYear: headYearIn(exam, cat.sources) };
 });
 
 /** What each gated page is called (the nav's words). */
 const pageName: Record<string, string> = {
   "/decide/residents": "Residents",
   "/decide/seats": "Seats",
-  "/decide/counselling": "Schedule",
   "/decide/rank-tools": "Score & rank",
   "/decide/fees": "Fees & bond",
   "/decide/allotments": "Allotments",

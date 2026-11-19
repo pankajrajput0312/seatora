@@ -115,9 +115,10 @@ describe("examFor: only staff get an exam other than NEET PG", () => {
 });
 
 describe("nav and page gating (pageNeeds)", () => {
-  const lacking = ["/decide/residents", "/decide/counselling", "/decide/rank-tools", "/decide/fees"];
-  const shown = ["/decide", "/decide/options", "/decide/seats", "/decide/choices", "/decide/compare", "/decide/institutes", "/decide/last-ranks", "/decide/allotments", "/decide/rank-scan", "/decide/rank-journey"];
-  it("NEET PG shows every page; NEET SS and MDS hide those without data and show the rest, Seats included", () => {
+  const lacking = ["/decide/residents", "/decide/rank-tools", "/decide/fees"];
+  // Schedule too: every exam has one (its round status once its data has it, else where its counselling body publishes it).
+  const shown = ["/decide", "/decide/options", "/decide/seats", "/decide/choices", "/decide/compare", "/decide/counselling", "/decide/institutes", "/decide/last-ranks", "/decide/allotments", "/decide/rank-scan", "/decide/rank-journey"];
+  it("NEET PG shows every page; NEET SS and MDS hide those without data and show the rest, Seats and Schedule included", () => {
     for (const href of [...Object.keys(pageNeeds), ...shown]) expect(showsPage("neet-pg", href)).toBe(true);
     for (const exam of ["neet-ss", "neet-mds"] as const) {
       expect(lacking.map((h) => showsPage(exam, h))).toEqual(lacking.map(() => false));

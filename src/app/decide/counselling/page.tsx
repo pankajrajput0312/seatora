@@ -20,7 +20,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { meritLists } from "@/features/decide/server/merit";
 import { listNotices, roundStatus, scheduleYear } from "@/features/decide/server/notices";
 import { noticeKinds, type NoticeKind, type Round } from "@/features/decide/types";
-import { activeExam, examGate } from "@/features/exams/active";
+import { activeExam } from "@/features/exams/active";
 import { CrossoverGuide } from "@/features/exams/crossover-guide";
 import { authorityOf, DEFAULT_EXAM, examYears, exams, sessionExams, yearName, type ExamKey } from "@/features/exams/registry";
 
@@ -65,8 +65,6 @@ const siteText = (text: string) => (
 type Words = ReturnType<typeof wordsOf>;
 
 export default async function CounsellingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const gated = await examGate("/decide/counselling");
-  if (gated) return gated;
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
   const exam = await activeExam();
@@ -98,13 +96,17 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
   // NEET PG: LATEST_YEAR, as ever; INI-CET: the session its round status follows (January 2027).
   const year = await scheduleYear(exam);
   const rs = year == null ? null : await roundStatus(year, exam);
-  const yearWords = yearName(exam, year ?? w.E.latestYear);
-  if (!rs)
+  if (!rs) {
+    // Another exam with no round status in its data yet (its bundle's round_status.json): the counselling it holds next
+    // (this calendar year, else its latest), and where its counselling body publishes the schedule. Never made-up dates.
+    const next = year ?? (sessionExams.includes(exam) ? w.E.latestYear : Math.max(w.E.latestYear, new Date().getFullYear()));
+    const named = `${exam === DEFAULT_EXAM ? "PG" : w.E.label} ${yearName(exam, next)}`;
     return (
-      <EmptyState icon={CalendarDays} title="No round status loaded" description={`No ${w.by} round status for ${yearWords} is in the data, and no dates are made up. The ${w.by} site has the current schedule.`}>
+      <EmptyState icon={CalendarDays} title={`${w.by} hasn't published the ${named} schedule here yet`} description={`Seatora shows ${w.by}'s round dates once its schedule is in the data, and never makes one up. Until then, ${w.by}'s own page has the current schedule and notices.`}>
         {exam === DEFAULT_EXAM ? <MccLink /> : siteLink(exam)}
       </EmptyState>
     );
+  }
   // Another exam: the session before as it ran (its notices), for reference only, never a forecast of this one's dates.
   const before = exam === DEFAULT_EXAM ? null : examYears(exam).filter((y) => y < rs.year).at(-1) ?? null;
   const ran = before == null ? [] : await listNotices({ year: before }, exam);

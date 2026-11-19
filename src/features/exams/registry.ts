@@ -38,6 +38,8 @@ export const exams: Record<ExamKey, Exam> = {
     // The bundle's course and group labels as printed (the data keeps them).
     typos: [["Reconstructructive", "Reconstructive"], ["Ent Group", "ENT Group"]],
     exampleRank: "250",
+    // MCC's Super Speciality counselling page (its current events: schedules and notices).
+    site: { url: "https://mcc.nic.in/current-events-super-speciality-3/", name: "MCC Super Speciality counselling page" },
     // Hospital facts (beds) are about the institution: an SS hospital's are NEET PG's record of it (institute-data.ts).
     has: { ...resultsOnly, seats: true, beds: true },
   },
@@ -58,6 +60,7 @@ export const exams: Record<ExamKey, Exam> = {
     rankName: "All India Rank",
     perGroup: false,
     exampleRank: "2,500",
+    site: { url: "https://mcc.nic.in/current-events-mds/", name: "MCC MDS counselling page" },
     // MCC's MDS wording for the paid quota now (its results said "Management/Paid Seats" up to 2025): one name everywhere.
     quotaNames: { "Deemed/Paid Seats": "Self-Financed Merit Seat", "Deemed/Paid": "Self-Financed Merit Seat" },
     has: { ...resultsOnly, seats: true },
