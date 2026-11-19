@@ -19,6 +19,10 @@ it("card's big number: the sorted column, else the newest year with a closing, R
   expect(bigClosing(grid, [2023, 2025, 2026])).toEqual({ year: 2025, round: "R2", cell: { closing: 300 } });
   expect(bigClosing(grid, [2026, 2025, 2023], { year: 2026, round: "R1" })).toEqual({ year: 2026, round: "R1", cell: null });
   expect(bigClosing({}, [2026])).toBeNull();
+  // A closing-rank range: the newest round that closed in it (the one the filter matched), else as without it.
+  expect(bigClosing(grid, [2023, 2025, 2026], null, { min: 350 })).toEqual({ year: 2025, round: "stray", cell: { closing: 400 } });
+  expect(bigClosing(grid, [2023, 2025, 2026], null, { max: 150 })).toEqual({ year: 2023, round: "R1", cell: { closing: 100 } });
+  expect(bigClosing(grid, [2023, 2025, 2026], null, { min: 9999 })).toEqual({ year: 2025, round: "R2", cell: { closing: 300 } });
 });
 
 it("meta skips what is not known; More filters opens when one of them is set", () => {

@@ -144,9 +144,12 @@ describe("unknown values", () => {
     expect(termVerdict(caveat, null, { maxBondInr: 100000 })).toBe("unknown");
   });
 
-  it("No bond never lists an unknown bond, ticked or not; a no-bond record where a state law may apply is unknown", () => {
-    expect(termVerdict(blank, null, { maxBondYears: 0 })).toBe("fail");
-    expect(termsPass(blank, null, { maxBondYears: 0, keepUnknown: true })).toBe(false);
+  it("No bond: a declared bond fails; one not declared (or not read) is unknown, listed with Include not published, as every cap", () => {
+    expect(termVerdict(blank, null, { maxBondYears: 0 })).toBe("unknown");
+    expect(termsPass(blank, null, { maxBondYears: 0 })).toBe(false);
+    expect(termsPass(blank, null, { maxBondYears: 0, keepUnknown: true })).toBe(true);
+    expect(termVerdict(known, null, { maxBondYears: 0 })).toBe("fail");
+    expect(termVerdict(noBond, null, { maxBondYears: 0 })).toBe("pass");
     const caveat = terms(null, null, { status: "not_declared", years: null, text: "No bond; Karnataka law: 1 yr service may apply", caveat: "Karnataka law: 1 yr service may apply" });
     expect(termVerdict(caveat, null, { maxBondYears: 0 })).toBe("unknown");
     expect(termVerdict(caveat, null, { maxBondYears: 1 })).toBe("unknown");
@@ -165,15 +168,16 @@ describe("unknown values", () => {
 });
 
 describe("lowestRisk (Compare)", () => {
-  it("only from the bond and leaving penalties shown: the lowest bond wins; unknown never counts as 0", () => {
-    expect(lowestRisk([{ name: "A", t: known }, { name: "B", t: noBond }, { name: "C", t: blank }])).toBe(
-      "Lowest risk here: B (no bond, leaving penalty not published), from the bond and leaving penalties shown. 1 with no bond figure not counted.",
-    );
-    // one figure is no comparison: no winner named
-    expect(lowestRisk([{ name: "A", t: known }, { name: "C", t: blank }])).toBe("Can't tell: only A publishes a bond figure, so there is nothing to compare it with.");
+  it("only from the bond penalties shown, every option's: the lowest wins; one with no figure means no winner", () => {
+    expect(lowestRisk([{ name: "A", t: known }, { name: "B", t: noBond }])).toBe("Lowest risk here: B (no bond, leaving penalty not published), from the bond and leaving penalties shown.");
+    expect(lowestRisk([{ name: "A", t: known }, { name: "B", t: noBond }, { name: "C", t: blank }])).toBe("Can't tell: C publishes no bond penalty figure, so there is no fair lowest.");
+    expect(lowestRisk([{ name: "A", t: known }, { name: "C", t: blank }])).toBe("Can't tell: C publishes no bond penalty figure, so there is no fair lowest.");
   });
   it("all unknown, or all none: said plainly", () => {
     expect(lowestRisk([{ name: "A", t: blank }, { name: "B", t: blank }])).toBe("Can't tell: none of these publishes a bond or leaving penalty figure.");
+    // bond years shown, no money figures: never "none publishes"
+    const years = { ...blank, bond: { ...blank.bond, status: "declared" as const, years: 2 } };
+    expect(lowestRisk([{ name: "A", t: years }, { name: "B", t: blank }])).toBe("Can't tell: no bond penalty or leaving penalty figure is published for these (their bond years are in the table).");
     expect(lowestRisk([{ name: "A", t: noBond }, { name: "B", t: noBond }])).toBe("No bond on record at any of these, and no leaving penalty published: nothing here to tell them apart.");
   });
 });

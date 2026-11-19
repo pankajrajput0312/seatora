@@ -121,8 +121,9 @@ export type TermVerdict = "pass" | "fail" | "unknown";
 
 export function termVerdict(t: ProgrammeTerms, type: TypeValue | null | undefined, f: TermFilters): TermVerdict {
   if (f.types?.length && (type == null || !f.types.includes(type))) return "fail";
-  // "No bond": a record saying so. One that adds a state law's service may apply (`caveat`, years unknown) is unknown, not a fail.
-  if (f.maxBondYears === 0 && t.bond.years !== 0 && t.bond.status !== "none" && !t.bond.caveat) return "fail";
+  // "No bond": a record saying so passes, a declared bond fails; one not declared, not read or not clear (or a no-bond
+  // record a state law's service may override) is unknown, so "Include not published" lists it, as every other cap.
+  if (f.maxBondYears === 0 && t.bond.status === "declared") return "fail";
   const fee = t.years[0]?.fee;
   const s = t.years[0]?.stipend;
   // A stipend range (by subject): its lowest figure meets a floor; a fee range's highest a cap (feeValue). An NBEMS
@@ -212,25 +213,20 @@ export const termMoreOpen = (f: TermParams) => f.minstip != null || f.maxbond !=
  * it; with no bond figure anywhere, the lowest leaving penalty. All unknown, or all none, said plainly.
  */
 export function lowestRisk(items: { name: string; t: ProgrammeTerms }[]): string {
-  const xs = items.map((x) => ({ ...x, bond: feeValue.bond(x.t), leave: feeValue.leave(x.t) }));
+  const xs = items.map((x) => ({ ...x, bond: feeValue.bond(x.t), leave: feeValue.leave(x.t), years: feeValue.bondyrs(x.t) }));
   const money = (n: number) => inrL(n);
-  if (xs.every((x) => x.bond == null && x.leave == null)) return "Can't tell: none of these publishes a bond or leaving penalty figure.";
-  if (xs.every((x) => x.bond === 0 && x.leave == null)) return "No bond on record at any of these, and no leaving penalty published: nothing here to tell them apart.";
   const names = (ys: typeof xs) => ys.map((y) => y.name).join(" and ");
-  const known = xs.filter((x) => x.bond != null);
+  if (xs.every((x) => x.bond == null && x.leave == null))
+    return xs.some((x) => x.years != null)
+      ? "Can't tell: no bond penalty or leaving penalty figure is published for these (their bond years are in the table)."
+      : "Can't tell: none of these publishes a bond or leaving penalty figure.";
+  if (xs.every((x) => x.bond === 0 && x.leave == null)) return "No bond on record at any of these, and no leaving penalty published: nothing here to tell them apart.";
+  // A winner only over figures for every option: one with no bond penalty figure is never beaten, nor beats.
+  const missing = xs.filter((x) => x.bond == null);
+  if (missing.length) return `Can't tell: ${names(missing)} ${missing.length === 1 ? "publishes" : "publish"} no bond penalty figure, so there is no fair lowest.`;
   const leaveText = (l: number | null) => (l == null ? "leaving penalty not published" : `leaving ${money(l)}`);
-  const left = xs.length - known.length;
-  const notCounted = left ? ` ${left} with no bond figure not counted.` : "";
-  // A winner needs two figures to weigh: one option with a figure is no comparison.
-  if (known.length === 1) return `Can't tell: only ${known[0].name} publishes a bond figure, so there is nothing to compare it with.`;
-  if (known.length) {
-    const min = Math.min(...known.map((x) => x.bond!));
-    const best = known.filter((x) => x.bond === min);
-    const leaves = [...new Set(best.map((x) => x.leave))];
-    return `Lowest risk here: ${names(best)} (${min === 0 ? "no bond" : `bond penalty ${money(min)}`}${leaves.length === 1 ? `, ${leaveText(leaves[0])}` : ""}), from the bond and leaving penalties shown.${notCounted}`;
-  }
-  const withLeave = xs.filter((x) => x.leave != null);
-  if (withLeave.length < 2) return `Can't tell: only ${names(withLeave)} publishes a leaving penalty, and none of these a bond figure.`;
-  const min = Math.min(...withLeave.map((x) => x.leave!));
-  return `Lowest risk here: ${names(withLeave.filter((x) => x.leave === min))} (leaving ${money(min)}); no bond figure is published for any of these.`;
+  const min = Math.min(...xs.map((x) => x.bond!));
+  const best = xs.filter((x) => x.bond === min);
+  const leaves = [...new Set(best.map((x) => x.leave))];
+  return `Lowest risk here: ${names(best)} (${min === 0 ? "no bond" : `bond penalty ${money(min)}`}${leaves.length === 1 ? `, ${leaveText(leaves[0])}` : ""}), from the bond and leaving penalties shown.`;
 }

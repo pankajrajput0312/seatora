@@ -6,6 +6,8 @@ import { cn } from "@/lib/cn";
 import { fmtDay, formatInrShort } from "../lib/format";
 import type { FeeQuotaGroup } from "../server/facts";
 import type { Amount, Figure, ProgrammeTerms, TermPart, TermSource } from "../server/terms";
+import { variantFor } from "../lib/specialty-search";
+import { UNREAD, unreadWhy } from "../lib/stat-format";
 import { termLabel } from "../types";
 import { SourceRef } from "./page-sources";
 import { smallLink } from "./ui";
@@ -205,12 +207,89 @@ function FeeWords({ fee }: { fee: FeeQuotaGroup["fee"] }) {
   );
 }
 
+/** A course here (the institute page passes them), `mine` when it is in her profile. */
+export type MyCourse = { degree: string; specialty: string; name: string; mine: boolean };
+type Variant = Extract<FeeQuotaGroup["fee"], { display: "numbers" }>["variants"][number];
+
+/** A course's fee for the whole course: its years added (a range: both ends); null when a year has no figure. */
+function variantTotal(v: Variant, years: number) {
+  const ys = v.per_year.slice(0, years);
+  if (ys.length < years || ys.some((y) => !y)) return null;
+  const lo = ys.reduce((n, y) => n + y!.amount, 0);
+  const hi = ys.reduce((n, y) => n + (y!.amount_max ?? y!.amount), 0);
+  return { amount: lo, amount_max: hi, currency: ys[0]!.currency };
+}
+
+/**
+ * The fee per course (fee_variants): her courses' own in view (a column each, the years and the whole course down the
+ * side, so it fits a phone); every course's behind "Fee of every course here" (a row each).
+ */
+function CourseFees({ rows, all, years, at, caption, nameOf }: { rows: { name: string; v: Variant }[]; all: Variant[]; years: number; at: At; caption: React.ReactNode; nameOf: (v: Variant) => string }) {
+  const money = (x: Parameters<typeof feeMoney>[0] | null | undefined) => (x ? feeMoney(x) : <NotDeclared what="not stated" />);
+  const yearNos = Array.from({ length: years }, (_, i) => i);
+  const th = "py-2 text-left font-normal text-muted-foreground";
+  const num = "numeric px-2 py-2 text-right whitespace-nowrap";
+  return (
+    <div className="grid min-w-0 gap-2">
+      {rows.length > 0 && (
+        <table className="w-full max-w-xl text-sm">
+          <caption className="mb-1 text-left text-sm font-semibold">
+            {rows.length === 1 ? "Your course's fee" : "Your courses' fees"}<span className="sr-only">, {caption}</span>
+          </caption>
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <th scope="col" className="py-2 pr-3 font-semibold">Year</th>
+              {rows.map(({ name, v }) => <th key={name} scope="col" className="px-2 py-2 text-right font-semibold">{name}{at(v.src)}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {yearNos.map((i) => (
+              <tr key={i} className="border-b border-border">
+                <th scope="row" className={th}>Year {i + 1}</th>
+                {rows.map(({ name, v }) => <td key={name} className={`${num} font-semibold`}>{money(v.per_year[i])}</td>)}
+              </tr>
+            ))}
+            <tr>
+              <th scope="row" className={th}>Whole course</th>
+              {rows.map(({ name, v }) => <td key={name} className={`${num} font-semibold`}>{money(variantTotal(v, years))}</td>)}
+            </tr>
+          </tbody>
+        </table>
+      )}
+      <details className="min-w-0 text-sm">
+        <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky">Fee of every course here ({all.length})</summary>
+        <div className="overflow-x-auto">
+          <table className="w-full max-w-xl text-sm">
+            <caption className="sr-only">{caption}: the fee of every course here, by year and for the whole course</caption>
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th scope="col" className="py-2 pr-3 font-semibold">Course</th>
+                {yearNos.map((i) => <th key={i} scope="col" className="px-2 py-2 text-right font-semibold">Year {i + 1}</th>)}
+                <th scope="col" className="py-2 pl-2 text-right font-semibold">Whole course</th>
+              </tr>
+            </thead>
+            <tbody>
+              {all.map((v) => (
+                <tr key={v.applies_to} className="border-b border-border">
+                  <th scope="row" className="py-2 pr-3 text-left font-normal">{nameOf(v)}{at(v.src)}</th>
+                  {yearNos.map((i) => <td key={i} className={num}>{money(v.per_year[i])}</td>)}
+                  <td className={`${num} font-semibold`}>{money(variantTotal(v, years))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  );
+}
+
 /**
  * One seat-type group's fee and stipend by course year. fee.display "numbers": a year table of the figures; "verbatim"
  * (also a record without fee_display): only the profile's fee words and their link, never a figure, then the stipends.
  * NBEMS ceilings and floors are labelled, never the college's figure.
  */
-function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of: string; title: string; off: number }) {
+function FeeGroup({ g, id, of, title, off, courses = [] }: { g: FeeQuotaGroup; id: string; of: string; title: string; off: number; courses?: MyCourse[] }) {
   const sources = groupSources(g, off);
   const at: At = (x) => <Sup n={x == null ? x : x + off} sources={sources} />;
   const n = g.fee.display === "numbers" ? g.fee : null;
@@ -222,6 +301,14 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
   const shown = <>{g.groups.map((x, i) => <Fragment key={x}>{i > 0 && " + "}<QuotaName quota={x} /></Fragment>)} seats</>;
   const fees = n?.perYear ?? [];
   const st = g.stipendPerMonth;
+  // Per-course figures (a deemed university's fee_variants): her courses' own, above the range over every course.
+  const variants = n?.variants ?? [];
+  const own = courses.flatMap((c) => {
+    const v = c.mine && variantFor(variants, c.degree, c.specialty);
+    return v ? [{ name: c.name, v }] : [];
+  });
+  // A course's name for its record words ("MDS CONSERVATIVEDENTISTRY"): the course here it is, else its words.
+  const nameOf = (v: Variant) => courses.find((c) => variantFor([v], c.degree, c.specialty))?.name ?? v.applies_to;
   // ponytail: stipend words the export calls "(no figure)" but that hold figures (one record: "35000/mth / 37000/mth"),
   // read here only to compare them with the NBEMS minimum shown; the export should read them as declared figures.
   const words = g.stipendNote?.match(/^MCC profile stipend text \(no figure\): (.*)$/)?.[1];
@@ -243,7 +330,7 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
       </>
     ) : null,
     n?.includesHostel && HOSTEL_IN[n.includesHostel],
-    ...(n?.notes ?? []),
+    ...(n?.notes ?? []).map((x) => x.replace(/\s*\(each course in fee_variants\)/, "")),
     (fees.some((f) => f?.maximum) || n?.wholeCourse?.maximum) && NBEMS_MAX,
     fees.some((f) => f?.above_nbems_ceiling) && "Above NBEMS maximum: the college declared more than NBEMS's maximum fee.",
     st.some((s) => s?.minimum) && (lower ? "NBEMS minimum: the hospital must pay at least this." : NBEMS_MIN),
@@ -285,12 +372,13 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
           <FeeWords fee={g.fee} />
         </div>
       )}
+      {variants.length > 0 && courses.length > 0 && <CourseFees rows={own} all={variants} years={g.years} at={at} caption={<>{title}, {shown}</>} nameOf={nameOf} />}
       <table className="w-full max-w-xl text-sm">
         <caption className="sr-only">{title}, {shown}: {feeCol ? "fee and stipend" : "stipend"} by year of the course</caption>
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
             <th scope="col" className="py-2 pr-3 font-semibold">Year</th>
-            {feeCol && <th scope="col" className="px-3 py-2 text-right font-semibold">Fee that year</th>}
+            {feeCol && <th scope="col" className="px-3 py-2 text-right font-semibold">{variants.length && courses.length ? "Fee that year, every course" : "Fee that year"}</th>}
             <th scope="col" className="py-2 pl-3 text-right font-semibold">Stipend per month</th>
           </tr>
         </thead>
@@ -402,7 +490,7 @@ function TermsYears({ t }: { t: ProgrammeTerms }) {
  * them (MCh, MPH, an import before the table) a year table from the programme's terms (a 2-year course has no year 3)
  * with the whole-course fee.
  */
-export function FeesSection({ t: all, id, className, groups = [] }: { t: ProgrammeTerms; id: string; className?: string; groups?: FeeQuotaGroup[] }) {
+export function FeesSection({ t: all, id, className, groups = [], courses }: { t: ProgrammeTerms; id: string; className?: string; groups?: FeeQuotaGroup[]; courses?: MyCourse[] }) {
   // Each group's sources, then the bond block's, kept apart (Sup finds a figure's document in its block's list).
   const offs = groups.reduce<number[]>((o, g, i) => [...o, o[i] + lastSource(g)], [0]);
   const t = groups.length ? bondBlock(all, offs[groups.length]) : all;
@@ -412,7 +500,7 @@ export function FeesSection({ t: all, id, className, groups = [] }: { t: Program
       <h3 id={id} className="text-lg font-semibold">{title}</h3>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="grid min-w-0 content-start gap-6">
-          {groups.length > 0 ? groups.map((g, i) => <FeeGroup key={g.quotaGroup} g={g} id={`${id}-g${i}`} of={id} title={title} off={offs[i]} />) : <TermsYears t={t} />}
+          {groups.length > 0 ? groups.map((g, i) => <FeeGroup key={g.quotaGroup} g={g} id={`${id}-g${i}`} of={id} title={title} off={offs[i]} courses={courses} />) : <TermsYears t={t} />}
         </div>
         <BondBox t={t} id={`${id}-bond`} of={id} />
       </div>
@@ -461,6 +549,9 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
           </>
         ) : bond.status === "other_course" ? (
           <p>{otherCourse(t)}<Sup n={bond.src} sources={sources} />{isDnb(t) ? <NbemsRules /> : ` ${STATE_CAUTION}`}</p>
+        ) : bond.why === "unread" ? (
+          // A bond document MCC lists that is not read yet: said once, with why when the record knows (its link below).
+          <p>{UNREAD}{unreadWhy(bond.text) && <span className={note}>{unreadWhy(bond.text)}<Sup n={bond.src} sources={sources} /></span>}</p>
         ) : bond.text ? (
           // The record's status is unknown: its words say why (not checked yet, not declared on MCC, no clear terms).
           <p>{bond.text}<Sup n={bond.src} sources={sources} />{isDnb(t) && <NbemsRules />}</p>

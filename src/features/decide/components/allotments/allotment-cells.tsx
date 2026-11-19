@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { DecideLinks } from "../../lib/links";
 import type { PrevSeat } from "../../types";
+import { QuotaName } from "../round-name";
 import { Dash } from "../bits";
 import type { ReportedBeds } from "../institute/institute-data";
 import { Beds as OneBeds } from "../pages/beds";
@@ -18,7 +19,7 @@ export function PrevSeatCell({ prev, L }: { prev: NamedPrev | null; L: DecideLin
       ) : (
         <span className="font-medium">{prev.collegeName}</span>
       )}
-      <span className="text-xs text-muted-foreground">{prev.courseName} · {prev.quota} · {prevRemarkLabel[prev.remark]}</span>
+      <span className="text-xs text-muted-foreground">{prev.courseName} · <QuotaName quota={prev.quota} /> · {prevRemarkLabel[prev.remark]}</span>
     </span>
   );
 }

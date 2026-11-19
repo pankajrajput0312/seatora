@@ -100,8 +100,7 @@ function Progress({ m, now }: { m: Msg; now: number }) {
   );
 }
 
-/** `profileParams`: the profile to send (another exam is active: her NEET PG one); absent, the URL's. */
-export function AskChat({ starters, youLine, head, profileParams }: { starters: Starter[]; youLine: string | null; head: React.ReactNode; profileParams?: string }) {
+export function AskChat({ starters, youLine, head }: { starters: Starter[]; youLine: string | null; head: React.ReactNode }) {
   const sp = useSearchParams();
   const [conv, setConv] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -112,7 +111,7 @@ export function AskChat({ starters, youLine, head, profileParams }: { starters: 
   const live = useRef<{ requestId: string; ctrl: AbortController } | null>(null);
   const convRef = useRef<string | null>(null);
   convRef.current = conv;
-  const profile = () => profileParams ?? keepProfileParams(new URLSearchParams(sp.toString())).toString();
+  const profile = () => keepProfileParams(new URLSearchParams(sp.toString())).toString();
   const busy = msgs.some((m) => m.role === "assistant" && (m.status === "streaming" || m.status === "checkpoint"));
 
   const patch = useCallback((requestId: string, fn: (m: Msg) => Msg) => setMsgs((xs) => xs.map((m) => (m.role === "assistant" && m.requestId === requestId ? fn(m) : m))), []);

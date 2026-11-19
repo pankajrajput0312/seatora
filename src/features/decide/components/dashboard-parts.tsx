@@ -52,6 +52,15 @@ export function SetRankPrompt({ path }: { path: string }) {
   );
 }
 
+/**
+ * A page that works without a profile (Last ranks: Open seats), with none in its address: while a saved profile is
+ * read (the shell then adds it) `wait` (its title and the loading line), never results for seats that aren't hers.
+ */
+export function WaitForSaved({ wait, children }: { wait: React.ReactNode; children: React.ReactNode }) {
+  const [saved, hydrated] = useSavedForPrompt();
+  return !hydrated || saved ? wait : children;
+}
+
 const STEPS = ["Rank and category", "Courses", "Quotas"];
 
 /** NEET SS with no question group in her profile (a URL rank alone): nothing is labelled until she picks it. */

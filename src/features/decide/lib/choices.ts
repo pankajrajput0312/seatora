@@ -1,7 +1,7 @@
 // Pure choice-list logic (tested). Items are snapshots so a list renders without refetching.
 import { z } from "zod";
 import type { ProgrammeTerms } from "../server/terms";
-import { statCells } from "./stat-format";
+import { statCells, statKeys, statLabel, type StatCell } from "./stat-format";
 import { groupOf } from "@/features/exams/exam";
 
 export type ChoiceItem = {
@@ -69,16 +69,18 @@ export function duplicateList(state: ChoicesState, sourceId: string): ChoicesSta
 }
 
 /** One choice's fee, bond and penalties in words, for sharing: "Fee: ₹1.71 L/yr; Bond period: 1 year; Bond penalty: ₹10 L; Leaving penalty: None". What isn't in the data is left out. */
-export const termsWords = (t: ProgrammeTerms) => statCells(t).filter((c) => c.key !== "stipend" && !c.missing).map((c) => `${c.label}: ${c.full}`).join("; ");
+/** A cell in words; a fee only "On college website ↗" gives its link instead (no arrow in a message or a file). */
+export const cellWords = (c: StatCell) => (c.href && c.full.endsWith("↗") ? `on the college website, ${c.href}` : c.full);
+export const termsWords = (t: ProgrammeTerms) => statCells(t).filter((c) => c.key !== "stipend" && !c.missing).map((c) => `${c.label}: ${cellWords(c)}`).join("; ");
 
-/** The list for WhatsApp, in order, one line a choice (`terms`: its termsWords, null while not loaded), then a link to Seatora. */
+/** The list for WhatsApp, in order, one line a choice (`terms`: its termsWords, null while not loaded), then `url`: the list's page. */
 /** `exam`: the exam's name ("NEET PG"). */
 export function shareText(list: ChoiceList, terms: (id: string) => string | null, url: string, exam = "NEET PG") {
   const lines = list.items.map((i, n) => {
     const t = terms(i.id);
     return `${n + 1}. ${i.institute} — ${i.course}, ${i.quota}${t ? `. ${t}` : ""}`;
   });
-  return [`My ${exam} choice list (${list.name}), in order:`, ...lines, "", `Made with Seatora: ${url}`].join("\n");
+  return [`My ${exam} choice list (${list.name}), in order:`, ...lines, "", `The list on Seatora: ${url}`].join("\n");
 }
 
 /**
@@ -95,9 +97,13 @@ export function toMccText(list: ChoiceList): string {
   return list.items.map((i, n) => `${n + 1}. ${[i.institute, [i.state, pinOf(i)].filter(Boolean).join(" ")].filter(Boolean).join(", ")} — ${i.course} — ${i.quota}`).join("\n");
 }
 
-export function toCsv(list: ChoiceList): string {
+/** The CSV's columns after the choice: its closings and terms (`extra`, in this order; blank while not loaded). */
+export const CSV_EXTRA = ["Latest closing", "Deepest closing", ...statKeys.map((k) => statLabel[k])];
+
+export function toCsv(list: ChoiceList, extra: (id: string) => (string | null)[] | null = () => null): string {
   const esc = (s: string | null) => `"${(s ?? "").replace(/"/g, '""')}"`;
-  return ["Order,Institute,State,PIN,Course,Quota", ...list.items.map((i, n) => [n + 1, esc(i.institute), esc(i.state), esc(pinOf(i)), esc(i.course), esc(i.quota)].join(","))].join("\n");
+  const head = ["Order", "Institute", "State", "PIN", "Course", "Quota", ...CSV_EXTRA].join(",");
+  return [head, ...list.items.map((i, n) => [n + 1, esc(i.institute), esc(i.state), esc(pinOf(i)), esc(i.course), esc(i.quota), ...CSV_EXTRA.map((_, k) => esc(extra(i.id)?.[k] ?? null))].join(","))].join("\n");
 }
 
 /** Mark the first n items as typed into MCC (what's in the portal now). */
@@ -161,21 +167,22 @@ export function renameOptionId(id: string, of: RenamedOf): string {
 /**
  * Saved choices and compare ids moved off retired college keys (merged colleges, neutral names): ids, links and names
  * follow the college; an option that now appears twice in a list (two merged colleges) is kept once. `renamed`: the
- * distinct saved ids that changed (old ids).
+ * distinct saved ids that changed (old ids); `names`: each one as the notice names it ("New name, MD Anaesthesiology
+ * (was Old name)"; a compared id: its college's new name).
  */
 export function renameSaved(state: ChoicesState, compare: string[], of: RenamedOf) {
-  const changed = new Set<string>();
-  const id = (x: string) => {
+  const changed = new Map<string, string>();
+  const id = (x: string, label?: string) => {
     const y = renameOptionId(x, of);
-    if (y !== x) changed.add(x);
+    if (y !== x && (label || !changed.has(x))) changed.set(x, label ?? of(collegeKeyOf(x))!.name);
     return y;
   };
   const lists = state.lists.map((l) => {
     const items = l.items.map((i) => {
       const r = of(collegeKeyOf(i.id));
-      return r ? { ...i, id: id(i.id), slug: r.slug, institute: r.name } : i;
+      return r ? { ...i, id: id(i.id, `${r.name}, ${i.course}${i.institute !== r.name ? ` (was ${i.institute})` : ""}`), slug: r.slug, institute: r.name } : i;
     });
-    return { ...l, items: items.filter((i, n) => items.findIndex((x) => x.id === i.id) === n), typedIds: [...new Set(l.typedIds.map(id))] };
+    return { ...l, items: items.filter((i, n) => items.findIndex((x) => x.id === i.id) === n), typedIds: [...new Set(l.typedIds.map((x) => id(x)))] };
   });
-  return { choices: { ...state, lists }, compare: [...new Set(compare.map(id))], renamed: [...changed] };
+  return { choices: { ...state, lists }, compare: [...new Set(compare.map((x) => id(x)))], renamed: [...changed.keys()], names: [...changed.values()] };
 }

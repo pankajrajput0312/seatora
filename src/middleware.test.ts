@@ -55,4 +55,11 @@ describe("middleware: the URL's ?exam=", () => {
     expect(header(res)).toBeNull();
     expect(res.headers.get("set-cookie") ?? "").not.toMatch(/seatora_exam/);
   });
+  it("bare /decide: the staff browser's last exam (its cookie); NEET PG's or none, or anything asked: as it is", async () => {
+    const aid = "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA";
+    const ss = await visit({ ...ua, cookie: `${aid}; seatora_exam=neet-ss` }, "/decide");
+    expect(new URL(ss.headers.get("location")!).pathname + new URL(ss.headers.get("location")!).search).toBe("/decide?exam=neet-ss");
+    for (const [cookie, path] of [[`${aid}; seatora_exam=neet-pg`, "/decide"], [aid, "/decide"], [`${aid}; seatora_exam=neet-ss`, "/decide?rank=500"], [`${aid}; seatora_exam=neet-ss`, "/decide/options"]])
+      expect((await visit({ ...ua, cookie }, path)).headers.get("location")).toBeNull();
+  });
 });

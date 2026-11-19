@@ -29,8 +29,8 @@ import { readTermFilters, termChips, termValueLabel } from "@/features/decide/li
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, listOptions, optionsView, unlistedSeats } from "@/features/decide/service";
 import { optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
-import { activeExam } from "@/features/exams/active";
-import { DEFAULT_EXAM, exams, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
+import { activeExam, examInfo } from "@/features/exams/active";
+import { DEFAULT_EXAM, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
 import { quotaIn } from "@/features/exams/exam";
 
 export const metadata: Metadata = { title: "Options" };
@@ -67,7 +67,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const profile = profileFromParams(params);
   if (!profile) return <AppPage><PageHead title="Options" /><SetRankPrompt path="/decide/options" /></AppPage>;
   const exam = await activeExam();
-  const E = exams[exam];
+  const E = await examInfo(exam); // its data: fees once its import has them
   // NEET SS: a rank is within one question group, so nothing is labelled until she picks hers.
   if (perGroup(exam) && !profile.quotas.length) return <AppPage><PageHead title="Options" /><GroupPrompt /></AppPage>;
   const PAST_YEARS = E.pastYears;
@@ -147,12 +147,13 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const capped = "capped" in r ? (r.capped ?? 0) : 0;
   const caps = [profile.maxFeeLakh != null && tp.maxfee == null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && tp.bondyrs == null && termValueLabel.bondyrs(profile.maxBondYears)].filter(Boolean).join(", ");
   const capWords = caps ? `your cap (${caps})` : "the fee, stipend, bond or type filters";
+  const showCapped = here({ fee: null, bond: null, maxfee: "any", bondyrs: "any", ctype: null, minstip: null, maxbond: null, maxleave: null });
   const capNote = exam !== DEFAULT_EXAM && (capped > 0 || r.unknownTerms > 0) && (
     <p role="status" className="flex flex-wrap items-center gap-x-3 rounded-md border border-sun/40 bg-sun/10 px-3 py-2 text-sm">
       {capped > 0 && (
         <span>
           <span className="numeric font-semibold">{formatRank(capped)}</span> {capped === 1 ? "option" : "options"} in your profile hidden by {capWords}.{" "}
-          <Link href={here({ fee: null, bond: null, maxfee: "any", bondyrs: "any", ctype: null, minstip: null, maxbond: null, maxleave: null })} className={`${smallLink} text-sky`}>Show them</Link>
+          <Link href={showCapped} className={`${smallLink} text-sky`}>Show them</Link>
         </span>
       )}
       {r.unknownTerms > 0 && (
@@ -245,7 +246,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
               </Link>
             )}
           </p>
-          <StillCanDo L={L} exam={exam} rank={profile.rank} list={roundView ? lists[0] : undefined} fresh={sum?.fresh ?? 0} counts={r.counts} id="still-h" title="What you can still do" />
+          <StillCanDo L={L} exam={exam} rank={profile.rank} list={roundView ? lists[0] : undefined} fresh={sum?.fresh ?? 0} counts={r.counts} cap={capNote ? { href: showCapped, words: capWords, n: capped } : undefined} id="still-h" title="What you can still do" />
         </>
       )}
       {!roundView && lists.length > 0 && (

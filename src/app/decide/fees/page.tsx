@@ -76,6 +76,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
     ...(f.bdecl ? [{ label: f.bdecl === "declared" ? "Bond declared" : "No bond on record", href: without("bdecl") }] : []),
   ];
 
+  const total = exam !== DEFAULT_EXAM;
   const sortTh = (k: FeeSort, label: string, cls = "text-right") => {
     const on = f.sort === k;
     return (
@@ -112,7 +113,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const table = (
     <ScrollTable label="Fees, stipend and bond table">
       <table className={tbl.table}>
-        <caption className="sr-only">Fees a year and stipend a month for years 1 to 3, service bond and leaving penalty by institute and programme, page {res.page}. The whole-course fee is in each Fee (i).</caption>
+        <caption className="sr-only">Fees a year and stipend a month for years 1 to 3, service bond and leaving penalty by institute and programme, page {res.page}. {total ? "The whole-course fee: the Fee total column." : "The whole-course fee is in each Fee (i)."}</caption>
         <thead className={tbl.head}><tr className={tbl.headRow}>
           {sortTh("name", "Institute", `sticky left-0 z-10 bg-card text-left ${tbl.pin}`)}
           {statKeys.flatMap((k) =>
@@ -124,6 +125,8 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                       Y{y}<span className="sr-only"> {statLabel[k].toLowerCase()}{k === "fee" ? " a year" : " a month"}</span>
                     </th>
                   )),
+                  // Another exam: the whole course's fee as a column of its own (NEET PG: in the Fee (i), as before).
+                  ...(k === "fee" && total ? [sortTh("feetotal", "Fee total")] : []),
                 ]
               : [sortTh(sortOf[k], statLabel[k])],
           )}
@@ -144,7 +147,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                     {type && <TypeBadge type={type} of={r.college.name} />}
                   </span>
                 </th>
-                <TermStatCells t={t} variant="table" years of={of(r)} tdClassName="text-[15px]" />
+                <TermStatCells t={t} variant="table" years total={total} of={of(r)} tdClassName="text-[15px]" />
               </tr>
             );
           })}
@@ -171,16 +174,15 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             <br /><strong>Leaving penalty</strong>: the penalty for leaving the seat or course after joining. MCC&apos;s Round 2 forfeit is on
             each institute&apos;s Fees tab.
             <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. &quot;No bond&quot; only where the
-            college&apos;s document or the NBEMS rule says so; &quot;Not published&quot; where Seatora&apos;s check found no clear answer.
-            &quot;state law may apply&quot;: the college&apos;s document says no bond, but a state law&apos;s service may apply
-            (the filters count it as not published).
+            college&apos;s document or the NBEMS rule says so; &quot;None declared&quot;: no bond declared to MCC; &quot;Law may apply&quot;:
+            the college&apos;s document says no bond, but a state law&apos;s service may apply (the filters count both as not published).
             <br />Sorting: — and figures without a number go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
           </>
           ) : (
             <>
               <strong>Fee</strong>: a year (/yr; year 1&apos;s may be paid at admission), as the college declared it on its MCC institute profile ({exams[exam].label}). &quot;Varies by subject&quot;, &quot;On college website&quot;, &quot;Not stated&quot;: the profile gives no one figure for these seats; its words are in the (i).
               <br /><strong>Stipend</strong>: a month (/mo), as declared.
-              <br /><strong>Bond</strong>: from MCC&apos;s institute list; a bond document Seatora has not read yet is &quot;not checked&quot;. MCC&apos;s Round 2 forfeit is on each institute&apos;s Fees tab.
+              <br /><strong>Bond</strong>: from MCC&apos;s institute list. &quot;Doc not read&quot;: MCC lists a bond document Seatora has not read yet (read it before you lock); &quot;Not clear&quot;: read, with no clear bond; &quot;None declared&quot;: no bond declared to MCC. MCC&apos;s Round 2 forfeit is on each institute&apos;s Fees tab.
               <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. Sorting: — and figures without a number go last either way.
             </>
           )

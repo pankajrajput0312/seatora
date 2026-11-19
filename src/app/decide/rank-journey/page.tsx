@@ -24,8 +24,8 @@ import { getMeta, rankJourney } from "@/features/decide/service";
 import { roundLabel, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
-import { activeExam } from "@/features/exams/active";
-import { exams, groupsOf, perGroup, roundNameIn } from "@/features/exams/registry";
+import { activeExam, examInfo } from "@/features/exams/active";
+import { groupsOf, perGroup, roundNameIn } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Rank journey" };
@@ -41,7 +41,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params);
   const exam = await activeExam();
-  const E = exams[exam];
+  const E = await examInfo(exam); // its data: fees once its import has them
   const meta = await getMeta(exam);
   const typed = params.get("air")?.trim() || null;
   // NEET SS: a rank is one candidate only within a question group: her group's seats (none picked: every group's).

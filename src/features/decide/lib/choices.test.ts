@@ -28,7 +28,12 @@ describe("lists", () => {
       "1. Inst x, S — DNB Anaesthesiology — DNB Quota",
       "2. Inst GANDHIMEDICALCOLLEGEBHOPAL#462001~MD~RADIODIAGNOSIS~All India, S 462001 — DNB Anaesthesiology — DNB Quota",
     ]);
-    expect(toCsv(s.lists[0]).split("\n")[1]).toBe('1,"Inst x","S","","DNB Anaesthesiology","DNB Quota"');
+    expect(toCsv(s.lists[0]).split("\n")[0]).toBe("Order,Institute,State,PIN,Course,Quota,Latest closing,Deepest closing,Fee,Stipend,Bond period,Bond penalty,Leaving penalty");
+    expect(toCsv(s.lists[0]).split("\n")[1]).toBe('1,"Inst x","S","","DNB Anaesthesiology","DNB Quota","","","","","","",""');
+    // Each choice's closings and terms when loaded, in the columns' order.
+    expect(toCsv(s.lists[0], (id) => (id === "x" ? ["1,234 (2025 R1)", "2,000", "₹1 L/yr", null, "1 year", "₹10 L", "None"] : null)).split("\n")[1]).toBe(
+      '1,"Inst x","S","","DNB Anaesthesiology","DNB Quota","1,234 (2025 R1)","2,000","₹1 L/yr","","1 year","₹10 L","None"',
+    );
     expect(toCsv(s.lists[0]).split("\n")[2]).toMatch(/,"S","462001","DNB/);
   });
 });
@@ -80,6 +85,8 @@ describe("retired college keys", () => {
     expect(r.choices.lists[0].typedIds).toEqual([id("SEPNEWNAME#400001")]);
     expect(r.compare).toEqual([id("SEPNEWNAME#400001"), id("SEPNEWNAME#400001", "FAMILYMEDICINE")]);
     expect(r.renamed).toHaveLength(3);
+    // Named for the notice: a choice with its course (and its old name), a compared id by its college.
+    expect(r.names).toEqual([`${to.name}, DNB Anaesthesiology (was Inst ${id("OLDA#400001")})`, `${to.name}, DNB Anaesthesiology (was Inst ${id("OLDB#400001")})`, to.name]);
     expect(renameSaved(r.choices, r.compare, of).renamed).toEqual([]);
   });
 });
@@ -99,8 +106,8 @@ describe("nameFirstList", () => {
 describe("shareText", () => {
   it("the list in order with each choice's terms when loaded, then the link", () => {
     const list = { id: "a", name: "Round 3 · 2026", items: [item("x"), item("y")], typedIds: [] };
-    expect(shareText(list, (id) => (id === "x" ? "Fee ₹1.71 L/yr; Bond period 1 year" : null), "https://seatora.test")).toBe(
-      "My NEET PG choice list (Round 3 · 2026), in order:\n1. Inst x — DNB Anaesthesiology, DNB Quota. Fee ₹1.71 L/yr; Bond period 1 year\n2. Inst y — DNB Anaesthesiology, DNB Quota\n\nMade with Seatora: https://seatora.test",
+    expect(shareText(list, (id) => (id === "x" ? "Fee ₹1.71 L/yr; Bond period 1 year" : null), "https://seatora.test/decide/choices")).toBe(
+      "My NEET PG choice list (Round 3 · 2026), in order:\n1. Inst x — DNB Anaesthesiology, DNB Quota. Fee ₹1.71 L/yr; Bond period 1 year\n2. Inst y — DNB Anaesthesiology, DNB Quota\n\nThe list on Seatora: https://seatora.test/decide/choices",
     );
   });
 });

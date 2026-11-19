@@ -30,7 +30,7 @@ import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, t
 import { allotmentTrends, getMeta } from "@/features/decide/service";
 import { fmtDay, listDay } from "@/features/decide/lib/format";
 import { seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
-import { activeExam, examGate } from "@/features/exams/active";
+import { activeExam, examGate, examInfo } from "@/features/exams/active";
 import { DEFAULT_EXAM, examYears, exams, latestOf, restrictedQuota, type ExamKey } from "@/features/exams/registry";
 import { roundNameFrom } from "@/features/exams/exam";
 import { quotaIn } from "@/features/exams/exam";
@@ -84,7 +84,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
 }
 
 async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; profile: Profile | null; params: URLSearchParams; L: DecideLinks; exam: ExamKey }) {
-  const E = exams[exam];
+  const E = await examInfo(exam); // its data: fees once its import has them
   const [{ all, meta, inst, course, list, mine, sort, r }, view] = await Promise.all([seatsView(f, profile, SEATS_PAGE_SIZE, exam), chosenView(params, "seats")]);
   const one = !!(inst || course || f.squota);
   if (!list || !r)
@@ -395,7 +395,7 @@ async function Trends({ profile, page, L, exam }: { profile: Profile | null; pag
                   <tr key={r.id} className={tbl.row}>
                     <th scope="row" className={`${tbl.td} min-w-56 text-left font-normal`}>
                       <Link href={L.institute(r.college.slug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline">{r.college.name}</Link>
-                      <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="flex min-h-6 w-fit items-center text-xs text-muted-foreground hover:text-sky hover:underline">{courseName(r)}, {r.quota}</Link>
+                      <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className="flex min-h-6 w-fit items-center text-xs text-muted-foreground hover:text-sky hover:underline">{courseName(r)}, {quotaIn(exams[exam], r.quota)}</Link>
                     </th>
                     {newest.map((y) => (
                       <td key={y} data-label={label(y)} className={tbl.num}>

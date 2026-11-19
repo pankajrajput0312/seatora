@@ -30,6 +30,8 @@ export function rankText(v: string | undefined): number | null | "bad" {
   const n = Math.round(Number(m[1]) * (m[2] === "k" ? 1e3 : m[2] ? 1e5 : 1));
   return n >= 1 ? n : "bad";
 }
+/** rankValue that also takes rankText's shorthand ("25k", "0.25L", "2.5 lakh"). */
+export const rankShorthand = z.preprocess((v) => (typeof v === "string" && typeof rankText(v) === "number" ? rankText(v) : v), rankValue);
 /** A closing-rank range from two typed ends: each read by rankText, swapped when typed the wrong way round (`swapped`). */
 export function rankRange(from: string | undefined, to: string | undefined) {
   const [a, b] = [rankText(from), rankText(to)];

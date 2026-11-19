@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { feeBandText, statCells, statLabel, yearValue, type Level, type StatCell, type StatKey } from "../lib/stat-format";
+import { feeBandText, feeRange, statCells, statLabel, yearValue, type Level, type StatCell, type StatKey } from "../lib/stat-format";
 import type { ProgrammeTerms } from "../server/terms";
 import { NBEMS_BOND_RULES, termDocs } from "./fees";
 import { InfoTip } from "./info-tip";
@@ -64,8 +64,8 @@ function Value({ c, full, nb }: { c: StatCell; full?: boolean; nb?: boolean }) {
 }
 
 /**
- * "below NBEMS min", "state law may apply" (the only two): beside the value on a card (under it when there is no room), on its own line in a table
- * (`block`: the column stays narrow). A long one ("state law may apply") wraps inside its cell, never past its rule.
+ * "below NBEMS min", "depends on specialty": beside the value on a card (under it when there is no room), on its own line in a table
+ * (`block`: the column stays narrow). A long one wraps inside its cell, never past its rule.
  */
 const Marker = ({ c, block }: { c: StatCell; block?: boolean }) =>
   c.marker && <span className={cn("text-xs leading-snug font-normal", block ? "block" : "ml-1 inline-block", c.markerWarn ? "text-sun" : "text-muted-foreground")}>{c.marker}</span>;
@@ -91,8 +91,8 @@ export function StatCellView({ c, t, of, short, tip = true, wrap }: { c: StatCel
 const columnNote: Record<StatKey, string> = {
   fee: "Year 1 fee for this course and quota: /yr a fee a year (year 1’s may be paid at admission); at admission (Year 1): MCC’s form gives the amount paid at admission, and later years differ or are not stated. Up to / ≤ ₹1.25 L: a DNB hospital that declared none; the most NBEMS lets it charge. Varies by subject, On college website, Not stated: the profile gives no one figure for these seats (its words are in the institute’s Fees tab). A range (₹1–40 L): the profile gives only the range across subjects (depends on specialty). —: none published. Colour: green a low fee, red a high one, for the course type (" + feeBandText + ").",
   stipend: "Year 1 stipend a month (/mo). From / ≥: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. Not stated: no figure published. —: none published. Colour: amber below the NBEMS minimum.",
-  bond: "Service bond years (1Y: one year). Yes: a bond, years not stated. None declared: a DNB hospital that declared no bond to MCC, so NBEMS lets it impose none this session (not counted as No bond in filters). Not published: no bond declared, or no clear answer; never read as no bond. state law may apply: the document says no bond, but a state law's service may apply. —: not checked. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey not published.",
-  bondInr: "What you pay if you do not serve the bond. ≤ at most, ≥ at least; a range where it varies (depends on specialty, when the record prices it by specialty); + more conditions. A short phrase (Refund stipend, Rest of course fee, No amount stated…): no ₹ figure. None: no bond. Colour: red ₹25 L or more, amber below that, green none.",
+  bond: "Service bond years (1Y: one year). Yes: a bond, years not stated. None declared: no bond declared to MCC (a DNB hospital that declared none: NBEMS lets it impose none this session); never read as no bond, so filters count it as not published. Law may apply: the document says no bond, but a state law's service may apply. —: not checked. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey none declared.",
+  bondInr: "What you pay if you do not serve the bond. ≤ at most, ≥ at least; a range where it varies (depends on specialty, when the record prices it by specialty); + more conditions. A short phrase (Refund stipend, Rest of course fee, Not stated…): no ₹ figure. None: no bond. Colour: red ₹25 L or more, amber below that, green none.",
   leaving: "The college's or state's penalty for leaving the seat or course after joining. ≤, ≥, + and the short phrases (Per state rule, No money penalty…): as for Bond penalty. —: none published. Colour: red ₹25 L or more.",
 };
 
@@ -100,7 +100,7 @@ const columnNote: Record<StatKey, string> = {
 const columnNoteOther: Record<StatKey, string> = {
   fee: "Year 1 fee for this course and quota, as the college's MCC institute profile declares it: /yr a fee a year (year 1’s may be paid at admission); at admission (Year 1): the amount the profile gives for admission. Varies by subject, On college website, Not stated: the profile gives no one figure for these seats (its words are in the institute’s Fees tab). A range: the profile gives only the range across subjects. —: none published. No colour: there are no fee bands for these courses.",
   stipend: "Year 1 stipend a month (/mo), as the college's MCC institute profile declares it. Not stated: no figure published. —: none published.",
-  bond: "Service bond years (1Y: one year). Not checked: MCC lists a bond document for the college that Seatora has not read yet; check it before you lock your choices. Not published: no bond declared. —: not checked. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey not published.",
+  bond: "Service bond years (1Y: one year). Doc not read: MCC lists a bond document for the college that Seatora has not read yet; read it before you lock your choices. Not clear: read, with no clear bond. None declared: no bond declared to MCC. —: not checked. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey none declared.",
   bondInr: columnNote.bondInr,
   leaving: columnNote.leaving,
 };
@@ -145,7 +145,7 @@ export function StatHead({ k }: { k: StatKey }) {
  * Table cells break only after a range's dash, their marker on its own line; `tdClassName`'s padding wins over theirs.
  * `of`: the row ("AIIMS Delhi, MD Anaesthesiology"), so each (i) button is named "About fee, AIIMS Delhi, …".
  */
-export function TermStatCells({ t, variant = "card", short, of, className, tdClassName, years }: { t: ProgrammeTerms; variant?: "card" | "table" | "compact"; short?: boolean; of?: string; className?: string; tdClassName?: string; years?: boolean }) {
+export function TermStatCells({ t, variant = "card", short, of, className, tdClassName, years, total }: { t: ProgrammeTerms; variant?: "card" | "table" | "compact"; short?: boolean; of?: string; className?: string; tdClassName?: string; years?: boolean; total?: boolean }) {
   const cells = statCells(t);
   if (variant !== "card") {
     // The default padding at zero specificity, so a caller's px-/py- wins whatever the CSS order.
@@ -156,6 +156,8 @@ export function TermStatCells({ t, variant = "card", short, of, className, tdCla
       </td>,
       // `years`: Fee and Stipend's years 2 and 3 as columns of their own (YearHeads), after year 1's cell.
       ...(years && (c.key === "fee" || c.key === "stipend") ? [2, 3].map((y) => <YearCell key={`${c.key}${y}`} t={t} pick={c.key as "fee" | "stipend"} year={y} className={td} />) : []),
+      // `total`: the whole course's fee after the fee's years (FeeTotalHead), "—" when a year has no figure.
+      ...(total && c.key === "fee" ? [<td key="feetotal" data-col="feetotal" className={td}>{t.wholeCourseFee != null ? <span className="numeric font-semibold">{feeRange(null, t.wholeCourseFee).replace(/ /g, "\u00a0")}</span> : <span className="text-muted-foreground">—<span className="sr-only">not stated for every year</span></span>}</td>] : []),
     ]);
   }
   return (

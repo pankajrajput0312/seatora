@@ -33,7 +33,7 @@ export const profileParamKeys = ["rank", "cat", "pwd", "sp", "deg", "c", "quota"
 const listKeys = new Set<string>(["sp", "deg", "c", "quota", "st"]);
 
 /** Choices offered for the fee and bond caps, shared by the profile dialog and page filters. */
-export const FEE_LAKH_CHOICES = [2, 5, 10, 20, 30, 50];
+export const FEE_LAKH_CHOICES = [1, 2, 3, 5, 8, 10, 15, 20, 30, 50];
 export const BOND_YEAR_CHOICES = [0, 1, 2, 3];
 /** Every course as an exact-pair choice (the `c` filter), grouped by specialty: "DNB Family Medicine". */
 export const pairChoices = (courses: { degree: string; specialty: string; name: string }[]) =>

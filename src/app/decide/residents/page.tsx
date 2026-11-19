@@ -17,7 +17,7 @@ import { specialtyName } from "@/features/decide/lib/specialty-search";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import type { ResidentsQuery } from "@/features/decide/residents-search";
 import { canSeeResidents } from "@/features/decide/server/residents";
-import { listResidentsAll, RESIDENTS_MAX_PAGE, residentColleges, residentQuota, residentYears, ResidentsDenied } from "@/features/decide/server/residents-all";
+import { countResidentsAll, listResidentsAll, RESIDENTS_MAX_PAGE, residentColleges, residentQuota, residentYears, ResidentsDenied } from "@/features/decide/server/residents-all";
 import { chosenView } from "@/features/decide/server/view";
 import { Paywall } from "@/features/plans/components/paywall";
 import { currentPlan } from "@/features/plans/usage";
@@ -115,6 +115,15 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     : query.q
       ? `No name or hospital matches “${query.q}”${inCourses}. Search finds one name or hospital (its name, city or short name, like KEM); for several hospitals use Filters → College.`
       : `MCC's admitted lists have no names for these filters${inCourses}.`;
+  // Nothing found: Clear filters keeps the name searched for only when it has residents in some course (else it clears
+  // that too); "Search all courses" (the other filters kept) only when that finds some, and is not the same link.
+  const hits = (href: string) => countResidentsAll(residentsFilters(new URLSearchParams(href.split("?")[1]), profile, meta.courses).query);
+  const qOnly = L.to(R, { course: "all", q: query.q });
+  const allHref = here({ course: "all", page: null });
+  const norm = (h: string) => new URLSearchParams([...new URLSearchParams(h.split("?")[1])].sort()).toString();
+  const nameHits = total === 0 && query.q ? await hits(qOnly) : 0;
+  const clearKeep = nameHits ? qOnly : clear;
+  const searchAll = nameHits && inCourses && norm(allHref) !== norm(clearKeep) && (await hits(allHref)) ? allHref : null;
   // A name taken off: by email when the site has a contact address (as the page's (i) says), else the request form.
   const removal = siteConfig.contactEmail
     ? `mailto:${siteConfig.contactEmail}?${new URLSearchParams({ subject: "Residents: request removal", body: "Please hide this name from Seatora's Residents.\n\nName:\nCollege:\nCourse and year:\n" }).toString().replace(/\+/g, "%20")}`
@@ -159,11 +168,10 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
       </div>
 
       {total === 0 ? (
-        // Clear filters keeps the name searched for; a name not found in her courses may be in another.
         <EmptyState title="No residents match these filters" description={emptyWhy}>
           <span className="flex flex-wrap justify-center gap-x-6">
-            {query.q && inCourses && <Link href={here({ course: "all", page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Search all courses</Link>}
-            <Link href={L.to("/decide/residents", { course: "all", q: query.q })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Clear filters</Link>
+            {searchAll && <Link href={searchAll} className="inline-flex min-h-11 items-center text-sm text-sky underline">Search all courses</Link>}
+            <Link href={clearKeep} className="inline-flex min-h-11 items-center text-sm text-sky underline">Clear filters</Link>
           </span>
         </EmptyState>
       ) : (

@@ -22,7 +22,7 @@ import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
-import { pageValue, parseSearchParams, rankValue } from "@/features/decide/lib/params";
+import { pageValue, parseSearchParams, rankShorthand } from "@/features/decide/lib/params";
 import { readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, rankScan } from "@/features/decide/service";
@@ -30,8 +30,8 @@ import { statKeys } from "@/features/decide/lib/stat-format";
 import { roundLabel, rounds } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
-import { activeExam } from "@/features/exams/active";
-import { exams, groupsOf, perGroup, roundNameIn } from "@/features/exams/registry";
+import { activeExam, examInfo } from "@/features/exams/active";
+import { groupsOf, perGroup, roundNameIn } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Rank scan" };
@@ -45,7 +45,7 @@ const windows = ["100", "250", "500", "1000", "2500", "5000", "1%", "2%", "5%", 
 const MAX_WINDOW = 5000;
 const halfWindow = (w: (typeof windows)[number], rank: number) => Math.min(MAX_WINDOW, w.endsWith("%") ? Math.max(1, Math.round((rank * parseFloat(w)) / 100)) : Number(w));
 const schema = z.object({
-  scan: rankValue.optional(),
+  scan: rankShorthand.optional(), // "25k", "2.5 lakh" as on Last ranks
   year: z.coerce.number().int().optional(),
   w: z.enum(windows).default("500"),
   round: z.enum(rounds).optional(),
@@ -63,7 +63,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const f = parseSearchParams(schema, params);
   const tp = readTermFilters(params, profile);
   const exam = await activeExam();
-  const E = exams[exam];
+  const E = await examInfo(exam); // its data: fees once its import has them
   const meta = await getMeta(exam);
   const typed = params.get("scan")?.trim() || null;
   // NEET SS: a rank is within one question group: her group's allotments only, unless she lifts it (grp=all).
@@ -131,7 +131,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         search={
           <label className="flex min-w-0 items-center gap-2 text-sm">
             <span className="shrink-0 text-xs font-semibold text-muted-foreground">Rank</span>
-            <input name="scan" inputMode="numeric" enterKeyHint="search" defaultValue={typed ?? rank ?? ""} placeholder={`e.g. ${E.exampleRank}`} aria-invalid={invalid || undefined} aria-describedby={invalid ? "scan-error" : undefined} className={`${control} numeric min-w-0`} />
+            <input name="scan" enterKeyHint="search" defaultValue={typed ?? rank ?? ""} placeholder={`e.g. ${E.exampleRank}`} aria-invalid={invalid || undefined} aria-describedby={invalid ? "scan-error" : undefined} className={`${control} numeric min-w-0`} />
           </label>
         }
       >
@@ -155,7 +155,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
       <ActiveFilters items={chips} clear={clear} />
 
       {invalid ? (
-        <p id="scan-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example {E.exampleRank}.</p>
+        <p id="scan-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a rank between 1 and 3,00,000, for example {E.exampleRank} (25k or 2.5 lakh work too).</p>
       ) : !rank || !year ? (
         <EmptyState title="Enter a rank to scan" description={`Type ${E.rankName === "All India Rank" ? "an" : "a"} ${E.rankName} above, or set your rank, to see the allotments made to ranks around it.`} />
       ) : (

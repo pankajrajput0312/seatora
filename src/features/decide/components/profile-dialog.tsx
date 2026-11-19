@@ -90,12 +90,8 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
   const group = grouped ? groupsIn(E, draft.quotas)[0] : undefined;
   const choosable = grouped ? groupCourseList(meta, group) : meta.courses;
   const offered = (s: string) => choosable.filter((c) => c.specialty === s).map((c) => c.degree);
-  /** A newly ticked specialty: all its degrees, or the degrees she ticked before (when it has any of them). */
-  const fresh = (s: string) => {
-    const ds = offered(s).filter((d) => draft.degrees.includes(d));
-    return ds.length ? ds : offered(s);
-  };
-  const pickSpecialties = (v: string[]) => setPicked((p) => Object.fromEntries(v.map((s) => [s, p[s] ?? fresh(s)])));
+  // A newly ticked specialty: all its degrees (never another specialty's degree choice); she unticks the ones she doesn't want.
+  const pickSpecialties = (v: string[]) => setPicked((p) => Object.fromEntries(v.map((s) => [s, p[s] ?? offered(s)])));
   const pickDegrees = (s: string, ds: string[]) => setPicked((p) => ({ ...p, [s]: offered(s).filter((d) => ds.includes(d)) }));
   // Null: specialties ticked but no degree in any, so no course; saving would mean every course (empty = all), so ask.
   const courses = grouped
@@ -120,7 +116,12 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
     if (!c) return setNoCourse(true);
     if (groupError) return setGroupMsg(true);
     const r = profileSchema.safeParse({ ...c, rank: rank() });
-    if (!r.success) return setError(rankError);
+    if (!r.success) {
+      // The field and its error into view (on a phone the sheet is scrolled down to Save).
+      setError(rankError);
+      rankInput.current?.focus();
+      return rankInput.current?.scrollIntoView({ block: "center" });
+    }
     setError(null);
     onSave(r.data);
     onOpenChange(false);

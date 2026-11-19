@@ -219,15 +219,16 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
       <table className="w-full text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className={tbl.head}>
-          {/* Fee…Leaving sit right after Reach (tight px-2 cells), so they are in view from 1280px wide; the seat lists and closings follow. */}
+          {/* The latest closing beside the option (from md; a phone has it in the row header), then Reach and Fee…Leaving (tight
+              px-2 cells), so all are in view from 1280px wide; the seat lists and the past years' closings follow. */}
           <tr className="text-left text-xs font-semibold text-muted-foreground">
             <th scope="col" className={cn(stick, "w-12 px-2 py-3 print:hidden")}><span className="sr-only">Add to choices</span></th>
             <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course<span className="md:hidden">, {latestText(latest)} closing</span></th>
             <th scope="col" className={phoneOnly}>{last} deepest</th>
+            <th scope="col" className={notPhone}>{latestText(latest)} closing</th>
             <th scope="col" className="px-3 py-3">Reach</th>
             {statKeys.map((k) => <th key={k} scope="col" data-col={k} className="px-2 py-3 text-right">{statLabel[k]}</th>)}
             {seatLists.map((l) => <th key={l.key} scope="col" className="px-1.5 py-3 text-right"><SeatsHead list={l} short /></th>)}
-            <th scope="col" className={notPhone}>{latestText(latest)} closing</th>
             <th scope="col" className={notPhone}>{last} deepest</th>
             <th scope="col" className="hidden px-3 py-3 text-right xl:table-cell">{older} deepest</th>
             {/* Controls, not data: not on paper. */}
@@ -250,10 +251,10 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
                 </span>
               </th>
               <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>
+              <td className={notPhone}><ClosingCell d={r.latest} year={latest.year} /></td>
               <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} /><SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} /></td>
               <TermStatCells t={r.fees} variant="table" of={rowLabel(r, E)} tdClassName="px-2!" />
               {seatLists.map((l) => <td key={l.key} className="px-1.5 py-1 text-right"><SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} /></td>)}
-              <td className={notPhone}><ClosingCell d={r.latest} year={latest.year} /></td>
               <td className={notPhone}><ClosingCell d={r.byYear[last]} year={last} /></td>
               <td className="hidden px-3 py-3 text-right xl:table-cell"><ClosingCell d={r.byYear[older]} year={older} /></td>
               <td className="px-3 py-1 text-xs print:hidden">

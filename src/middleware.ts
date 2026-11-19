@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { EXAM_COOKIE, EXAM_HEADER, examCookie, isExam } from "@/features/exams/keys";
+import { DEFAULT_EXAM, EXAM_COOKIE, EXAM_HEADER, examCookie, isExam } from "@/features/exams/keys";
 import { AID_COOKIE, AID_MAX_AGE_S, isAid, isBot } from "@/features/funnel/lib";
 import { ACCESS_COOKIE, accessCookieUser, siteGate } from "@/lib/site-access";
 
@@ -25,6 +25,9 @@ export async function middleware(req: NextRequest) {
   const known = req.cookies.get(EXAM_COOKIE)?.value;
   // ?exam= without the staff cookie (or an exam that isn't one): through /decide/exam first.
   if (exam != null && !(isExam(exam) && isExam(known))) return withAid(redirect(req, `/decide/exam?${new URLSearchParams({ k: exam, next: req.nextUrl.pathname + req.nextUrl.search })}`), aid);
+  // Bare /decide (Home, nothing asked) in a staff browser last on another exam: that exam's Home. Members never have
+  // the cookie (only the route sets it, for staff); one made up only names an exam the page then ignores (active.tsx).
+  if (req.nextUrl.pathname === "/decide" && !req.nextUrl.search && isExam(known) && known !== DEFAULT_EXAM) return withAid(redirect(req, `/decide?exam=${known}`), aid);
   if (exam != null) req.headers.set(EXAM_HEADER, exam);
   const res = await gate(req, api);
   // Staff's cookie follows the exam their URL names (a link, Back): the last one used.

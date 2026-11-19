@@ -5,6 +5,8 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { roundLabel, type Round } from "../types";
+import { quotaIn } from "@/features/exams/exam";
+import { useExamInfo } from "../lib/use-decide-store";
 import { InfoTip } from "./info-tip";
 import { ScrollTable } from "./scroll-table";
 
@@ -75,6 +77,7 @@ type StripPoint = { name: string; quota: string; closing: number; round: Round; 
  */
 export function RankStrip({ rank, rows, year = 2025 }: { rank: number; rows: { course: string; points: StripPoint[] }[]; year?: number }) {
   const [tip, setTip] = useState<Tip>(null);
+  const E = useExamInfo(); // each quota as the exam's MCC words it
   const all = rows.flatMap((r) => r.points.map((p) => p.closing));
   const max = niceMax(Math.max(rank * 1.2, ...all));
   // Text sizes are viewBox units: at the 860px minimum width (scale 0.86) the 14-unit labels draw at 12px or more.
@@ -92,7 +95,7 @@ export function RankStrip({ rank, rows, year = 2025 }: { rank: number; rows: { c
       const d = Math.abs(x(p.closing) - vx);
       if (d < dist) [best, dist] = [p, d];
     }
-    setTip(best && { x: x(best.closing) * s, y: (top + i * rowH + rowH / 2) * s, value: formatRank(best.closing), label: best.name, sub: `${best.quota} · ${year} ${roundLabel[best.round]} · ${best.category} seat` });
+    setTip(best && { x: x(best.closing) * s, y: (top + i * rowH + rowH / 2) * s, value: formatRank(best.closing), label: best.name, sub: `${quotaIn(E, best.quota)} · ${year} ${roundLabel[best.round]} · ${best.category} seat` });
   };
   const summary = rows.map((r) => `${r.course}: ${r.points.length} options, ${r.points.filter((p) => p.closing >= rank).length} closed at or after your rank`).join("; ");
   return (

@@ -14,7 +14,7 @@ const inputSchema = z.object({ ids: z.array(z.string().min(1).max(300)).max(1000
  * virtual, new; never added) with `below` (OptionRow.seatsBelow), as on Options, and its course and quota's terms
  * (`fees`, for the stat cells) and `hospital` (type, beds). Unknown ids are left out of `options`. With no rank in
  * `profile` only the terms and hospital (they don't depend on it): `reach` null, no seat lists or seats (her seat
- * categories are unknown). Null when the input is invalid, there's no data or no access (Server Actions can be POSTed
+ * categories are unknown). `latest` and `byYear`: its closings on her seat categories (OptionRow's; none without a rank), for the CSV. Null when the input is invalid, there's no data or no access (Server Actions can be POSTed
  * to any route, past the middleware).
  * (A server action: a list can hold hundreds of ids, more than /api/v1/options/compare takes.)
  */
@@ -29,7 +29,7 @@ export async function liveReach(ids: string[], profile: string) {
     return {
       lists: p ? lists : [],
       options: Object.fromEntries(
-        rows.map((o) => [o.id, p ? { reach: o.reach, provisional: o.reachProvisional, seats: o.seatsBy ?? {}, below: o.seatsBelow ?? [], fees: o.fees, hospital: o.hospital ?? null, ...(o.otherGroup && { otherGroup: true }) } : { reach: null, provisional: false, seats: {}, below: [], fees: o.fees, hospital: o.hospital ?? null }]),
+        rows.map((o) => [o.id, { ...(p ? { reach: o.reach, provisional: o.reachProvisional, seats: o.seatsBy ?? {}, below: o.seatsBelow ?? [], latest: o.latest, byYear: o.byYear, ...(o.otherGroup && { otherGroup: true }) } : { reach: null, provisional: false, seats: {}, below: [], latest: null, byYear: {} }), fees: o.fees, hospital: o.hospital ?? null }]),
       ),
     };
   } catch (e) {

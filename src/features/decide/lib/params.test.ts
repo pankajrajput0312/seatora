@@ -22,4 +22,9 @@ describe("rankText / rankRange (Last ranks' closing-rank filter)", () => {
     expect(rankRange("40000", "")).toEqual({ min: 40000, max: undefined, swapped: false, bad: [] });
     expect(rankRange("-10", "5k")).toEqual({ min: undefined, max: 5000, swapped: false, bad: ["-10"] });
   });
+  it("rankShorthand (Rank scan): the same shorthand, still 1 to 3,00,000", async () => {
+    const { rankShorthand } = await import("./params");
+    expect(["25k", "0.25L", "2.5 lakh", "42,284"].map((v) => rankShorthand.safeParse(v).data)).toEqual([25000, 25000, 250000, 42284]);
+    expect(["abc", "-5", "4L"].map((v) => rankShorthand.safeParse(v).success)).toEqual([false, false, false]);
+  });
 });

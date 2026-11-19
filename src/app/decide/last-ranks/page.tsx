@@ -3,6 +3,7 @@ import { ColourLegend } from "@/features/decide/components/colour-legend";
 import Link from "next/link";
 import { z } from "zod";
 import { AppPage } from "@/features/decide/components/app-page";
+import { WaitForSaved } from "@/features/decide/components/dashboard-parts";
 import { toolbarRow } from "@/features/decide/components/csv-link";
 import { AboutData } from "@/features/decide/components/filter-form";
 import { DataSource } from "@/features/decide/components/data-source";
@@ -99,25 +100,27 @@ function YearGrid({ r, cols, rds, caption, rank }: { r: OptionRow; cols: Col[]; 
   );
 }
 
-function LastRankCard({ r, cols, rds, stat, mcc, L, mine, rank, E }: {
+function LastRankCard({ r, cols, rds, stat, range, mcc, L, mine, rank, E }: {
   r: OptionRow;
   E: Exam;
   cols: Col[];
   rds: Round[];
   /** The sorted column; else each card shows its own newest closing (its newest year's R1, else that year's first round). */
   stat: { year: number; round: Round } | null;
+  /** The closing-rank filter: the big number is the newest round that closed in it (the one that matched). */
+  range?: { min?: number; max?: number };
   mcc: string | null | undefined;
   L: DecideLinks;
   mine?: boolean;
   rank?: number;
 }) {
   const course = { slug: r.course.slug, label: courseName(r) };
-  const of = `${r.college.name}, ${course.label}, ${r.quota}`;
-  const big = bigClosing(r.grid, cols.map((c) => c.year), stat);
+  const of = `${r.college.name}, ${course.label}, ${quotaIn(E, r.quota)}`;
+  const big = bigClosing(r.grid, cols.map((c) => c.year), stat, range);
   return (
     <ResultCard
       className={mine ? "border-sky" : undefined}
-      chips={[r.quota]}
+      chips={[quotaIn(E, r.quota)]}
       actions={<Link href={L.allotments({ course: course.slug, inst: r.college.slug })} className={`${smallLink} px-3 text-xs text-sky`}>Allotments</Link>}
       stat={big ? { label: `${big.year} ${roundIn(E, big.year, big.round)}`, value: <span className="numeric">{big.cell ? formatRank(big.cell.closing) : <Dash />}</span> } : undefined}
       title={r.college.name}
@@ -142,7 +145,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const f = parseSearchParams(schema, params);
   const tp = readTermFilters(params, profile);
   const exam = await activeExam();
-  const E = exams[exam];
+  const E = await examInfo(exam); // its data: fees once its import has them
   const EI = await examInfo(exam);
   const meta = await getMeta(exam);
   // Every one of her courses by default (lib/course-filter.ts), the picked ones otherwise; no profile courses: the first course.
@@ -286,7 +289,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
     </ScrollTable>
   );
 
-  return (
+  const content = (
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Last ranks"
@@ -327,14 +330,14 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
             <Select name="rk" value={f.rk} all="Any closing rank" options={[{ value: "reached", label: `Would have got ${E.rankWord} ${formatRank(myRank)}` }, { value: "near", label: `Near ${E.rankWord} ${formatRank(myRank)} (±10%)` }]} />
           </Field>
         )}
-        <Field label="Closing rank from"><input name="rmin" defaultValue={f.rmin ?? ""} placeholder={exam === DEFAULT_EXAM ? "e.g. 40,000 or 40k" : `e.g. ${E.exampleRank}`} className={`${control} numeric`} /></Field>
-        <Field label="Closing rank to"><input name="rmax" defaultValue={f.rmax ?? ""} placeholder={exam === DEFAULT_EXAM ? "e.g. 60,000 or 0.6L" : "e.g. 5k"} className={`${control} numeric`} /></Field>
+        <Field label="Closing rank from"><input name="rmin" defaultValue={f.rmin ?? ""} aria-invalid={range.bad.includes(f.rmin ?? "") || undefined} aria-describedby={range.bad.length ? "range-note" : undefined} placeholder={exam === DEFAULT_EXAM ? "e.g. 40,000 or 40k" : `e.g. ${E.exampleRank}`} className={`${control} numeric`} /></Field>
+        <Field label="Closing rank to"><input name="rmax" defaultValue={f.rmax ?? ""} aria-invalid={range.bad.includes(f.rmax ?? "") || undefined} aria-describedby={range.bad.length ? "range-note" : undefined} placeholder={exam === DEFAULT_EXAM ? "e.g. 60,000 or 0.6L" : "e.g. 5k"} className={`${control} numeric`} /></Field>
         <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
         {E.has.fees && <TermFilterControls f={tp.params} caps={profile} />}
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
       {(range.swapped || range.bad.length > 0) && (
-        <p role="status" className="text-sm text-sun">
+        <p id="range-note" role="status" className="text-sm text-sun">
           {range.bad.length > 0 && <>“{range.bad.join("”, “")}” isn&apos;t a rank (a whole number from 1, or 40k / 4.5L), so it was left out. </>}
           {range.swapped && "The closing-rank range was the wrong way round, so it reads from the lower to the higher."}
         </p>
@@ -381,7 +384,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       {/* Her institute (a link from it, #inst-…) in view in either view: its card above the list. */}
       {pinned && (
         <div id={`inst-${pinned.college.slug}`} tabIndex={-1} className="scroll-mt-24">
-          <LastRankCard r={pinned} cols={cols} rds={rds} stat={stat} mcc={mcc(pinned)} L={L} mine rank={myRank} E={EI} />
+          <LastRankCard r={pinned} cols={cols} rds={rds} stat={stat} range={closing} mcc={mcc(pinned)} L={L} mine rank={myRank} E={EI} />
         </div>
       )}
 
@@ -393,7 +396,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
           view={view}
           cards={
             <ResultCards title={caption} hideTitle>
-              {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} mine={inst?.slug === r.college.slug} rank={myRank} E={EI} />)}
+              {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} range={closing} mcc={mcc(r)} L={L} mine={inst?.slug === r.college.slug} rank={myRank} E={EI} />)}
             </ResultCards>
           }
           table={table}
@@ -404,4 +407,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       <HistoryNote />
     </AppPage>
   );
+  // No profile in the address: Open seats, unless a saved one is on its way (as Options' loading line).
+  if (profile) return content;
+  return <WaitForSaved wait={<AppPage><PageHead title="Last ranks" /><p role="status" className="mt-6 text-sm text-muted-foreground">Loading your saved rank and courses…</p></AppPage>}>{content}</WaitForSaved>;
 }

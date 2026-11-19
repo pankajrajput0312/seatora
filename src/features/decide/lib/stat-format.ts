@@ -80,14 +80,13 @@ export type StatCell = {
   short: string;
   full: string;
   /**
-   * Tiny note beside the value: two warnings, "below NBEMS min" (stipend) and "state law may apply" (bond not
-   * published), and a range's reason, "depends on specialty" (RANGE_HINT), where the data gives it. Everything else a
-   * value leaves out is said in its (i), never in the cell.
+   * Tiny note beside the value: a warning, "below NBEMS min" (stipend), and a range's reason, "depends on specialty"
+   * (RANGE_HINT), where the data gives it. Everything else a value leaves out is said in its (i), never in the cell.
    */
   marker: string | null;
   /** The value is a link (a fee "On college website ↗"). */
   href?: string;
-  /** bond: a bond applies (orange); muted: "—", "Not published", a short reason ("Refund stipend", "Not stated"); warn: the marker is a warning. */
+  /** bond: a bond applies (orange); muted: "—", "None declared", a short reason ("Refund stipend", "Not stated"); warn: the marker is a warning. */
   tone: "bond" | "muted" | null;
   markerWarn?: true;
   /** "—": not in the data (screen readers hear it). */
@@ -203,14 +202,17 @@ function feeWords(text: string, website: string | null | undefined): { label: st
  * amount at admission, with later years different or not stated. MCC's form never says an amount at admission is
  * one-time, so no screen says "not a yearly fee". The whole course is "₹3.75 L for the course".
  */
-export function feeBasis(t: Pick<ProgrammeTerms, "years">): "yearly" | "admission" | null {
+export function feeBasis(t: Pick<ProgrammeTerms, "years" | "programme">): "yearly" | "admission" | "year1" | null {
   const f = t.years[0]?.fee;
   if (!f) return null;
-  if (!f.atAdmission) return "yearly";
   const later = t.years.slice(1).map((y) => y.fee);
+  // NEET MDS / SS: year 1's figure when a later year states another ("₹60,000 (Year 1)", then ₹10,000 a year), never "/yr".
+  if (!f.atAdmission) return OTHER_EXAM.has(t.programme) && later.some((g) => g && (g.inr !== f.inr || g.min !== f.min)) ? "year1" : "yearly";
   return later.length && later.every((g) => g && !g.atAdmission && g.inr === f.inr && g.min === f.min && g.kind === f.kind) ? "yearly" : "admission";
 }
-const PER = { yearly: "/yr", admission: " at admission (Year 1)" } as const;
+/** NEET MDS and NEET SS programmes (their MCC institute profiles), where the cells' MDS / SS fixes apply. */
+const OTHER_EXAM = new Set<string>(["MDS", "DM/MCh", "DrNB SS"]);
+const PER = { yearly: "/yr", admission: " at admission (Year 1)", year1: " (Year 1)" } as const;
 /** Why a ₹ range is a range, when the data says so (a fee or amount priced by specialty): the cell's hint. */
 export const RANGE_HINT = "depends on specialty";
 
@@ -289,20 +291,31 @@ function stipendCell(t: ProgrammeTerms): StatCell {
  */
 export const noneDeclared = (t: Pick<ProgrammeTerms, "programme" | "bond">) =>
   isDnb(t as ProgrammeTerms) && t.bond.status === "not_declared" && !t.bond.caveat && /\bcan(?:'|’|no)t be imposed\b/i.test(t.bond.text ?? "");
+export const UNREAD = "MCC lists a bond document for this college that Seatora has not read yet (a scan, a filled-in form or not a PDF): read it on MCC before you lock your choices.";
+/** An unread bond document's record words as one line: why it isn't read ("a scanned image"), none when they only say "not read". */
+export function unreadWhy(text: string | null): string | null {
+  const m = /not read: (.+?); see the document/i.exec(text ?? "");
+  return !m ? text : m[1].trim() === "not read" ? null : `Why it isn't read: ${m[1].trim()}.`;
+}
 const NONE_DECLARED = "None declared: the hospital declared no bond to MCC, and NBEMS lets a DNB hospital impose only a bond declared before counselling, so none can be imposed this session. Not \"No bond\" in the filters: no document of the hospital's says so.";
 
-/** A bond that is not declared: why ("Not published": the record's words; "None declared": see noneDeclared; "—": no record, or a record for other courses). */
+/** A bond that is not declared: why ("Doc not read", "Not clear", "Law may apply", "None declared": the record's words; "—": no record, or a record for other courses). */
 function bondMissing(t: ProgrammeTerms, c: Pick<StatCell, "key" | "label" | "about">): StatCell {
   const b = t.bond;
   if (noneDeclared(t)) return { ...c, short: "None declared", full: "None declared", marker: null, tone: "muted", tip: [{ text: NONE_DECLARED }, { text: b.text!, src: b.src }, ...(b.doc != null ? [{ text: "The college's own bond document on MCC", src: b.doc }] : []), { text: "NBEMS bond rules", rules: true }] };
   const doc: TipLine[] = b.doc != null ? [{ text: "The college's own bond document on MCC", src: b.doc }] : [];
   const rules: TipLine[] = isDnb(t) ? [{ text: DNB_RULE, rules: true }] : [{ text: STATE_CAUTION }];
+  // One word for each kind of no answer, in every cell, card and Compare: the bond document MCC lists is not read yet;
+  // read, with no clear bond; no-bond, but a state law's service may apply; nothing declared to MCC.
+  if (b.why === "unread") {
+    const why = unreadWhy(b.text);
+    return { ...c, short: "Doc not read", full: "Bond doc not read", marker: null, tone: "muted", tip: [{ text: UNREAD, warn: true }, ...(why ? [{ text: why, src: b.src }] : []), ...doc] };
+  }
   if (b.status === "other_course") return dash(c, [{ text: `Not published for ${t.programme}: the bond on the college's MCC profile is for other courses.`, src: b.src }, ...rules]);
   if (b.text) {
-    // A no-bond document where a state law's service may apply (`caveat`): the Bond cell marks it.
-    const law = b.caveat && c.key === "bond";
+    const [short, full] = b.caveat ? ["Law may apply", "No bond, but a state law may apply"] : b.why === "unclear" ? ["Not clear", "No clear bond in its document"] : ["None declared", "None declared"];
     return {
-      ...c, short: "Not published", full: "Not published", marker: law ? "state law may apply" : null, ...(law && { markerWarn: true as const }), tone: "muted",
+      ...c, short, full, marker: null, tone: "muted",
       tip: [...(b.caveat ? [{ text: MAY_APPLY, warn: true as const }] : []), { text: b.text, src: b.src }, ...doc, ...(isDnb(t) ? rules.map((r) => ({ ...r, text: "NBEMS bond rules" })) : [])],
     };
   }
@@ -367,9 +380,9 @@ function phrase(a: Amount, texts: (string | null | undefined)[]): string {
   const t = texts.filter(Boolean).join(" ");
   if (/^State rule/.test(t)) return /\bno money penalty\b/i.test(t) ? "No money penalty" : "Per state rule";
   if (/by subject|by specialt/i.test(t)) return "Varies by subject";
-  if (/left blank|_{3,}/i.test(t)) return "Amount left blank";
   if (/as per (?:the )?policy|as applicable/i.test(t)) return "As per college policy";
-  return /no (?:fixed )?amount|amount not (?:stated|specified)/i.test(t) ? "No amount stated" : "Not stated";
+  // No figure (none written, a blank left in the form): one word for it everywhere.
+  return "Not stated";
 }
 
 /** What a figure leaves out: "₹10,00,000 per year × 3 years, computed", "incl. ₹10,00,000 additional". */
@@ -420,7 +433,7 @@ function bondInrCell(t: ProgrammeTerms): StatCell {
   const quote: TipLine[] = b.quote ? [{ text: b.quote, src: b.src, quote: true }] : [];
   if (a.state === "words")
     return words(c, [head, { text: "Declared without a ₹ figure for this course.", src: b.src }, ...partLines(b.amounts, b.src), ...quote, ...formulaLines(a, b.src), ...other], phrase(a, [b.text, b.quote]));
-  return dash(c, [head, { text: "Amount not stated in the bond record.", src: b.src }, ...quote, ...other]);
+  return words(c, [head, { text: "Amount not stated in the bond record.", src: b.src }, ...quote, ...other], "Not stated");
 }
 
 function leavingCell(t: ProgrammeTerms): StatCell {
@@ -442,6 +455,9 @@ function leavingCell(t: ProgrammeTerms): StatCell {
   }
   const tip = [head, ...partLines(b.leaving, b.src), ...amountLines(a, null, b.leaving[0]?.src ?? b.src), ...other, ...forfeit];
   if (a.state !== "figure" || a.max == null) return words(c, tip, phrase(a, b.leaving.map((p) => p.text)));
+  // Priced from a fee that is a range across courses (no fee of this course's own): the dearest course's, not this one's.
+  const range = a.formula && t.years.find((y) => y.fee?.min != null)?.fee;
+  if (range) return words(c, [head, { text: `It is priced from the course fee, and this course has no fee of its own here (the MCC profile gives ${feeRange(range.min!, range.inr)}/yr across courses), so it depends on your course: at most ${inrFull(a.max)} (the dearest course's).`, warn: true }, ...tip.slice(1)], "Varies by course");
   return levelOf({ ...c, short: amountValue(a, true), full: amountValue(a, false), marker: rangeHint(a), tone: null, tip }, a.max >= HIGH_PENALTY ? "heavy" : undefined, "₹25 L or more");
 }
 
@@ -472,6 +488,8 @@ export function bondPlain(t: ProgrammeTerms): string {
     if (b.basis === "state_rule" || b.yearsFrom) parts.push("Years from the state's rule, not the college's own bond document: confirm with the college.");
   } else if (b.status === "none") parts.push(b.caveat || b.stateRule ? "No bond on record, with a caveat (below): confirm with the college." : "No bond: no service to serve, nothing to pay for one.");
   else if (noneDeclared(t)) parts.push("No bond declared, so none can be imposed this session.");
+  else if (b.why === "unread") parts.push("Bond: MCC lists a bond document Seatora has not read; read it before you lock.");
+  else if (b.text && !b.caveat && b.why !== "unclear") parts.push("Bond: none declared to MCC.");
   else parts.push("Bond: no clear answer published; ask the college.");
   return parts.join(" ");
 }

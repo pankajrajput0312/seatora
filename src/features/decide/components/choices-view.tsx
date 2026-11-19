@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
-import { pastOf, reachWindow, seatsBelowNotes, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
-import { statKeys, statLabel } from "../lib/stat-format";
+import { cellWords, duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
+import { deepestOf, latestText, pastOf, reachWindow, seatsBelowNotes, type Deepest, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
+import { statCells, statKeys, statLabel } from "../lib/stat-format";
 import { groupsIn, quotaIn, roundIn } from "@/features/exams/exam";
 import { useChoices, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
 import { keepProfileParams, profileFromParams } from "../profile";
@@ -20,7 +20,7 @@ import type { SeatList } from "../types";
 import { Dash, InstName, ReachBadge } from "./bits";
 import { InfoTip } from "./info-tip";
 import { CompareToggle } from "./option-actions";
-import { SeatsLink } from "./options-view";
+import { cardClosing, ClosingCell, SeatsLink } from "./options-view";
 import { Beds } from "./pages/beds";
 import { ResultCard } from "./result-card";
 import { TermStatCells } from "./stat-cells";
@@ -31,7 +31,7 @@ import { ViewToggle, type View } from "./view-toggle";
 import { ScrollTable } from "./scroll-table";
 
 /** `reach` null: no rank in the address (terms and hospital only; the stored label stays). */
-type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; fees: ProgrammeTerms; hospital: RowHospital; otherGroup?: boolean }>;
+type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; fees: ProgrammeTerms; hospital: RowHospital; otherGroup?: boolean; latest: Deepest | null; byYear: Record<number, Deepest | null> }>;
 
 // Memoised: a reorder re-renders every row, but each one's terms, type and beds (their (i) tips and source refs, the
 // bulk of a long list) only change when the live data does.
@@ -201,7 +201,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
 
   // A phone: its share sheet (WhatsApp among them); else WhatsApp's own link. Fee, bond and penalties once loaded.
   const share = async () => {
-    const text = shareText(out, (id) => (current?.[id] && E.has.fees ? termsWords(current[id].fees) || null : null), location.origin, E.label);
+    const text = shareText(out, (id) => (current?.[id] && E.has.fees ? termsWords(current[id].fees) || null : null), location.origin + L.choices(), E.label);
     if (navigator.share && matchMedia("(pointer: coarse)").matches) {
       try {
         return await navigator.share({ text });
@@ -215,9 +215,19 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
   const dupKey = (i: ChoiceItem) => `${i.slug}|${i.course}`;
   const counts = items.reduce((m, i) => m.set(dupKey(i), (m.get(dupKey(i)) ?? 0) + 1), new Map<string, number>());
 
+  // The CSV's closings (the newest, as a card's big number, and the deepest of every year) and terms, once loaded.
+  const closingWords = (d: Deepest, year: number) => `${formatRank(d.closing)} (${year} ${roundIn(E, year, d.round)}, ${d.category}${d.provisional ? ", provisional" : ""})`;
+  const csvExtra = (id: string) => {
+    const lr = current?.[id];
+    if (!lr) return null;
+    const c = cardClosing(lr, latest.year, pastOf(latest), true);
+    const deep = deepestOf(Object.entries(lr.byYear).flatMap(([y, d]) => (d ? [{ ...d, year: Number(y) }] : [])));
+    const cells = E.has.fees ? statCells(lr.fees) : [];
+    return [c && closingWords(c.d, c.year), deep && closingWords(deep, deep.year), ...statKeys.map((k) => { const x = cells.find((x) => x.key === k); return x ? cellWords(x) : null; })];
+  };
   const download = () => {
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([toCsv(out)], { type: "text/csv" }));
+    a.href = URL.createObjectURL(new Blob([toCsv(out, csvExtra)], { type: "text/csv" }));
     a.download = `${list.name.replace(/\W+/g, "-").toLowerCase()}.csv`;
     a.click();
   };
@@ -283,9 +293,10 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
   /** Cards: move to a position, compare, remove (the table has drag, the handle and up / down). */
   const tools = (item: ChoiceItem, i: number) => (
     <span className="flex flex-wrap items-center gap-1" data-print-hide>
-      <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("to")); if (v) moveTo(i, v); }}>
+      {/* Shows where it is now (its number); emptied after a move, so it never reads a stale position. */}
+      <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const v = Number(new FormData(f).get("to")); f.reset(); if (v) moveTo(i, v); }}>
         <label className="sr-only" htmlFor={`to-${item.id}`}>Move {name(item)} to position</label>
-        <span className="w-16"><input id={`to-${item.id}`} name="to" type="number" min={1} max={n} placeholder="#" className={cn(control, "numeric")} /></span>
+        <span className="w-16"><input id={`to-${item.id}`} name="to" type="number" min={1} max={n} placeholder={String(i + 1)} className={cn(control, "numeric")} /></span>
         <Button type="submit" variant="ghost">Move</Button>
       </form>
       <CompareToggle id={item.id} label={name(item)} />
@@ -296,7 +307,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} latest={latest} otherGroup={lr.otherGroup} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>;
   const typedBadge = <Badge tone="success"><Check className="mr-1 size-3" aria-hidden />Typed into MCC</Badge>;
   const seatsOf = (item: ChoiceItem, lr: Live[string], l: SeatList) => (
-    <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${item.quota}`} />
+    <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${quotaIn(E, item.quota)}`} />
   );
   const related = (item: ChoiceItem, lr: Live[string] | undefined) =>
     item.courseSlug && lr?.reach !== "new" && (
@@ -360,6 +371,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
         <thead className={tbl.head}>
           <tr className={tbl.headRow}>
             <th scope="col" className={cn(th, "bg-card md:sticky md:left-0 md:z-[3]")}>Choice</th>
+            <th scope="col" className={cn(th, "px-3! text-right")}>{latestText(latest)} closing</th>
             <th scope="col" className={cn(th, "px-3!")}>Your reach</th>
             {lists.length > 0 && <th scope="col" className={cn(th, "px-3! text-right")}>{round} seats</th>}
             {E.has.fees && statKeys.map((k) => <th key={k} scope="col" data-col={k} className={cn(th, "px-3! text-right")}>{statLabel[k]}</th>)}
@@ -397,6 +409,8 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                     </span>
                   </span>
                 </th>
+                {/* Beside the choice, as on Options, so it is in view without scrolling sideways. */}
+                <td className={cn(tbl.td, "px-3! text-right")}>{lr ? <ClosingCell d={lr.latest} year={latest.year} /> : <Dash />}</td>
                 <td className={cn(tbl.td, "px-3! text-xs")}>{reachOf(item, lr)}</td>
                 {lists.length > 0 && (
                   <td className={cn(tbl.td, "px-3! py-1! text-right text-xs")}>
@@ -445,13 +459,13 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       </div>
       {nextRound && <p className="-mt-2 text-sm text-muted-foreground" data-print-hide>For {nextRound.when}.</p>}
 
-      {/* As on every results page: Cards | Table, then the CSV. */}
-      <div className="flex flex-wrap items-center gap-2" data-print-hide>
+      {/* As on every results page: Cards | Table, then the CSV. An empty list: none of them (nothing to show or send). */}
+      {n > 0 && <div className="flex flex-wrap items-center gap-2" data-print-hide>
         <ViewToggle page="choices" view={view} />
-        <Button variant="secondary" disabled={!n} onClick={download} aria-label={`Download CSV of ${list.name}`}><Download className="size-4" aria-hidden />CSV</Button>
-        <Button variant="secondary" disabled={!n} onClick={copy}>Copy in MCC order</Button>
-        <Button variant="secondary" disabled={!n} onClick={share}>Share on WhatsApp</Button>
-        <Button variant="secondary" disabled={!n} onClick={() => window.print()}>Print</Button>
+        <Button variant="secondary" onClick={download} aria-label={`Download CSV of ${list.name}`}><Download className="size-4" aria-hidden />CSV</Button>
+        <Button variant="secondary" onClick={copy}>Copy in MCC order</Button>
+        <Button variant="secondary" onClick={share}>Share on WhatsApp</Button>
+        <Button variant="secondary" onClick={() => window.print()}>Print</Button>
         <label className="inline-flex min-h-11 items-center gap-2 text-sm">
           Mark how far you&apos;ve typed into MCC: up to choice
           <span className="w-20">
@@ -462,7 +476,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
             />
           </span>
         </label>
-      </div>
+      </div>}
       {others.length > 0 && (
         <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-sun" data-print-hide>
           {withOthers

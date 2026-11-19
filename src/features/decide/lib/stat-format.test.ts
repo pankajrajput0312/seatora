@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BondDetails, PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
 import { normalizeProgramme, type Programme } from "../server/terms";
 import type { FeeTableRecord, Term } from "../types";
+import { termsWords } from "./choices";
 import { feeRange, inrApprox, inrCard, inrFull, inrL, inrRange, inrShort, statCells, yearValue, type StatCell, type StatKey } from "./stat-format";
 
 // Terms shaped as the bundle has them (server/terms.test.ts), through the real normalizer, then the cells.
@@ -115,6 +116,7 @@ describe("fee and stipend cells", () => {
     expect(shown(said("At admission / Year 1 / Year 2 / Year 3 / Annual fees: 100000 to 4000000 Depending upon the Specialty")).slice(0, 3)).toEqual(["₹1–40 L/yr", "₹1–40 L/yr", "depends on specialty"]);
     const site = { ...normalizeProgramme("MD/MS", fees("MD", [{ ...verbatim, fee_text: "For details of Course fee visit website." }])), website: "www.x.ac.in" };
     expect([statCells(site)[0].short, statCells(site)[0].href]).toEqual(["On college website ↗", "http://www.x.ac.in/"]);
+    expect(termsWords(site)).toMatch(/^Fee: on the college website, http:\/\/www\.x\.ac\.in\/(;|$)/); // a message gives the link, not "↗"
     // No words for these seats: "—", saying so.
     const none = cells("MD/MS", fees("MD", [{ ...verbatim, fee_text: null }]));
     expect(shown(none.fee)).toEqual(["—", "—", null, "muted"]);
@@ -285,12 +287,12 @@ describe("bond cells, by record status", () => {
 
   it("no bond, but a state law's service may apply: 'Unknown' (never 'No bond'), marked, as the filters read it", () => {
     const ka = cells("MD/MS", [bond("MD", "No bond per the college's MCC bond document; Karnataka law: 1 yr compulsory govt service may apply", null, { status: "no_bond_verified" })]);
-    expect([...shown(ka.bond), ka.bond.markerWarn]).toEqual(["Not published", "Not published", "state law may apply", "muted", true]);
+    expect([...shown(ka.bond), ka.bond.markerWarn]).toEqual(["Law may apply", "No bond, but a state law may apply", null, "muted", undefined]);
     expect(ka.bond.tip.slice(0, 2)).toEqual([
       { text: "The college's own document says no bond, but a state law's service may apply, so Seatora counts it as unknown.", warn: true },
       { text: "No bond per the college's MCC bond document; Karnataka law: 1 yr compulsory govt service may apply", src: 1 },
     ]);
-    expect(shown(ka.bondInr)).toEqual(["Not published", "Not published", null, "muted"]);
+    expect(shown(ka.bondInr)).toEqual(["Law may apply", "No bond, but a state law may apply", null, "muted"]);
     expect(ka.bondInr.tip[0]).toMatchObject({ warn: true });
   });
 
@@ -304,13 +306,19 @@ describe("bond cells, by record status", () => {
     expect(unsure.bond.tip).toContainEqual({ text: "Seatora's check: private status inferred from name.", warn: true });
   });
 
-  it("unknown: 'Unknown' with the record's words (never 'No bond', never '—')", () => {
+  it("unknown: 'Not clear' with the record's words (never 'No bond', never '—'); a listed document not read: 'Doc not read'", () => {
     const unknown = bond("MD", "MCC bond document has no clear terms — check with the college", null, { status: "unknown", reason: "mcc_document_unclear" });
     const c = cells("MD/MS", [unknown]);
     for (const k of ["bond", "bondInr"] as const) {
-      expect(shown(c[k])).toEqual(["Not published", "Not published", null, "muted"]);
+      expect(shown(c[k])).toEqual(["Not clear", "No clear bond in its document", null, "muted"]);
       expect(c[k].tip[0]).toEqual({ text: "MCC bond document has no clear terms — check with the college", src: 1 });
     }
+    const unread = cells("MD/MS", [bond("MD", "Bond document on MCC not read: a scan; see the document", null, { status: "unknown", reason: "bond document not read", doc_url: "https://mcc.admissions.nic.in/x?Type=BM" })]);
+    expect(shown(unread.bond)).toEqual(["Doc not read", "Bond doc not read", null, "muted"]);
+    expect(unread.bond.lead).toMatch(/Bond: MCC lists a bond document Seatora has not read/);
+    // "None declared" and "Doc not read" never read the same
+    const none = cells("MD/MS", [bond("MD", "Not declared: the college's MCC profile states no bond and MCC lists no bond document", null, { status: "not_declared", reason: "no bond document on MCC" })]);
+    expect(none.bond.short).toBe("None declared");
   });
 
   it("every bond tooltip leads with one plain line from the cells' own fields; a conflict in the record said plainly", () => {
@@ -335,8 +343,8 @@ describe("bond cells, by record status", () => {
       expect(shown(c[k])).toEqual(["None declared", "None declared", null, "muted"]);
       expect(c[k].tip[0].text).toMatch(/^None declared: the hospital declared no bond to MCC/);
     }
-    // Words that don't say so (an MD record): still "Not published".
-    expect(cells("MD/MS", [bond("MD", "Not declared by the college", null, { status: "not_declared", reason: "not_declared_no_document" })]).bond.short).toBe("Not published");
+    // Words that don't say so (an MD record): "None declared" too (its (i): the record's words, no NBEMS rule).
+    expect(cells("MD/MS", [bond("MD", "Not declared by the college", null, { status: "not_declared", reason: "not_declared_no_document" })]).bond.short).toBe("None declared");
   });
 
   it("no bond record at all: '—' with 'not checked yet' (never 'No bond'); DNB cites the NBEMS rule", () => {
@@ -465,6 +473,10 @@ describe("formula amounts: computed from the record's words over the row's own f
     expect(shown(cells("DNB", [dnb, ...max]).leaving).slice(0, 3)).toEqual(["≤ ₹3.75 L", "≤ ₹3.75 L", null]);
     // The fee in words only: what it is, no number.
     expect(cells("MD/MS", [kims, ...verbatim([])]).leaving.short).toBe("Whole course fee");
+    // A fee that is a range across courses (no fee of this course's own): the dearest course's figure only in the (i).
+    const ranged = cells("MD/MS", [kims, ...fees("MD", [rec("MD/MS", { fee_per_year: [1, 2, 3].map(() => ({ ...fee(500000), amount_max: 5200000 })) })])]);
+    expect(shown(ranged.leaving)).toEqual(["Varies by course", "Varies by course", null, "muted"]);
+    expect(tip(ranged.leaving)).toContain("gives ₹5–52 L/yr across courses), so it depends on your course: at most ₹1,56,00,000 (the dearest course's).");
   });
 
   it("a ₹ figure plus the stipend received: added, the figure to the total ('₹10 L–₹38 L'); 'the lesser of' adds nothing", () => {

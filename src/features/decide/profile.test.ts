@@ -43,7 +43,7 @@ it("no quota ticked means the open quotas only; pages read a bad pwd as not PwD"
 
 it("offers her fee cap even when it isn't a standard choice", () => {
   expect(feeChoices(50)).toContain(50);
-  expect(feeChoices(7)).toEqual([2, 5, 7, 10, 20, 30, 50]);
+  expect(feeChoices(7)).toEqual([1, 2, 3, 5, 7, 8, 10, 15, 20, 30, 50]);
 });
 
 // Her real case: Anaesthesiology in every degree, Family Medicine only as DNB (MD and NBEMS Diploma Family Medicine exist).

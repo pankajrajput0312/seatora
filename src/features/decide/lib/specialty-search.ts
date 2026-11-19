@@ -86,3 +86,13 @@ export function specialtyName(name: string, code?: string): string {
     return i > 0 && SMALL.has(lower) ? lower : lower[0].toUpperCase() + lower.slice(1);
   });
 }
+
+/**
+ * A deemed university's per-course fee (a fee record's fee_variants, applies_to "MD ANAESTHESIOLOGY") for one course:
+ * its degree and specialty, else its specialty alone; undefined when the record lists none for it.
+ */
+export function variantFor<V extends { applies_to: string }>(variants: V[], degree: string, specialty: string): V | undefined {
+  const norm = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
+  const want = norm(`${degree} ${specialty}`);
+  return variants.find((x) => norm(x.applies_to) === want) ?? variants.find((x) => norm(x.applies_to).endsWith(norm(specialty)));
+}

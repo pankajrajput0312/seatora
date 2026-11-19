@@ -16,13 +16,14 @@ import { decideLinks } from "@/features/decide/lib/links";
 import { fmtIST, nextChoiceFilling, nextDate, nextFilling, roundName, stepName, stepsNow } from "@/features/decide/lib/round-status";
 import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { roundStatus } from "@/features/decide/server/notices";
-import { termValueLabel } from "@/features/decide/lib/term-filters";
+import { readTermFilters, termValueLabel } from "@/features/decide/lib/term-filters";
 import { eligibleCategories, latestText, pastOf, reachLabel, reachOrder, reachWindow, type Latest, type Reach } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { dashboard, getMeta, listOptions, type StripPoint } from "@/features/decide/service";
 import { roundLabel } from "@/features/decide/types";
+import { QuotaName } from "@/features/decide/components/round-name";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { exams, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
+import { DEFAULT_EXAM, exams, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -32,7 +33,7 @@ function At({ p }: { p: StripPoint | null }) {
   return (
     <>
       {formatRank(p.closing)}
-      <span className="block text-xs text-muted-foreground">{p.category}, {roundLabel[p.round]}, {p.quota}</span>
+      <span className="block text-xs text-muted-foreground">{p.category}, {roundLabel[p.round]}, <QuotaName quota={p.quota} /></span>
     </>
   );
 }
@@ -77,7 +78,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   // pageSize 1: only the counts and the round summary are used, not the rows.
   const { latestYear: LATEST_YEAR, pastYears: PAST_YEARS } = exams[exam];
-  const [d, meta, r, rs] = await Promise.all([dashboard(profile, exam), getMeta(exam), listOptions(profile, {}, { page: 1, pageSize: 1 }, exam), roundStatus(LATEST_YEAR, exam)]);
+  // Her caps as Options reads them (an absent maxfee / bondyrs is hers; nd=keep keeps the ones not published).
+  const { params: tp, filters: terms } = readTermFilters(params, profile);
+  const [d, meta, r, rs] = await Promise.all([dashboard(profile, exam), getMeta(exam), listOptions(profile, { terms }, { page: 1, pageSize: 1 }, exam), roundStatus(LATEST_YEAR, exam)]);
   const L = decideLinks(params);
   const list = r.view === "round" ? r.seatLists[0] : undefined;
   const roundWords = list && roundName[list.round];
@@ -103,6 +106,28 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // MCC's seat lists of the round Options lists, said as such (never "Round 2 seats in your courses").
   const lists = list && `MCC's ${roundWords} seat lists`;
   const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} without a published figure</Link></>;
+  // Another exam (most of its MCC profiles give no fee figure): what her cap hides, said as Options says it, with the
+  // ways back; then the cap, not her courses, is what to change.
+  const capped = "capped" in r ? (r.capped ?? 0) : 0;
+  const capWords = caps && tp.maxfee == null && tp.bondyrs == null ? `your cap (${caps})` : "your fee, bond or type limits";
+  const showCapped = L.with("/decide/options", { fee: null, bond: null, maxfee: "any", bondyrs: "any", ctype: null, minstip: null, maxbond: null, maxleave: null, nd: null });
+  const capCause = exam !== DEFAULT_EXAM && (capped > 0 || r.unknownTerms > 0);
+  const capNote = capCause && (
+    <p role="status" className="flex flex-wrap items-center gap-x-3 rounded-md border border-sun/40 bg-sun/10 px-3 py-2 text-sm">
+      {capped > 0 && (
+        <span>
+          <span className="numeric font-semibold">{formatRank(capped)}</span> {capped === 1 ? "option" : "options"} in your profile hidden by {capWords}.{" "}
+          <Link href={showCapped} className={`${smallLink} text-sky`}>Show them</Link>
+        </span>
+      )}
+      {r.unknownTerms > 0 && (
+        <span>
+          <span className="numeric font-semibold">{formatRank(r.unknownTerms)}</span> more with no published figure for {capWords}.{" "}
+          <Link href={L.with("/decide", { nd: "keep" })} className={`${smallLink} text-sky`}>Include not published</Link>
+        </span>
+      )}
+    </p>
+  );
 
   return (
     <AppPage className="grid grid-cols-1 gap-4">
@@ -125,12 +150,19 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               </p>
             )}
             <p className="mt-1 text-body text-muted-foreground">
-              <span className="numeric">{formatRank(total)}</span> {list ? "options with seats in MCC's latest seat lists, in your courses" : "options in your profile"};{" "}
+              <span className="numeric">{formatRank(total)}</span> {total === 1 ? "option" : "options"} {list ? "with seats in MCC's latest seat lists, in your courses" : "in your profile"};{" "}
               {/* The parts are Options' own label tabs, so each number is one she can open there. */}
               <span className="numeric">{formatRank(reached)}</span> reached your rank in a past round
               {reached > 0 && <>{" "}(<ReachedParts L={L} counts={r.counts} latest={latest} />)</>}.
             </p>
             <Button asChild size="lg" className="mt-3 min-h-11 max-sm:w-full"><Link href={L.options()}>Open Options</Link></Button>
+          </>
+        ) : capCause ? (
+          <>
+            <h2 id="next-step-h" className="mt-1 text-h2 font-bold">Your limits hide your options</h2>
+            <p className="mt-1 text-body text-muted-foreground">Your courses have options, but {capWords} {capped + r.unknownTerms === 1 ? "hides it" : "hides them"}. Show them, or lift the limit in your profile.</p>
+            <div className="mt-2">{capNote}</div>
+            <Button asChild size="lg" className="mt-3 min-h-11 max-sm:w-full"><Link href={L.to("/decide", { editProfile: 1 })}>Edit your profile</Link></Button>
           </>
         ) : (
           <>
@@ -152,6 +184,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               : `Every option in your profile with past allotments, on ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`}
           </InfoTip>
         </div>
+        {total > 0 && capNote}
         <StatStrip
           items={[
             sum && list
@@ -192,7 +225,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       </section>
 
       {reached === 0 && (
-        <StillCanDo L={L} exam={exam} rank={profile.rank} list={list} fresh={sum?.fresh ?? 0} counts={r.counts} id="next-h" title={`None of these reached your rank in ${counted}: what you can still do`} />
+        <StillCanDo L={L} exam={exam} rank={profile.rank} list={list} fresh={sum?.fresh ?? 0} counts={r.counts} cap={capCause ? { href: showCapped, words: capWords, n: capped } : undefined} id="next-h" title={`None of these reached your rank in ${counted}: what you can still do`} />
       )}
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1.4fr_1fr]">

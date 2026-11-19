@@ -85,10 +85,12 @@ describe("institutesByTerms on the test fixture", () => {
     const loose = (await institutesByTerms({ maxFee: 1e12 }))!;
     expect(loose.pass.size).toBeGreaterThan(0);
     expect(sorted([...loose.pass, ...loose.unknown])).toEqual(sorted(fx.colleges.map((c) => c.key)));
-    // No type in the memory catalog: a type filter lists none, and never as unknown; "No bond" is never unknown either.
+    // No type in the memory catalog: a type filter lists none, and never as unknown. "No bond": a bond not declared is
+    // unknown, so nd=keep lists those too, as every cap.
     const typed = (await institutesByTerms({ types: ["govt"], keepUnknown: true }))!;
     expect(typed.pass.size + typed.unknown.size).toBe(0);
-    expect((await institutesByTerms({ maxBondYears: 0 }))!.unknown.size).toBe(0);
+    const nb = (await institutesByTerms({ maxBondYears: 0 }))!;
+    expect(sorted((await institutesByTerms({ maxBondYears: 0, keepUnknown: true }))!.pass)).toEqual(sorted([...nb.pass, ...nb.unknown]));
   });
 });
 

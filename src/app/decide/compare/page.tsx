@@ -28,7 +28,7 @@ import { currentOptionIds, currentSeatLists, getMeta, getOptionsByIds, type Opti
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
-import { examYears, latestOf } from "@/features/exams/registry";
+import { DEFAULT_EXAM, examYears, latestOf } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Compare" };
 
@@ -114,7 +114,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     { label: "State", cell: (r) => r.college.state ?? <Dash /> },
     { label: "Type", cell: (r) => (r.hospital?.type ? <TypeBadge type={r.hospital.type} of={r.college.name} /> : <Dash />) },
     // NEET MDS: no hospital beds (dental colleges): no row.
-    ...(E.has.beds ? [{ label: "Beds (as reported)", cell: (r: OptionRow) => (r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} of={`${r.college.name}, ${courseName(r)}, ${r.quota}`} /> : <Dash />) }] : []),
+    ...(E.has.beds ? [{ label: "Beds (as reported)", cell: (r: OptionRow) => (r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} of={`${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} /> : <Dash />) }] : []),
     {
       label: "Your reach",
       cell: (r) =>
@@ -139,7 +139,11 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       : []),
     ...(fees
       ? [
-          ...statKeys.map((k, i) => ({ label: statLabel[k], cell: (r: OptionRow) => <StatCellView c={terms.get(r.id)![i]} t={r.fees} of={`${r.college.name}, ${courseName(r)}, ${r.quota}`} wrap /> })),
+          ...statKeys.flatMap((k, i) => [
+            { label: statLabel[k], cell: (r: OptionRow) => <StatCellView c={terms.get(r.id)![i]} t={r.fees} of={`${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} wrap /> },
+            // Another exam: the whole course's fee on its own row (NEET PG: in the Fee (i), as before).
+            ...(k === "fee" && exam !== DEFAULT_EXAM ? [{ label: "Fee, whole course", cell: (r: OptionRow) => (r.fees.wholeCourseFee != null ? <span className="numeric font-semibold">{inrFull(r.fees.wholeCourseFee)}</span> : <Dash />) }] : []),
+          ]),
           { label: "If you leave", cell: (r: OptionRow) => <IfYouLeave r={r} leaving={terms.get(r.id)!.find((c) => c.key === "leaving")!.full} /> },
         ]
       : []),

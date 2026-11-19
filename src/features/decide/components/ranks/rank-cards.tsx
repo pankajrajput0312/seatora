@@ -65,9 +65,14 @@ export function youMarks<T extends { round: Round; rank: number }>(rows: T[], ra
   return out;
 }
 
-/** A Last ranks card's big number: `sort` (a year and round) when given, else the row's newest closing (newest year first, R1 → special stray). */
-export function bigClosing<C>(grid: Partial<Record<number, Partial<Record<Round, C>>>>, years: number[], sort?: { year: number; round: Round } | null) {
-  const year = sort?.year ?? [...years].sort((a, b) => b - a).find((y) => grid[y] && rounds.some((r) => grid[y]?.[r]));
-  const round = sort?.round ?? (year != null ? rounds.find((r) => grid[year]?.[r]) : undefined);
-  return year != null && round ? { year, round, cell: grid[year]?.[round] ?? null } : null;
+/**
+ * A Last ranks card's big number: `sort` (a year and round) when given, else the row's newest closing (newest year
+ * first, R1 → special stray); with a closing-rank range (`range`) the newest one in it, the round that matched.
+ */
+export function bigClosing<C extends { closing: number }>(grid: Partial<Record<number, Partial<Record<Round, C>>>>, years: number[], sort?: { year: number; round: Round } | null, range?: { min?: number; max?: number }): { year: number; round: Round; cell: C | null } | null {
+  const ok = (c: C | undefined) => !!c && (!range || (c.closing >= (range.min ?? 0) && c.closing <= (range.max ?? Infinity)));
+  const year = sort?.year ?? [...years].sort((a, b) => b - a).find((y) => rounds.some((r) => ok(grid[y]?.[r])));
+  const round = sort?.round ?? (year != null ? rounds.find((r) => ok(grid[year]?.[r])) : undefined);
+  if (year != null && round) return { year, round, cell: grid[year]?.[round] ?? null };
+  return range ? bigClosing(grid, years, sort) : null;
 }

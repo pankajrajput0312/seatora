@@ -32,10 +32,10 @@ import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories, latestText } from "@/features/decide/lib/reach";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
-import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
+import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getInstitute, getMeta, listAllotments, optionsView, renamedCollege } from "@/features/decide/service";
 import { feesFor } from "@/features/decide/server/facts";
-import { programmes } from "@/features/decide/server/terms";
+import { programmeOfDegree, programmes } from "@/features/decide/server/terms";
 import { canSeeResidents, groupResidents, listResidents, residentsDenied } from "@/features/decide/server/residents";
 import { residentYears } from "@/features/decide/server/residents-all";
 import { deviceAid } from "@/features/funnel/service";
@@ -46,7 +46,7 @@ import { hideResidentAction } from "./actions";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { DEFAULT_EXAM, headYearIn, latestOf } from "@/features/exams/registry";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { roundIn, type Exam } from "@/features/exams/exam";
+import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { QuotaName } from "@/features/decide/components/round-name";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -122,6 +122,14 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const latest = latestOf(meta.sources, exam);
   const maxN = Math.max(1, ...allotmentsByYear.map((a) => a.n ?? 0));
   const courses = [...new Map(options.map((o) => [o.course.slug, o.course])).values()];
+  // Another exam: the courses here for the Fees tab, hers marked (none without a course in her profile), so it shows
+  // each course's own fee where the college lists one per course (NEET PG: its year table as before).
+  const hasCourses = !!profile && !!(profile.specialties.length || profile.pairs?.length);
+  const feeCourses = exam === DEFAULT_EXAM ? [] : courses.map((c) => ({ degree: c.degree, specialty: c.specialty, name: `${c.degree} ${c.name}`, mine: hasCourses && profileHasCourse(profile!, c) }));
+  // The Overview's counts are of past allotments, as the Institutes list's: courses and quotas only in the round's seat lists ("new") aside.
+  const past = options.filter((o) => o.reach !== "new");
+  const pastCourses = new Set(past.map((o) => o.course.slug)).size;
+  const newNote = (n: number, what: string) => (n ? ` ${n} more ${n === 1 ? what : `${what}s`} only in this round's seat lists (new) are on the Courses tab.` : "");
   const listed = profile ? yours : options;
   const allotYear = yearInfo(f.year ?? 0)?.year;
   const allotCourse = courses.find((c) => c.slug === f.course)?.slug;
@@ -299,8 +307,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         <>
           <StatStrip
             items={[
-              { label: "Courses", value: formatRank(courses.length) },
-              { label: "Options", value: formatRank(options.length), info: "Course and quota options here (with past allotments)." },
+              { label: "Courses", value: formatRank(pastCourses), info: courses.length > pastCourses ? `Courses with past MCC allotments here.${newNote(courses.length - pastCourses, "course")}` : undefined },
+              { label: "Options", value: formatRank(past.length), info: `Course and quota options here (with past allotments).${newNote(options.length - past.length, "option")}` },
               { label: `Allotments ${HEAD}`, value: n2025 != null ? formatRank(n2025) : <Dash />, info: "All rounds and seat categories. This counts allotments, not seats." },
               // Four cells fill the strip: hers when she has a profile, else the latest year's allotments.
               profile
@@ -421,11 +429,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                 <ul className="grid gap-3 lg:grid-cols-2">
                   {options.map((r) => {
                     const d = r.byYear[HEAD];
-                    const name = `${college.name}, ${courseName(r)}, ${r.quota}`;
+                    const name = `${college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`;
                     return (
                       <li key={r.id} className="grid min-w-0">
                         <ResultCard
-                          chips={[r.quota, profile && <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} />]}
+                          chips={[quotaIn(E, r.quota), profile && <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} />]}
                           actions={<>{profile && <ChoiceStar item={toChoiceItem(r, latest)} />}<CompareToggle id={r.id} label={name} /></>}
                           stat={{ label: `${HEAD} deepest`, value: d ? <span className="numeric">{formatRank(d.closing)}</span> : <Dash /> }}
                           title={courseName(r)}
@@ -462,7 +470,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       {options.flatMap((r) => [
                         <tr key={r.id} className={`expand-host ${tbl.row}`}>
                           {/* Without a rank the reach is unknown, so nothing would be saved with the choice: star only with a profile. */}
-                          <td className="px-1 py-2"><div className="grid justify-items-center">{profile && <ChoiceStar item={toChoiceItem(r, latest)} />}<CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}, ${r.quota}`} /></div></td>
+                          <td className="px-1 py-2"><div className="grid justify-items-center">{profile && <ChoiceStar item={toChoiceItem(r, latest)} />}<CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} /></div></td>
                           <th scope="row" className={`${stick} min-w-48 px-3 py-3 text-left align-top font-medium`}>
                             <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link>
                             <span className="block text-xs font-normal text-muted-foreground"><QuotaName quota={r.quota} /></span>
@@ -479,11 +487,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                             <Provisional when={r.latest?.provisional && !(profile && r.reachProvisional)} />
                           </td>
                           <td className={numTight}><Closing d={r.byYear[HEAD]} year={HEAD} /></td>
-                          <TermStatCells t={r.fees} variant="table" of={`${college.name}, ${courseName(r)}, ${r.quota}`} />
+                          <TermStatCells t={r.fees} variant="table" of={`${college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} />
                         </tr>,
                         <tr key={`${r.id}-rounds`} className="expand-row bg-muted/30">
                           <td />
-                          <td colSpan={3 + statKeys.length} className="px-4 pb-4"><RoundGrid row={r} caption={`${courseName(r)}, ${r.quota}: closing ranks by year and round`} /></td>
+                          <td colSpan={3 + statKeys.length} className="px-4 pb-4"><RoundGrid row={r} caption={`${courseName(r)}, ${quotaIn(E, r.quota)}: closing ranks by year and round`} /></td>
                         </tr>,
                       ])}
                     </tbody>
@@ -625,7 +633,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               )}
               {fees.map((p, i) => (
                 <div key={p.programme} className="rounded-xl border border-border bg-card p-5">
-                  <FeesSection t={p} groups={feeGroups[i]} id={`fees-${programmes[p.programme].slug}`} />
+                  <FeesSection t={p} groups={feeGroups[i]} courses={feeCourses.filter((c) => programmeOfDegree(c.degree, exam) === p.programme)} id={`fees-${programmes[p.programme].slug}`} />
                 </div>
               ))}
             </>
@@ -635,13 +643,13 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <InfoTip label="fees and bond">
               {exam === DEFAULT_EXAM ? (
                 <>
-                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type (All India, Deemed/Paid, NRI, DNB Quota) where the MCC profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead, never a figure. NBEMS maximum and minimum are NBEMS&apos;s limits, not the college&apos;s figures. A dash means not stated (not in the MCC profile fields we import; the profile may say more), never zero.
+                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type (All India, {quotaIn(E, "Deemed/Paid")}, NRI, DNB Quota) where the MCC profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead, never a figure. NBEMS maximum and minimum are NBEMS&apos;s limits, not the college&apos;s figures. A dash means not stated (not in the MCC profile fields we import; the profile may say more), never zero.
                   Leaving the course after joining is the college&apos;s or state&apos;s penalty from its bond document; resigning from Round 2 is MCC&apos;s separate forfeit.
                 </>
               ) : (
                 <>
                   One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type where the college&apos;s MCC institute profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead (a figure they state, beside them). A dash means not stated (the profile may say more), never zero.
-                  The bond is from MCC&apos;s institute list (a document Seatora has not read is &quot;not checked&quot;); resigning from Round 2 is MCC&apos;s separate forfeit.
+                  The bond is from MCC&apos;s institute list (a document Seatora has not read is &quot;Doc not read&quot;); resigning from Round 2 is MCC&apos;s separate forfeit.
                 </>
               )}
             </InfoTip>

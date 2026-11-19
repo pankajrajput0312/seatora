@@ -14,7 +14,7 @@ import { quotaIn } from "@/features/exams/exam";
  * Rank scan. `list`: the newest round's seat list while Options lists that round; `fresh`: its options never
  * allotted before.
  */
-export function StillCanDo({ L, rank, list, fresh, counts, title, id, exam = DEFAULT_EXAM }: {
+export function StillCanDo({ L, rank, list, fresh, counts, title, id, exam = DEFAULT_EXAM, cap }: {
   L: DecideLinks;
   rank: number;
   list: SeatList | undefined;
@@ -24,6 +24,8 @@ export function StillCanDo({ L, rank, list, fresh, counts, title, id, exam = DEF
   id: string;
   /** Another exam: only what it has (no schedule; NEET SS: no other quota but her group's). */
   exam?: ExamKey;
+  /** Her cap hides options (another exam): they are what to look at, not more courses (`n` hidden, `href` shows them). */
+  cap?: { href: string; words: string; n: number };
 }) {
   const pg = exam === DEFAULT_EXAM;
   return (
@@ -36,7 +38,9 @@ export function StillCanDo({ L, rank, list, fresh, counts, title, id, exam = DEF
         {list && <li><Link href={L.to("/decide/options", { seats: "virtual" })} className={smallLink}>Virtual vacancy seats</Link>: seats held now that free up when someone upgrades this round. Fill them as choices too.</li>}
         {counts["stray-only"] > 0 && <li><Link href={L.options({ reach: "stray-only" })} className={smallLink}>{formatRank(counts["stray-only"])} reached your rank only in a stray round</Link>, after R1 to R3 had closed far earlier.</li>}
         {counts["within-10"] > 0 && <li><Link href={L.options({ reach: "within-10" })} className={smallLink}>{formatRank(counts["within-10"])} closed within 10% of your rank</Link> in a past round.</li>}
-        {pg ? (
+        {cap ? (
+          <li><Link href={cap.href} className={smallLink}>{cap.n > 0 ? `${formatRank(cap.n)} ${cap.n === 1 ? "option" : "options"} hidden by ${cap.words}` : `Options hidden by ${cap.words}`}</Link>: see them on Options, or lift the limit in your profile.</li>
+        ) : pg ? (
           <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>Widen your courses, quotas or states</Link>: other states, Deemed/Paid seats (a quota), DNB and Diploma courses of your specialties, more specialties, or looser fee and bond caps.</li>
         ) : (
           <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>{perGroup(exam) ? "Widen your courses or states" : "Widen your courses, quotas or states"}</Link>: other states, more courses{perGroup(exam) ? " of your question group" : `, other quotas you can take (${exams[exam].quotas.map((q) => quotaIn(exams[exam], q)).join(", ")})`}.</li>

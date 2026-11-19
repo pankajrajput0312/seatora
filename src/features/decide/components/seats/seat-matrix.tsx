@@ -417,7 +417,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
                 <section aria-labelledby="row-terms" className="grid gap-2">
                   <h3 id="row-terms" className="font-semibold">Fee, stipend, bond and leaving penalty: {programmeTitle(r.fees)}</h3>
                   {/* The row's own cells, so the drawer never reads differently from it. */}
-                  <TermStatCells t={r.fees} of={`${r.college.name}, ${courseOf(r)}, ${r.quota}`} className="rounded-lg border border-border" />
+                  <TermStatCells t={r.fees} of={`${r.college.name}, ${courseOf(r)}, ${quotaIn(E, r.quota ?? "")}`} className="rounded-lg border border-border" />
                   <p className="text-xs text-muted-foreground">Year by year, with each figure&apos;s source and the bond&apos;s exact words: the institute&apos;s Fees &amp; bond tab.</p>
                   <TermSources t={r.fees} />
                 </section>

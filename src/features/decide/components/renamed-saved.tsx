@@ -30,7 +30,7 @@ export function RenamedSaved({ listName }: { listName?: string | null }) {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const [renamed, setRenamed] = useState(0);
+  const [renamed, setRenamed] = useState<string[]>([]);
   const exam = useExam();
 
   useEffect(() => {
@@ -47,18 +47,20 @@ export function RenamedSaved({ listName }: { listName?: string | null }) {
       const hashed = new Map(await Promise.all(keys.map(async (k) => [k, `sha256:${await sha256(k)}`] as const)));
       const of = (k: string) => map[k] ?? map[hashed.get(k) ?? ""];
       if (!keys.some(of)) return;
-      const old = new Set<string>();
+      // Old id → its name in the notice; the choices go first, so a choice's (with its course) wins over a compared id's.
+      const old = new Map<string, string>();
+      const note = (r: ReturnType<typeof renameSaved>) => r.renamed.forEach((x, k) => old.has(x) || old.set(x, r.names[k]));
       setChoices((s) => {
         const r = renameSaved(s, [], of);
-        r.renamed.forEach((x) => old.add(x));
+        note(r);
         return r.choices;
       });
       setCompare((ids) => {
         const r = renameSaved({ lists: [], activeId: "" }, ids, of);
-        r.renamed.forEach((x) => old.add(x));
+        note(r);
         return r.compare;
       });
-      setRenamed(old.size);
+      setRenamed([...new Set(old.values())]);
       const next = urlIds.map((id) => renameOptionId(id, of));
       if (next.some((id, i) => id !== urlIds[i])) {
         const p = new URLSearchParams(sp.toString());
@@ -72,11 +74,12 @@ export function RenamedSaved({ listName }: { listName?: string | null }) {
   }, [hydrated, choices, compare, sp, router, pathname, setChoices, setCompare, exam]);
 
   return (
-    <div role="status" className={renamed ? "px-4 pt-4 md:px-6 xl:px-10" : undefined} data-print-hide>
-      {renamed > 0 && (
+    <div role="status" className={renamed.length ? "px-4 pt-4 md:px-6 xl:px-10" : undefined} data-print-hide>
+      {renamed.length > 0 && (
         <p className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm">
-          {renamed} saved {renamed === 1 ? "option was" : "options were"} renamed after MCC&apos;s college names were cleaned up.
-          <Button variant="ghost" onClick={() => setRenamed(0)}>Dismiss</Button>
+          {renamed.length} saved {renamed.length === 1 ? "option was" : "options were"} renamed after MCC&apos;s college names were cleaned up:{" "}
+          {renamed.slice(0, 3).join("; ")}{renamed.length > 3 ? `; and ${renamed.length - 3} more` : ""}.
+          <Button variant="ghost" onClick={() => setRenamed([])}>Dismiss</Button>
         </p>
       )}
     </div>

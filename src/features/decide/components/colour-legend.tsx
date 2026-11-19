@@ -41,7 +41,7 @@ export function ColourLegend({ className }: { className?: string }) {
           <Val c={levelClass.caution}>1Y–2Y</Val>
           <Val c={levelClass.strong}>3Y or more</Val>
           <Val c={levelClass.heavy}>₹25 L or more to pay</Val>
-          <Val c="text-muted-foreground font-normal">None declared / Not published / —</Val>
+          <Val c="text-muted-foreground font-normal">None declared / Not clear / Doc not read / —</Val>
         </Row>
         {key === "neet-pg" ? (
           <>

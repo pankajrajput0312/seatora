@@ -58,7 +58,7 @@ export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Pro
             state law&apos;s service may still apply), and a type filter never lists a college without a type.
             <PgOr
               pg={<> &quot;None declared&quot; (a DNB hospital that declared no bond to MCC, so NBEMS lets it impose none this session) is not &quot;No bond&quot;: no document of its own says so, so it counts as not published.</>}
-              other={<> A bond document Seatora has not read yet (&quot;not checked&quot;) counts as not published.</>}
+              other={<> A bond document Seatora has not read yet (&quot;Doc not read&quot;), one with no clear bond (&quot;Not clear&quot;) and no bond declared (&quot;None declared&quot;) count as not published.</>}
             />
           </>
         }
@@ -82,7 +82,7 @@ export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Pro
         <TermSelect name="maxleave" label="Leaving penalty" value={f.maxleave} any="Any leaving penalty" options={choices("maxleave", f.maxleave ?? null)} />
         <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
           <input type="checkbox" name="nd" value="keep" defaultChecked={f.nd === "keep"} className="size-5 accent-sky" />
-          Include not published
+          Include not published (none declared, doc not read)
         </label>
       </FilterSection>
     </>

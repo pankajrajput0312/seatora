@@ -2,6 +2,7 @@ import "server-only";
 import { formatINR } from "@/features/cutoffs/lib/format";
 import { seatGroups, termSourceName, type BondDetails, type PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
 import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
+import { variantFor } from "../lib/specialty-search";
 import type { Catalog } from "./catalog";
 import type { SourceType } from "@/types/provenance";
 import type { FeeTableRecord, Term } from "../types";
@@ -120,6 +121,11 @@ export type Bond = {
    * law's service may apply); other_course: the record's bond is for other courses only (an MCh reading a record for PG seats).
    */
   status: "declared" | "none" | "not_declared" | "other_course";
+  /**
+   * Why a not_declared bond has no answer, where the record says (NEET SS / MDS records; NEET PG's never carry it):
+   * unread, MCC lists a bond document Seatora has not read; unclear, read, and no clear service bond in it.
+   */
+  why?: "unread" | "unclear";
   /** What says so (verified records only): the college's own document (or an official prospectus), a state rule, or the NBEMS rule. */
   basis: "document" | "state_rule" | "nbems_rule" | null;
   /** The college's own document says no bond (or a bond), and a state rule also covers the seat: its summary. */
@@ -367,6 +373,9 @@ const clausesOf = (s: string | null | undefined, split: RegExp) => (s ? s.split(
 const leavingSection = (text: string | undefined) => clausesOf(text?.match(/Seat-leaving penalty: (.*?)(?:; (?:Other penalty|Counselling forfeit):|$)/)?.[1], / · /);
 
 /** A bond and leaving amount in words only that the record gives as a formula: computed where it can be (formulaAmount). */
+/** A bond after withFormulas → the bond before it and the penalty text, so a course's own fee years (withFeeVariant) price it again. */
+const unpriced = new WeakMap<Bond, { raw: Bond; penaltyText: string | undefined }>();
+
 function withFormulas(b: Bond, years: Years, penaltyText: string | undefined): Bond {
   let out = b;
   if (b.status === "declared" && b.amount.state === "words") {
@@ -516,7 +525,10 @@ function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url
   const caveat = mayApply ?? (st.basis === "nbems_rule" && d.confidence ? d.confidence.replace(/^\w+: /, "") : null);
   // A state rule's applies_to is the checker's research note; its text already says whom the rule binds.
   const appliesTo = st.basis === "state_rule" ? null : (d.applies_to ?? null);
-  const base = { ...notDeclared(), ...st, stateRule: d.state_rule?.text ?? null, appliesTo, text, quote: d.quote || null, caveat, src: own, doc };
+  const rs = course?.status ?? d.status;
+  // A listed document not read (NEET SS / MDS: "unknown" with the document's link); read with no clear bond, or unknown otherwise.
+  const why = rs === "unknown" && d.doc_url ? ("unread" as const) : rs === "unknown" || rs === "unclear" ? ("unclear" as const) : null;
+  const base = { ...notDeclared(), ...st, stateRule: d.state_rule?.text ?? null, appliesTo, text, quote: d.quote || null, caveat, src: own, doc, ...(why && { why }) };
   // "No bond" only where nothing may still bind: one where a state law's service may apply is unknown (cells, filters, CSV).
   if (st.status === "none") return mayApply ? { ...base, status: "not_declared", basis: null } : { ...base, years: 0 };
   if (unknown) return base;
@@ -602,6 +614,9 @@ function recordFor(recs: FeeTableRecord[], quota: string | undefined) {
  * (null: not stated, never copied from another year); the whole course only when the record gives it (every year stated).
  * Stipends always (an NBEMS floor is `minimum`). MCC's Round 2 forfeit from its form fields.
  */
+/** Every year's fee added up; null when a year has none, or one is a range or a ceiling. */
+const yearsTotal = (years: { fee: Figure | null }[]) => (years.every((y) => y.fee && y.fee.min == null && y.fee.kind !== "maximum") ? years.reduce((n, y) => n + y.fee!.inr, 0) : null);
+
 /** The NBEMS annual DNB course fee (no GST): the most a DNB hospital may charge. */
 const NBEMS_FEE = 125000;
 
@@ -768,7 +783,9 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
   // the Leaving cell shows "See text" with them, never a figure read out of the words.
   const rulePenalty = bond.basis === "state_rule" && bondT?.details && "status" in bondT.details ? bondT.details.penalty : null;
   if (rulePenalty && !bond.leaving.length) bond = { ...bond, leaving: [{ text: `State rule${bondT!.details && "state" in bondT!.details && bondT!.details.state ? ` (${bondT!.details.state})` : ""}: ${rulePenalty}`, inr: null, group: "all", src: bond.src ?? undefined }], leavingAmount: { ...NONE, state: "words" } };
+  const raw = bond;
   bond = withFormulas(bond, years, penT?.text);
+  unpriced.set(bond, { raw, penaltyText: penT?.text });
   resignForfeit ??= read?.forfeit ?? null;
   if (!resignForfeit && !resignForfeitText && read?.forfeitText) resignForfeitText = read.forfeitText;
 
@@ -779,8 +796,9 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
     feeNote: fee && feeFig ? fee.note : null,
     hostelFee: read?.hostel ?? null,
     feeExtras: read?.extras ?? [],
-    // A range (by subject) has no one whole-course figure.
-    wholeCourseFee: recs ? (read?.whole ?? null) : feeFig && feeFig.min == null ? feeFig.inr * def.years : null,
+    // A range (by subject) has no one whole-course figure. NEET MDS / SS: a record without its total, every year's figure
+    // stated (and none a range or a ceiling), adds them up (RIMS Ranchi: ₹42,000 + ₹25,000 + ₹22,000).
+    wholeCourseFee: recs ? (read?.whole ?? (examProgrammes(DEFAULT_EXAM).includes(programme) ? null : yearsTotal(years))) : feeFig && feeFig.min == null ? feeFig.inr * def.years : null,
     bond,
     resignForfeit,
     resignForfeitText,
@@ -844,9 +862,7 @@ function withFeeVariant(cat: Catalog, t: ProgrammeTerms, college: string, degree
   const recs = recordsOf(p, own.find((x) => x.kind === "FEE"), own.find((x) => x.kind === "STIPEND"));
   const v = recs ? recordFor(recs, quota)?.fee_variants : undefined;
   if (!v?.length) return t;
-  const norm = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
-  const want = norm(`${degree} ${specialty}`);
-  const hit = v.find((x) => norm(x.applies_to) === want) ?? v.find((x) => norm(x.applies_to).endsWith(norm(specialty)));
+  const hit = variantFor(v, degree, specialty);
   // Another exam: a figure for the programme where some subjects have their own says it may vary (NEET PG: as before).
   if (!hit) return cat.exam === DEFAULT_EXAM ? t : { ...t, years: t.years.map((y) => (y.fee && y.fee.min == null ? { ...y, fee: { ...y.fee, varies: true as const } } : y)) };
   const years = t.years.map((y, i) => {
@@ -857,7 +873,10 @@ function withFeeVariant(cat: Catalog, t: ProgrammeTerms, college: string, degree
     return { ...y, fee: { ...rest, inr: f.amount_max ?? f.amount, ...(f.amount_max != null && f.amount_max !== f.amount && { min: f.amount }) } };
   });
   const all = years.every((y) => y.fee && y.fee.min == null);
-  return { ...t, years, wholeCourseFee: all ? years.reduce((n, y) => n + (y.fee?.inr ?? 0), 0) : t.wholeCourseFee };
+  // A penalty priced from the fee ("tuition for the remaining course") on this course's own fee, not the range's highest.
+  const r = unpriced.get(t.bond);
+  const bond = r ? withFormulas(r.raw, years, r.penaltyText) : t.bond;
+  return { ...t, years, bond, wholeCourseFee: all ? years.reduce((n, y) => n + (y.fee?.inr ?? 0), 0) : t.wholeCourseFee };
 }
 
 export function courseTerms(cat: Catalog, college: string, degree: string, specialty?: string, quota?: string): ProgrammeTerms {

@@ -123,7 +123,7 @@ Choices is your list, in the order you will type it into the MCC portal. It is n
 
 - **Reorder** by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), with the up and down buttons, or by typing a position number and pressing **Move**. **Undo** brings back a removed row.
 - Each row shows its current label and its Round 2 seats. Rows that no longer have seats, or are closed before your rank, are flagged. "Same institute and course listed more than once" warns about duplicates.
-- **Copy in MCC order** copies "1. Institute — Course — Quota" lines. **Download CSV** and **Print** save it. Keep a copy, because the list lives in this browser only.
+- **Copy in MCC order** copies "1. Institute — Course — Quota" lines. **Download CSV** (each choice's latest and deepest closing, fee, stipend, bond and leaving penalty too) and **Print** save it. **Share on WhatsApp** sends the list with a link to it. Keep a copy, because the list lives in this browser only.
 - **Typed into the MCC portal up to #**: as you enter choices on the MCC portal, set this number. Seatora then warns if you move a row that is already typed in ("Check the order in the MCC portal").
 - **Duplicate for next round** copies the list as the start of the next round's list.
 
