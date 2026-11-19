@@ -63,7 +63,8 @@ describe("session codes (INI-CET only)", () => {
   it("an exam with sessions takes January (1) and July (7) session codes and AIIMS source keys", () => {
     expect([sessionSchemas.source.safeParse(src).success, sessionSchemas.cutoff.safeParse(cut).success, sessionSchemas.allotment.safeParse(al).success]).toEqual([true, true, true]);
     for (const year of [2026, 20262, 20260, 19991, 21017, 202601]) expect(sessionSchemas.allotment.safeParse({ ...al, year }).success, String(year)).toBe(false);
-    expect(sessionSchemas.source.safeParse({ ...src, key: "mcc/2026/R1.pdf" }).success).toBe(false);
+    expect(sessionSchemas.source.safeParse({ ...src, key: "mcc/2026/inicet-20261-R1.pdf" }).success).toBe(true); // the adapter's
+    expect(sessionSchemas.source.safeParse({ ...src, key: "ini/20261/R1.pdf" }).success).toBe(false);
   });
   it("every other exam's schemas are as before: calendar years 2000-2100 and MCC keys only", () => {
     expect([mccSourceSchema.safeParse(src).success, mccCutoffSchema.safeParse(cut).success, mccAllotmentV2LooseSchema.safeParse(al).success]).toEqual([false, false, false]);

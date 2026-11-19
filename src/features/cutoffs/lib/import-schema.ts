@@ -15,9 +15,9 @@ export const sessionYear = z
   .number()
   .int()
   .refine((y) => { const s = sessionOf(y); return !!s && s[0] >= 2000 && s[0] <= 2100 && (s[1] === 1 || s[1] === 7); }, "Expected a session code YYYYM (20261 = January 2026, 20267 = July 2026)");
-/** `sessions`: the exam's years are session codes, its PDFs keyed by session (aiims/20261/…, or mcc/20261/…); else calendar years, MCC's. */
+/** `sessions`: the exam's years are session codes, its PDF keys opaque ids under a year or a session (mcc/2026/inicet-20261-…, aiims/20261/…); else calendar years, MCC's. */
 export const yearSchema = (sessions = false) => (sessions ? sessionYear : calendarYear);
-export const sourceKey = (sessions = false) => z.string().regex(sessions ? /^(aiims|mcc)\/\d{5}\/[\w.-]+\.pdf$/ : /^mcc\/\d{4}\/[\w.-]+\.pdf$/);
+export const sourceKey = (sessions = false) => z.string().regex(sessions ? /^(aiims|mcc)\/\d{4,5}\/[\w.-]+\.pdf$/ : /^mcc\/\d{4}\/[\w.-]+\.pdf$/);
 const rank = z.number().int().positive();
 const ikey = z.string().regex(/^[A-Z0-9]{1,40}(#(\d{6})?)?$/, "Expected <letters>[#<PIN>]");
 

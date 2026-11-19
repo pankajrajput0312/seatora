@@ -70,7 +70,7 @@ export const exams: Record<ExamKey, Exam> = {
     categories: baseCategories,
     pwd: true,
     quotas: ["Open"],
-    quotasNote: `None ticked means Open seats: the ones anyone can take. Tick a restricted quota (Sponsored, Foreign National) only if you are eligible. ${iniScope}`,
+    quotasNote: `None ticked means Open seats: the ones anyone can take. Tick a restricted quota (an institute's Institutional Preference or Institute seats, a domicile or rural quota, Sponsored, Foreign National) only if you are eligible. ${iniScope}`,
     scopeNote: iniScope,
     rankWord: "Rank",
     rankName: "INI-CET rank",
