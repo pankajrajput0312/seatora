@@ -494,6 +494,12 @@ const LEAVING_WORDS = /\bleav(?:e|es|ing)\b|\bresign|\bdiscontinu|\bquit/i;
 /** Such a rule's short phrase: "Barred next year" (a debarment from the next admission), else "Rule (see source)". */
 const ruleWords = (text: string) => (/\bdebar|\bbarred\b|\bban(?:ned)?\b|not (?:be )?(?:allowed|eligible)/i.test(text) ? "Barred next year" : "Rule (see source)");
 
+/** No leaving penalty, but a rule for leaving among the other penalties: its short phrase ("Barred next year"), else null. */
+export function leavingRule(t: Pick<ProgrammeTerms, "bond">): string | null {
+  const rule = !t.bond.leaving.length && t.bond.otherPenalties.find((p) => p.inr == null && LEAVING_WORDS.test(p.text));
+  return rule ? ruleWords(rule.text) : null;
+}
+
 function leavingCell(t: ProgrammeTerms): StatCell {
   const c = { key: "leaving", label: statLabel.leaving, about: "leaving penalty" } as const;
   const b = t.bond;

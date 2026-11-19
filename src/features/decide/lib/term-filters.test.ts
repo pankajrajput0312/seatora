@@ -213,10 +213,20 @@ describe("unknown values", () => {
 });
 
 describe("lowestRisk (Compare)", () => {
-  it("only from the bond penalties shown, every option's: the lowest wins; one with no figure means no winner", () => {
-    expect(lowestRisk([{ name: "A", t: known }, { name: "B", t: noBond }])).toBe("Lowest risk here: B (no bond, leaving penalty not published), from the bond and leaving penalties shown.");
-    expect(lowestRisk([{ name: "A", t: known }, { name: "B", t: noBond }, { name: "C", t: blank }])).toBe("Can't tell: C publishes no bond penalty figure, so there is no fair lowest.");
-    expect(lowestRisk([{ name: "A", t: known }, { name: "C", t: blank }])).toBe("Can't tell: C publishes no bond penalty figure, so there is no fair lowest.");
+  it("bond and leaving penalties together: no bond never wins over a big leaving penalty; a winner only when no other could be lower", () => {
+    // MGMCRI-like: no bond, ₹1.65 Cr to leave; KGMU-like: ₹40 L bond, ₹5 L to leave. The lower worst case wins.
+    const bigLeave = { ...noBond, bond: { ...noBond.bond, leavingAmount: amt(16500000) } };
+    const bond40 = { ...known, bond: { ...known.bond, amount: amt(4000000) } };
+    expect(lowestRisk([{ name: "M", t: bigLeave }, { name: "K", t: bond40 }])).toBe("Lowest risk here: K, from the bond and leaving penalties together. Most you could owe: M ₹1.65 Cr; K ₹40 L.");
+    // No bond and no leaving penalty published: not known, so no winner.
+    expect(lowestRisk([{ name: "A", t: known }, { name: "B", t: noBond }])).toBe("Can't tell which is lowest risk: B doesn't publish every penalty. Most you could owe: A ₹20 L; B not known (leaving penalty not published).");
+    // An unknown that is already dearer than the known one never stops it winning.
+    const dear = { ...blank, bond: { ...blank.bond, status: "declared" as const, years: 2, amount: amt(5000000) } };
+    expect(lowestRisk([{ name: "A", t: known }, { name: "D", t: dear }])).toBe("Lowest risk here: A, from the bond and leaving penalties together. Most you could owe: A ₹20 L; D ₹50 L or more (leaving penalty not published).");
+  });
+  it("a leaving rule with no ₹ (Saifai's debarment) is known: no money, said beside it", () => {
+    const saifai = { ...known, bond: { ...known.bond, amount: amt(4000000), leaving: [], leavingAmount: { ...known.bond.leavingAmount, state: "none" as const, min: null, max: null }, otherPenalties: [{ text: "PG, leaving the seat before completing the course: debarred from the next academic session's admission", inr: null, group: "all" as const }] } };
+    expect(lowestRisk([{ name: "S", t: saifai }, { name: "A", t: known }])).toBe("Lowest risk here: A, from the bond and leaving penalties together. Most you could owe: S ₹40 L, and barred next year if you leave; A ₹20 L.");
   });
   it("all unknown, or all none: said plainly", () => {
     expect(lowestRisk([{ name: "A", t: blank }, { name: "B", t: blank }])).toBe("Can't tell: none of these publishes a bond or leaving penalty figure.");

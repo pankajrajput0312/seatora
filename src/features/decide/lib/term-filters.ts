@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { formatInrShort } from "./format";
-import { inrL, noneDeclared, yearlyFee } from "./stat-format";
+import { inrL, leavingRule, noneDeclared, yearlyFee } from "./stat-format";
 import { parseSearchParams } from "./params";
 import { asCategory, typeCategories, typeCategoryLabel, typesIn, type CollegeType, type TypeCategory } from "../components/institute/college-type";
 import { BOND_YEAR_CHOICES, FEE_LAKH_CHOICES, type Profile } from "../profile";
@@ -267,12 +267,13 @@ export function termChips(f: TermParams): { key: keyof TermParams; label: string
 export const termMoreOpen = (f: TermParams) => f.minstip != null || f.maxbond != null || f.maxleave != null || f.nd === "keep";
 
 /**
- * Compare's one-line "Lowest risk here": only from the bond and leaving penalties the rows show (feeValue: no bond = 0,
- * not published = unknown, never 0). The lowest bond penalty wins (ties named together), its leaving penalty said beside
- * it; with no bond figure anywhere, the lowest leaving penalty. All unknown, or all none, said plainly.
+ * Compare's "Lowest risk here", from the bond and leaving penalties the rows show together (feeValue: no bond = 0, not
+ * published = unknown, never 0): each option's most she could owe (the larger of the two; a leaving rule with no ₹ said
+ * beside it), and a winner only when its whole exposure is known and no other's could be lower, so "no bond" never wins
+ * over a ₹1.65 Cr leaving penalty. Else "Can't tell", naming what isn't published. All unknown, or all none, said plainly.
  */
 export function lowestRisk(items: { name: string; t: ProgrammeTerms }[], byLeaving = false): string {
-  const xs = items.map((x) => ({ ...x, bond: feeValue.bond(x.t), leave: feeValue.leave(x.t), years: feeValue.bondyrs(x.t) }));
+  const xs = items.map((x) => ({ ...x, bond: noneDeclared(x.t) ? 0 : feeValue.bond(x.t), leave: feeValue.leave(x.t), years: feeValue.bondyrs(x.t) }));
   const money = (n: number) => inrL(n);
   const names = (ys: typeof xs) => ys.map((y) => y.name).join(" and ");
   // `byLeaving` (INI-CET: no bond penalty figure, a leaving penalty everywhere): the leaving penalty that exists decides,
@@ -297,17 +298,27 @@ export function lowestRisk(items: { name: string; t: ProgrammeTerms }[], byLeavi
     if (!best.length) return `Can't tell: their leaving penalties overlap (${xs.map((x) => `${x.name} ${range(x)}`).join("; ")}), so there is no fair lowest.`;
     return `Lowest leaving penalty here: ${names(best)} (${range(best[0])}); none of these publishes a bond penalty figure.`;
   }
-  if (xs.every((x) => x.bond == null && x.leave == null))
+  if (xs.every((x) => x.bond == null && x.leave == null && !leavingRule(x.t)))
     return xs.some((x) => x.years != null)
       ? "Can't tell: no bond penalty or leaving penalty figure is published for these (their bond years are in the table)."
       : "Can't tell: none of these publishes a bond or leaving penalty figure.";
-  if (xs.every((x) => x.bond === 0 && x.leave == null)) return "No bond on record at any of these, and no leaving penalty published: nothing here to tell them apart.";
-  // A winner only over figures for every option: one with no bond penalty figure is never beaten, nor beats.
-  const missing = xs.filter((x) => x.bond == null);
-  if (missing.length) return `Can't tell: ${names(missing)} ${missing.length === 1 ? "publishes" : "publish"} no bond penalty figure, so there is no fair lowest.`;
-  const leaveText = (l: number | null) => (l == null ? "leaving penalty not published" : `leaving ${money(l)}`);
-  const min = Math.min(...xs.map((x) => x.bond!));
-  const best = xs.filter((x) => x.bond === min);
-  const leaves = [...new Set(best.map((x) => x.leave))];
-  return `Lowest risk here: ${names(best)} (${min === 0 ? "no bond" : `bond penalty ${money(min)}`}${leaves.length === 1 ? `, ${leaveText(leaves[0])}` : ""}), from the bond and leaving penalties shown.`;
+  if (xs.every((x) => x.bond === 0 && x.leave == null && !leavingRule(x.t))) return "No bond on record at any of these, and no leaving penalty published: nothing here to tell them apart.";
+  // The most each could cost her: the larger of the bond penalty and the leaving penalty (a leaving rule with no ₹, e.g.
+  // a debarment, costs no money and is said beside it). Known only when both are; else at least the part that is.
+  const ex = xs.map((x) => {
+    const rule = leavingRule(x.t);
+    const leave = x.leave ?? (rule ? 0 : null);
+    return { ...x, rule, leaveKnown: leave != null, lo: Math.max(x.bond ?? 0, leave ?? 0), known: x.bond != null && leave != null };
+  });
+  const most = (x: (typeof ex)[number]) => {
+    const missing = [x.bond == null && "bond penalty", !x.leaveKnown && "leaving penalty"].filter(Boolean).join(" and ");
+    const what = !x.known ? (x.lo ? `${money(x.lo)} or more (${missing} not published)` : `not known (${missing} not published)`) : x.lo ? money(x.lo) : "nothing in ₹";
+    return `${x.name} ${what}${x.rule ? `, and ${x.rule.toLowerCase()} if you leave` : ""}`;
+  };
+  const line = `Most you could owe: ${ex.map(most).join("; ")}.`;
+  // A winner only when its whole exposure is known and no other option's could be lower: never one with no bond but a big leaving penalty.
+  const best = ex.filter((x) => x.known && ex.every((y) => y === x || y.lo >= x.lo));
+  if (!best.length) return `Can't tell which is lowest risk: ${names(ex.filter((x) => !x.known))} ${ex.filter((x) => !x.known).length === 1 ? "doesn't" : "don't"} publish every penalty. ${line}`;
+  if (best.length === ex.length) return `Same risk at each (${best[0].lo ? money(best[0].lo) : "nothing in ₹"} at most). ${line}`;
+  return `Lowest risk here: ${names(best)}, from the bond and leaving penalties together. ${line}`;
 }

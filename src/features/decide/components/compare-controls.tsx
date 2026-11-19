@@ -33,8 +33,8 @@ export function CompareFromDevice({ validIds, requested }: { validIds: string[];
 let inFlight: { from: string; to: string } | null = null;
 
 /**
- * Removes one column (tray and URL). Focus goes to the next remaining column's header, or to the page heading when
- * none is left: both stay in the page across the re-render, so focus never falls to <body>.
+ * Removes one option (tray and URL). Focus goes to the next remaining option's heading link (the table's column, or the
+ * phone's card), or to the page heading when none is left: both stay across the re-render, so focus never falls to <body>.
  */
 export function RemoveFromCompare({ id, label, nextFocus }: { id: string; label: string; nextFocus: string | null }) {
   const [, setIds] = useCompare();
@@ -60,7 +60,9 @@ export function RemoveFromCompare({ id, label, nextFocus }: { id: string; label:
         inFlight = { from: current, to: p.toString() };
         navigating();
         router.replace(`${pathname}?${p}`, { scroll: false });
-        const next = [nextFocus, ...rest].filter((i) => i && rest.includes(i)).map((i) => document.getElementById(`col-${i}`)).find(Boolean);
+        // The column's heading (md up) or the card's (phones): whichever is on show.
+        const shown = (i: string) => [`col-${i}`, `card-${i}`].map((x) => document.getElementById(x)).find((el) => el && el.offsetParent !== null);
+        const next = [nextFocus, ...rest].filter((i): i is string => !!i && rest.includes(i)).map(shown).find(Boolean);
         (next ?? document.getElementById("main-h1"))?.focus();
       }}
     >
