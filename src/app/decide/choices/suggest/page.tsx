@@ -19,7 +19,8 @@ import { parseSearchParams } from "@/features/decide/lib/params";
 import { pastOf, reachWindow, STRAY_NOT_COUNTED } from "@/features/decide/lib/reach";
 import { BUCKET_RULES, bucketName, buckets, type LeftOut } from "@/features/decide/lib/suggest";
 import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
-import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams } from "@/features/decide/profile";
+import { heldParts } from "@/features/decide/lib/held";
+import { keepProfileParams, pairChoices, pairKey, profileFromParams, toURLSearchParams, upgradeCourses } from "@/features/decide/profile";
 import { getMeta, nearestCourses, suggestOptions } from "@/features/decide/service";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { authorityOf, exams, perGroup } from "@/features/exams/registry";
@@ -28,7 +29,7 @@ export const metadata: Metadata = { title: "Suggest my list" };
 
 const TITLE = "Suggest my list";
 /** `govt=1`: government colleges first within each bucket. The term filters (college type, fee, bond…): lib/term-filters.ts. */
-const filtersSchema = z.object({ govt: z.literal("1").optional() });
+const filtersSchema = z.object({ govt: z.literal("1").optional(), /** "1": with her seat set, only courses she ranks above it (Options' Upgrades only). */ up: z.literal("1").optional() });
 const th = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
 
 /**
@@ -47,7 +48,11 @@ export default async function SuggestPage({ searchParams }: { searchParams: Prom
   const f = parseSearchParams(filtersSchema, params);
   // Her caps as Options reads them (an absent maxfee / bondyrs is hers), and the page's own (college type…).
   const { params: tp, filters: terms } = readTermFilters(params, profile);
-  const [meta, s] = await Promise.all([getMeta(exam), suggestOptions(profile, { terms, govtFirst: !!f.govt }, exam)]);
+  // Her seat (profile `held`): never suggested; "Upgrades only": the courses she ranks above it.
+  const held = profile.held;
+  const seatCourse = held && pairKey(heldParts(held));
+  const upCourses = held && f.up ? upgradeCourses(profile, held, (await getMeta(exam)).courses) : undefined;
+  const [meta, s] = await Promise.all([getMeta(exam), suggestOptions(profile, { terms, govtFirst: !!f.govt, ...(held && { exclude: [held.id], courses: upCourses }) }, exam)]);
   const L = decideLinks(params);
   const here = (changes: Record<string, string | null>) => L.with("/decide/choices/suggest", changes);
   const by = authorityOf(exam);
@@ -63,7 +68,9 @@ export default async function SuggestPage({ searchParams }: { searchParams: Prom
   const groups = order?.map((g, i) => `${th(i + 1)} preference: ${g}`) ?? null;
 
   // Her preferences with nothing suggested (closed before her rank, or her caps): said, so the list never just starts at a later one.
-  const bare = order?.flatMap((g, i) => (s.items.some((x) => x.pref === i) ? [] : [`${th(i + 1)} (${g})`])) ?? [];
+  // Upgrades only: her seat's preference and the ones below it are left out on purpose, never "nothing to suggest".
+  const upGroup = (i: number) => !upCourses || !!profile.order?.[i]?.some((e) => upCourses.some((c) => c === e || c.endsWith(`~${e}`)));
+  const bare = order?.flatMap((g, i) => (s.items.some((x) => x.pref === i) || !upGroup(i) ? [] : [`${th(i + 1)} (${g})`])) ?? [];
   // Nothing at all: the courses nearest hers that reached her rank, each a suggestion of its own (`c`: that course alone).
   const nearest = s.items.length ? [] : await nearestCourses(profile, { terms }, exam);
   const items: SuggestItem[] = s.items.map((x) => ({ item: toChoiceItem(x.row, latest), bucket: x.bucket, reason: x.reason, pref: x.pref, ...(x.unsure && { unsure: true }) }));
@@ -98,12 +105,13 @@ export default async function SuggestPage({ searchParams }: { searchParams: Prom
   // The sheet: college type and caps (as Options'), and government first.
   const keep = keepProfileParams(params);
   const chips = [
+    upCourses && { label: "Upgrades only", param: "up", href: here({ up: null }) },
     f.govt && { label: "Government first", param: "govt", href: here({ govt: null }) },
     profile.maxFeeLakh != null && tp.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: here({ fee: null }) },
     profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: here({ bond: null }) },
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/choices/suggest", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
-  const clearAll = here({ govt: null, fee: null, bond: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null });
+  const clearAll = here({ up: null, govt: null, fee: null, bond: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null });
 
   return (
     <AppPage className="grid grid-cols-1 gap-3">
@@ -127,9 +135,23 @@ export default async function SuggestPage({ searchParams }: { searchParams: Prom
           {order?.length ? <>Your order: <span className="font-semibold">{order.join(" › ")}</span>.</> : <>No course order set: your courses count as equal.</>}{" "}
           <Link href={L.to("/decide/choices/suggest", { editProfile: 1 })} className={`${smallLink} text-sky`}>{order?.length ? "Change your order" : "Set your order"}</Link>
         </p>
+        {seatCourse && (
+          <p>
+            Your seat ({unitName(seatCourse)}) is left out.{" "}
+            {upCourses ? (
+              <>
+                {upCourses.length ? `Upgrades only: the ${upCourses.length === 1 ? "course" : `${upCourses.length} courses`} you rank above it.` : "No course in your profile ranks above it in your order, so nothing is an upgrade."}{" "}
+                <Link href={here({ up: null })} className={`${smallLink} text-sky`}>Suggest from every course</Link>
+              </>
+            ) : (
+              <Link href={here({ up: "1" })} className={`${smallLink} text-sky`}>Upgrades only: courses you rank above it</Link>
+            )}
+          </p>
+        )}
         {/* The term filters, as on Options (her caps are their default), and government first. */}
         <FilterForm action="/decide/choices/suggest" role="search" aria-label="Limits for the suggested list" className={toolbar}>
           {[...keep].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+          {upCourses && <input type="hidden" name="up" value="1" />}
           <FiltersPanel count={chips.length} clear={clearAll}>
             <TermFilterControls f={tp} caps={profile} fees={E.has.fees} />
             <label className="flex min-h-12 cursor-pointer items-center gap-3 border-b border-border text-sm">

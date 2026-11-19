@@ -8,7 +8,8 @@ import { ChoicesView } from "@/features/decide/components/choices-view";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
 import { decideLinks } from "@/features/decide/lib/links";
 import { fillWindow, nextChoiceFilling, roundName, stepsNow } from "@/features/decide/lib/round-status";
-import { toURLSearchParams } from "@/features/decide/profile";
+import { HeldSeat } from "@/features/decide/components/held-seat";
+import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { roundStatus } from "@/features/decide/server/notices";
 import { chosenView } from "@/features/decide/server/view";
 import { currentSeatLists, getMeta, optionsView } from "@/features/decide/service";
@@ -22,6 +23,7 @@ export const metadata: Metadata = { title: "Choices" };
 export default async function ChoicesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
   const L = decideLinks(params);
+  const profile = profileFromParams(params);
   const exam = await activeExam();
   const { latestYear: LATEST_YEAR, pastYears: PAST_YEARS } = exams[exam];
   const [lists, view, me, rs, meta] = await Promise.all([currentSeatLists(exam), chosenView(params, "choices"), currentPlan(), roundStatus(LATEST_YEAR, exam).catch(() => null), getMeta(exam)]);
@@ -31,6 +33,8 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   return (
     <AppPage>
       <PageHead title="Choices" about={`Your list in the order you'll enter it on the ${authorityOf(exam)} portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons; in the table, pick a choice's number to move it straight there.`} />
+      {/* The seat she holds and what she risks if this list upgrades her (with a rank in the address). */}
+      {profile && <div className="mt-3"><HeldSeat profile={profile} exam={exam} L={L} where="choices" /></div>}
       {/* Her options in a suggested order (Dream, Target, Safe within her course order), each with its reason; added only when she says so. */}
       <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground" data-print-hide>
         <Button asChild variant="secondary" className="max-sm:w-full"><Link href={L.to("/decide/choices/suggest")}><ListOrdered className="size-4" aria-hidden />Suggest my list</Link></Button>

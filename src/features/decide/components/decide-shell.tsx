@@ -14,12 +14,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { LogOutButton } from "@/features/auth/components/log-out-button";
 import { compactRank, formatRank } from "@/features/cutoffs/lib/format";
-import { examShows, groupsIn, neetPg, type Exam } from "@/features/exams/exam";
+import { examShows, neetPg, type Exam } from "@/features/exams/exam";
 import { DEFAULT_EXAM, scopedKey, type ExamKey } from "@/features/exams/keys";
 import { MAX_COMPARE } from "../lib/choices";
 import { pageFilters, withFilters } from "../lib/links";
 import { readLocal } from "../lib/local-store";
-import { ExamContext, useCompare, useDecideLinks, useSavedProfile } from "../lib/use-decide-store";
+import { ExamContext, useCompare, useDecideLinks, useSavedProfile, useTrying } from "../lib/use-decide-store";
 import { categoryFromText, PROFILE_KEY, profileFromParams, profileInput, profileSchema, profileToParams, type Profile } from "../profile";
 import { AccountSync } from "./account-sync";
 import { BackToTop } from "./back-to-top";
@@ -101,10 +101,9 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
   // What the page is actually using: URL params override the saved profile.
   const inUrl = profileFromParams(new URLSearchParams(sp.toString()));
   const shown = inUrl ?? profile;
-  // Trying a rank: the address's rank, category or (NEET SS) question group isn't her saved one (or none is saved).
-  // Nothing is saved until she says so; links carry the address's profile, so every page shows the one she is trying.
-  const group = (p: Profile) => groupsIn(E, p.quotas).join("|");
-  const trying = hydrated && !!inUrl && (!profile || inUrl.rank !== profile.rank || inUrl.category !== profile.category || inUrl.pwd !== profile.pwd || group(inUrl) !== group(profile));
+  // Trying a rank (useTrying): nothing is saved until she says so; links carry the address's profile, so every page
+  // shows the one she is trying.
+  const trying = useTrying();
   // A `cat` the URL has that is no category (cat=XYZ): said, never a silent fallback (the saved profile, else Open).
   const [badCat, setBadCat] = useState<string | null>(null);
   const [compare] = useCompare(); // Zod-validated tray: a malformed value is an empty tray, never a crash
@@ -194,7 +193,8 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
       // storage blocked: Back to my rank drops every filter
     }
     if (keep) {
-      setStored(p);
+      // The editor works on the address's profile: what Home last showed her (`seen`, never in the address) stays hers.
+      setStored(profile?.seen ? { ...p, seen: profile.seen } : p);
       setToast({ text: "Saved your rank", at: Date.now() });
     }
     // First run: on to Options, which opens on the current round's seats in her courses (service.ts optionsView).

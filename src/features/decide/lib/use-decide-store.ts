@@ -2,9 +2,9 @@
 
 import { createContext, use, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { neetPg, type Exam } from "@/features/exams/exam";
+import { groupsIn, neetPg, type Exam } from "@/features/exams/exam";
 import { scopedKey } from "@/features/exams/keys";
-import { PROFILE_KEY, profileSchema, type Profile } from "../profile";
+import { PROFILE_KEY, profileFromParams, profileSchema, type Profile } from "../profile";
 import { CHOICES_KEY, compareSchema, COMPARE_KEY, defaultChoices, parseChoices, type ChoicesState } from "./choices";
 import { decideLinks } from "./links";
 import { useLocal } from "./local-store";
@@ -72,4 +72,17 @@ export function useSavedProfile(): [Profile | null, (p: Profile) => void, boolea
     return r.success ? r.data : null;
   }, [raw]);
   return [profile, setRaw, hydrated];
+}
+
+/**
+ * Trying a rank (DecideShell's banner): the address's rank, category, PwD or (NEET SS) question group isn't her saved
+ * one, or none is saved. Then nothing is saved: what she sets lives in the address only.
+ */
+export function useTrying() {
+  const E = useExamInfo();
+  const sp = useSearchParams();
+  const [profile, , hydrated] = useSavedProfile();
+  const inUrl = profileFromParams(new URLSearchParams(sp.toString()));
+  const group = (p: Profile) => groupsIn(E, p.quotas).join("|");
+  return hydrated && !!inUrl && (!profile || inUrl.rank !== profile.rank || inUrl.category !== profile.category || inUrl.pwd !== profile.pwd || group(inUrl) !== group(profile));
 }

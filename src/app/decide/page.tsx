@@ -21,6 +21,8 @@ import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, ST
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { dashboard, getMeta, listOptions, optionsPicture, type StripPoint } from "@/features/decide/service";
 import { YourPicture } from "@/features/decide/components/your-picture";
+import { HeldSeat } from "@/features/decide/components/held-seat";
+import { WhatChanged } from "@/features/decide/components/what-changed";
 import { kindName, roundShort } from "@/features/decide/types";
 import { QuotaName, RoundShort } from "@/features/decide/components/round-name";
 import { activeExam, examInfo } from "@/features/exams/active";
@@ -139,6 +141,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <AppPage className="grid grid-cols-1 gap-4">
       {title}
+      {/* Since her last visit (never on a first one), then the seat she holds and what she risks by upgrading from it. */}
+      <WhatChanged exam={exam} round={list && sum ? { list, sum } : null} />
+      <HeldSeat profile={profile} exam={exam} L={L} where="home" />
       <HeldStrip />
       <ResidentsPromo L={L} />
       {reached > 0 && <YourPicture pic={pic} profile={profile} E={E} latest={latest} L={L} scope={list ? ` with seats in ${lists}` : ""} closedHref={L.options({ reach: "closed-before", closed: true })} />}

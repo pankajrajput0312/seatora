@@ -1,7 +1,7 @@
 // INI-CET's "Also in NEET PG counselling?" guide: the official rules where MCC's NEET PG counselling and AIIMS's INI-CET
 // counselling meet (neetpg-planner data/exams/ini-cet/facts/crossover.json, copied as ./ini-cet-crossover.json; every
 // rule with its verbatim quote, document, page and link). Server-only, like the rest of INI-CET: staff's pages only,
-// never in a member's JS. Validated on load; a file that doesn't fit throws (a deploy check, never a half-shown guide).
+// never in a member's JS. Its MCC rules also make NEET PG's "What you risk" lines (./held-risk.ts), server-rendered. Validated on load; a file that doesn't fit throws (a deploy check, never a half-shown guide).
 import "server-only";
 import { z } from "zod";
 import type { BaseCategory } from "@/features/decide/types";

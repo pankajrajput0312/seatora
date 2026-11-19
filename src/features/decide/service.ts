@@ -171,7 +171,8 @@ export function optionsView(asked: OptionsView | undefined, lists: SeatList[], s
  */
 /** `terms`: fee, stipend, bond, leaving and college-type filters (lib/term-filters.ts); given, they replace her profile's fee and bond caps. */
 /** `capped`: only the options in her profile her caps and term filters hide (a known figure outside them: capNote says which). */
-export type OptionFilters = { search?: string; reach?: Reach[]; includeProvisional?: boolean; showClosed?: boolean; hasSeats?: boolean | SeatKind | "any"; view?: OptionsView; terms?: TermFilters; sort?: OptionSort; capped?: boolean };
+/** `exclude`: option ids left out (her current seat, shown apart); `courses`: only these courses ("degree~SPECIALTY": the ones that beat her seat). */
+export type OptionFilters = { search?: string; reach?: Reach[]; includeProvisional?: boolean; showClosed?: boolean; hasSeats?: boolean | SeatKind | "any"; view?: OptionsView; terms?: TermFilters; sort?: OptionSort; capped?: boolean; exclude?: string[]; courses?: string[] };
 
 /** Seats per kind in one option's own cells (OptionSeats.cells, `lists` order), in `categories` (all when omitted); null = that list prints none. */
 export function seatsByKind(lists: SeatList[], s: Pick<OptionSeats, "cells"> | undefined, categories?: string[]) {
@@ -537,6 +538,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   // Every word in the institute's name, state, address (its city) or the course; a short name ("KEM") as its official words.
   const match = searchMatcher(f.search);
   const text = (o: Opt) => {
+    if (f.exclude?.includes(o.id) || (f.courses && !f.courses.includes(`${o.degree}~${o.specialty}`))) return false;
     if (!match) return true;
     const college = cat.collegeByKey.get(o.college)!;
     const course = cat.courseOf.get(`${o.degree}|${o.specialty}`)!;
@@ -664,8 +666,8 @@ export async function nearestCourses(profile: Profile, f: OptionFilters = {}, ex
  * what they leave out; `left` counts each option not suggested by its first reason (closed before her rank and no
  * allotment in her categories from the labels' counts).
  */
-export async function suggestOptions(profile: Profile, f: { terms?: TermFilters; govtFirst?: boolean } = {}, exam: ExamKey = DEFAULT_EXAM) {
-  const [r, cat] = await Promise.all([listOptions(profile, { reach: SUGGEST_REACH, terms: {} }, undefined, exam), getCatalog(exam)]);
+export async function suggestOptions(profile: Profile, f: { terms?: TermFilters; govtFirst?: boolean } & Pick<OptionFilters, "exclude" | "courses"> = {}, exam: ExamKey = DEFAULT_EXAM) {
+  const [r, cat] = await Promise.all([listOptions(profile, { reach: SUGGEST_REACH, terms: {}, exclude: f.exclude, courses: f.courses }, undefined, exam), getCatalog(exam)]);
   const latest = latestOf(cat.sources, exam);
   const s = suggestList(r.rows, { rank: profile.rank, latest, order: profile.order, caps: f.terms ?? profileTermFilters(profile), govtFirst: f.govtFirst });
   return { ...s, latest, view: r.view, seatLists: r.seatLists, left: { ...s.left, closed: r.counts["closed-before"], noData: r.counts["no-data"] } };

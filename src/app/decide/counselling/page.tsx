@@ -12,6 +12,8 @@ import { MCC_PG, MccLink } from "@/features/decide/components/pages/mcc-link";
 import { LatestNotice, NoticeLink, siteLink } from "@/features/decide/components/round-status";
 import { ScrollToHash } from "@/features/decide/components/scroll-to-hash";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
+import { NewMark } from "@/features/decide/components/what-changed-card";
+import { noticeKey, VISIT_NOTICES } from "@/features/decide/lib/visit";
 import { ActiveFilters, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -265,6 +267,8 @@ async function Announcements({ f, params, L, exam }: { f: Filters; params: URLSe
   const w: Words = wordsOf(exam);
   const [all, matching] = await Promise.all([listNotices({}, exam), listNotices({ kind: f.kind, round: f.round, year: f.year }, exam)]);
   const years = [...new Set(all.map((n) => n.year))].sort((a, b) => b - a);
+  // "New" since her last visit: only the notices Home's "What changed" keeps (lib/visit.ts, the newest few).
+  const recent = new Set(all.slice(0, VISIT_NOTICES).map(noticeKey));
   const page = Math.min(f.page, Math.max(1, Math.ceil(matching.length / PAGE_SIZE)));
   const res = { rows: matching.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total: matching.length, page, pageSize: PAGE_SIZE };
   const here = (changes: Record<string, string | null>) => L.with("/decide/counselling", { page: null, ...changes });
@@ -317,6 +321,7 @@ async function Announcements({ f, params, L, exam }: { f: Filters; params: URLSe
                   <time dateTime={n.date} className="numeric">{fmtIST(n.date, true)}</time>
                   <span>{n.authority}, {w.year(n.year)}{n.round && `, ${w.round(n.round)}`}</span>
                   <Badge>{kindLabel[n.kind]}</Badge>
+                  {recent.has(noticeKey(n)) && <NewMark k={noticeKey(n)} />}
                 </p>
                 <p className="mt-1 break-words">{n.title}</p>
               </div>

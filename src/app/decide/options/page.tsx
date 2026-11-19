@@ -18,6 +18,7 @@ import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, kindNote, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { CourseReach, StillCanDo, type CourseHit } from "@/features/decide/components/still-can-do";
 import { YourPicture } from "@/features/decide/components/your-picture";
+import { HeldSeat, heldRow } from "@/features/decide/components/held-seat";
 import { GroupPrompt } from "@/features/decide/components/dashboard-parts";
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
@@ -29,7 +30,7 @@ import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { deepestOf, eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, resultsSpan, STRAY_NOT_COUNTED } from "@/features/decide/lib/reach";
 import { readTermFilters, termChips, termValueLabel, untypedOnly } from "@/features/decide/lib/term-filters";
-import { keepProfileParams, orderUnits, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
+import { keepProfileParams, orderUnits, pairChoices, profileFromParams, profileToParams, toURLSearchParams, upgradeCourses } from "@/features/decide/profile";
 import { examGroupCourses, getMeta, listOptions, nearestCourses, optionsPicture, optionsView, reachedOf, unlistedSeats } from "@/features/decide/service";
 import { kindName, optionSorts, optionsViews, roundShort, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 import { activeExam, examInfo } from "@/features/exams/active";
@@ -59,6 +60,8 @@ const filtersSchema = z.object({
   details: z.literal("1").optional(),
   /** "1": only the options her caps and term filters hide on a known figure (another exam's "Show them"), each saying which. */
   capped: z.literal("1").optional(),
+  /** "1": with her seat set (profile `held`), only the options in courses she ranks above it ("Upgrades only"). */
+  up: z.literal("1").optional(),
   page: pageValue.default(1),
 });
 const sortLabels = (last: string): Record<OptionSort, string> => ({
@@ -85,18 +88,24 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const hasSeats = f.seats === "1" ? "clear" : f.seats === "all" ? false : f.seats;
   // The ones her caps hide ("Show them"): every one of them, whatever its seats or closing (the count said so).
   const capMode = f.capped === "1" && exam !== DEFAULT_EXAM;
+  // Her seat (profile `held`): pinned above the results as "Your seat", never in them; "Upgrades only": the courses
+  // she ranks above it (profile.ts upgradeCourses).
+  const held = profile.held;
+  const upCourses = held && f.up ? upgradeCourses(profile, held, (await getMeta(exam)).courses) : undefined;
+  const seatFilters = held ? { exclude: [held.id], courses: upCourses } : {};
   const filters = capMode
-    ? { search: f.q, includeProvisional: !f.prov, showClosed: true, hasSeats: false, view: "all" as const, terms, sort: f.sort, capped: true }
-    : { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms, sort: f.sort };
+    ? { search: f.q, includeProvisional: !f.prov, showClosed: true, hasSeats: false, view: "all" as const, terms, sort: f.sort, capped: true, ...seatFilters }
+    : { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms, sort: f.sort, ...seatFilters };
   // A college type picked: the options it left out only because their type is not known (counted, never silently).
   const typeless = untypedOnly(terms);
-  const [meta, r, view, untyped, pic] = await Promise.all([
+  const [meta, r, view, untyped, pic, seat] = await Promise.all([
     getMeta(exam),
     listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }, exam),
     chosenView(params, "options"),
     typeless ? listOptions(profile, { ...filters, terms: typeless }, { page: 1, pageSize: 1 }, exam).then((x) => x.total) : 0,
     // "Your picture": the same options the reach chips count (search, view, seats and terms as here).
     optionsPicture(profile, filters, exam),
+    heldRow(profile, exam),
   ]);
   // The sorts' year: the latest complete one (NEET PG: its later past year, as before).
   const HEAD = yearName(exam, headYearIn(exam, meta.sources)); // as the exam names it (INI-CET: "Jan 2026")
@@ -144,7 +153,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const courseHit = (key: string, n: number): CourseHit => ({ key, name: pairLabel(key), n, href: L.with("/decide/options", { c: key, page: null, reach: null, q: null }) });
   const hit = Object.entries(r.courses).flatMap(([key, c]) => (reachedOf(c) ? [courseHit(key, reachedOf(c))] : [])).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
   const missed = orderUnits(profile)
-    .filter((u) => !hit.some((h) => h.key === u || h.key.endsWith(`~${u}`)))
+    // Upgrades only: her seat's course and the ones below it are not on show, so never "missed".
+    .filter((u) => !hit.some((h) => h.key === u || h.key.endsWith(`~${u}`)) && (!upCourses || upCourses.some((c) => c === u || c.endsWith(`~${u}`))))
     .map((u) => (u.includes("~") ? pairLabel(u) : (meta.specialties.find((x) => x.code === u)?.name ?? u)));
   const nearest = labelled > 0 && reached === 0 ? (await nearestCourses(profile, filters, exam)).map((x) => courseHit(x.key, x.reached)) : undefined;
   const suggestButton = (
@@ -165,7 +175,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
   const keep = keepProfileParams(params);
   // Same profile and filters for /api/v1/options, where "Show more" reads the next pages (and the CSV).
-  const api = profileToParams(profile);
+  // Upgrades only: those courses as her exact ones (her seat, `held`, is left out there too).
+  const api = profileToParams(upCourses?.length ? { ...profile, pairs: upCourses } : profile);
   for (const [k, v] of [["q", f.q], ["reach", f.reach], ["prov", f.prov], ["view", r.view], ["showClosed", r.showClosed ? "1" : "0"], ["hasSeats", r.seats ?? "all"], ["sort", f.sort]] as const) if (v) api.set(k, v);
   for (const [k, v] of Object.entries(tp)) if (v != null) api.set(k, Array.isArray(v) ? v.join(",") : String(v));
   // INI-CET: one list a session, AIIMS's seat position (never clear / virtual / newly added).
@@ -178,6 +189,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const termKeys = ["ctype", "maxfee", "minstip", "bondyrs", "maxbond", "maxleave", "nd"] as const;
   const active = [
     capMode && { label: "Only the ones your caps hide", param: "capped", href: here({ capped: null }) },
+    upCourses && { label: "Upgrades only", param: "up", href: here({ up: null }) },
     f.q && { label: `Search: “${f.q}”`, param: "q", href: here({ q: null }) },
     f.reach && { label: reachLabel(f.reach, latest, PAST_YEARS, !f.prov), href: here({ reach: null, closed: null }) },
     // The seats filter, the round view's default too ("Has seats in any 2026 R2 list", as the sheet names it): × shows the
@@ -202,7 +214,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: here({ bond: null }) },
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/options", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
-  const clearAll = here({ capped: null, q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, sort: null, ...(perGroup(exam) ? {} : { quota: null }), st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
+  const clearAll = here({ capped: null, up: null, q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, sort: null, ...(perGroup(exam) ? {} : { quota: null }), st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
   // Another exam (most of its MCC profiles give no fee figure): a cap never empties the list unsaid.
   const capped = "capped" in r ? (r.capped ?? 0) : 0;
   const caps = [profile.maxFeeLakh != null && tp.maxfee == null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && tp.bondyrs == null && termValueLabel.bondyrs(profile.maxBondYears)].filter(Boolean).join(", ");
@@ -352,7 +364,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
 
       {/* The profile filters are URL params, so this visit can differ from the saved profile. The toolbar (pinned on phones): the search box, Filters (the rest, in a sheet) and the count. The form, its buttons and the sheet stay mounted; only the fields remount to show what was applied. */}
       <FilterForm action="/decide/options" role="search" aria-label="Filter options" className={toolbar}>
-        {(["rank", "cat", "pwd", "fee", "bond", "ord"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
+        {(["rank", "cat", "pwd", "fee", "bond", "ord", "held"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
+        {upCourses && <input type="hidden" name="up" value="1" />}
         {/* NEET SS: no Quota filter; her group's quotas ride along. */}
         {perGroup(exam) && keep.get("quota") && <input type="hidden" name="quota" value={keep.get("quota")!} />}
         {f.reach && <input type="hidden" name="reach" value={f.reach} />}
@@ -439,6 +452,36 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           </span>
         )}
       </nav>
+      {/* Her seat, pinned above the results (never in them), with the Upgrades only switch and what she risks, folded. */}
+      {held && (
+        <HeldSeat
+          profile={profile}
+          exam={exam}
+          L={L}
+          where="options"
+          row={seat}
+          toggle={
+            seat && (
+              <p className="flex flex-wrap items-center gap-x-1 text-sm">
+                {upCourses ? (
+                  <>
+                    <span>
+                      {upCourses.length ? <>Upgrades only: {upCourses.length === 1 ? "the course" : <>the <span className="numeric">{upCourses.length}</span> courses</>} you rank above {seat.course.degree} {seat.course.name}.</> : <>No course in your profile ranks above {seat.course.degree} {seat.course.name} in your order, so nothing here is an upgrade.</>}
+                    </span>
+                    {!upCourses.length && <Link href={here({ editProfile: "1" })} className={`${smallLink} text-sky`}>Set your order</Link>}
+                    <Link href={here({ up: null })} className={`${smallLink} text-sky`}>Show every option</Link>
+                  </>
+                ) : (
+                  <Link href={here({ up: "1" })} className={`${smallLink} text-sky`}>Show only upgrades: courses you rank above {seat.course.degree} {seat.course.name}</Link>
+                )}
+                <InfoTip label="upgrades only">
+                  By your course order (Edit, Your order): the courses in your profile you put above your seat&apos;s, or all of them when your seat&apos;s course isn&apos;t in your profile. Courses only: the same course at another institute isn&apos;t counted.
+                </InfoTip>
+              </p>
+            )
+          }
+        />
+      )}
       {/* Stays mounted across filter changes (OptionsResults remounts), so the new count is announced. */}
       <p role="status" className="sr-only">{formatRank(r.total)} {r.total === 1 ? "option matches" : "options match"}</p>
 

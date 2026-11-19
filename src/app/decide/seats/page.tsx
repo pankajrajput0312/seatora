@@ -204,7 +204,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
       {/* As on Options: the toolbar (pinned on phones) has the search box, Filters (the rest, in a sheet) and the count;
           the form, its buttons and the sheet stay mounted, the fields remount to show what was applied. */}
       <FilterForm action="/decide/seats" role="search" aria-label="Filter seats" className={toolbar}>
-        {(["rank", "cat", "pwd", "fee", "bond", "ord"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
+        {(["rank", "cat", "pwd", "fee", "bond", "ord", "held"] as const).map((k) => keep.get(k) && <input key={k} type="hidden" name={k} value={keep.get(k)!} />)}
         <input type="hidden" name="list" value={list.key} />
         {!matrix && <input type="hidden" name="view" value={f.view} />}
         {allRounds && <input type="hidden" name="rounds" value="all" />}

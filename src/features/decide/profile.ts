@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { heldFromParam, heldParam, heldParts, heldSchema, type Held } from "./lib/held";
 import { baseCategories, openQuotas, type BaseCategory } from "./types";
 
 /** One exact course as "degree~SPECIALTY", e.g. "DNB~FAMILYMEDICINE" (the `c` URL param). */
@@ -30,11 +31,18 @@ export const profileSchema = z.object({
    * Suggest my list reads it (prefRank). The `ord` URL param: groups comma-joined, equal ones "=" joined.
    */
   order: z.array(z.array(z.string().max(200).regex(/^[^=,]+$/)).min(1).max(100)).max(100).optional(),
+  /** "I already hold a seat" (lib/held.ts): her current seat and the round she joined it in. The `held` URL param. */
+  held: heldSchema.optional(),
+  /**
+   * What Home last showed her of the exam's data (lib/visit.ts visitItems' keys), for "What changed since your last
+   * visit". Saved with the profile (so it follows her account), never in the URL; absent before her first visit with it.
+   */
+  seen: z.array(z.string().max(40)).max(500).optional(),
 });
 export type Profile = z.infer<typeof profileSchema>;
 
 export const PROFILE_KEY = "medpath.profile";
-export const profileParamKeys = ["rank", "cat", "pwd", "sp", "deg", "c", "quota", "st", "fee", "bond", "ord"] as const;
+export const profileParamKeys = ["rank", "cat", "pwd", "sp", "deg", "c", "quota", "st", "fee", "bond", "ord", "held"] as const;
 /** Profile params that hold several values: repeated (sp=A&sp=B, what GET forms send) or comma-joined (sp=A,B). */
 const listKeys = new Set<string>(["sp", "deg", "c", "quota", "st", "ord"]);
 
@@ -108,6 +116,19 @@ export function prefRank(order: Profile["order"], c: { degree: string; specialty
 }
 
 /**
+ * "Upgrades only": her courses ("degree~SPECIALTY", of `courses`) she ranks above her seat's course by her order
+ * (prefRank); a seat in a course outside her profile is beaten by every course of hers. [] when none beats it (no order,
+ * or her seat's course is in her first group). Courses only: the same course at another institute is not counted.
+ */
+export function upgradeCourses(p: ProfileCourses & Pick<Profile, "order">, held: Pick<Held, "id">, courses: { degree: string; specialty: string }[]) {
+  const seat = heldParts(held);
+  const mine = courses.filter((c) => profileHasCourse(p, c));
+  if (!profileHasCourse(p, seat)) return mine.map(pairKey);
+  const r = prefRank(p.order, seat);
+  return mine.filter((c) => prefRank(p.order, c) < r).map(pairKey);
+}
+
+/**
  * `order` kept to `units` (her courses now): an entry stands for the units it names (itself, a specialty's pairs, or a
  * pair's specialty when she now ticks the specialty), each unit once, empty groups dropped; units it names nowhere come
  * after, one group each. All equal (one group, or no order): undefined, as a profile says it.
@@ -152,8 +173,11 @@ export function profileInput(p: URLSearchParams) {
   const known = categoryFromText(cat); // "obc", "UR", "GEN-PwD"
   const pairs = list(p, "c");
   const order = list(p, "ord").map((g) => g.split("=").map((x) => x.trim()).filter(Boolean)).filter((g) => g.length);
+  const held = p.get("held")?.trim();
   return {
     ...(order.length ? { order } : {}),
+    // A malformed one stays a string, so strict parsing rejects it.
+    ...(held ? { held: heldFromParam(held) ?? held } : {}),
     rank: num(p.get("rank")?.replace(/[,\s]/g, "")),
     category: known?.category ?? cat,
     pwd: known?.pwd || flag(p.get("pwd")),
@@ -175,15 +199,17 @@ export function profileFromParams(p: URLSearchParams): Profile | null {
   const raw = profileInput(p);
   const rank = profileSchema.shape.rank.safeParse(raw.rank);
   if (!rank.success) return null;
-  const field = <K extends keyof Profile>(k: K, fallback: Profile[K]): Profile[K] => {
+  const field = <K extends keyof Profile & keyof typeof raw>(k: K, fallback: Profile[K]): Profile[K] => {
     const r = profileSchema.shape[k].safeParse(raw[k]);
     return r.success ? (r.data as Profile[K]) : fallback;
   };
   // Pairs item by item: a hand-edited bad one is dropped, the rest kept.
   const pairs = raw.pairs?.filter((x) => pairSchema.safeParse(x).success);
   const order = raw.order && profileSchema.shape.order.safeParse(raw.order).data;
+  const held = raw.held && heldSchema.safeParse(raw.held).data;
   return {
     ...(order ? { order } : {}),
+    ...(held ? { held } : {}),
     rank: rank.data,
     category: field("category", "Open"),
     pwd: field("pwd", false),
@@ -211,6 +237,7 @@ export function profileToParams(profile: Profile, base = new URLSearchParams()):
   if (profile.maxFeeLakh != null) p.set("fee", String(profile.maxFeeLakh));
   if (profile.maxBondYears != null) p.set("bond", String(profile.maxBondYears));
   if (profile.order?.length) p.set("ord", profile.order.map((g) => g.join("=")).join(","));
+  if (profile.held) p.set("held", heldParam(profile.held));
   return p;
 }
 

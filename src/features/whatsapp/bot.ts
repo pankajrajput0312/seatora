@@ -85,6 +85,9 @@ async function saveProfile(userId: string, current: Profile | null, input: z.inf
     states: current?.states ?? [],
     maxFeeLakh: current?.maxFeeLakh ?? null,
     maxBondYears: current?.maxBondYears ?? null,
+    // Her seat and what Home last showed her (set on the site) stay hers.
+    ...(current?.held && { held: current.held }),
+    ...(current?.seen && { seen: current.seen }),
   });
   const json = withExamPart(row, DEFAULT_EXAM, p) as unknown as Prisma.InputJsonValue;
   await db.userProfile.upsert({ where: { userId }, create: { userId, json, updatedAt: new Date() }, update: { json, updatedAt: new Date() } });
