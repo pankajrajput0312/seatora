@@ -31,7 +31,7 @@ const data = schema.parse(raw);
  */
 const stages: { title: string; ids: string[] }[] = [
   { title: "MCC Round 1 and Round 2 (Round 2 on hold)", ids: ["mcc_r2_on_hold", "mcc_schedule_dates", "mcc_resign_r1_r2_only", "mcc_withdrawal_user_guide", "mcc_deposit_forfeit_r2_onwards", "mcc_deposit_amounts", "mcc_r2_upgrade_loses_r1", "mcc_r2_exit_then_r3", "mcc_r2_resign_state_flowchart"] },
-  { title: "MCC Round 3", ids: ["mcc_r3_holder_ineligible", "mcc_r3_no_resign", "mcc_r3_no_resign_annexure"] },
+  { title: "MCC Round 3", ids: ["mcc_r3_holder_ineligible", "mcc_r3_upgrade_no_claim", "mcc_r3_no_resign", "mcc_r3_no_resign_annexure"] },
   { title: "MCC stray round", ids: ["mcc_stray_eligibility", "mcc_stray_must_join", "mcc_stray_state_data_sharing"] },
   { title: "Original certificates: both want them", ids: ["mcc_originals_needed_to_join", "mcc_originals_retained", "aiims_report_originals_or_3l", "aiims_r1_dd_five_days", "aiims_new_r2_dd_five_days", "aiims_r2_noshow_originals_buyback", "aiims_originals_held_3l"] },
   { title: "INI-CET: already doing or done an MD/MS", ids: ["aiims_pursuing_pg_excluded"] },

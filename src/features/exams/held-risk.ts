@@ -63,17 +63,12 @@ function mcc(i: RiskInput): RiskLine[] {
       : said("mcc_deposit_amounts").replace(/^The security deposit is /, "").replace(/\.$/, "");
   const lines: (RiskLine | false)[] = [
     r2Open && { key: "r2-upgrade", text: "If Round 2 upgrades you, your Round 1 seat is cancelled automatically, at once, and goes to someone else: you must join the Round 2 seat, and not joining it in time forfeits your security deposit.", rules: of("mcc_r2_upgrade_loses_r1") },
+    early && { key: "r3-upgrade", text: "If Round 3 upgrades you, you lose any claim on your earlier seat.", rules: of("mcc_r3_upgrade_no_claim") },
     early && { key: "r3-no-resign", text: "Joining a Round 3 seat means you can't resign it or upgrade from it, and you can't take part in any later MCC round.", rules: of("mcc_r3_no_resign", "mcc_r3_no_resign_annexure") },
     early && { key: "r3-join", text: "If Round 3 allots you a seat and you don't join it, you lose your security deposit and are out of every later MCC round.", rules: of("mcc_r3_no_resign") },
     i.round === "R3" && { key: "r3-held", text: "You can't resign your Round 3 seat or upgrade from it, and having joined it you can't take part in any later MCC round.", rules: of("mcc_r3_no_resign", "mcc_r3_no_resign_annexure") },
     { key: "deposit", text: `Your MCC security deposit: ${depositWords}. From Round 2 on, it is forfeited if you are allotted a seat and don't join it, or surrender it.`, rules: of("mcc_deposit_amounts", "mcc_deposit_forfeit_r2_onwards") },
     early && { key: "r3-eligible", text: `Holding your Round ${n} seat, you can take part in Round 3 only if you gave your willingness to upgrade.`, rules: of("mcc_r3_holder_ineligible") },
-    early && {
-      key: "r3-cancel",
-      text: "Whether a Round 3 allotment cancels your current seat automatically: not stated in the rules Seatora has from MCC (the bulletin says so for a Round 2 upgrade).",
-      rules: of("mcc_r2_upgrade_loses_r1"),
-      gap: { note: "Not in the MCC rules Seatora has extracted with their exact words. Check the bulletin's Round 3 section before you fill choices.", checked: [crossover.sources.mcc_bulletin?.title ?? "MCC bulletin"] },
-    },
     r2Open && { key: "r2-hold", text: said("mcc_r2_on_hold"), rules: of("mcc_r2_on_hold"), asOf: true },
     i.round === "R2" && { key: "r2-exit", text: "If you exit your Round 2 seat with forfeiture, you can still take part in Round 3, paying the fees afresh.", rules: of("mcc_r2_exit_then_r3") },
     (early || i.round === "R3") && { key: "stray", text: "The stray vacancy round is for candidates not holding a seat: while you hold yours, you can't take part.", rules: of("mcc_stray_eligibility") },

@@ -9,13 +9,18 @@ const ids = (i: Partial<RiskInput>, key: string) => line(i, key)?.rules.map((r) 
 
 describe("What you risk (held-risk.ts riskLines): only the documents' rules, by exam, round, quota, category and deemed", () => {
   it("NEET PG, a Round 1 seat while Round 2's result is held: the Round 2 upgrade first, then Round 3's no-resign and join rules", () => {
-    expect(keys({}).slice(0, 4)).toEqual(["r2-upgrade", "r3-no-resign", "r3-join", "deposit"]);
+    expect(keys({}).slice(0, 5)).toEqual(["r2-upgrade", "r3-upgrade", "r3-no-resign", "r3-join", "deposit"]);
     expect(ids({}, "r2-upgrade")).toEqual(["mcc_r2_upgrade_loses_r1"]);
     expect(ids({}, "r3-no-resign")).toEqual(["mcc_r3_no_resign", "mcc_r3_no_resign_annexure"]);
     expect(line({}, "r2-hold")?.asOf).toBe(true);
-    // Round 3 cancelling her seat at once is not in the extracted rules: said so, never claimed.
-    expect(line({}, "r3-cancel")?.gap).toBeDefined();
-    expect(line({}, "r3-cancel")?.text).toMatch(/^Whether .*not stated/);
+    // Round 3: an upgrade leaves no claim on the earlier seat, from the bulletin's own words (p. 45).
+    const r3 = line({}, "r3-upgrade")!;
+    expect([r3.text, r3.gap, r3.rules.map((r) => [r.id, r.doc, r.page, r.quote])]).toEqual([
+      "If Round 3 upgrades you, you lose any claim on your earlier seat.",
+      undefined,
+      [["mcc_r3_upgrade_no_claim", "mcc_bulletin", 45, "Candidates getting upgraded in Round 3 shall Not have any claim on earlier round allotted seat."]],
+    ]);
+    expect(keys({})).not.toContain("r3-cancel");
   });
   it("Round 2's result out: no Round 2 upgrade or hold lines", () => {
     expect(keys({ pending: ["R3", "stray"] })).not.toContain("r2-upgrade");
@@ -23,7 +28,7 @@ describe("What you risk (held-risk.ts riskLines): only the documents' rules, by 
   });
   it("a Round 2 seat: Round 3's rules and the exit-with-forfeiture rule, never Round 1's", () => {
     const k = keys({ round: "R2" });
-    expect(k).toEqual(expect.arrayContaining(["r3-no-resign", "r3-join", "r3-eligible", "r2-exit", "resign"]));
+    expect(k).toEqual(expect.arrayContaining(["r3-upgrade", "r3-no-resign", "r3-join", "r3-eligible", "r2-exit", "resign"]));
     expect(k).not.toContain("r2-upgrade");
     expect(k).not.toContain("r1-window");
     expect(line({ round: "R2" }, "r3-eligible")?.text).toContain("Round 2 seat");
@@ -32,6 +37,7 @@ describe("What you risk (held-risk.ts riskLines): only the documents' rules, by 
     const k = keys({ round: "R3" });
     expect(k[0]).toBe("r3-held");
     expect(k).not.toContain("r3-join");
+    expect(k).not.toContain("r3-upgrade");
     expect(k).not.toContain("resign");
     expect(line({ round: "R3" }, "leave-late")?.gap?.note).toMatch(/^Not stated/);
   });

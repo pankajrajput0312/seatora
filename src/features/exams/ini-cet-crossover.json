@@ -282,6 +282,17 @@
    "doc": "mcc_bulletin"
   },
   {
+   "id": "mcc_r3_upgrade_no_claim",
+   "body": "MCC",
+   "applies_when": "Upgraded in MCC Round 3 while holding an earlier-round seat",
+   "rule": "If Round 3 upgrades you, you lose any claim on your earlier seat.",
+   "quote": "Candidates getting upgraded in Round 3 shall Not have any claim on earlier round allotted seat.",
+   "url": "https://cdnbbsr.s3waas.gov.in/s3e0f7a4d0ef9b84b83b693bbf3feb8e6e/uploads/2026/10/202610082121348550.pdf",
+   "page": 45,
+   "session": "NEET PG 2026 counselling",
+   "doc": "mcc_bulletin"
+  },
+  {
    "id": "mcc_stray_eligibility",
    "body": "MCC",
    "applies_when": "Wanting the MCC stray vacancy round",
