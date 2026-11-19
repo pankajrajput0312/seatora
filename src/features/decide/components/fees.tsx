@@ -614,7 +614,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
       ))}
       {(bond.quote ?? bond.text) && (
         <details className="text-sm">
-          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky">{bond.quote ? "Exact words of the bond document" : "Exact words of the bond summary"}</summary>
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky">{bond.quote ? (authorityOf(t.exam) === "MCC" ? "Exact words of the bond document" : "Exact words of the prospectus") : "Exact words of the bond summary"}</summary>
           <blockquote className="mt-1 border-l-2 border-border pl-3 text-muted-foreground">{bond.quote ?? bond.text}</blockquote>
         </details>
       )}

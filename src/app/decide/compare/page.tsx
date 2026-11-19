@@ -70,17 +70,20 @@ function YearLines({ r, E }: { r: OptionRow; E: Exam }) {
 }
 
 /** "If you leave": the leaving penalty after joining, and what MCC lets the college keep if you resign or don't join from Round 2. */
-function IfYouLeave({ r, leaving }: { r: OptionRow; leaving: string }) {
+function IfYouLeave({ r, leaving, shared }: { r: OptionRow; leaving: string; /** INI-CET: round rules every compared option has (said once above the table). */ shared: Set<string> }) {
   const t = r.fees;
+  const own = t.roundRules?.filter((p) => !shared.has(p.text));
   return (
     <span className="grid gap-1 text-xs">
       <span><span className="text-muted-foreground">After joining:</span> <span className="font-semibold">{leaving === "—" ? "no penalty published" : leaving}</span></span>
-      {t.roundRules ? (
-        // INI-CET: AIIMS's round rules, each in its own words.
-        <span className="grid gap-0.5">
-          <span className="text-muted-foreground">{authorityOf(t.exam)}&apos;s round rules:</span>
-          {t.roundRules.map((p, i) => <span key={i}>{p.text}<Sup n={p.src ?? t.bond.src} sources={t.sources} /></span>)}
-        </span>
+      {own ? (
+        // INI-CET: AIIMS's round rules, each in its own words; the ones every option shares are above the table.
+        own.length > 0 && (
+          <span className="grid gap-0.5">
+            <span className="text-muted-foreground">{shared.size ? "Also, here:" : `${authorityOf(t.exam)}'s round rules:`}</span>
+            {own.map((p, i) => <span key={i}>{p.text}<Sup n={p.src ?? t.bond.src} sources={t.sources} /></span>)}
+          </span>
+        )
       ) : (
       <span>
         <span className="text-muted-foreground">Resign or don&apos;t join from Round 2:</span>{" "}
@@ -111,6 +114,10 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const E = await examInfo(exam);
   const round = lists[0] && `${yearName(exam, lists[0].year)} ${roundIn(E, lists[0].year, lists[0].round)}`;
   const fees = E.has.fees; // another exam may have no fee, stipend or bond data: no such rows
+  // INI-CET: AIIMS's round rules every compared option has, said once above the table (each column shows only its own).
+  const ruleSets = options.map((r) => new Set((r.fees.roundRules ?? []).map((p) => p.text)));
+  const sharedRules = new Set(options.length > 1 && options.every((r) => r.fees.roundRules) ? [...ruleSets[0]].filter((x) => ruleSets.every((s) => s.has(x))) : []);
+  const sharedParts = options[0]?.fees.roundRules?.filter((p) => sharedRules.has(p.text)) ?? [];
   const risk = fees && options.length > 1 && lowestRisk(options.map((r) => ({ name: r.college.name, t: r.fees })), authorityOf(exam) !== "MCC");
   const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? yearName(exam, y);
   const latest = latestOf(meta.sources, exam);
@@ -139,7 +146,10 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           cell: (r: OptionRow) => (
             <span className="grid text-xs">
               {lists.map((l) => (
-                <span key={l.key}><span className="text-muted-foreground">{kindName(l.kind, exam)}:</span> <span className="numeric font-semibold">{r.seatsBy?.[l.kind] != null ? formatRank(r.seatsBy[l.kind]!) : "—"}</span></span>
+                <span key={l.key}><span className="text-muted-foreground">{kindName(l.kind, exam)}:</span> <span className="numeric font-semibold">{r.seatsBy?.[l.kind] != null ? formatRank(r.seatsBy[l.kind]!) : "—"}</span>
+                  {/* INI-CET: hers out of the option's own ("4 in your categories of 6"). */}
+                  {r.seatsAllBy?.[l.kind] != null && <span className="text-muted-foreground"> in your categories of <span className="numeric">{formatRank(r.seatsAllBy[l.kind]!)}</span></span>}
+                </span>
               ))}
             </span>
           ),
@@ -152,7 +162,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             // Another exam: the whole course's fee on its own row (NEET PG: in the Fee (i), as before).
             ...(k === "fee" && exam !== DEFAULT_EXAM ? [{ label: "Fee, whole course", cell: (r: OptionRow) => (r.fees.wholeCourseFee != null ? <span className="numeric font-semibold">{inrFull(r.fees.wholeCourseFee)}</span> : <Dash />) }] : []),
           ]),
-          { label: "If you leave", cell: (r: OptionRow) => <IfYouLeave r={r} leaving={terms.get(r.id)!.find((c) => c.key === "leaving")!.full} /> },
+          { label: "If you leave", cell: (r: OptionRow) => <IfYouLeave r={r} leaving={terms.get(r.id)!.find((c) => c.key === "leaving")!.full} shared={sharedRules} /> },
         ]
       : []),
     { label: `${latestText(latest)} closing`, cell: (r) => <ClosingCell d={r.latest} year={latest.year} r1={r1Of(r, latest.year)} /> },
@@ -199,6 +209,14 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         <>
         {me && known.length > cap && <Paywall feature="compare" eff={me.eff} className="mt-6" />}
         {risk && <p className="mt-3 text-sm">{risk}</p>}
+        {sharedParts.length > 0 && (
+          <section aria-label={`${authorityOf(exam)}'s round rules`} className="mt-3 grid gap-1 rounded-xl border border-border bg-card px-4 py-3 text-sm">
+            <p className="font-semibold">{authorityOf(exam)}&apos;s round rules, the same for all {options.length}:</p>
+            <ul className="grid list-disc gap-1 pl-5 text-xs">
+              {sharedParts.map((p, i) => <li key={i}>{p.text}<Sup n={p.src ?? options[0].fees.bond.src} sources={options[0].fees.sources} /></li>)}
+            </ul>
+          </section>
+        )}
         {/* Phones: two options fit the width beside the labels; three or four get 10rem columns, so the next one peeks in
             at the edge (ScrollTable's edge shadow and first-time "Swipe for more" say there are more). */}
         <ScrollTable label="Comparison" className="mt-3 rounded-xl border border-border bg-card md:mt-8" scrollClassName="[scroll-padding-inline-start:11rem]">

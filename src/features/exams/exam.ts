@@ -49,6 +49,8 @@ export type Exam = {
   quotaScoped?: boolean;
   /** Institutes's groups (INI-CET: AIIMS New Delhi, the new AIIMS, JIPMER…), each its colleges' key prefix (`not`: one it leaves out); the Institutes filter. */
   instituteGroups?: { label: string; prefix: string; not?: string }[];
+  /** Quotas its seat position notifies apart (INI-CET: Sponsored / Foreign National / Bhutani, AIIMS's own notice), and their one name: seat totals say them apart ("204 open + 53 Sponsored/Foreign National"). */
+  apartQuotas?: { quotas: string[]; name: string };
 };
 
 export const neetPg: Exam = {

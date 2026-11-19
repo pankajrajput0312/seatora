@@ -281,12 +281,13 @@ function stipendCell(t: ProgrammeTerms): StatCell {
   const tip: TipLine[] = [
     ...yearLines(t, "stipend", " a month"),
     ...(below ? [{ text: below.nbems ? `${BELOW_MIN} of ${inrFull(below.nbems.inr)} a month.` : `${BELOW_MIN}.`, warn: true as const, src: below.nbems?.src }] : []),
-    ...(s.plusDa ? [{ text: "Plus DA (dearness allowance), as the college declared." }] : []),
+    // INI-CET: the entry pay plus NPA and allowances (its record's basis); every other exam's words as before.
+    ...(s.plusDa ? [{ text: t.exam === "ini-cet" ? "Plus NPA and DA (allowances), as the prospectus prints it: the figure is the entry pay." : "Plus DA (dearness allowance), as the college declared." }] : []),
     ...(s.kind === "minimum" ? [{ text: NBEMS_MIN }] : s.kind === "nmc" ? [{ text: NMC }] : []),
   ];
   // Always a month, one money style: "₹35,000/mo", "₹1.05 L/mo", "≥ ₹43,000/mo" (full: "From ₹43,000/mo").
   const min = s.kind === "minimum";
-  return levelOf({ ...c, short: `${min ? "≥ " : ""}${inrCard(s.inr)}/mo`, full: `${min ? "From " : ""}${inrFull(s.inr)}/mo`, marker: s.below ? "below NBEMS min" : null, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
+  return levelOf({ ...c, short: `${min ? "≥ " : ""}${inrCard(s.inr)}/mo`, full: `${min ? "From " : ""}${inrFull(s.inr)}/mo`, marker: s.below ? "below NBEMS min" : t.exam === "ini-cet" && s.plusDa ? "+ NPA/DA" : null, ...(s.below && { markerWarn: true as const }), tone: null, tip }, s.below ? "caution" : undefined, "below the NBEMS minimum");
 }
 
 /**
@@ -318,7 +319,7 @@ function bondMissing(t: ProgrammeTerms, c: Pick<StatCell, "key" | "label" | "abo
   }
   if (b.status === "other_course") return dash(c, [{ text: `Not published for ${t.programme}: the bond ${t.exam === "ini-cet" ? `in ${profileOf(t.exam)}` : "on the college's MCC profile"} is for other courses.`, src: b.src }, ...rules]);
   if (b.text) {
-    const [short, full] = b.caveat ? ["Law may apply", "No bond, but a state law may apply"] : b.why === "unclear" ? ["Not clear", "No clear bond in its document"] : ["None declared", "None declared"];
+    const [short, full] = b.caveat ? ["Law may apply", "No bond, but a state law may apply"] : b.why === "unclear" && t.exam === "ini-cet" ? ["None stated", "No service bond stated"] : b.why === "unclear" ? ["Not clear", "No clear bond in its document"] : ["None declared", "None declared"];
     return {
       ...c, short, full, marker: null, tone: "muted",
       tip: [...(b.caveat ? [{ text: MAY_APPLY, warn: true as const }] : []), { text: b.text, src: b.src }, ...doc, ...(isDnb(t) ? rules.map((r) => ({ ...r, text: "NBEMS bond rules" })) : [])],
@@ -498,6 +499,7 @@ export function bondPlain(t: ProgrammeTerms): string {
   else if (noneDeclared(t)) parts.push("No bond declared, so none can be imposed this session.");
   else if (b.why === "unread") parts.push(`Bond: ${authorityOf(t.exam)} lists a bond document Seatora has not read; read it before you lock.`);
   else if (b.text && !b.caveat && b.why !== "unclear") parts.push(`Bond: none declared to ${authorityOf(t.exam)}.`);
+  else if (b.why === "unclear" && t.exam === "ini-cet") parts.push("Bond: no service bond after the course is stated (the residency contract and its leaving penalty are not one).");
   else parts.push("Bond: no clear answer published; ask the college.");
   return parts.join(" ");
 }

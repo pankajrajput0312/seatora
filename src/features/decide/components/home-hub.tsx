@@ -2,7 +2,8 @@ import Link from "next/link";
 import { ArrowRight, Building2, ChevronRight, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
 import { activeExam } from "@/features/exams/active";
 import { examShows, neetPg, type Exam } from "@/features/exams/exam";
-import { exams, inExamWords } from "@/features/exams/registry";
+import { authorityOf, exams, inExamWords } from "@/features/exams/registry";
+import { kindName } from "../types";
 import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import { PLANS } from "@/features/payments/plans";
 import { limitLine, passView } from "@/features/plans/components/plan-cards";
@@ -46,7 +47,8 @@ const groups = [
 /** Plan and Research: a section label and its one-line hint, then a tile per tool (two across on phones). `E`: the exam (examInfo): only the tools it has data for. */
 export function ToolGroups({ L, E = neetPg }: { L: DecideLinks; E?: Exam }) {
   // NEET MDS: no hospital beds (dental colleges).
-  const note = (t: (typeof groups)[number]["tools"][number]) => (t.href === "/decide/institutes" && !E.has.beds ? "Every college and its type" : inExamWords(E.key, t.note));
+  const note = (t: (typeof groups)[number]["tools"][number]) =>
+    t.href === "/decide/institutes" && !E.has.beds ? "Every college and its type" : t.href === "/decide/seats" && kindName("clear", E.key) === "Seat position" ? `${authorityOf(E.key)}'s seat position, session by session` : inExamWords(E.key, t.note);
   return (
     <div className="grid gap-4">
       {groups.map((g) => ({ ...g, tools: g.tools.filter((t) => examShows(E, t.href)).map((t) => ({ ...t, note: note(t) })) })).map((g) => (

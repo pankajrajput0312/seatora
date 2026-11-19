@@ -42,10 +42,10 @@ import { residentYears } from "@/features/decide/server/residents-all";
 import { deviceAid } from "@/features/funnel/service";
 import { Paywall } from "@/features/plans/components/paywall";
 import { checkAndCount, currentPlan } from "@/features/plans/usage";
-import { kindName } from "@/features/decide/types";
+import { kindName, type SeatList } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { authorityOf, DEFAULT_EXAM, headYearIn, inExamWords, latestOf, rankListParam, restrictedQuota, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, headYearIn, inExamWords, latestOf, rankListParam, yearName } from "@/features/exams/registry";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { QuotaName } from "@/features/decide/components/round-name";
@@ -236,7 +236,13 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       ];
     });
   // Header: this round's clear and virtual vacancies here (the newest PDF of each kind); the lists overlap, so never added.
-  const roundSeats = totals ?? headerLists(round.map((r) => r.list)).map((list) => ({ list, n: round.find((r) => r.list === list)!.rows.reduce((a, r) => a + r.seats, 0) }));
+  const isApart = (q: string | null) => !!q && !!E.apartQuotas?.quotas.includes(q);
+  const roundSeats: { list: SeatList; n: number; apart?: number }[] =
+    totals ??
+    headerLists(round.map((r) => r.list)).map((list) => {
+      const rows = round.find((r) => r.list === list)!.rows;
+      return { list, n: rows.reduce((a, r) => a + r.seats, 0), ...(E.apartQuotas && { apart: rows.filter((r) => isApart(r.quota)).reduce((a, r) => a + r.seats, 0) }) };
+    });
 
   return (
     <AppPage className="grid grid-cols-1 gap-3">
@@ -275,10 +281,10 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                 )}
               </InfoTip>
             </span>}
-            {roundSeats.map(({ list, n }) => (
+            {roundSeats.map(({ list, n, apart }) => (
               <span key={list.key} className="inline-flex items-center gap-0.5">
                 <Link href={L.to(`/decide/institutes/${slug}`, { tab: "seats" })} className="inline-flex min-h-11 items-center hover:underline">
-                  <span className="text-muted-foreground">{yn(list.year)} {roundIn(E, list.year, list.round)} {seatKindShort(list.kind, exam)}:</span>&nbsp;{n > 0 ? <span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{formatRank(n)}</span> : <span className="numeric text-muted-foreground">0 seats</span>}
+                  <span className="text-muted-foreground">{yn(list.year)} {roundIn(E, list.year, list.round)} {seatKindShort(list.kind, exam)}:</span>&nbsp;{n > 0 ? <span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{apart ? `${formatRank(n - apart)} open + ${formatRank(apart)} ${E.apartQuotas!.name}` : formatRank(n)}</span> : <span className="numeric text-muted-foreground">0 seats</span>}
                   <span className="sr-only"> seats: see Seats</span>
                 </Link>
                 <InfoTip label={listSeats(list, exam)}>
@@ -536,7 +542,9 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             {round.map(({ list, rows }, i) => {
               const n = rows.reduce((a, r) => a + r.seats, 0);
               // INI-CET: the open seats, and each restricted quota's (Sponsored, Foreign National…) said apart, never one total.
-              const restricted = E.quotaScoped ? [...Map.groupBy(rows.filter((r) => r.quota != null && restrictedQuota(exam, r.quota)), (r) => r.quota!)].map(([q, xs]) => [q, xs.reduce((a, r) => a + r.seats, 0)] as const) : [];
+              // INI-CET: the quotas AIIMS's seat position notifies apart (Sponsored / Foreign National), one figure beside the open seats.
+              const apartN = rows.filter((r) => isApart(r.quota)).reduce((a, r) => a + r.seats, 0);
+              const restricted = E.apartQuotas && apartN ? [[E.apartQuotas.name, apartN] as const] : [];
               const open = n - restricted.reduce((a, [, m]) => a + m, 0);
               return (
                 <section key={list.key} aria-labelledby={`seats-${i}`} className="grid gap-3">
@@ -544,8 +552,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     {kindName(list.kind, exam)}
                     {rows.length > 0 && (
                       <span className="numeric text-sm font-normal text-muted-foreground">
-                        {formatRank(restricted.length ? open : n)} {(restricted.length ? open : n) === 1 ? "seat" : "seats"} here
-                        {restricted.map(([q, m]) => <Fragment key={q}>, +{formatRank(m)} {quotaIn(E, q)}</Fragment>)}
+                        {formatRank(restricted.length ? open : n)} {restricted.length ? "open" : (n === 1 ? "seat" : "seats")}{restricted.length ? "" : " here"}
+                        {restricted.map(([q, m]) => <Fragment key={q}> + {formatRank(m)} {q}{" "}here</Fragment>)}
                       </span>
                     )}
                     <InfoTip label={kindName(list.kind, exam).toLowerCase()}><span className="first-letter:uppercase">{kindName(list.kind, exam)}: {kindNote(list.kind, exam)}</span></InfoTip>

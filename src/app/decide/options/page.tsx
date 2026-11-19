@@ -120,11 +120,11 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const api = profileToParams(profile);
   for (const [k, v] of [["q", f.q], ["reach", f.reach], ["prov", f.prov], ["view", r.view], ["showClosed", r.showClosed ? "1" : "0"], ["hasSeats", r.seats ?? "all"], ["sort", f.sort]] as const) if (v) api.set(k, v);
   for (const [k, v] of Object.entries(tp)) if (v != null) api.set(k, Array.isArray(v) ? v.join(",") : String(v));
-  const caption = `Options for ${E.rankWord} ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added` : ""}`;
-  // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
-  const pairLabel = (c: string) => pairChoices(meta.courses).find((x) => x.value === c)?.label ?? c.replace("~", " ");
   // INI-CET: one list a session, AIIMS's seat position (never clear / virtual / newly added).
   const sp = kindName("clear", exam) === "Seat position";
+  const caption = `Options for ${E.rankWord} ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? (sp ? `; ${round} seat position` : `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added`) : ""}`;
+  // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
+  const pairLabel = (c: string) => pairChoices(meta.courses).find((x) => x.value === c)?.label ?? c.replace("~", " ");
   const seatsWords = (s: SeatKind | "any") => (s === "any" || sp ? `Has seats in ${sp ? `the ${round} seat position` : `a ${round} list`}` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
   const closedDefault = roundView ? "1" : "0";
   const termKeys = ["ctype", "maxfee", "minstip", "bondyrs", "maxbond", "maxleave", "nd"] as const;

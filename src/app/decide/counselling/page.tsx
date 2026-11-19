@@ -105,6 +105,8 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
   // Another exam: the session before as it ran (its notices), for reference only, never a forecast of this one's dates.
   const before = exam === DEFAULT_EXAM ? null : examYears(exam).filter((y) => y < rs.year).at(-1) ?? null;
   const ran = before == null ? [] : await listNotices({ year: before }, exam);
+  // Another exam: the session's dates its counselling body has printed (INI-CET's Prospectus Part A: course start, last date of admission).
+  const printed = exam === DEFAULT_EXAM ? [] : await listNotices({ kind: "schedule", year: rs.year }, exam);
   const now = new Date();
   const steps = stepsNow(rs, now);
   return (
@@ -123,6 +125,19 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
         </p>
       </div>
       <ScrollToHash />
+      {printed.length > 0 && (
+        <section aria-labelledby="dates-h" className="grid gap-1 rounded-xl border border-border bg-card px-4 py-3">
+          <h3 id="dates-h" className="font-semibold">Dates {w.by} has printed for the {yearName(exam, rs.year, true)}</h3>
+          <ul className="grid gap-1 text-sm">
+            {printed.map((n) => (
+              <li key={`${n.date}|${n.url}|${n.title}`} className="flex flex-wrap items-center gap-x-2">
+                {n.url ? <a href={n.url} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>{n.title}<span className="sr-only"> (opens in a new tab)</span></a> : <span>{n.title}</span>}
+                <span className="text-xs text-muted-foreground">published <time dateTime={n.date} className="numeric">{fmtIST(n.date, true)}</time></span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {rs.rounds.map((r) => (
         <section key={r.round} aria-labelledby={`round-${r.round}`} className="scroll-mt-24 rounded-xl border border-border bg-card">
           <div className="flex flex-wrap items-center justify-between gap-x-3 border-b border-border px-4">

@@ -543,7 +543,12 @@ function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url
   // A listed document not read (NEET SS / MDS: "unknown" with the document's link); read with no clear bond, or unknown otherwise.
   // INI-CET (`aiims`): its prospectus is read, so "unknown" there means it states no service bond: unclear, never "not read".
   const why = rs === "unknown" && d.doc_url && !aiims ? ("unread" as const) : rs === "unknown" || rs === "unclear" ? ("unclear" as const) : null;
-  const base = { ...notDeclared(), ...st, stateRule: d.state_rule?.text ?? null, appliesTo, text, quote: d.quote || null, caveat, src: own, doc, ...(why && { why }) };
+  // INI-CET (`aiims`) with no service bond stated: said so, and what the record's note says the three years are (a
+  // residency contract or a bond to complete the course, never a service bond after it), the leaving penalty beside it.
+  const said = aiims && st.status === "not_declared"
+    ? ["No document read states a service bond after the course.", d.note ? `${d.note[0].toUpperCase()}${d.note.slice(1)}${/[.!?"”)]$/.test(d.note) ? "" : "."} Leaving the course early costs the leaving penalty.` : null].filter(Boolean).join(" ")
+    : null;
+  const base = { ...notDeclared(), ...st, stateRule: d.state_rule?.text ?? null, appliesTo, text: said ?? text, quote: d.quote || null, caveat, src: own, doc, ...(why && { why }) };
   // "No bond" only where nothing may still bind: one where a state law's service may apply is unknown (cells, filters, CSV).
   if (st.status === "none") return mayApply ? { ...base, status: "not_declared", basis: null } : { ...base, years: 0 };
   if (unknown) return base;

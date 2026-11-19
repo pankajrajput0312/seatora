@@ -82,6 +82,7 @@ export const exams: Record<ExamKey, Exam> = {
     site: { url: "https://www.aiimsexams.ac.in/", name: "AIIMS exams site" },
     roundWords: { R3: "Open Round" },
     quotaScoped: true,
+    apartQuotas: { quotas: ["Sponsored/Foreign National", "Sponsored", "Foreign National", "Bhutani National"], name: "Sponsored/Foreign National" },
     // Its institutes by family (college keys: neetpg-planner tools/exams/ini_cet identity.json).
     instituteGroups: [
       { label: "AIIMS New Delhi", prefix: "AIIMSNEWDELHI" },

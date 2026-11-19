@@ -255,5 +255,21 @@ describe("INI-CET's words for seat lists, rounds, seats and institutes (tester f
     const t = (leave: number | null) => ({ ...normalizeProgramme("MD/MS", []), bond: { ...normalizeProgramme("MD/MS", []).bond, leavingAmount: { ...normalizeProgramme("MD/MS", []).bond.leavingAmount, state: leave == null ? "none" : "figure", max: leave, min: leave } } }) as never;
     expect(lowestRisk([{ name: "A", t: t(300000) }, { name: "B", t: t(500000) }], true)).toMatch(/^Lowest leaving penalty here: A/);
     expect(lowestRisk([{ name: "A", t: t(300000) }, { name: "B", t: t(500000) }])).toMatch(/^Can't tell/);
+    // ranges: a tie said as one, overlapping ones as can't tell
+    const r = (lo: number, hi: number) => { const x = t(hi) as unknown as { bond: { leavingAmount: { min: number } } }; x.bond.leavingAmount.min = lo; return x as never; };
+    expect(lowestRisk([{ name: "A", t: r(300000, 500000) }, { name: "B", t: r(300000, 500000) }], true)).toMatch(/^Leaving penalty: all the same \(₹3/);
+    expect(lowestRisk([{ name: "A", t: r(200000, 600000) }, { name: "B", t: r(300000, 500000) }], true)).toMatch(/^Can't tell: their leaving penalties overlap/);
+    expect(lowestRisk([{ name: "A", t: r(200000, 400000) }, { name: "B", t: r(300000, 500000) }], true)).toMatch(/^Lowest leaving penalty here: A/);
+  });
+});
+
+describe("JIPMER's course total in a seat note (category All)", () => {
+  it("its own sentence, never 'All seats'", () => {
+    const l = latestOf([src(20267, "R1"), src(20267, "R3")], "ini-cet");
+    const [only] = seatsBelowNotes([{ kind: "clear", on: [{ category: "All", reach: "no-data" }] }], l, pastOf(l));
+    expect(only).toMatch(/course total AIIMS doesn't split by category/);
+    expect(only).not.toMatch(/All seats/);
+    const [mixed] = seatsBelowNotes([{ kind: "clear", on: [{ category: "Open", reach: "closed-before", at: { year: 20267, round: "R1", closing: 90 } }, { category: "All", reach: "no-data" }] }], l, pastOf(l));
+    expect(mixed).toMatch(/Open seats only, besides a course total not split by category/);
   });
 });

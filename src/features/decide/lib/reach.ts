@@ -1,5 +1,5 @@
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
+import { authorityOf, DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
 import { kindName, roundLabel, rounds, roundShort, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind, type Source } from "../types";
 
 /** The years the labels compare (client-safe; service.ts re-exports them). They match the imported MCC results. */
@@ -257,7 +257,10 @@ export function seatsBelowNotes(ns: SeatsBelow[], latest: Latest, pastYears: [nu
   return [...groups.values()].map((g) => {
     const kinds = g.map((n) => (kindName(n.kind, latest.exam) === "Seat position" ? "seat position" : kindWords[n.kind]));
     const lists = `${kinds.length > 1 ? `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)} lists` : `${kinds[0]} list`}`;
-    const on = g[0].on;
+    // INI-CET: JIPMER's course total ("All", not split by category) is no category of hers: its own sentence, never "All seats".
+    const on = g[0].on.filter((x) => x.category !== "All");
+    const unsplit = on.length < g[0].on.length;
+    if (!on.length) return `In the ${lists}, the seats here are a course total ${authorityOf(latest.exam)} doesn't split by category, so it may or may not include seats of yours. The label is from your categories' past closings.`;
     const facts = on.map(({ category, reach, at }) => {
       const verdict = atVerdict[reach];
       // Stray left out of the label's closing: say so, and give Stray as its own number.
@@ -266,7 +269,7 @@ export function seatsBelowNotes(ns: SeatsBelow[], latest: Latest, pastYears: [nu
       if (verdict) return `On ${category} seats alone: ${reachLabel(reach, latest, pastYears, includeLatest, category)}.`;
       return `On ${category} seats: no allotment in ${reachWindow(latest, pastYears, includeLatest, true)}.`;
     });
-    return `In the ${lists}, the seats here you can take are ${on.map((x) => x.category).join(" and ")} seats only. ${facts.join(" ")}`;
+    return `In the ${lists}, the seats here you can take are ${on.map((x) => x.category).join(" and ")} seats only${unsplit ? ", besides a course total not split by category" : ""}. ${facts.join(" ")}`;
   });
 }
 

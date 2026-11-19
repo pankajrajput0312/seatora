@@ -15,6 +15,7 @@ import { hospitalInfo, institutesByTerms } from "@/features/decide/components/in
 import { ResultCard } from "@/features/decide/components/result-card";
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
+import { Badge } from "@/components/ui/badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { chosenView } from "@/features/decide/server/view";
@@ -96,8 +97,16 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without(PATH, c.key, c.value) : L.with(PATH, { [c.key]: null, page: null }) })),
   ];
   const clear = L.with(PATH, { q: null, state: null, course: null, grp: null, ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null, page: null });
+  // INI-CET: the institute's group as a small tag ("AIIMS New Delhi", "New AIIMS", "JIPMER"…), the Institute filter's words.
+  const groupTag = (key: string) => {
+    const g = instituteGroupOf(E, key);
+    return g ? <Badge key="grp" className="w-fit">{g}</Badge> : null;
+  };
+  // INI-CET: every option here closed before her rank names none of them (any would be an arbitrary pick).
   const bestOf = (r: (typeof res.rows)[number]) =>
-    r.best && (
+    r.best && E.quotaScoped && r.bestReach === "closed-before" ? (
+      <span className="text-xs text-muted-foreground">None reached your rank</span>
+    ) : r.best && (
       <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
         <ReachBadge reach={r.bestReach} provisional={r.best.provisional} latest={latest} />
         <span className="text-xs text-muted-foreground">{r.best.course.degree} {r.best.course.name}, {quotaIn(E, r.best.quota)}</span>
@@ -129,6 +138,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
                 r.college.state,
                 r.college.pincode && <span key="pin">PIN <span className="numeric">{r.college.pincode}</span></span>,
                 <TypeBadge key="type" type={h?.type} of={r.college.name} />,
+                groupTag(r.college.key),
                 h?.beds && <Beds b={h.beds} inst={r.college.name} unit />,
               ]}
               footer={
@@ -176,6 +186,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
               <tr key={r.college.key} className={tbl.row}>
                 <th scope="row" className={`${tbl.td} sticky left-0 z-[1] min-w-56 max-w-80 border-r border-border bg-card text-left font-medium ${tbl.pin}`}>
                   <Link href={L.institute(r.college.slug)} title={r.college.name} className={`wrap-anywhere hover:text-sky hover:underline ${tbl.clamp}`}>{r.college.name}</Link>
+                  {groupTag(r.college.key)}
                 </th>
                 <td className={tbl.td}>{r.college.state ?? <Dash />}</td>
                 <td className={`${tbl.td} whitespace-nowrap`}><TypeBadge type={h?.type} of={r.college.name} /></td>

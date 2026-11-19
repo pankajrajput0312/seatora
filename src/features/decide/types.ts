@@ -165,7 +165,7 @@ export const kindName = (k: SeatKind, exam?: ExamKey) => (exam && seatPositionEx
  * One seat list PDF. `publishedAt` = date (YYYY-MM-DD) of the MCC notice that links the PDF, null when no imported notice
  * does (never guessed). `seats` = Σ seats the list prints (one kind, one PDF).
  */
-export type SeatList = { key: string; name: string; url: string | null; year: number; round: Round; kind: SeatKind; publishedAt: string | null; seats: number };
+export type SeatList = { key: string; name: string; url: string | null; year: number; round: Round; kind: SeatKind; publishedAt: string | null; seats: number; /** INI-CET: of `seats`, those on the quotas its seat position notifies apart (Sponsored / Foreign National). */ apart?: number };
 
 /** MCC notices (Announcement), kind as notices.json gives it. */
 export const noticeKinds = ["notice", "seat_matrix", "result", "schedule", "bulletin"] as const;

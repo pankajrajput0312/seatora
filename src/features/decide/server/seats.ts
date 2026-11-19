@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
+import { exams } from "@/features/exams/registry";
 import { db } from "@/lib/db";
 import type { PageQuery, Paged } from "../service";
 import { optionId, rounds, seatKinds, type College, type Course, type MccNotice, type Round, type SeatKind, type SeatList } from "../types";
@@ -15,8 +16,15 @@ import { categoryOrder, roundKey, seatRoundRows, snapshotAt, type SeatDbRow } fr
 export const seatLists = (exam: ExamKey = DEFAULT_EXAM) => listsOnce("", exam);
 const listsOnce = perImport(async (_, exam): Promise<SeatList[]> => {
   const rows = await db.seatSource.findMany({ where: { source: { exam } }, select: { year: true, round: true, kind: true, total: true, source: { select: { key: true, name: true, url: true, publishedAt: true } } } });
+  // INI-CET: each list's seats on the quotas its seat position notifies apart (Sponsored / Foreign National).
+  const apartQuotas = exams[exam].apartQuotas?.quotas;
+  const apart = apartQuotas
+    ? new Map((await db.$queryRaw<{ key: string; n: number }[]>`
+        SELECT d.key, SUM(x.seats)::int AS n FROM "SeatCount" x JOIN "DataSource" d ON d.id = x."seatSourceId"
+        WHERE d.exam = ${exam} AND x.quota = ANY(${apartQuotas}) GROUP BY 1`).map((r) => [r.key, r.n]))
+    : null;
   return rows
-    .map(({ source: s, ...l }) => ({ key: s.key, name: s.name, url: s.url, year: l.year, round: l.round as Round, kind: l.kind as SeatKind, publishedAt: s.publishedAt?.toISOString().slice(0, 10) ?? null, seats: l.total }))
+    .map(({ source: s, ...l }) => ({ key: s.key, name: s.name, url: s.url, year: l.year, round: l.round as Round, kind: l.kind as SeatKind, publishedAt: s.publishedAt?.toISOString().slice(0, 10) ?? null, seats: l.total, ...(apart && { apart: apart.get(s.key) ?? 0 }) }))
     .sort(
       (a, b) =>
         b.year - a.year ||

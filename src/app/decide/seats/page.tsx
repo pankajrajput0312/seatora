@@ -183,7 +183,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
     <>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       {/* A list's chip filters to it: one list's seats (One list, Compare), or in the matrix the rows with seats in it. */}
-      <SeatListPicker lists={all} exam={exam} current={list.key} href={(key) => here({ list: key, has: matrix ? all.find((l) => l.key === key)?.kind ?? null : null })} />
+      <SeatListPicker lists={all} exam={exam} apartName={exams[exam].apartQuotas?.name} current={list.key} href={(key) => here({ list: key, has: matrix ? all.find((l) => l.key === key)?.kind ?? null : null })} />
       <div className="chip-row flex flex-wrap items-center gap-2">
         <nav aria-label="Seats view" className="flex flex-wrap gap-2">
           <Link href={here({ view: null })} aria-current={matrix ? "true" : undefined} className={chip(matrix)}>Seat matrix</Link>

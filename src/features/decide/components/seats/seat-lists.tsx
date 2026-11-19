@@ -43,7 +43,7 @@ export const listSeats = (l: SeatList, exam: ExamKey = DEFAULT_EXAM) => `${listT
 const roundOf = (l: SeatList, exam: ExamKey) => `${yearName(exam, l.year)} ${roundNameFrom(l.name, l.round)}`;
 
 /** Link chips, one per list PDF, grouped by year and round (seatLists() order); earlier rounds fold away unless picked. */
-export function SeatListPicker({ lists, current, href, exam = DEFAULT_EXAM }: { lists: SeatList[]; current: string; href: (key: string) => string; exam?: ExamKey }) {
+export function SeatListPicker({ lists, current, href, exam = DEFAULT_EXAM, apartName }: { lists: SeatList[]; current: string; href: (key: string) => string; exam?: ExamKey; /** INI-CET: the name of the seats notified apart (SeatList.apart). */ apartName?: string }) {
   const groupOf = (l: SeatList) => roundOf(l, exam);
   const [latest, ...earlier] = [...new Set(lists.map(groupOf))];
   const group = (g: string, first?: boolean) => (
@@ -65,7 +65,10 @@ export function SeatListPicker({ lists, current, href, exam = DEFAULT_EXAM }: { 
             l.key === current ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input",
           )}
         >
-          <span className="sr-only">{g} </span>{kindName(l.kind, exam)} <span className="numeric font-semibold">{formatRank(l.seats)}</span><span className="sr-only"> seats in the whole list, All India</span>
+          <span className="sr-only">{g} </span>{kindName(l.kind, exam)}{" "}
+          {/* INI-CET: the open seats and those notified apart, as AIIMS's two notices total them. */}
+          {l.apart && apartName ? <span className="numeric font-semibold">{formatRank(l.seats - l.apart)} + {formatRank(l.apart)} {apartName}</span> : <span className="numeric font-semibold">{formatRank(l.seats)}</span>}
+          <span className="sr-only"> seats in the whole list, All India</span>
           {xs.some((x) => x !== l && x.kind === l.kind) && listDay(l) && <span className="numeric text-xs"><span className="sr-only">, </span>{fmtDay(listDay(l)!)} PDF</span>}
         </Link>
       ))}
