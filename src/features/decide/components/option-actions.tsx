@@ -22,7 +22,7 @@ import { toast } from "./nav-pending";
 import { Beds } from "./pages/beds";
 import { cardClosing, ClosingCell, courseName, R1Line, r1Of, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, seatKindShort, toChoiceItem, type ListRow } from "./options-view";
 import { ResultCard, ResultCards } from "./result-card";
-import { summaryKeys, summaryText, TermStatCells, TermSummary, type SummaryKey } from "./stat-cells";
+import { BeCareful, summaryKeys, summaryText, TermStatCells, TermSummary, type SummaryKey } from "./stat-cells";
 import { typeCategoryLabel } from "./institute/college-type";
 import { TypeBadge } from "./type-badge";
 import { smallLink, tbl } from "./ui";
@@ -213,6 +213,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
           <>
             <div className="grid gap-1 px-4 py-2 empty:hidden">
               {E.has.fees && <TermSummary cells={statCells(r.fees)} hide={same} />}
+              {E.has.fees && <BeCareful cells={statCells(r.fees)} />}
               <R1Trend r={r} latest={latest} pastYears={pastYears} />
               <SimilarNote r={r} />
               <CapNote r={r} />
@@ -407,6 +408,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
               <td className="px-2 py-3">
                 <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} from={r.reachFrom} seats={r} />
                 <SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} />
+                {E.has.fees && <BeCareful cells={statCells(r.fees)} className="mt-1 max-w-xs" />}
                 {r.similar && <span className="mt-1 block max-w-xs"><SimilarNote r={r} /></span>}
                 {r.capNote && <span className="mt-1 block max-w-xs"><CapNote r={r} /></span>}
               </td>

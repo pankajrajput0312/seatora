@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { bondFlag, feeBandText, feeRange, MISSING_WORDS, NOT_PUBLISHED, statCells, statLabel, yearValue, type Level, type StatCell, type StatKey } from "../lib/stat-format";
+import { beCareful, bondFlag, feeBandText, feeRange, MISSING_WORDS, NOT_PUBLISHED, statCells, statLabel, yearValue, type Level, type StatCell, type StatKey } from "../lib/stat-format";
 import type { ProgrammeTerms } from "../server/terms";
 import { NBEMS_BOND_RULES, termDocs } from "./fees";
 import { InfoTip } from "./info-tip";
@@ -139,6 +139,17 @@ export function StatHead({ k }: { k: StatKey }) {
         <PgOr pg={columnNote[k][0]} other={<ExamWords>{columnNoteOther[k][0]}</ExamWords>} />
       </InfoTip>
     </span>
+  );
+}
+
+/** "Be careful: bond penalty ₹40 L · bond 3 years" (lib/stat-format.ts beCareful); nothing when there is no reason. */
+export function BeCareful({ cells, className }: { cells: StatCell[]; className?: string }) {
+  const why = beCareful(cells);
+  if (!why.length) return null;
+  return (
+    <p data-terms className={cn("text-xs", className)}>
+      <span className="font-semibold text-ember">Be careful</span>: {why.join(" · ")}
+    </p>
   );
 }
 

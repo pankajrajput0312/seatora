@@ -11,7 +11,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { CHOICE_LIST, choiceListTitle, duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, wholeCourseRange, wholeCourseWords, type ChoiceItem } from "../lib/choices";
 import { inrFull } from "../lib/stat-format";
 import { deepestOf, latestText, pastOf, reachWindow, seatsBelowNotes, type Deepest, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
-import { statCells, statKeys, statLabel } from "../lib/stat-format";
+import { beCareful, statCells, statKeys, statLabel } from "../lib/stat-format";
 import { groupsIn, quotaIn, roundIn } from "@/features/exams/exam";
 import { authorityOf, yearName } from "@/features/exams/keys";
 import { useChoices, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
@@ -253,6 +253,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       // Seats are matched to the option by institute and course; say what was found, not what MCC printed.
       listsCurrent && lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
       ...seatsBelowNotes(lr?.below ?? [], latest, pastOf(latest)),
+      E.has.fees && lr && beCareful(statCells(lr.fees)).length > 0 && `Be careful: ${beCareful(statCells(lr.fees)).join(" · ")}`,
       fresh && !lr && `Not found in the current ${authorityOf(E.key)} data; it may have been renamed. Check it on Options.`,
       typed && i >= prefix && `Marked typed, but its position changed since. Check the order in the ${authorityOf(E.key)} portal.`,
     ].filter(Boolean) as string[];

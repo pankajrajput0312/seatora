@@ -553,6 +553,21 @@ export function bondPlain(t: ProgrammeTerms): string {
 const LEVELS: Level[] = ["good", "caution", "strong", "heavy"];
 
 /**
+ * "Be careful", from the cells' own values and colours (never a new reading): a bond or leaving penalty of ₹25 L or more,
+ * a bond of 3 years or more, or a bond that is Not known (ask the college). Each reason in words; empty when none.
+ */
+export function beCareful(cells: StatCell[]): string[] {
+  const at = (k: StatKey) => cells.find((c) => c.key === k)!;
+  const [bond, inr, leaving] = [at("bond"), at("bondInr"), at("leaving")];
+  return [
+    bond.level === "strong" && `bond ${bond.full}`,
+    inr.level === "heavy" && `bond penalty ${inr.short}`,
+    leaving.level === "heavy" && `leaving penalty ${leaving.short}`,
+    bond.short === NOT_KNOWN && "bond not known: ask the college",
+  ].filter((x): x is string => !!x);
+}
+
+/**
  * The bond and its penalties as one flag, for a card's summary line, from the cells' own values (never a new reading),
  * in the cells' three states: "No bond", a stated bond ("Bond 2 yr · ₹50 L": the years and what skipping them costs;
  * "Bond, years not stated"), or "Bond not known" (the cell's "Not known"; why is in its (i) under Details), then a

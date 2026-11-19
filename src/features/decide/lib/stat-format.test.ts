@@ -3,7 +3,7 @@ import type { BondDetails, PenaltyDetails } from "@/features/cutoffs/lib/import-
 import { normalizeProgramme, type Programme } from "../server/terms";
 import type { FeeTableRecord, Term } from "../types";
 import { termsWords } from "./choices";
-import { bondFlag, bondPlain, feeRange, inrApprox, inrCard, inrFull, inrL, inrRange, inrShort, statCells, yearValue, type StatCell, type StatKey } from "./stat-format";
+import { beCareful, bondFlag, bondPlain, feeRange, inrApprox, inrCard, inrFull, inrL, inrRange, inrShort, statCells, yearValue, type StatCell, type StatKey } from "./stat-format";
 import { summaryText } from "../components/stat-cells";
 
 // Terms shaped as the bundle has them (server/terms.test.ts), through the real normalizer, then the cells.
@@ -564,6 +564,19 @@ describe("colour levels (display only; the colour key)", () => {
   });
 });
 const statKeysAll = ["fee", "stipend", "bond", "bondInr", "leaving"] as const;
+
+describe("Be careful (beCareful): ₹25 L or more to pay, 3 years or more of bond, or a bond not known", () => {
+  const list = (p: Programme, terms: Term[]) => statCells(normalizeProgramme(p, terms));
+  it("each reason in words, from the cells", () => {
+    expect(beCareful(list("MD/MS", [bond("MD", "Service bond: 1 + 3 years · ₹25 L–₹1.5 Cr by subject", 15000000, { status: "documented", years: "1 + 3", by_subject: { ANAESTHESIOLOGY: 5000000, PATHOLOGY: 2500000, GENERALSURGERY: 15000000 } })]))).toEqual(["bond 1 + 3 = 4 years", "bond penalty ₹25 L–₹1.5 Cr"]);
+    expect(beCareful(list("MD/MS", []))).toEqual(["bond not known: ask the college"]);
+    const leave = penalty("MD", { items: [{ kind: "leaving_penalty", applies_to: "PG degree", inr: 3500000, when: "discontinues PG course", quote: null, source_url: MCC.url }] });
+    expect(beCareful(list("MD/MS", [bond("MD", "No bond", null, { status: "no" }), leave]))).toEqual(["leaving penalty ₹35 L"]);
+  });
+  it("nothing to say: a short bond under ₹25 L", () => {
+    expect(beCareful(list("MD/MS", [bond("MD", "Service bond: 1 year · ₹10 L", 1000000, { status: "documented", years: "1" })]))).toEqual([]);
+  });
+});
 
 describe("a card's summary: the bond flag and the three items (bondFlag, summaryText)", () => {
   const list = (p: Programme, terms: Term[]) => statCells(normalizeProgramme(p, terms));
