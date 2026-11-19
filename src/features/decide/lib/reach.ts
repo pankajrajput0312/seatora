@@ -262,13 +262,15 @@ const kindWords: Record<SeatKind, string> = { clear: "clear vacancy", virtual: "
  * take: "Reached in 2026 R1 on EWS seats" + "the current list has only Open seats". Null otherwise.
  */
 export function reachedElsewhere(reach: Reach, r: { reachBy?: Partial<Record<string, Reach>>; seatsBelow?: SeatsBelow[]; seatsBy?: Partial<Record<SeatKind, number | null>> }, exam?: ExamKey): { on: string; lists: string } | null {
-  if (!reach.startsWith("reached") || !r.seatsBelow?.length || !r.reachBy) return null;
+  // Only lists whose seats here are all on categories that never reached her rank (a past year's reach is still one).
+  const below = (r.seatsBelow ?? []).filter((b) => b.on.every((x) => !x.reach.startsWith("reached")));
+  if (!reach.startsWith("reached") || !below.length || !r.reachBy) return null;
   const on = Object.entries(r.reachBy).filter(([, x]) => x === reach).map(([c]) => c);
-  const only = [...new Set(r.seatsBelow.flatMap((b) => b.on.map((x) => x.category)))].filter((c) => c !== "All");
+  const only = [...new Set(below.flatMap((b) => b.on.map((x) => x.category)))].filter((c) => c !== "All");
   if (!on.length || !only.length) return null;
   // Every list with her seats here is one of these: "the current list(s)"; else the lists by name.
   const withSeats = (Object.keys(r.seatsBy ?? {}) as SeatKind[]).filter((k) => (r.seatsBy![k] ?? 0) > 0);
-  const kinds = r.seatsBelow.map((b) => b.kind);
+  const kinds = below.map((b) => b.kind);
   const all = withSeats.every((k) => kinds.includes(k));
   const named = kinds.map((k) => (kindName(k, exam) === "Seat position" ? "seat position" : kindWords[k]));
   const lists = all ? (withSeats.length > 1 ? "the current lists have" : "the current list has") : `the ${named.length > 1 ? `${named.slice(0, -1).join(", ")} and ${named.at(-1)} lists have` : `${named[0]} list has`}`;

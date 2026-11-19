@@ -240,5 +240,8 @@ describe("reachedElsewhere: a reach on categories the newest lists have no seats
     expect(reachedElsewhere("closed-before", { reachBy: { Open: "closed-before" }, seatsBelow: below })).toBeNull();
     expect(reachedElsewhere("reached-latest", { reachBy: { EWS: "reached-latest" }, seatsBelow: [] })).toBeNull();
     expect(reachedElsewhere("reached-latest", { seatsBelow: below })).toBeNull();
+    // Open seats reached in a past year are seats she may take: no qualifier (the notes say the rest).
+    const reachedOpen: SeatsBelow[] = [{ kind: "virtual", on: [{ category: "Open", reach: "reached-both", at: { year: 2025, round: "R3", closing: 84331 } }] }];
+    expect(reachedElsewhere("reached-latest", { reachBy: { EWS: "reached-latest", Open: "reached-both" }, seatsBelow: reachedOpen, seatsBy: { clear: 1, virtual: 1 } })).toBeNull();
   });
 });

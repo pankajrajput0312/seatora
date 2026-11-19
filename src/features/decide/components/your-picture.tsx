@@ -4,7 +4,7 @@ import { groupsIn, quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { yearName } from "@/features/exams/keys";
 import type { DecideLinks } from "../lib/links";
 import { pastOf, reachLabel, reachOrder, reachWindow, type Latest, type Reach } from "../lib/reach";
-import { statCells } from "../lib/stat-format";
+import { inrCard, statCells } from "../lib/stat-format";
 import type { Profile } from "../profile";
 import type { OptionRow, OptionsPicture } from "../service";
 import { courseName } from "./options-view";
@@ -37,6 +37,7 @@ export function YourPicture({ pic, profile, E, latest, includeLatest = true, L, 
   const total = shown.reduce((n, x) => n + pic.counts[x], 0);
   const group = groupsIn(E, profile.quotas)[0];
   const fee = pic.cheapest && statCells(pic.cheapest.fees)[0];
+  const hostel = pic.cheapest?.fees.hostelFee;
   const s = pic.safest;
   const r1 = `${yearName(E.key, pic.year)} ${roundIn(E, pic.year, "R1")}`;
   return (
@@ -65,7 +66,11 @@ export function YourPicture({ pic, profile, E, latest, includeLatest = true, L, 
               <dd>
                 <span className={`numeric font-semibold ${fee.level ? levelClass[fee.level] : ""}`}>{fee.short}</span> at{" "}
                 <Link href={L.institute(pic.cheapest.college.slug, "fees")} className={`${smallLink} font-semibold`}>{pic.cheapest.college.name}</Link>
-                <span className="block text-xs text-muted-foreground">{what(pic.cheapest, E)}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {what(pic.cheapest, E)}
+                  {/* What the yearly fee leaves out, where the record says (JSS: tuition, its hostel a year apart). */}
+                  {hostel && !hostel.included && <>; hostel <span className="numeric">{inrCard(hostel.inr)}</span>{hostel.period === "per_month" ? " a month" : hostel.period === "per_year" ? " a year" : ""} on top</>}
+                </span>
               </dd>
             </div>
           )}
