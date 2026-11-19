@@ -212,7 +212,7 @@ export function termChips(f: TermParams): { key: keyof TermParams; label: string
     const v = f[k];
     if (typeof v === "number") out.push({ key: k, label: termValueLabel[k](v) });
   }
-  if (f.nd === "keep") out.push({ key: "nd", label: "Including not published" });
+  if (f.nd === "keep") out.push({ key: "nd", label: "Including not published or not known" });
   return out;
 }
 

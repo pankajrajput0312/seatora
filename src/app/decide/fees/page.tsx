@@ -173,23 +173,23 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             it (a range where it varies by specialty; sorting and filters use the highest).
             <br /><strong>Leaving penalty</strong>: the penalty for leaving the seat or course after joining. MCC&apos;s Round 2 forfeit is on
             each institute&apos;s Fees tab.
-            <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. &quot;No bond&quot; only where the
-            college&apos;s document or the NBEMS rule says so; &quot;None declared&quot;: no bond declared to MCC; &quot;Law may apply&quot;:
-            the college&apos;s document says no bond, but a state law&apos;s service may apply (the filters count both as not published).
+            <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. The bond is one of three: &quot;No bond&quot; only where the
+            college&apos;s document or the NBEMS rule says so; a stated bond (its years, or &quot;Bond, years not stated&quot;); or &quot;Not known&quot;:
+            no bond declared to MCC, or a document that says no bond while a state law&apos;s service may apply (the (i) says which; the filters count it as not published).
             <br />Sorting: — and figures without a number go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
           </>
           ) : exam === "ini-cet" ? (
             <>
               <strong>Fee</strong>: a year (/yr), or Year 1&apos;s where later years differ, as the institute&apos;s INI-CET prospectus (Part B) prints it; its words are in the (i) where it gives no one figure.
               <br /><strong>Stipend</strong>: a month (/mo), as printed.
-              <br /><strong>Bond</strong> and <strong>leaving penalty</strong>: as the prospectus states them (&quot;Not clear&quot;: it neither states nor rules out service after the course).
+              <br /><strong>Bond</strong> and <strong>leaving penalty</strong>: as the prospectus states them (&quot;Not known&quot;: it neither states nor rules out service after the course).
               <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. Sorting: — and figures without a number go last either way.
             </>
           ) : (
             <>
               <strong>Fee</strong>: a year (/yr; year 1&apos;s may be paid at admission), as the college declared it on its MCC institute profile ({exams[exam].label}). &quot;Varies by subject&quot;, &quot;On college website&quot;, &quot;Not stated&quot;: the profile gives no one figure for these seats; its words are in the (i).
               <br /><strong>Stipend</strong>: a month (/mo), as declared.
-              <br /><strong>Bond</strong>: from MCC&apos;s institute list. &quot;Doc not read&quot;: MCC lists a bond document Seatora has not read yet (read it before you lock); &quot;Not clear&quot;: read, with no clear bond; &quot;None declared&quot;: no bond declared to MCC. MCC&apos;s Round 2 forfeit is on each institute&apos;s Fees tab.
+              <br /><strong>Bond</strong>: from MCC&apos;s institute list: &quot;No bond&quot;, a stated bond, or &quot;Not known&quot; (a bond document Seatora couldn&apos;t read, read it before you lock; a blank form or one with no clear bond; no bond declared to MCC: the (i) says which). MCC&apos;s Round 2 forfeit is on each institute&apos;s Fees tab.
               <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. Sorting: — and figures without a number go last either way.
             </>
           )

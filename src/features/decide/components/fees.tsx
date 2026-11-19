@@ -7,12 +7,12 @@ import { fmtDay, formatInrShort } from "../lib/format";
 import type { FeeQuotaGroup } from "../server/facts";
 import type { Amount, Figure, ProgrammeTerms, TermPart, TermSource } from "../server/terms";
 import { variantFor } from "../lib/specialty-search";
-import { UNREAD, unreadWhy } from "../lib/stat-format";
+import { bondUnknownWhy, NOT_KNOWN, unreadWhy } from "../lib/stat-format";
 import { termLabel } from "../types";
 import { SourceRef } from "./page-sources";
 import { smallLink } from "./ui";
 import { ExamWords, QuotaName } from "./round-name";
-import { authorityOf, DEFAULT_EXAM, inExamWords, type ExamKey } from "@/features/exams/keys";
+import { authorityOf, type ExamKey } from "@/features/exams/keys";
 
 // Fees, stipend and bond as ProgrammeTerms (server/terms.ts) renders them. Server-safe and client-safe on purpose (no
 // "use client", type-only server imports): the institute and Fees pages render them on the server, Options rows in the browser.
@@ -33,10 +33,8 @@ export const NBEMS_BOND_RULES = [
   { label: "NBEMS fee guidelines, 3 April 2019", url: "https://natboard.edu.in/pdoof/pbnotice2019/Notice%20Fee%20Guidelines%20-%2003-04-2019.pdf" },
   { label: "NBEMS accreditation bulletin 2025, para 5.10", url: "https://accr.natboard.edu.in/online_user/DOCUMENTS/misc/information_bulletin_chapter/Jan-feb/09-2025.pdf" },
 ];
-// No bond record for the programme at all (the bundle has one for every college and programme with allotments).
-const NOT_CHECKED = "Not checked yet: Seatora has no bond record for this programme.";
-const DNB_NO_BOND = `${NOT_CHECKED} NBEMS rule: private DNB hospitals may not take any bond or deposit; government hospitals may apply a state service bond only if they declared it to MCC before counselling.`;
-const MD_NO_BOND = `${NOT_CHECKED} Government colleges may still have a state service bond: check the state's PG rules.`;
+// The rules that may still bind a bond that is not known.
+const DNB_RULE = "NBEMS rule: private DNB hospitals may not take any bond or deposit; government hospitals may apply a state service bond only if they declared it to MCC before counselling.";
 const STATE_CAUTION = "Government colleges may still have a state service bond: check the state's PG rules.";
 const NOT_IN_DATA = "Not published";
 
@@ -103,10 +101,9 @@ function Parts({ parts, src, sources }: { parts: TermPart[]; src: number | null;
 }
 const years = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
 /** "2 years", or "1 + 3 = 4 years" where the record's years are added up. */
-const bondYears = (b: ProgrammeTerms["bond"]) => (b.years == null ? "Years not stated" : b.yearsSum ? `${b.yearsSum} = ${years(b.years)}` : years(b.years));
+const bondYears = (b: ProgrammeTerms["bond"]) => (b.years == null ? "Bond, years not stated" : b.yearsSum ? `${b.yearsSum} = ${years(b.years)}` : years(b.years));
 const BASIS: Record<NonNullable<ProgrammeTerms["bond"]["basis"]>, string> = { document: "the college's own document", state_rule: "state rule", nbems_rule: "NBEMS rule" };
 
-const otherCourse = (t: ProgrammeTerms) => inExamWords(t.exam ?? DEFAULT_EXAM, `Not published for ${t.programme}: the bond on the college's MCC profile is for other courses (its exact words are below).`);
 
 /** The NBEMS bond rules as source numbers (the page's footer). */
 function NbemsRules() {
@@ -559,18 +556,15 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
             {bond.caveat && <span className="block text-xs text-sun">{bond.basis === "nbems_rule" ? `Seatora's check: ${bond.caveat}.` : `${bond.caveat}.`}</span>}
             {bond.basis === "nbems_rule" && <NbemsRules />}
           </>
-        ) : bond.status === "other_course" ? (
-          <p>{otherCourse(t)}<Sup n={bond.src} sources={sources} />{isDnb(t) ? <NbemsRules /> : ` ${STATE_CAUTION}`}</p>
-        ) : bond.why === "unread" ? (
-          // A bond document MCC lists that is not read yet: said once, with why when the record knows (its link below).
-          <p>{UNREAD}{unreadWhy(bond.text) && <span className={note}>{unreadWhy(bond.text)}<Sup n={bond.src} sources={sources} /></span>}</p>
-        ) : bond.text ? (
-          // The record's status is unknown: its words say why (not checked yet, not declared on MCC, no clear terms).
-          <p>{bond.text}<Sup n={bond.src} sources={sources} />{isDnb(t) && <NbemsRules />}</p>
-        ) : isDnb(t) ? (
-          <p>{DNB_NO_BOND} <NbemsRules /></p>
         ) : (
-          <p>{MD_NO_BOND}</p>
+          // Not known (the cells' word): why, in one plain line (a scan Seatora couldn't read, a blank form, nothing
+          // declared, no record), then the record's own words and the rules that may still bind.
+          <>
+            <p className="text-base font-semibold">{NOT_KNOWN}</p>
+            <p>{bondUnknownWhy(t)}{(bond.text || bond.status === "other_course") && bond.why !== "unread" && <Sup n={bond.src} sources={sources} />}</p>
+            {bond.why === "unread" ? unreadWhy(bond.text) && <span className={note}>{unreadWhy(bond.text)}<Sup n={bond.src} sources={sources} /></span> : bond.text && bond.status !== "other_course" && <span className={note}>{bond.text}</span>}
+            {isDnb(t) ? <span className={note}>{bond.text ? "NBEMS bond rules" : DNB_RULE}<NbemsRules /></span> : (!bond.text || bond.status === "other_course") && <span className={note}>{STATE_CAUTION}</span>}
+          </>
         )}
         {bond.doc != null && <span className={note}>The college&apos;s own bond document{authorityOf(t.exam) === "MCC" && " on MCC"}<Sup n={bond.doc} sources={sources} /></span>}
       </div>

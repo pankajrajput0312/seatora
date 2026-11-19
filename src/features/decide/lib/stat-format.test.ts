@@ -286,15 +286,12 @@ describe("bond cells, by record status", () => {
     expect(plain.bond.marker).toBeNull();
   });
 
-  it("no bond, but a state law's service may apply: 'Unknown' (never 'No bond'), marked, as the filters read it", () => {
+  it("no bond, but a state law's service may apply: 'Not known' (never 'No bond'), why in the (i)'s first line, as the filters read it", () => {
     const ka = cells("MD/MS", [bond("MD", "No bond per the college's MCC bond document; Karnataka law: 1 yr compulsory govt service may apply", null, { status: "no_bond_verified" })]);
-    expect([...shown(ka.bond), ka.bond.markerWarn]).toEqual(["Law may apply", "No bond, but a state law may apply", null, "muted", undefined]);
-    expect(ka.bond.tip.slice(0, 2)).toEqual([
-      { text: "The college's own document says no bond, but a state law's service may apply, so Seatora counts it as unknown.", warn: true },
-      { text: "No bond per the college's MCC bond document; Karnataka law: 1 yr compulsory govt service may apply", src: 1 },
-    ]);
-    expect(shown(ka.bondInr)).toEqual(["Law may apply", "No bond, but a state law may apply", null, "muted"]);
-    expect(ka.bondInr.tip[0]).toMatchObject({ warn: true });
+    expect([...shown(ka.bond), ka.bond.markerWarn]).toEqual(["Not known", "Not known", null, "muted", undefined]);
+    expect(ka.bond.lead).toBe("Leave after joining: not published. Bond not known. Its document says no bond, but a state law's service may still apply.");
+    expect(ka.bond.tip[0]).toEqual({ text: "No bond per the college's MCC bond document; Karnataka law: 1 yr compulsory govt service may apply", src: 1 });
+    expect(shown(ka.bondInr)).toEqual(["Not known", "Not known", null, "muted"]);
   });
 
   it("no_bond_rule: 'No bond', marked NBEMS rule and citing the NBEMS rules; an inferred private status is a caveat", () => {
@@ -307,19 +304,22 @@ describe("bond cells, by record status", () => {
     expect(unsure.bond.tip).toContainEqual({ text: "Seatora's check: private status inferred from name.", warn: true });
   });
 
-  it("unknown: 'Not clear' with the record's words (never 'No bond', never '—'); a listed document not read: 'Doc not read'", () => {
+  it("unknown, unclear, not read, blank, none declared: one word, 'Not known' (never 'No bond', never '—'), each with its own why and the record's words", () => {
     const unknown = bond("MD", "MCC bond document has no clear terms — check with the college", null, { status: "unknown", reason: "mcc_document_unclear" });
     const c = cells("MD/MS", [unknown]);
     for (const k of ["bond", "bondInr"] as const) {
-      expect(shown(c[k])).toEqual(["Not clear", "No clear bond in its document", null, "muted"]);
+      expect(shown(c[k])).toEqual(["Not known", "Not known", null, "muted"]);
       expect(c[k].tip[0]).toEqual({ text: "MCC bond document has no clear terms — check with the college", src: 1 });
     }
+    expect(c.bond.lead).toMatch(/Bond not known\. Its bond document doesn't clearly state a bond\.$/);
+    const blank = cells("MD/MS", [bond("MD", "No clear service bond: its MCC bond document is a blank form; leaving penalty: see penalty", null, { status: "unclear" })]);
+    expect([blank.bond.short, blank.bond.lead]).toEqual(["Not known", expect.stringMatching(/Bond not known\. The college's bond form is blank\.$/)]);
     const unread = cells("MD/MS", [bond("MD", "Bond document on MCC not read: a scan; see the document", null, { status: "unknown", reason: "bond document not read", doc_url: "https://mcc.admissions.nic.in/x?Type=BM" })]);
-    expect(shown(unread.bond)).toEqual(["Doc not read", "Bond doc not read", null, "muted"]);
-    expect(unread.bond.lead).toMatch(/Bond: MCC lists a bond document Seatora has not read/);
-    // "None declared" and "Doc not read" never read the same
+    expect(shown(unread.bond)).toEqual(["Not known", "Not known", null, "muted"]);
+    expect(unread.bond.lead).toMatch(/Bond not known\. Its bond document on MCC is a scan or a filled-in form Seatora couldn't read/);
+    expect(unread.bond.tip).toEqual([{ text: "Why it isn't read: a scan.", src: 1 }, { text: "The college's own bond document on MCC", src: 2 }]);
     const none = cells("MD/MS", [bond("MD", "Not declared: the college's MCC profile states no bond and MCC lists no bond document", null, { status: "not_declared", reason: "no bond document on MCC" })]);
-    expect(none.bond.short).toBe("None declared");
+    expect([none.bond.short, none.bond.lead]).toEqual(["Not known", expect.stringMatching(/Bond not known\. No bond is declared to MCC, and no document of the college's says “no bond”\.$/)]);
   });
 
   it("every bond tooltip leads with one plain line from the cells' own fields; a conflict in the record said plainly", () => {
@@ -334,30 +334,31 @@ describe("bond cells, by record status", () => {
     expect(c.fee.lead).toBeUndefined();
     // The record's own words stay, under the lead.
     expect(c.bond.tip[0]).toEqual({ text: "Service bond: 2 years · ₹40 L · ₹20 L diploma", src: 1 });
-    expect(cells("MD/MS", []).bond.lead).toBe("Leave after joining: not published. Bond: no clear answer published; ask the college.");
+    expect(cells("MD/MS", []).bond.lead).toBe("Leave after joining: not published. Bond not known. Seatora has no bond record for this programme yet.");
   });
 
-  it("a DNB hospital that declared no bond, where NBEMS lets none be imposed: 'None declared', never 'No bond'", () => {
+  it("a DNB hospital that declared no bond, where NBEMS lets none be imposed: 'Not known', never 'No bond'; why in the (i)", () => {
     const words = "Not declared by the hospital (checked MCC profile and bond page, Uttar Pradesh rules, NBEMS rules on 15 Nov 2026); NBEMS: an undeclared bond can't be imposed this session";
     const c = cells("DNB", [bond("DNB", words, null, { status: "not_declared", reason: "not_declared_no_document" })]);
     for (const k of ["bond", "bondInr"] as const) {
-      expect(shown(c[k])).toEqual(["None declared", "None declared", null, "muted"]);
-      expect(c[k].tip[0].text).toMatch(/^None declared: the hospital declared no bond to MCC/);
+      expect(shown(c[k])).toEqual(["Not known", "Not known", null, "muted"]);
+      expect(c[k].lead).toMatch(/Bond not known\. The hospital declared no bond to MCC, and NBEMS lets a DNB hospital impose only a bond it declared before counselling/);
+      expect(c[k].tip[0]).toEqual({ text: words, src: 1 });
     }
-    // Words that don't say so (an MD record): "None declared" too (its (i): the record's words, no NBEMS rule).
-    expect(cells("MD/MS", [bond("MD", "Not declared by the college", null, { status: "not_declared", reason: "not_declared_no_document" })]).bond.short).toBe("None declared");
+    // Words that don't say so (an MD record): "Not known" too (its (i): the record's words, no NBEMS rule).
+    expect(cells("MD/MS", [bond("MD", "Not declared by the college", null, { status: "not_declared", reason: "not_declared_no_document" })]).bond.short).toBe("Not known");
   });
 
-  it("no bond record at all: '—' with 'not checked yet' (never 'No bond'); DNB cites the NBEMS rule", () => {
+  it("no bond record at all: 'Not known' with 'not checked yet' (never 'No bond'), still nothing published; DNB cites the NBEMS rule", () => {
     const md = cells("MD/MS", []);
-    expect([md.bond.short, md.bond.missing, md.bond.tip[0].text]).toEqual(["—", true, "Not checked yet: Seatora has no bond record for this programme."]);
+    expect([md.bond.short, md.bond.missing, md.bond.tip[0].text]).toEqual(["Not known", true, "Not checked yet: Seatora has no bond record for this programme."]);
     expect(tip(md.bond)).toContain("Government colleges may still have a state service bond");
     expect(cells("DNB", []).bond.tip[1]).toMatchObject({ rules: true, text: expect.stringMatching(/^NBEMS rule: private DNB hospitals/) });
   });
 
-  it("a declared bond with no ₹ figure for this course is a short phrase (no stipend figures to compute it); years not stated is 'Yes'", () => {
+  it("a declared bond with no ₹ figure for this course is a short phrase (no stipend figures to compute it); years not stated is 'Bond, years not stated'", () => {
     const words = cells("MD/MS", [bond("MD", "Service bond: double the stipend received for 3 years of study", null, { status: "documented", years: "3 years of study; service not stated" })]);
-    expect(shown(words.bond)).toEqual(["Yes", "Years not stated", null, "bond"]);
+    expect(shown(words.bond)).toEqual(["Bond", "Bond, years not stated", null, "bond"]);
     expect(shown(words.bondInr)).toEqual(["2× stipend", "2× stipend", null, "muted"]);
     expect(tip(words.bondInr)).toContain("No number: Seatora has no stipend figure for every year needed.");
   });

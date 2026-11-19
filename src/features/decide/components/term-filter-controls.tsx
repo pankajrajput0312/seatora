@@ -59,8 +59,8 @@ export function TermFilterControls({ f, caps, fees = true }: { f: TermParams; ca
             unless &quot;Include not published&quot; is ticked. &quot;No bond&quot; only lists colleges whose record says no bond (ticked, also those where a
             state law&apos;s service may still apply), and a type filter never lists a college without a type.
             <PgOr
-              pg={<> &quot;None declared&quot; (a DNB hospital that declared no bond to MCC, so NBEMS lets it impose none this session) is not &quot;No bond&quot;: no document of its own says so, so it counts as not published.</>}
-              other={<> A bond document Seatora has not read yet (&quot;Doc not read&quot;), one with no clear bond (&quot;Not clear&quot;) and no bond declared (&quot;None declared&quot;) count as not published.</>}
+              pg={<> A bond that is &quot;Not known&quot; counts as not published: none declared to MCC (a DNB hospital that declared none, so NBEMS lets it impose none this session, but no document of its own says &quot;no bond&quot;), or a document saying no bond while a state law&apos;s service may apply.</>}
+              other={<> A bond that is &quot;Not known&quot; counts as not published: a bond document Seatora couldn&apos;t read, a blank form or one with no clear bond, or none declared.</>}
             />
           </>
         }
@@ -84,7 +84,7 @@ export function TermFilterControls({ f, caps, fees = true }: { f: TermParams; ca
         <TermSelect name="maxleave" label="Leaving penalty" value={f.maxleave} any="Any leaving penalty" options={choices("maxleave", f.maxleave ?? null)} />
         <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
           <input type="checkbox" name="nd" value="keep" defaultChecked={f.nd === "keep"} className="size-5 accent-sky" />
-          Include not published (none declared, doc not read)
+          Include not published or not known
         </label>
       </FilterSection>}
     </>

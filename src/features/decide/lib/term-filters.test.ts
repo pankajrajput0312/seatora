@@ -47,7 +47,7 @@ describe("params", () => {
   });
 
   it("chips name each applied value; termMoreOpen opens the fold for a folded one", () => {
-    expect(termChips({ ctype: ["govt", "public_sector"], maxfee: 5, bondyrs: 0, nd: "keep" }).map((c) => c.label)).toEqual(["Govt", "Public Sector", "Fee up to ₹5 L/yr", "No bond", "Including not published"]);
+    expect(termChips({ ctype: ["govt", "public_sector"], maxfee: 5, bondyrs: 0, nd: "keep" }).map((c) => c.label)).toEqual(["Govt", "Public Sector", "Fee up to ₹5 L/yr", "No bond", "Including not published or not known"]);
     expect(termChips({ maxfee: "any" })).toEqual([]);
     expect(termMoreOpen({ maxfee: 5 })).toBe(false);
     expect(termMoreOpen({ maxleave: 5 })).toBe(true);

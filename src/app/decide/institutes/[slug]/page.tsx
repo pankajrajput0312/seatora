@@ -672,12 +672,12 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               ) : exam === "ini-cet" ? (
                 <>
                   One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), as the INI-CET prospectus (Part B) prints them for this institute: fee that year and stipend per month; where it gives no one figure, its own words. A dash means not stated, never zero.
-                  The bond and the leaving penalty are the prospectus&apos;s terms (&quot;Not clear&quot;: it neither states nor rules out service after the course).
+                  The bond and the leaving penalty are the prospectus&apos;s terms (&quot;Not known&quot;: it neither states nor rules out service after the course).
                 </>
               ) : (
                 <>
                   One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type where the college&apos;s MCC institute profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead (a figure they state, beside them). A dash means not stated (the profile may say more), never zero.
-                  The bond is from MCC&apos;s institute list (a document Seatora has not read is &quot;Doc not read&quot;); resigning from Round 2 is MCC&apos;s separate forfeit.
+                  The bond is from MCC&apos;s institute list: &quot;No bond&quot;, a stated bond, or &quot;Not known&quot; (a document Seatora couldn&apos;t read, a blank form, none declared: the bond box says which); resigning from Round 2 is MCC&apos;s separate forfeit.
                 </>
               )}
             </InfoTip>
