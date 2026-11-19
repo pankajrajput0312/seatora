@@ -1,0 +1,14 @@
+[
+ {
+  "degree": "MD",
+  "specialty": "GENERALMEDICINE",
+  "name": "General Medicine",
+  "slug": "md-general-medicine"
+ },
+ {
+  "degree": "MCh",
+  "specialty": "NEUROSURGERY",
+  "name": "Neuro Surgery (6 years)",
+  "slug": "mch-neuro-surgery-6-years"
+ }
+]

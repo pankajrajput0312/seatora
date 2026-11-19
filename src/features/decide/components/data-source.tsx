@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { activeExam } from "@/features/exams/active";
 import { roundNameFrom } from "@/features/exams/exam";
-import { DEFAULT_EXAM, exams, roundNameIn } from "@/features/exams/registry";
+import { DEFAULT_EXAM, exams, roundNameIn, yearName } from "@/features/exams/registry";
 import { fmtDay } from "../lib/format";
 import { roundName } from "../lib/round-status";
 import { listNotices } from "../server/notices";
@@ -49,7 +49,7 @@ export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLin
   const sameDay = once(each.flatMap((e) => e.sameDay));
   const { year, round } = lists[0];
   const noticesHref = L.to("/decide/counselling", { tab: "announcements", kind: "seat_matrix", year, round });
-  const named = lists.length === 1 ? `the ${listTitle(lists[0])} list` : `the ${year} ${roundNameFrom(lists[0].name, round)} seat lists`;
+  const named = lists.length === 1 ? `the ${listTitle(lists[0], exam)} list` : `the ${yearName(exam, year)} ${roundNameFrom(lists[0].name, round)} seat lists`;
   // Another exam has no MCC notices in the data (no Schedule page): no link to them.
   const notices = exams[exam].has.notices;
   return (
@@ -65,13 +65,13 @@ export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLin
             const doc: SourceDoc = { key: `seat-list|${list.key}`, name: `${list.name}, PDF${dated ? ` (${dated})` : ""}`, url: list.url, type: "OFFICIAL" };
             return (
               <span key={list.key} className="block">
-                Seats: the {listTitle(list)} list as its PDF printed it<SourceRef doc={doc} first />: {list.name}{dated && `, ${dated}`}.
+                Seats: the {listTitle(list, exam)} list as its PDF printed it<SourceRef doc={doc} first />: {list.name}{dated && `, ${dated}`}.
               </span>
             );
           })}
           Seats MCC added or removed after {lists.length === 1 ? "it" : "them"} are not applied here.
           {sameDay.length > 0 && <> Published the same day as the list, so it may already include {sameDay.length === 1 ? "this notice" : "these notices"}: {noticeLinks(sameDay)}.</>}{" "}
-          {notices && <Link href={noticesHref} className={`${smallLink} text-sky`}>All MCC seat notices, {exam === DEFAULT_EXAM ? "PG" : exams[exam].label} {year} {roundName[round]}</Link>}
+          {notices && <Link href={noticesHref} className={`${smallLink} text-sky`}>All MCC seat notices, {exam === DEFAULT_EXAM ? "PG" : exams[exam].label} {yearName(exam, year)} {roundName[round]}</Link>}
         </InfoTip>
       </span>
       {later.length > 0 && (
@@ -105,7 +105,7 @@ export async function DataSource({ used, terms, results = true }: { used?: Used[
   const docs: SourceDoc[] = [
     ...years.map((y) => ({
       key: `mcc-results|${y}`,
-      name: `MCC allotment results, ${exam === DEFAULT_EXAM ? "PG" : exams[exam].label} ${y}`,
+      name: `${exams[exam].resultsName ?? "MCC allotment results"}, ${exam === DEFAULT_EXAM ? "PG" : exams[exam].label} ${yearName(exam, y)}`,
       type: "OFFICIAL" as const,
       links: pdfs.filter((s) => s.year === y).map((s) => ({ label: roundNameIn(exam, meta.sources, s.year, s.round), url: s.url, title: s.name, provisional: s.provisional, order: rounds.indexOf(s.round) })),
     })),
@@ -121,7 +121,7 @@ export async function DataSource({ used, terms, results = true }: { used?: Used[
       {provisional.length > 0 && (
         <span className="inline-flex items-center gap-1">
           <Provisional when />
-          {provisional.map((s) => `${s.year} ${roundLabel[s.round]}`).join(", ")} result
+          {provisional.map((s) => `${yearName(exam, s.year)} ${roundLabel[s.round]}`).join(", ")} result
         </span>
       )}
     </div>

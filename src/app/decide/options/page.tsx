@@ -20,7 +20,7 @@ import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { GroupPrompt } from "@/features/decide/components/dashboard-parts";
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
-import { iniCetIn, iniWord } from "@/features/decide/lib/college-aliases";
+import { iniElsewhere } from "@/features/decide/lib/college-aliases";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -30,7 +30,7 @@ import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toU
 import { getMeta, listOptions, optionsView, unlistedSeats } from "@/features/decide/service";
 import { optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { DEFAULT_EXAM, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
+import { DEFAULT_EXAM, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
 import { quotaIn } from "@/features/exams/exam";
 
 export const metadata: Metadata = { title: "Options" };
@@ -54,7 +54,7 @@ const filtersSchema = z.object({
   sort: z.enum(optionSorts).optional(),
   page: pageValue.default(1),
 });
-const sortLabels = (last: number): Record<OptionSort, string> => ({
+const sortLabels = (last: string): Record<OptionSort, string> => ({
   label: "Label (reached first)",
   deep: `${last} closing: deepest first`,
   tight: `${last} closing: tightest first`,
@@ -86,7 +86,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     typeless ? listOptions(profile, { ...filters, terms: typeless }, { page: 1, pageSize: 1 }, exam).then((x) => x.total) : 0,
   ]);
   // The sorts' year: the latest complete one (NEET PG: its later past year, as before).
-  const HEAD = headYearIn(exam, meta.sources);
+  const HEAD = yearName(exam, headYearIn(exam, meta.sources)); // as the exam names it (INI-CET: "Jan 2026")
   const sortLabel = sortLabels(HEAD);
   const lists = r.seatLists;
   const roundView = r.view === "round";
@@ -101,9 +101,9 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // The latest year's newest round (lib/reach.ts latestRound): the only one that can be provisional (MCC's provisional
   // result); the toggle exists only then.
   const latest = latestOf(meta.sources, exam);
-  const latestName = `${latest.year} ${roundLabel[latest.round]}`;
+  const latestName = `${yearName(exam, latest.year)} ${roundLabel[latest.round]}`;
   const counted = reachWindow(latest, PAST_YEARS, !f.prov);
-  const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
+  const round = lists[0] && `${yearName(exam, lists[0].year)} ${roundLabel[lists[0].round]}`;
   const roundWords = lists[0] && roundName[lists[0].round];
   // Switching views drops the filters whose default differs by view (seats, closed), so each view opens as itself, and
   // the "new" label, which only the round view has.
@@ -211,7 +211,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats,
             the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${E.quotas.map((q) => quotaIn(E, q)).join(", ")})`}. Within 10%: in a past round the closing rank was at
             least 90% of yours ({`${E.rankWord} `}<span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or later) but before your rank.
-            {roundView && <> Never allotted before = MCC allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years)}), in any round or seat category, so there is no closing rank to compare.</>}
+            {roundView && <> Never allotted before = MCC allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years, exam)}), in any round or seat category, so there is no closing rank to compare.</>}
           </>
         }
       >
@@ -380,7 +380,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           historyMore={
             <>
               {`Closing = the highest ${E.rankName} allotted in that round on a seat of that category; here `}{seats} seats, the ones you can take. {latestText(latest)} is {latest.round === "R1" ? "that round alone" : "the deepest of those rounds"}. Labels
-              count every round of {PAST_YEARS[0]} and {PAST_YEARS[1]}{(!f.prov || latest.round !== "R1") && `, and ${latestText(latest, !f.prov)}`}; Rounds by year shows every round of every year (R2 and R3 included), older years
+              count every round of {yearName(exam, PAST_YEARS[0])} and {yearName(exam, PAST_YEARS[1])}{(!f.prov || latest.round !== "R1") && `, and ${latestText(latest, !f.prov)}`}; Rounds by year shows every round of every year (R2 and R3 included), older years
               too, which the labels do not count; its bracketed numbers are allotments made that round in every category, not the seat matrix.
             </>
           }
@@ -403,7 +403,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       ) : (
         <EmptyState
           title="No options match"
-          description={iniCetIn(f.q) ? `${iniCetIn(f.q)} admits through ${iniWord(exam)}, not MCC's ${E.label} counselling, so it is not in MCC's data.` : `${f.q ? `Nothing here matches “${f.q}”. ` : ""}Clear the search, the label and the Filters sheet's page filters, or add courses, quotas or states in your profile (Edit beside your rank).${exam !== DEFAULT_EXAM && capped + r.unknownTerms > 0 ? ` ${formatRank(capped + r.unknownTerms)} are hidden by ${capWords} (above).` : ""}`}
+          description={iniElsewhere(f.q, exam) ? `${iniElsewhere(f.q, exam)}, not MCC's ${E.label} counselling, so it is not in MCC's data.` : `${f.q ? `Nothing here matches “${f.q}”. ` : ""}Clear the search, the label and the Filters sheet's page filters, or add courses, quotas or states in your profile (Edit beside your rank).${exam !== DEFAULT_EXAM && capped + r.unknownTerms > 0 ? ` ${formatRank(capped + r.unknownTerms)} are hidden by ${capWords} (above).` : ""}`}
         >
           <span className="flex flex-wrap justify-center gap-x-6">
             <Link href={here({ q: null, reach: null, closed: "1", seats: roundView ? "all" : null, ...Object.fromEntries(termKeys.map((k) => [k, null])) })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Clear search and page filters</Link>
@@ -415,11 +415,11 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
 
       {r.virtualOnly && r.virtualOnly.options > 0 && (
         <p className="text-sm text-muted-foreground">
-          {n(r.virtualOnly.options)} more only in the {r.virtualOnly.list.year} {roundLabel[r.virtualOnly.list.round]} virtual vacancy list.{" "}
+          {n(r.virtualOnly.options)} more only in the {yearName(exam, r.virtualOnly.list.year)} {roundLabel[r.virtualOnly.list.round]} virtual vacancy list.{" "}
           <Link href={here({ seats: "virtual" })} className={`${smallLink} text-sky`}>Show options with virtual vacancy seats</Link>
         </p>
       )}
-      {unlisted && <UnlistedSeats u={unlisted} profile href={L.to("/decide/seats", { view: "list", list: unlisted.list.key, nohist: "1" })} />}
+      {unlisted && <UnlistedSeats u={unlisted} exam={exam} profile href={L.to("/decide/seats", { view: "list", list: unlisted.list.key, nohist: "1" })} />}
       {r.noState > 0 && (
         <p className="text-sm text-muted-foreground">
           {n(r.noState)} more with {round} seats left out by the state filter: no state in Decide&apos;s data.

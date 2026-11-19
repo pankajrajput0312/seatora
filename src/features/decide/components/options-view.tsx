@@ -8,7 +8,7 @@ import type { OptionRow } from "../service";
 import { rounds, seatKindLabel, type Round, type SeatList, type Term } from "../types";
 import { Closing, Dash, Provisional, TermText } from "./bits";
 import { smallLink } from "./ui";
-import { RoundName, RoundNames } from "./round-name";
+import { RoundName, RoundNames, YearName } from "./round-name";
 import { quotaIn } from "@/features/exams/exam";
 import { useExamInfo } from "../lib/use-decide-store";
 
@@ -57,7 +57,7 @@ export function SeatsLink({ n, list, L, at, name, end }: { n: number | null | un
   if (n == null) return <Dash />;
   return (
     <Link href={L.seats({ list: list.key, ...at })} className={`${smallLink} numeric min-w-11 font-semibold ${seatKindClass[list.kind]} ${end ? "justify-end" : ""}`}>
-      {formatRank(n)}<span className="sr-only"> {n === 1 ? "seat" : "seats"} in the {list.year} <RoundName year={list.year} round={list.round} /> {seatKindLabel[list.kind].toLowerCase()} list: {name}</span>
+      {formatRank(n)}<span className="sr-only"> {n === 1 ? "seat" : "seats"} in the <YearName year={list.year} /> <RoundName year={list.year} round={list.round} /> {seatKindLabel[list.kind].toLowerCase()} list: {name}</span>
     </Link>
   );
 }
@@ -127,7 +127,7 @@ export function RoundGrid({ row, caption }: { row: Pick<OptionRow, "grid" | "rea
         <tbody>
           {years.map((y) => (
             <tr key={y} className="border-t border-border">
-              <th scope="row" className="numeric py-1 pr-3 text-left font-normal">{y}</th>
+              <th scope="row" className="numeric py-1 pr-3 text-left font-normal"><YearName year={y} /></th>
               {used.map((r) => {
                 const c = row.grid[y]?.[r as Round];
                 return (

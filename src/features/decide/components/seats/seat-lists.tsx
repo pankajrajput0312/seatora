@@ -18,7 +18,8 @@ import { PAST_ROUNDS, type SeatLine, type SeatSort } from "./find-seats";
 import { seatCourse as courseOf } from "./seat-cards";
 import { ScrollTable } from "../scroll-table";
 import { roundNameFrom } from "@/features/exams/exam";
-import { RoundName } from "../round-name";
+import { RoundName, YearName } from "../round-name";
+import { DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
 import { QuotaName } from "../round-name";
 import { quotaIn } from "@/features/exams/exam";
 
@@ -32,14 +33,15 @@ export const seatKindNote: Record<SeatKind, string> = {
 
 export { fmtDay } from "../../lib/format";
 /** The round as the list's own PDF names it (NEET SS 2023's "Mop-up"; NEET PG's: roundLabel). */
-export const listTitle = (l: SeatList) => `${l.year} ${roundNameFrom(l.name, l.round)} ${seatKindLabel[l.kind].toLowerCase()}`;
+export const listTitle = (l: SeatList, exam: ExamKey = DEFAULT_EXAM) => `${yearName(exam, l.year)} ${roundNameFrom(l.name, l.round)} ${seatKindLabel[l.kind].toLowerCase()}`;
 /** "2026 R1 clear vacancy seats"; the new list's label already ends in seats ("newly added seats"). */
-export const listSeats = (l: SeatList) => `${listTitle(l)}${l.kind === "new" ? "" : " seats"}`;
+export const listSeats = (l: SeatList, exam: ExamKey = DEFAULT_EXAM) => `${listTitle(l, exam)}${l.kind === "new" ? "" : " seats"}`;
 
-const groupOf = (l: SeatList) => `${l.year} ${roundNameFrom(l.name, l.round)}`;
+const roundOf = (l: SeatList, exam: ExamKey) => `${yearName(exam, l.year)} ${roundNameFrom(l.name, l.round)}`;
 
 /** Link chips, one per list PDF, grouped by year and round (seatLists() order); earlier rounds fold away unless picked. */
-export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; current: string; href: (key: string) => string }) {
+export function SeatListPicker({ lists, current, href, exam = DEFAULT_EXAM }: { lists: SeatList[]; current: string; href: (key: string) => string; exam?: ExamKey }) {
+  const groupOf = (l: SeatList) => roundOf(l, exam);
   const [latest, ...earlier] = [...new Set(lists.map(groupOf))];
   const group = (g: string, first?: boolean) => (
     // Phones: the latest round's row scrolls sideways and fades at an edge with more (fade-x), so a chip under the
@@ -85,15 +87,15 @@ export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; cu
  * and institute pages: one line, the why behind its (i), and a link to them on Seats. `here`: at one institute.
  * `options`: while Options' round view lists them as new options, the link to them there (else they are no option).
  */
-export function UnlistedSeats({ u, profile, here, href, options }: { u: { list: SeatList; options: number; seats: number } | null; profile: boolean; here?: boolean; href: string; options?: string }) {
+export function UnlistedSeats({ u, profile, here, href, options, exam = DEFAULT_EXAM }: { u: { list: SeatList; options: number; seats: number } | null; profile: boolean; here?: boolean; href: string; options?: string; exam?: ExamKey }) {
   if (!u || u.seats <= 0) return null;
   const one = u.options === 1;
   const them = u.seats === 1 ? "it" : "them";
   return (
     <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
       {/* "2026 R2 clear vacancy seats", "2026 R2 newly added seats" (that list's name already says seats). */}
-      <span><span className="numeric">{formatRank(u.seats)}</span> {u.list.kind === "new" ? `${u.list.year} ${roundNameFrom(u.list.name, u.list.round)} newly added` : listTitle(u.list)} {u.seats === 1 ? "seat" : "seats"}{here && " here"} never allotted before</span>
-      <InfoTip label={`${listSeats(u.list)} never allotted before`}>
+      <span><span className="numeric">{formatRank(u.seats)}</span> {u.list.kind === "new" ? `${roundOf(u.list, exam)} newly added` : listTitle(u.list, exam)} {u.seats === 1 ? "seat" : "seats"}{here && " here"} never allotted before</span>
+      <InfoTip label={`${listSeats(u.list, exam)} never allotted before`}>
         {u.seats === 1 ? "It is" : "They are"} in <span className="numeric">{formatRank(u.options)}</span> {one ? "course and quota" : "courses and quotas"}
         {profile ? " that match your courses, quotas, states and seat categories" : ""} with no past MCC allotments, so there is no closing rank to
         compare{options ? `: Options lists ${one ? "it" : "them"} as “Never allotted before”.` : `, and ${one ? "it is not an option" : "they are not options"} here.`}
@@ -118,7 +120,7 @@ function PastClosings({ r, name, latest }: { r: SeatLine; name: string; latest: 
       {d ? (
         <span className="numeric">
           <span className="text-[15px] font-semibold">{formatRank(d.closing)}</span>
-          <span className="block text-xs text-muted-foreground">{d.year} <RoundName year={d.year} round={d.round} /></span>
+          <span className="block text-xs text-muted-foreground"><YearName year={d.year} /> <RoundName year={d.year} round={d.round} /></span>
         </span>
       ) : (
         <Dash />
@@ -129,7 +131,7 @@ function PastClosings({ r, name, latest }: { r: SeatLine; name: string; latest: 
         <dl className="grid grid-cols-[auto_auto] gap-x-3 text-right">
           {all.map((c) => (
             <Fragment key={`${c.year}-${c.round}`}>
-              <dt className="numeric text-left text-muted-foreground">{c.year} <RoundName year={c.year} round={c.round} /></dt>
+              <dt className="numeric text-left text-muted-foreground"><YearName year={c.year} /> <RoundName year={c.year} round={c.round} /></dt>
               <dd className="numeric">{c.closing != null ? <>{formatRank(c.closing)}{c.provisional && " (provisional)"}</> : <Dash />}</dd>
             </Fragment>
           ))}

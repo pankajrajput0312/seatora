@@ -42,6 +42,16 @@ it("everyone else: the page without ?exam=, and without another exam's profile p
   expect(await to("neet-ss", "//evil.example/x")).toBe("http://test/decide?exam=neet-ss");
 });
 
+it("INI-CET: staff get it (a session year kept); everyone else NEET PG's page without its profile params", async () => {
+  staffUser.mockResolvedValue({ id: "u", role: "ADMIN" });
+  const res = await pick("ini-cet", "/decide/allotments?year=20261&exam=neet-pg");
+  expect([res.headers.get("location"), res.cookies.get("seatora_exam")?.value]).toEqual(["http://test/decide/allotments?year=20261&exam=ini-cet", "ini-cet"]);
+  staffUser.mockResolvedValue(null);
+  const member = await pick("ini-cet", "/decide/options?rank=900&cat=OBC&exam=ini-cet&page=2");
+  expect(member.headers.get("location")).toBe("http://test/decide/options?page=2");
+  expect(member.headers.get("set-cookie")).toBeNull();
+});
+
 it("an account read that fails is everyone else", async () => {
   staffUser.mockImplementation(async () => {
     throw new Error("db down");

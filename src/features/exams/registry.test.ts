@@ -1,11 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { LATEST_YEAR, latestRound, latestText, PAST_YEARS, pastOf, reachLabel, reachWindow } from "@/features/decide/lib/reach";
+import { LATEST_YEAR, latestRound, latestText, PAST_YEARS, pastOf, reachLabel, reachWindow, resultsSpan, seatsBelowNotes } from "@/features/decide/lib/reach";
 import { CHOICES_KEY, COMPARE_KEY } from "@/features/decide/lib/choices";
 import { PROFILE_KEY, profileQuotas } from "@/features/decide/profile";
 import { baseCategories, openQuotas, openQuotasNote, quotaScopeNote, rounds, type Source } from "@/features/decide/types";
 import { completeYear, examShows, headYearOf, neetPg, quotaIn, roundIn, roundNamesOf, tidyLabel } from "./exam";
-import { DEFAULT_EXAM, examFor, examKeys, exams, examYears, groupOf, groupsOf, headYearIn, isExam, latestOf, markerKey, pageNeeds, restrictedQuota, roundNameIn, scopedKey, showsPage } from "./registry";
+import { DEFAULT_EXAM, examFor, examKeys, exams, examYears, groupOf, groupsOf, headYearIn, isExam, latestOf, markerKey, pageNeeds, restrictedQuota, roundNameIn, scopedKey, showsPage, yearName } from "./registry";
+import { sessionOf } from "./keys";
+import { yearsOf } from "@/features/decide/server/catalog";
 
 const src = (year: number, round: Source["round"], name = "", provisional = false): Source => ({ key: `${year}/${round}`, url: null, year, round, provisional, name });
 
@@ -53,7 +55,7 @@ describe("per-exam years and labels", () => {
   it("NEET SS: its own latest year (2025), its past years in every label", () => {
     const l = latestOf(ss, "neet-ss");
     // "Reached" never counts a stray round: its label stops at the round before (main).
-    expect(l).toEqual({ year: 2025, round: "special_stray", main: "R2", provisional: false, pastYears: [2023, 2024] });
+    expect(l).toEqual({ year: 2025, round: "special_stray", main: "R2", provisional: false, pastYears: [2023, 2024], exam: "neet-ss" });
     expect(reachLabel("reached-latest", l, pastOf(l))).toBe("Reached in 2025 R1 to R2");
     expect(reachLabel("reached-both", l, pastOf(l))).toBe("Reached in 2023 and 2024");
     expect(reachWindow(l, pastOf(l))).toBe("2023, 2024 and 2025 R1 to Special stray");
@@ -99,6 +101,8 @@ describe("examFor: only staff get an exam other than NEET PG", () => {
   it("staff get a known exam, else NEET PG", () => {
     expect(examFor("neet-ss", true)).toBe("neet-ss");
     expect(examFor("neet-mds", true)).toBe("neet-mds");
+    expect(examFor("ini-cet", true)).toBe("ini-cet");
+    expect(examFor("INI-CET", true)).toBe("neet-pg");
     expect(examFor("NEET-SS", true)).toBe("neet-pg");
     expect(examFor("__proto__", true)).toBe("neet-pg");
     expect(examFor(undefined, true)).toBe("neet-pg");
@@ -157,5 +161,51 @@ describe("from the data: round names, the complete year, quota words (exams/exam
     expect(Object.entries(exams).every(([k, e]) => e.key === k)).toBe(true);
     expect(examShows(exams["neet-ss"], "/decide/fees")).toBe(false);
     expect(examShows({ has: { ...exams["neet-ss"].has, fees: true } }, "/decide/fees")).toBe(true);
+  });
+});
+
+describe("INI-CET: two sessions a year, a year is a session code", () => {
+  const E = exams["ini-cet"];
+  it("owner-only like SS and MDS: AIIMS's results, its words and scope", () => {
+    expect(E).toMatchObject({ label: "INI-CET", rankWord: "Rank", rankName: "INI-CET rank", categories: baseCategories, pwd: true, perGroup: false });
+    expect(E.scopeNote).toBe("Seatora covers INI-CET counselling by AIIMS New Delhi (AIIMS, JIPMER, PGIMER, NIMHANS, SCTIMST seats).");
+    expect(E.quotasNote).toContain(E.scopeNote);
+    expect(E.has.allotments && !E.has.residents && !E.has.notices && !E.has.scoreRank && !E.has.merit).toBe(true);
+    for (const h of ["/decide/residents", "/decide/counselling", "/decide/rank-tools"]) expect(showsPage("ini-cet", h)).toBe(false);
+    expect(restrictedQuota("ini-cet", "Sponsored")).toBe(true);
+    expect(E.quotas.every((q) => !restrictedQuota("ini-cet", q))).toBe(true);
+  });
+  it("yearName: a session's name; every other exam's year exactly as before", () => {
+    expect([yearName("ini-cet", 20261), yearName("ini-cet", 20267), yearName("ini-cet", 20261, true), yearName("ini-cet", 20267, true)]).toEqual(["Jan 2026", "Jul 2026", "January 2026 session", "July 2026 session"]);
+    for (const k of ["neet-pg", "neet-ss", "neet-mds"] as const) for (const y of [2019, 2025, 2026, 20261]) expect(yearName(k, y)).toBe(String(y));
+    expect(yearName("ini-cet", 2026)).toBe("2026"); // not a session code
+    expect([sessionOf(20267), sessionOf(2026), sessionOf(20260)]).toEqual([[2026, 7], null, null]);
+  });
+  it("its years are session codes in time order (examYears), never a year ± 1", () => {
+    const ys = examYears("ini-cet");
+    expect(ys.every((y) => sessionOf(y))).toBe(true);
+    expect([...ys].sort((a, b) => a - b)).toEqual(ys);
+    expect(new Set(ys.map((y) => y % 10))).toEqual(new Set([1, 7]));
+  });
+  it("labels, windows, year lists and spans name sessions; round names from the source (AIIMS's Open Round)", () => {
+    const [p0, p1] = E.pastYears;
+    const y = E.latestYear;
+    const ini = [src(p0, "R1"), src(p0, "R3", "INI-CET Open Round seat allocation"), src(p1, "R1"), src(p1, "R2"), src(y, "R1"), src(y, "R2")];
+    const l = latestOf(ini, "ini-cet");
+    expect(l).toMatchObject({ year: y, round: "R2", pastYears: [p0, p1], exam: "ini-cet" });
+    const [n0, n1, n] = [p0, p1, y].map((x) => yearName("ini-cet", x));
+    expect(latestText(l)).toBe(`${n} R1 to R2`);
+    expect(reachLabel("reached-both", l, pastOf(l))).toBe(`Reached in ${n0} and ${n1}`);
+    expect(reachLabel("reached-one", l, pastOf(l))).toBe(`Reached in ${n0} or ${n1}`);
+    expect(reachWindow(l, pastOf(l))).toBe(`${n0}, ${n1} and ${n} R1 to R2`);
+    expect(seatsBelowNotes([{ kind: "clear", on: [{ category: "Open", reach: "closed-before", at: { year: p1, round: "R1", closing: 90, stray: { year: p0, closing: 120 } } }] }], l, pastOf(l))[0]).toContain(`90 in ${n1} R1, before your rank. Stray: 120 in ${n0}.`);
+    const years = yearsOf(ini, "ini-cet");
+    expect(years.map((x) => x.label)).toEqual([`${n} (R1, R2)`, n1, n0]);
+    expect(resultsSpan(years, "ini-cet")).toBe(`${n0} to ${n} R2`);
+    expect(roundNameIn("ini-cet", ini, p0, "R3")).toBe("Open Round");
+    expect(roundNameIn("ini-cet", [src(p0, "stray", "INI-CET Open Round 2 seat allocation")], p0, "stray")).toBe("Open Round 2");
+    // NEET PG's: its years, labels and round names as ever
+    expect(yearsOf([src(2025, "R1"), src(2026, "R1", "", true)]).map((x) => x.label)).toEqual(["2026 (R1, provisional)", "2025"]);
+    expect(resultsSpan([{ year: 2026, rounds: ["R1"] }, { year: 2024, rounds: ["R1"] }])).toBe("2024 to 2026 R1");
   });
 });

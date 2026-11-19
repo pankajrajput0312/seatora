@@ -11,7 +11,7 @@ import { ResultCard, ResultCards } from "../result-card";
 import { TermStatCells } from "../stat-cells";
 import { TypeBadge } from "../type-badge";
 import type { SeatLine } from "./find-seats";
-import { RoundName } from "../round-name";
+import { RoundName, YearName } from "../round-name";
 import { QuotaName } from "../round-name";
 import { quotaIn } from "@/features/exams/exam";
 
@@ -61,7 +61,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
           <ResultCard
             key={`${k}|${i}`}
             chips={[
-              <>{own.year} · <RoundName year={own.year} round={own.round} /></>,
+              <><YearName year={own.year} /> · <RoundName year={own.year} round={own.round} /></>,
               r.quota != null ? <QuotaName key="q" quota={r.quota} /> : "Quota not printed",
               r.quota != null && isRestricted(exam, r.quota) && <Badge tone="warning">Restricted</Badge>,
               `${r.category} seat`,
@@ -88,7 +88,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
                   {d ? (
                     <span>
                       {/* As deepestText: "Deepest 2025: 60,351 (Stray)", every round counted. */}
-                      Deepest <span className="numeric">{d.year}:</span> <span className="numeric font-semibold text-foreground">{formatRank(d.closing)}</span> (<RoundName year={d.year} round={d.round} />)
+                      Deepest <span className="numeric"><YearName year={d.year} />:</span> <span className="numeric font-semibold text-foreground">{formatRank(d.closing)}</span> (<RoundName year={d.year} round={d.round} />)
                       {d.provisional && <> <Provisional when /></>}
                     </span>
                   ) : (

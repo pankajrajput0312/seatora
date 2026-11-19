@@ -74,5 +74,11 @@ export const iniCetIn = (q: string | undefined) => {
   const w = words.find((x) => INI_CET.has(x) && (x !== "pgimer" || words.includes("chandigarh")));
   return w ? (w === "pgimer" ? "PGIMER Chandigarh" : w.toUpperCase()) : null;
 };
-/** What admits the institute `iniCetIn` names for this exam instead of MCC: INI-SS for NEET SS, else INI-CET. */
-export const iniWord = (exam: string) => (exam === "neet-ss" ? "INI-SS" : "INI-CET");
+/** What admits the institute `iniCetIn` names for this exam instead of MCC: INI-SS for NEET SS, else INI-CET; null for INI-CET itself (its data has them). */
+export const iniWord = (exam: string) => (exam === "ini-cet" ? null : exam === "neet-ss" ? "INI-SS" : "INI-CET");
+/** The INI institute a search names that this exam's data can't have (iniCetIn, iniWord), and what admits it. */
+export const iniElsewhere = (q: string | undefined, exam: string) => {
+  const name = iniCetIn(q);
+  const by = iniWord(exam);
+  return name && by ? `${name} admits through ${by}` : null;
+};

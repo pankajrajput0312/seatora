@@ -32,9 +32,9 @@ import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decid
 import { baseCategories, rounds, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { DEFAULT_EXAM, exams, perGroup, roundNameIn } from "@/features/exams/registry";
+import { DEFAULT_EXAM, exams, perGroup, roundNameIn, sessionExams, yearName } from "@/features/exams/registry";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
-import { RoundNames, QuotaName } from "@/features/decide/components/round-name";
+import { RoundNames, QuotaName, YearName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Last ranks" };
 // ponytail: 25 a page: each card carries its five term cells and their (i)s (both views are in the page).
@@ -47,7 +47,7 @@ const schema = z.object({
   lquota: z.string().max(100).optional(),
   q: z.string().trim().max(100).optional(),
   inst: z.string().max(200).optional(),
-  /** A year-round column, e.g. "2025-R1" or "2024-special_stray". */
+  /** A year-round column, e.g. "2025-R1" or "2024-special_stray" (an exam with sessions: sortOf). */
   sort: z.string().regex(new RegExp(`^\\d{4}-(${rounds.join("|")})$`)).optional(),
   dir: z.enum(["asc", "desc"]).default("desc"),
   since: z.coerce.number().int().optional(),
@@ -58,6 +58,8 @@ const schema = z.object({
   rmax: z.string().max(12).optional(),
   page: pageValue.optional(),
 });
+/** INI-CET's columns are sessions: "20261-R1" (keys.ts sessionExams); every other exam's as `schema`. */
+const sessionSchema = schema.extend({ sort: z.string().regex(new RegExp(`^\\d{5}-(${rounds.join("|")})$`)).optional() });
 
 
 type Col = { year: number; rounds: Round[]; provisional: boolean };
@@ -87,7 +89,7 @@ function YearGrid({ r, cols, rds, caption, rank }: { r: OptionRow; cols: Col[]; 
           {cols.map((c) => (
             <tr key={c.year} className="border-t border-border">
               <th scope="row" className="px-1.5 py-1.5 text-left align-top font-semibold">
-                <span className="numeric">{c.year}</span>
+                <span className="numeric"><YearName year={c.year} /></span>
                 {Object.values(r.grid[c.year] ?? {}).some((x) => x?.provisional) && <span className="block"><Provisional when /></span>}
               </th>
               {/* A round that year never had: a blank cell, not "—" (no allotment). */}
@@ -122,7 +124,7 @@ function LastRankCard({ r, cols, rds, stat, range, mcc, L, mine, rank, E }: {
       className={mine ? "border-sky" : undefined}
       chips={[quotaIn(E, r.quota)]}
       actions={<Link href={L.allotments({ course: course.slug, inst: r.college.slug })} className={`${smallLink} px-3 text-xs text-sky`}>Allotments</Link>}
-      stat={big ? { label: `${big.year} ${roundIn(E, big.year, big.round)}`, value: <span className="numeric">{big.cell ? formatRank(big.cell.closing) : <Dash />}</span> } : undefined}
+      stat={big ? { label: `${yearName(E.key, big.year)} ${roundIn(E, big.year, big.round)}`, value: <span className="numeric">{big.cell ? formatRank(big.cell.closing) : <Dash />}</span> } : undefined}
       title={r.college.name}
       href={L.institute(r.college.slug)}
       external={mcc ? { href: mcc, label: `MCC profile: ${r.college.name}` } : undefined}
@@ -142,9 +144,9 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const params = toURLSearchParams(await searchParams);
   const profile = profileFromParams(params);
   const L = decideLinks(params);
-  const f = parseSearchParams(schema, params);
-  const tp = readTermFilters(params, profile);
   const exam = await activeExam();
+  const f = parseSearchParams(sessionExams.includes(exam) ? sessionSchema : schema, params);
+  const tp = readTermFilters(params, profile);
   const E = await examInfo(exam); // its data: fees once its import has them
   const EI = await examInfo(exam);
   const meta = await getMeta(exam);
@@ -240,7 +242,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
             <th rowSpan={2} scope="col" className={`sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-semibold ${tbl.pin}`}>Institute</th>
             {cols.map((c) => (
               <th key={c.year} scope="colgroup" colSpan={c.rounds.length} className="border-l border-border px-2 py-2 text-center text-xs font-semibold">
-                <span className="numeric">{c.year}</span> <Provisional when={c.provisional} />
+                <span className="numeric">{yearName(exam, c.year)}</span> <Provisional when={c.provisional} />
               </th>
             ))}
             {/* The course's terms after the closing ranks (the page's figures come first; the cards lead with both). */}
@@ -253,7 +255,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                 const on = f.sort === key;
                 return (
                   <th key={key} scope="col" aria-sort={on ? (f.dir === "asc" ? "ascending" : "descending") : undefined} className={`px-1 py-1 text-right font-normal ${i === 0 ? "border-l border-border" : ""}`}>
-                    <Link href={sortHref(key)} aria-label={`${c.year} ${roundNameIn(exam, meta.sources, c.year, r)}, sort ${on && f.dir === "desc" ? "ascending" : "descending"}`} className="inline-flex min-h-11 items-center justify-end px-1 hover:text-foreground">
+                    <Link href={sortHref(key)} aria-label={`${yearName(exam, c.year)} ${roundNameIn(exam, meta.sources, c.year, r)}, sort ${on && f.dir === "desc" ? "ascending" : "descending"}`} className="inline-flex min-h-11 items-center justify-end px-1 hover:text-foreground">
                       {roundNameIn(exam, meta.sources, c.year, r)}{on ? (f.dir === "asc" ? " ↑" : " ↓") : ""}
                     </Link>
                   </th>
@@ -335,7 +337,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         )}
         <Field label="Closing rank from"><input name="rmin" defaultValue={f.rmin ?? ""} aria-invalid={range.bad.includes(f.rmin ?? "") || undefined} aria-describedby={range.bad.length ? "range-note" : undefined} placeholder={exam === DEFAULT_EXAM ? "e.g. 40,000 or 40k" : `e.g. ${E.exampleRank}`} className={`${control} numeric`} /></Field>
         <Field label="Closing rank to"><input name="rmax" defaultValue={f.rmax ?? ""} aria-invalid={range.bad.includes(f.rmax ?? "") || undefined} aria-describedby={range.bad.length ? "range-note" : undefined} placeholder={exam === DEFAULT_EXAM ? "e.g. 60,000 or 0.6L" : "e.g. 5k"} className={`${control} numeric`} /></Field>
-        <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
+        <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: yearName(exam, c.year) }))} /></Field>
         <TermFilterControls f={tp.params} caps={profile} fees={E.has.fees} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />

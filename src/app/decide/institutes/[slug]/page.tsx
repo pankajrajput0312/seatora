@@ -44,7 +44,7 @@ import { checkAndCount, currentPlan } from "@/features/plans/usage";
 import { seatKindLabel } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { DEFAULT_EXAM, headYearIn, latestOf } from "@/features/exams/registry";
+import { DEFAULT_EXAM, headYearIn, latestOf, yearName } from "@/features/exams/registry";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { QuotaName } from "@/features/decide/components/round-name";
@@ -137,6 +137,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // Headlines: the latest complete year (NEET PG: its later past year, as before); the fourth cell the latest year, or
   // (that one is complete: another exam) the year before it.
   const HEAD = headYearIn(exam, meta.sources);
+  const yn = (y: number) => yearName(exam, y); // as the exam names it (INI-CET: "Jan 2026")
+  const head = yn(HEAD);
   const n2025 = allotmentsByYear.find((a) => a.year === HEAD)?.n ?? null;
   const LATER = HEAD === LATEST_YEAR ? PAST_YEARS[1] : LATEST_YEAR;
   const nLatest = allotmentsByYear.find((a) => a.year === LATER)?.n ?? null;
@@ -186,7 +188,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // One line per list; the why behind each one's (i).
   const unlistedNote = unlisted.length > 0 && (
     <div className="grid">
-      {unlisted.map((u) => <UnlistedSeats key={u.list.key} u={u} profile={!!profile} here href={L.to("/decide/seats", { view: "list", list: u.list.key, inst: slug, nohist: "1" })} options={newOnOptions} />)}
+      {unlisted.map((u) => <UnlistedSeats key={u.list.key} u={u} exam={exam} profile={!!profile} here href={L.to("/decide/seats", { view: "list", list: u.list.key, inst: slug, nohist: "1" })} options={newOnOptions} />)}
     </div>
   );
   // The newest round's seat lists here (Courses columns, Seats tab), each separate; the header's totals from them there,
@@ -207,7 +209,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // The Courses table's own columns, a little tighter than tbl's (px-3): with the five term cells it fits 1366px.
   const thTight = "px-3 py-3 text-xs font-semibold text-muted-foreground";
   const numTight = "px-3 py-3 text-right align-top text-[15px] font-semibold tabular-nums";
-  const roundName = round[0] && `${round[0].list.year} ${roundIn(E, round[0].list.year, round[0].list.round)}`;
+  const roundName = round[0] && `${yn(round[0].list.year)} ${roundIn(E, round[0].list.year, round[0].list.round)}`;
   const mine = profile ? eligibleCategories(profile.category, profile.pwd) : null;
   const seatCats = mine && f.scat !== "all" ? mine : undefined;
   const beds = info?.beds ? { ...reportedCount(info.beds), period: info.beds.meta?.period } : null;
@@ -272,11 +274,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             {roundSeats.map(({ list, n }) => (
               <span key={list.key} className="inline-flex items-center gap-0.5">
                 <Link href={L.to(`/decide/institutes/${slug}`, { tab: "seats" })} className="inline-flex min-h-11 items-center hover:underline">
-                  <span className="text-muted-foreground">{list.year} {roundIn(E, list.year, list.round)} {list.kind}:</span>&nbsp;{n > 0 ? <span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{formatRank(n)}</span> : <span className="numeric text-muted-foreground">0 seats</span>}
+                  <span className="text-muted-foreground">{yn(list.year)} {roundIn(E, list.year, list.round)} {list.kind}:</span>&nbsp;{n > 0 ? <span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{formatRank(n)}</span> : <span className="numeric text-muted-foreground">0 seats</span>}
                   <span className="sr-only"> seats: see Seats</span>
                 </Link>
                 <InfoTip label={listSeats(list)}>
-                  The {listTitle(list)} list. {n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves." : "Every course, quota and category here.") : "The MCC list prints none here."} The lists overlap, so they are never added.
+                  The {listTitle(list, exam)} list. {n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves." : "Every course, quota and category here.") : "The MCC list prints none here."} The lists overlap, so they are never added.
                 </InfoTip>
               </span>
             ))}
@@ -309,11 +311,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             items={[
               { label: "Courses", value: formatRank(pastCourses), info: courses.length > pastCourses ? `Courses with past MCC allotments here.${newNote(courses.length - pastCourses, "course")}` : undefined },
               { label: "Options", value: formatRank(past.length), info: `Course and quota options here (with past allotments).${newNote(options.length - past.length, "option")}` },
-              { label: `Allotments ${HEAD}`, value: n2025 != null ? formatRank(n2025) : <Dash />, info: "All rounds and seat categories. This counts allotments, not seats." },
+              { label: `Allotments ${head}`, value: n2025 != null ? formatRank(n2025) : <Dash />, info: "All rounds and seat categories. This counts allotments, not seats." },
               // Four cells fill the strip: hers when she has a profile, else the latest year's allotments.
               profile
                 ? { label: "Yours", value: formatRank(yours.length), info: "The course and quota options here that match your courses, quotas, states and caps." }
-                : { label: `Allotments ${yearInfo(LATER)?.label ?? LATER}`, value: nLatest != null ? formatRank(nLatest) : <Dash />, info: "All seat categories. This counts allotments, not seats." },
+                : { label: `Allotments ${yearInfo(LATER)?.label ?? yn(LATER)}`, value: nLatest != null ? formatRank(nLatest) : <Dash />, info: "All seat categories. This counts allotments, not seats." },
             ]}
           />
 
@@ -341,7 +343,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     </span>
                     <span className="flex items-center gap-4">
                       {profile && <ReachBadge reach={o.reach} provisional={o.reachProvisional} latest={latest} otherGroup={o.otherGroup} from={o.reachFrom} />}
-                      <span className="text-right"><span className="block text-xs text-muted-foreground">{HEAD} deepest</span><Closing d={o.byYear[HEAD]} year={HEAD} /></span>
+                      <span className="text-right"><span className="block text-xs text-muted-foreground">{head} deepest</span><Closing d={o.byYear[HEAD]} year={HEAD} /></span>
                     </span>
                   </li>
                 ))}
@@ -386,7 +388,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               <tbody>
                 {[...allotmentsByYear].sort((a, b) => b.year - a.year).map((a) => (
                   <tr key={a.year}>
-                    <th scope="row" className="w-48 py-1.5 text-left font-normal text-muted-foreground">{yearInfo(a.year)?.label ?? a.year}</th>
+                    <th scope="row" className="w-48 py-1.5 text-left font-normal text-muted-foreground">{yearInfo(a.year)?.label ?? yn(a.year)}</th>
                     <td className="py-1.5">{a.n != null && <div className="h-3 rounded-r-[4px] bg-mark" style={{ width: `${(a.n / maxN) * 100}%` }} aria-hidden />}</td>
                     <td className="numeric w-16 py-1.5 text-right font-semibold">{a.n != null ? formatRank(a.n) : <Dash />}</td>
                   </tr>
@@ -435,7 +437,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                         <ResultCard
                           chips={[quotaIn(E, r.quota), profile && <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} from={r.reachFrom} />]}
                           actions={<>{profile && <ChoiceStar item={toChoiceItem(r, latest)} />}<CompareToggle id={r.id} label={name} /></>}
-                          stat={{ label: `${HEAD} deepest`, value: d ? <span className="numeric">{formatRank(d.closing)}</span> : <Dash /> }}
+                          stat={{ label: `${head} deepest`, value: d ? <span className="numeric">{formatRank(d.closing)}</span> : <Dash /> }}
                           title={courseName(r)}
                           href={L.lastRanks(r.course.slug, { inst: slug })}
                           subtitle={d && <span className="text-xs text-muted-foreground">{roundIn(E, HEAD, d.round)}, {d.category} seat</span>}
@@ -462,7 +464,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                             Reach and the round's seats sit under the course, so every fee and bond cell fits a 1366px screen. */}
                         <th scope="col" className={`${thTight} ${stick} z-[3]`}>Course</th>
                         <th scope="col" className={`${thTight} text-right`}>{latestText(latest)}</th>
-                        <th scope="col" className={`${thTight} text-right`}>{HEAD} deepest</th>
+                        <th scope="col" className={`${thTight} text-right`}>{head} deepest</th>
                         {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={`${tbl.th} text-right`}>{statLabel[k]}</th>)}
                       </tr>
                     </thead>
@@ -575,7 +577,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   {allot.rows.map((a, i) => (
                     <li key={i} className="grid min-w-0">
                       <ResultCard
-                        chips={[<span key="yr"><span className="numeric">{a.year}</span> · {roundIn(E, a.year, a.round)}</span>, a.quota, `${a.category} seat`, a.provisional && <Provisional key="p" when />]}
+                        chips={[<span key="yr"><span className="numeric">{yn(a.year)}</span> · {roundIn(E, a.year, a.round)}</span>, a.quota, `${a.category} seat`, a.provisional && <Provisional key="p" when />]}
                         stat={{ label: "Rank", value: <Link href={L.rankScan(a.rank, a.year)} className="numeric inline-flex min-h-11 items-center hover:text-sky hover:underline">{formatRank(a.rank)}<span className="sr-only">: scan ranks around it</span></Link> }}
                         title={a.courseName}
                         href={L.lastRanks(a.courseSlug, { inst: slug })}
@@ -599,9 +601,9 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                         <tr key={i} className={tbl.row}>
                           <td className={`${tbl.num} ${stick} max-md:px-2`}>
                             <Link href={L.rankScan(a.rank, a.year)} className="hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link>
-                            <span className="block text-xs font-normal whitespace-nowrap md:hidden"><span className="numeric">{a.year}</span> {roundIn(E, a.year, a.round)} <Provisional when={a.provisional} /></span>
+                            <span className="block text-xs font-normal whitespace-nowrap md:hidden"><span className="numeric">{yn(a.year)}</span> {roundIn(E, a.year, a.round)} <Provisional when={a.provisional} /></span>
                           </td>
-                          <td className={`${tbl.td} whitespace-nowrap max-md:hidden`}><span className="numeric">{a.year}</span> {roundIn(E, a.year, a.round)} <Provisional when={a.provisional} /></td>
+                          <td className={`${tbl.td} whitespace-nowrap max-md:hidden`}><span className="numeric">{yn(a.year)}</span> {roundIn(E, a.year, a.round)} <Provisional when={a.provisional} /></td>
                           <td className={`${tbl.td} max-md:px-2`}><Link href={L.lastRanks(a.courseSlug, { inst: slug })} className="hover:text-sky hover:underline">{a.courseName}</Link></td>
                           <td className={`${tbl.td} max-md:px-2`}><QuotaName quota={a.quota} /></td>
                           <td className={`${tbl.td} max-md:px-2`}>{a.category}</td>

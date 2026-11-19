@@ -18,12 +18,13 @@ beforeEach(() => {
 });
 
 it("everyone but staff gets NEET PG, whatever the URL's exam (the middleware's header) says", async () => {
-  for (const c of [null, "neet-pg", "neet-ss", "neet-mds", "nope"]) expect(await as(c, false)).toBe("neet-pg");
+  for (const c of [null, "neet-pg", "neet-ss", "neet-mds", "ini-cet", "nope"]) expect(await as(c, false)).toBe("neet-pg");
 });
 
 it("staff get the exam they picked; an unknown pick is NEET PG", async () => {
   expect(await as("neet-ss", true)).toBe("neet-ss");
   expect(await as("neet-mds", true)).toBe("neet-mds");
+  expect(await as("ini-cet", true)).toBe("ini-cet");
   expect(await as("nope", true)).toBe("neet-pg");
   expect(await as(null, true)).toBe("neet-pg");
 });

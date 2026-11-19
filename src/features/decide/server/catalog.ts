@@ -4,7 +4,7 @@ import { cache as perRequest } from "react";
 import { requireDecideAccess } from "@/features/auth/lib/session";
 import { tidyLabel } from "@/features/exams/exam";
 import { exams } from "@/features/exams/registry";
-import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
+import { DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
 import { db } from "@/lib/db";
 import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Source, type Term } from "../types";
 import { termSourceName } from "@/features/cutoffs/lib/import-schema";
@@ -60,14 +60,15 @@ export type Catalog = {
 };
 export type YearInfo = { year: number; rounds: Round[]; provisional: boolean; label: string };
 
-/** Years and rounds come from the result PDFs, so labels say "provisional" only while a source is. */
-export function yearsOf(sources: Source[]): YearInfo[] {
+/** Years and rounds come from the result PDFs, so labels say "provisional" only while a source is. Years as `exam` names them (INI-CET: "Jan 2026"). */
+export function yearsOf(sources: Source[], exam: ExamKey = DEFAULT_EXAM): YearInfo[] {
   const ys = [...new Set(sources.map((s) => s.year))].sort((a, b) => b - a);
   return ys.map((year, i) => {
     const mine = sources.filter((s) => s.year === year);
     const rs = rounds.filter((r) => mine.some((s) => s.round === r));
     const provisional = mine.some((s) => s.provisional);
-    const label = i === 0 ? `${year} (${rs.map((r) => roundLabel[r]).join(", ")}${provisional ? ", provisional" : ""})` : provisional ? `${year} (provisional)` : String(year);
+    const name = yearName(exam, year);
+    const label = i === 0 ? `${name} (${rs.map((r) => roundLabel[r]).join(", ")}${provisional ? ", provisional" : ""})` : provisional ? `${name} (provisional)` : name;
     return { year, rounds: rs, provisional, label };
   });
 }
@@ -135,7 +136,7 @@ export function indexCatalog(p: {
       quotas: uniq(options.map((o) => o.quota)),
       states: uniq(p.colleges.map((c) => c.state)),
       sources,
-      years: yearsOf(sources),
+      years: yearsOf(sources, p.exam ?? DEFAULT_EXAM),
     },
   };
 }

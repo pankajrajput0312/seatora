@@ -10,7 +10,7 @@ import { roundStatus } from "@/features/decide/server/notices";
 import { chosenView } from "@/features/decide/server/view";
 import { currentSeatLists, getMeta, optionsView } from "@/features/decide/service";
 import { activeExam } from "@/features/exams/active";
-import { DEFAULT_EXAM, exams, latestOf } from "@/features/exams/registry";
+import { DEFAULT_EXAM, exams, latestOf, yearName } from "@/features/exams/registry";
 import { currentPlan } from "@/features/plans/usage";
 import { liveReach } from "./actions";
 
@@ -24,7 +24,7 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   const [lists, view, me, rs, meta] = await Promise.all([currentSeatLists(exam), chosenView(params, "choices"), currentPlan(), roundStatus(LATEST_YEAR, exam).catch(() => null), getMeta(exam)]);
   // Her list is for the choice filling she fills next (MCC's schedule), never a fixed round (the layout names it the same).
   const fill = rs && nextChoiceFilling(stepsNow(rs, new Date()));
-  const nextRound = fill && { name: `${roundName[fill.round]} · ${rs.year}`, when: `${roundName[fill.round]} choice filling, ${fillWindow(fill)}` };
+  const nextRound = fill && { name: `${roundName[fill.round]} · ${yearName(exam, rs.year)}`, when: `${roundName[fill.round]} choice filling, ${fillWindow(fill)}` };
   return (
     <AppPage>
       <PageHead title="Choices" about="Your list in the order you'll enter it on the MCC portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons; in the table, pick a choice's number to move it straight there." />

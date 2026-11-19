@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sessionOf } from "../../exams/keys.ts";
 
 /** Records of the MCC export bundle (neetpg-planner tools/export_medpath.py). `.strict()` rejects any extra key, so a
  * bundle that ever carried names, roll numbers or application ids would fail validation instead of being imported. */
@@ -8,20 +9,30 @@ export const mccCategories = ["Open", "OBC", "SC", "ST", "EWS", "Open PwD", "OBC
 export const termKinds = ["FEE", "STIPEND", "BOND", "PENALTY"] as const;
 export const programs = ["MD", "DNB"] as const;
 
-const year = z.number().int().min(2000).max(2100);
+export const calendarYear = z.number().int().min(2000).max(2100);
+/** An exam with two sessions a year (exams/keys.ts sessionExams, INI-CET): a session code YYYYM, January (1) or July (7). */
+export const sessionYear = z
+  .number()
+  .int()
+  .refine((y) => { const s = sessionOf(y); return !!s && s[0] >= 2000 && s[0] <= 2100 && (s[1] === 1 || s[1] === 7); }, "Expected a session code YYYYM (20261 = January 2026, 20267 = July 2026)");
+/** `sessions`: the exam's years are session codes, its result PDFs AIIMS's (aiims/<session>/…); else calendar years, MCC's. */
+export const yearSchema = (sessions = false) => (sessions ? sessionYear : calendarYear);
+export const sourceKey = (sessions = false) => z.string().regex(sessions ? /^aiims\/\d{5}\/[\w.-]+\.pdf$/ : /^mcc\/\d{4}\/[\w.-]+\.pdf$/);
 const rank = z.number().int().positive();
 const ikey = z.string().regex(/^[A-Z0-9]{1,40}(#(\d{6})?)?$/, "Expected <letters>[#<PIN>]");
 
-export const mccSourceSchema = z
-  .object({
-    key: z.string().regex(/^mcc\/\d{4}\/[\w.-]+\.pdf$/),
-    url: z.url(),
-    year,
-    round: z.enum(mccRounds),
-    provisional: z.boolean(),
-    name: z.string().min(1),
-  })
-  .strict();
+const sourceOf = (sessions: boolean) =>
+  z
+    .object({
+      key: sourceKey(sessions),
+      url: z.url(),
+      year: yearSchema(sessions),
+      round: z.enum(mccRounds),
+      provisional: z.boolean(),
+      name: z.string().min(1),
+    })
+    .strict();
+export const mccSourceSchema = sourceOf(false);
 export type MccSource = z.infer<typeof mccSourceSchema>;
 
 export const mccCollegeSchema = z
@@ -69,41 +80,45 @@ export const mccCourseSchema = z
   .strict();
 export type MccCourse = z.infer<typeof mccCourseSchema>;
 
-export const mccCutoffSchema = z
-  .object({
-    ikey,
-    degree: z.string().min(1),
-    specialty: z.string().regex(/^[A-Z0-9]+$/),
-    year,
-    round: z.enum(mccRounds),
-    quota: z.string().min(1),
-    category: z.enum(mccCategories),
-    opening: rank,
-    closing: rank,
-    n: z.number().int().positive(),
-    src: z.string().min(1),
-  })
-  .strict()
-  .refine((c) => c.opening <= c.closing, { message: "opening rank is worse than closing rank", path: ["opening"] });
+const cutoffOf = (sessions: boolean) =>
+  z
+    .object({
+      ikey,
+      degree: z.string().min(1),
+      specialty: z.string().regex(/^[A-Z0-9]+$/),
+      year: yearSchema(sessions),
+      round: z.enum(mccRounds),
+      quota: z.string().min(1),
+      category: z.enum(mccCategories),
+      opening: rank,
+      closing: rank,
+      n: z.number().int().positive(),
+      src: z.string().min(1),
+    })
+    .strict()
+    .refine((c) => c.opening <= c.closing, { message: "opening rank is worse than closing rank", path: ["opening"] });
+export const mccCutoffSchema = cutoffOf(false);
 export type MccCutoff = z.infer<typeof mccCutoffSchema>;
 
 export const allotmentStatuses = ["allotted", "fresh", "upgraded"] as const;
 
 /** One seat allotment as printed by MCC: rank and seat only. */
-export const mccAllotmentSchema = z
-  .object({
-    year,
-    round: z.enum(mccRounds),
-    rank,
-    quota: z.string().min(1),
-    category: z.enum(mccCategories),
-    ikey,
-    degree: z.string().min(1),
-    specialty: z.string().regex(/^[A-Z0-9]+$/),
-    status: z.enum(allotmentStatuses),
-    src: z.string().min(1),
-  })
-  .strict();
+const allotmentOf = (sessions: boolean) =>
+  z
+    .object({
+      year: yearSchema(sessions),
+      round: z.enum(mccRounds),
+      rank,
+      quota: z.string().min(1),
+      category: z.enum(mccCategories),
+      ikey,
+      degree: z.string().min(1),
+      specialty: z.string().regex(/^[A-Z0-9]+$/),
+      status: z.enum(allotmentStatuses),
+      src: z.string().min(1),
+    })
+    .strict();
+export const mccAllotmentSchema = allotmentOf(false);
 export type MccAllotment = z.infer<typeof mccAllotmentSchema>;
 
 /** The allotted candidate's own category as the PDF prints it (not the seat category). */
@@ -116,8 +131,8 @@ const prevFields = ["prev_ikey", "prev_degree", "prev_specialty", "prev_quota", 
  * the PDF prints in the previous round's columns (R2 / R3; all prev_* null where it prints "-"). No names.
  * `loose` (another exam than NEET PG): null where its PDF prints none, a choice number in R2 / R3 or the candidate's category.
  */
-const allotmentV2 = (loose: boolean) =>
-  mccAllotmentSchema
+const allotmentV2 = (loose: boolean, sessions = false) =>
+  allotmentOf(sessions)
     .extend({
       candidate_category: loose ? z.enum(candidateCategories).nullable() : z.enum(candidateCategories),
       option_no: z.number().int().positive().nullable(),
@@ -138,6 +153,8 @@ export const mccAllotmentV2Schema = allotmentV2(false);
 /** An exam other than NEET PG: no choice number where an R2 / R3 PDF prints none (NEET MDS mop-up 2019, 2020, 2022), no candidate category where none is printed (NEET SS). */
 export const mccAllotmentV2LooseSchema = allotmentV2(true);
 export type MccAllotmentV2 = z.infer<typeof mccAllotmentV2Schema>;
+/** An exam whose years are session codes (INI-CET): its sources, cutoffs and allotments (loose, as another exam's). */
+export const sessionSchemas = { source: sourceOf(true), cutoff: cutoffOf(true), allotment: allotmentV2(true, true) };
 
 const inr = z.number().int().nonnegative().max(2_147_483_647);
 const words = z.string().nullable().optional();

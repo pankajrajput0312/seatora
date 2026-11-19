@@ -23,7 +23,7 @@ import { dashboard, getMeta, listOptions, type StripPoint } from "@/features/dec
 import { roundLabel } from "@/features/decide/types";
 import { QuotaName } from "@/features/decide/components/round-name";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { DEFAULT_EXAM, exams, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
+import { DEFAULT_EXAM, exams, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -91,6 +91,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const latest = latestOf(meta.sources, exam);
   // The charts' year: the latest complete one (NEET PG: its later past year, as before).
   const HEAD = headYearIn(exam, meta.sources);
+  const head = yearName(exam, HEAD); // as the exam names it (INI-CET: "Jan 2026")
   const seats = eligibleCategories(profile.category, profile.pwd).join(" or ");
   const counted = reachWindow(latest, PAST_YEARS);
   const labelSources = <DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR }]} />;
@@ -102,7 +103,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const filling = steps && nextFilling(steps);
   // Her choice list is named for the choice filling she fills next (MCC's schedule), as Choices names it.
   const fill = steps && nextChoiceFilling(steps);
-  const fillName = fill ? `${roundName[fill.round]} · ${rs.year}` : null;
+  const fillName = fill ? `${roundName[fill.round]} · ${yearName(exam, rs.year)}` : null;
   // MCC's seat lists of the round Options lists, said as such (never "Round 2 seats in your courses").
   const lists = list && `MCC's ${roundWords} seat lists`;
   const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} without a published figure</Link></>;
@@ -180,7 +181,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <h2 id="numbers-h" className="text-h2 font-bold">{list ? `Your courses in ${lists}` : "Your options"}</h2>
           <InfoTip label={list ? `your courses in ${lists}` : "your options"}>
             {list
-              ? `Options with seats in MCC's ${list.year} ${roundWords} lists, in your courses, quotas and ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`
+              ? `Options with seats in MCC's ${yearName(exam, list.year)} ${roundWords} lists, in your courses, quotas and ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`
               : `Every option in your profile with past allotments, on ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`}
           </InfoTip>
         </div>
@@ -258,17 +259,17 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         source={<DataSource used={[{ year: HEAD }]} />}
         className="chart-paper"
         title="Where your rank sits"
-        subtitle={`Each dot is one option's deepest closing rank in ${HEAD}, on ${seats} seats. Dots at or right of your line closed at or after your rank.${d.strip.length < d.summary.length ? ` The ${d.strip.length} courses with the most options are drawn; the table lists all ${d.summary.length}. Tick courses in your profile to choose which are drawn.` : ""} Every option, with its round and seat category, is on Options.`}
+        subtitle={`Each dot is one option's deepest closing rank in ${head}, on ${seats} seats. Dots at or right of your line closed at or after your rank.${d.strip.length < d.summary.length ? ` The ${d.strip.length} courses with the most options are drawn; the table lists all ${d.summary.length}. Tick courses in your profile to choose which are drawn.` : ""} Every option, with its round and seat category, is on Options.`}
         legend={
           <>
-            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-mark" />Closed at or after your rank in {HEAD}</span>
+            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-mark" />Closed at or after your rank in {head}</span>
             <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-muted-foreground/60" />Closed before your rank</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-3 w-0.5 bg-foreground" />Your rank</span>
           </>
         }
         table={
           <table className="w-full text-sm">
-            <caption className="sr-only">{HEAD} deepest closing ranks of your options, on {seats} seats, by course</caption>
+            <caption className="sr-only">{head} deepest closing ranks of your options, on {seats} seats, by course</caption>
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th scope="col" className="py-2">Course</th>
@@ -304,11 +305,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       <ChartCard
         source={<DataSource used={[{ year: HEAD }]} />}
-        title={`How closing ranks moved through ${HEAD}`}
-        subtitle={`Median closing rank per round across your options, on ${seats} seats, in ${HEAD}.${d.trend.length < d.summary.length ? ` The ${d.trend.length} courses with the most options.` : ""}`}
+        title={`How closing ranks moved through ${head}`}
+        subtitle={`Median closing rank per round across your options, on ${seats} seats, in ${head}.${d.trend.length < d.summary.length ? ` The ${d.trend.length} courses with the most options.` : ""}`}
         table={
           <table className="w-full text-sm">
-            <caption className="sr-only">Median {HEAD} closing rank by round, on {seats} seats</caption>
+            <caption className="sr-only">Median {head} closing rank by round, on {seats} seats</caption>
             <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th scope="col" className="py-2">Course</th>{(d.trend[0]?.points.map((p) => roundLabel[p.round]) ?? ["R1", "R2", "R3", "Stray"]).map((x) => <th key={x} scope="col" className="text-right">{x}</th>)}</tr></thead>
             <tbody>{d.trend.map((t) => <tr key={t.course.slug} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{t.course.degree} {t.course.name}</th>{t.points.map((p) => <td key={p.round} className="numeric text-right">{formatRank(p.median)}</td>)}</tr>)}</tbody>
           </table>

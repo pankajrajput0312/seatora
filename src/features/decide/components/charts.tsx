@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { roundLabel, type Round } from "../types";
 import { quotaIn } from "@/features/exams/exam";
+import { yearName } from "@/features/exams/keys";
 import { useExamInfo } from "../lib/use-decide-store";
 import { InfoTip } from "./info-tip";
 import { ScrollTable } from "./scroll-table";
@@ -75,9 +76,10 @@ type StripPoint = { name: string; quota: string; closing: number; round: Round; 
  * label: dots are not focusable (hundreds of tab stops); the hover tooltip finds the nearest dot, and ChartCard's
  * table view carries the numbers for keyboard and screen-reader use.
  */
-export function RankStrip({ rank, rows, year = 2025 }: { rank: number; rows: { course: string; points: StripPoint[] }[]; year?: number }) {
+export function RankStrip({ rank, rows, year: y = 2025 }: { rank: number; rows: { course: string; points: StripPoint[] }[]; year?: number }) {
   const [tip, setTip] = useState<Tip>(null);
   const E = useExamInfo(); // each quota as the exam's MCC words it
+  const year = yearName(E.key, y);
   const all = rows.flatMap((r) => r.points.map((p) => p.closing));
   const max = niceMax(Math.max(rank * 1.2, ...all));
   // Text sizes are viewBox units: at the 860px minimum width (scale 0.86) the 14-unit labels draw at 12px or more.
@@ -146,7 +148,8 @@ export function LabelBars({ rows }: { rows: { label: string; count: number; href
 }
 
 /** Small multiple: median 2025 closing by round for one course, with a hairline at your rank. Hover tooltips; values in the label. */
-export function RoundTrend({ title, href, rank, points, year = 2025 }: { title: string; href?: string; rank: number; points: { round: Round; median: number | null; n: number }[]; year?: number }) {
+export function RoundTrend({ title, href, rank, points, year: yr = 2025 }: { title: string; href?: string; rank: number; points: { round: Round; median: number | null; n: number }[]; year?: number }) {
+  const year = yearName(useExamInfo().key, yr);
   const [tip, setTip] = useState<Tip>(null);
   const vals = points.flatMap((p) => (p.median ? [p.median] : []));
   const max = niceMax(Math.max(rank * 1.15, ...vals));

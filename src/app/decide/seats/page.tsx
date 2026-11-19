@@ -31,7 +31,7 @@ import { allotmentTrends, getMeta } from "@/features/decide/service";
 import { fmtDay, listDay } from "@/features/decide/lib/format";
 import { seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
 import { activeExam, examGate, examInfo } from "@/features/exams/active";
-import { DEFAULT_EXAM, examYears, exams, latestOf, restrictedQuota, type ExamKey } from "@/features/exams/registry";
+import { DEFAULT_EXAM, examYears, exams, latestOf, restrictedQuota, yearName, type ExamKey } from "@/features/exams/registry";
 import { roundNameFrom } from "@/features/exams/exam";
 import { quotaIn } from "@/features/exams/exam";
 
@@ -55,11 +55,11 @@ const notInMatrix = ["terms", "rounds", "list", "seats", "cs"];
 const noTerms = { ctype: null, maxfee: null, minstip: null, bondyrs: null, maxbond: null, maxleave: null, nd: null };
 const matrixRow = (r: SeatLine) => Object.fromEntries(Object.entries(r).filter(([k]) => !notInMatrix.includes(k))) as MatrixRow;
 /** Seat columns of the matrix: one group per round of `lists` (seatLists order, newest first). */
-const seatGroups = (lists: SeatList[]): SeatGroup[] =>
+const seatGroups = (lists: SeatList[], exam: ExamKey): SeatGroup[] =>
   [...new Set(lists.map((l) => `${l.year}-${l.round}`))].map((g) => {
     const ls = lists.filter((l) => `${l.year}-${l.round}` === g);
     // ponytail: a round with two clear (or virtual) PDFs shows the newest; none has so far (only newly added lists come in twos).
-    return { key: `seats-${g}`, label: `${ls[0].year} ${roundNameFrom(ls[0].name, ls[0].round)}`, clear: ls.find((l) => l.kind === "clear") ?? null, virtual: ls.find((l) => l.kind === "virtual") ?? null, added: ls.filter((l) => l.kind === "new") };
+    return { key: `seats-${g}`, label: `${yearName(exam, ls[0].year)} ${roundNameFrom(ls[0].name, ls[0].round)}`, clear: ls.find((l) => l.kind === "clear") ?? null, virtual: ls.find((l) => l.kind === "virtual") ?? null, added: ls.filter((l) => l.kind === "new") };
   });
 
 export default async function SeatsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -104,8 +104,8 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   const here = (changes: Record<string, string | null>) => L.with("/decide/seats", { tab: null, page: null, ...changes });
   const keep = keepProfileParams(params);
   const matching = r.seats[list.key] ?? 0;
-  const title = listTitle(list);
-  const round = `${list.year} ${roundNameFrom(list.name, list.round)}`;
+  const title = listTitle(list, exam);
+  const round = `${yearName(exam, list.year)} ${roundNameFrom(list.name, list.round)}`;
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const caption = matrix
@@ -174,7 +174,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
     <>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       {/* A list's chip filters to it: one list's seats (One list, Compare), or in the matrix the rows with seats in it. */}
-      <SeatListPicker lists={all} current={list.key} href={(key) => here({ list: key, has: matrix ? all.find((l) => l.key === key)?.kind ?? null : null })} />
+      <SeatListPicker lists={all} exam={exam} current={list.key} href={(key) => here({ list: key, has: matrix ? all.find((l) => l.key === key)?.kind ?? null : null })} />
       <div className="chip-row flex flex-wrap items-center gap-2">
         <nav aria-label="Seats view" className="flex flex-wrap gap-2">
           <Link href={here({ view: null })} aria-current={matrix ? "true" : undefined} className={chip(matrix)}>Seat matrix</Link>
@@ -303,7 +303,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle page="seats" view={view} />
             {exam === DEFAULT_EXAM && <CsvLink href={L.with("/api/v1/seats/export", { tab: null, page: null })} what={`${matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row`} total={r.total} />}
-            {matrix && view === "table" && <SeatMatrixDisplay groups={seatGroups(r.lists)} ranked={!!profile} years={years} />}
+            {matrix && view === "table" && <SeatMatrixDisplay groups={seatGroups(r.lists, exam)} ranked={!!profile} years={years} />}
           </div>
         )}
         </div>
@@ -332,7 +332,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
         />
       ) : matrix ? (
         <>
-          <SeatMatrix latest={exam === DEFAULT_EXAM ? undefined : latest} rows={r.rows.map(matrixRow)} groups={seatGroups(r.lists)} years={years} results={meta.sources} ranked={!!profile} sort={sort} caption={caption} list={list} lists={r.lists} view={view} />
+          <SeatMatrix latest={exam === DEFAULT_EXAM ? undefined : latest} rows={r.rows.map(matrixRow)} groups={seatGroups(r.lists, exam)} years={years} results={meta.sources} ranked={!!profile} sort={sort} caption={caption} list={list} lists={r.lists} view={view} />
           <DataSource terms={termDocs(r.rows.map((x) => x.fees))} />
         </>
       ) : (
@@ -350,7 +350,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
       {allRounds && r.lists.length > roundLists.length && (
         <details className="text-xs text-muted-foreground">
           <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky underline">Sources of the other rounds&apos; lists</summary>
-          <div className="grid gap-2">{[...new Set(r.lists.filter((l) => !roundLists.includes(l)).map((l) => `${l.year} ${l.round}`))].map((g) => <p key={g}>{g}: <SeatSource lists={r.lists.filter((l) => !roundLists.includes(l) && `${l.year} ${l.round}` === g)} L={L} /></p>)}</div>
+          <div className="grid gap-2">{[...new Set(r.lists.filter((l) => !roundLists.includes(l)).map((l) => `${l.year} ${l.round}`))].map((g) => <p key={g}>{g.replace(/^\d+/, (y) => yearName(exam, +y))}: <SeatSource lists={r.lists.filter((l) => !roundLists.includes(l) && `${l.year} ${l.round}` === g)} L={L} /></p>)}</div>
         </details>
       )}
     </>
@@ -361,7 +361,8 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
 async function Trends({ profile, page, L, exam }: { profile: Profile | null; page: number; L: DecideLinks; exam: ExamKey }) {
   const mine = profile && (profile.pairs?.length || profile.specialties.length || profile.degrees.length) ? profile : null;
   const [meta, res] = await Promise.all([getMeta(exam), allotmentTrends({ profile: mine }, { page, pageSize: PAGE_SIZE }, exam)]);
-  const label = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
+  const label = (y: number) => meta.years.find((x) => x.year === y)?.label ?? yearName(exam, y);
+  const vs = `${yearName(exam, exams[exam].pastYears[1])} vs ${yearName(exam, exams[exam].pastYears[0])}`;
   const [y0, y1] = exams[exam].pastYears;
   const YEARS = examYears(exam);
   const max = Math.max(1, ...res.rows.flatMap((r) => YEARS.map((y) => r.byYear[y] ?? 0)));
@@ -385,7 +386,7 @@ async function Trends({ profile, page, L, exam }: { profile: Profile | null; pag
               <tr className={tbl.headRow}>
                 <th scope="col" className={tbl.th}>Institute, course and quota</th>
                 {newest.map((y) => <th key={y} scope="col" className={`${tbl.th} text-right`}>{label(y)}</th>)}
-                <th scope="col" className={`${tbl.th} text-right`}>{y1} vs {y0}</th>
+                <th scope="col" className={`${tbl.th} text-right`}>{vs}</th>
               </tr>
             </thead>
             <tbody>
@@ -405,7 +406,7 @@ async function Trends({ profile, page, L, exam }: { profile: Profile | null; pag
                         </span>
                       </td>
                     ))}
-                    <td data-label={`${y1} vs ${y0}`} className={tbl.num}>{change == null ? <Dash /> : change > 0 ? `+${formatRank(change)}` : formatRank(change)}</td>
+                    <td data-label={vs} className={tbl.num}>{change == null ? <Dash /> : change > 0 ? `+${formatRank(change)}` : formatRank(change)}</td>
                   </tr>
                 );
               })}

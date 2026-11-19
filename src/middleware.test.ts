@@ -49,6 +49,17 @@ describe("middleware: the URL's ?exam=", () => {
     const same = await visit({ ...ua, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA; seatora_exam=neet-ss" }, "/decide/seats?exam=neet-ss");
     expect([header(same), same.headers.get("set-cookie")]).toEqual(["neet-ss", null]);
   });
+  it("INI-CET as SS and MDS: a member's ?exam=ini-cet (made-up cookie too) goes through /decide/exam; a forged header never passes", async () => {
+    const aid = "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA";
+    const res = await visit({ ...ua, cookie: aid, "x-seatora-exam": "ini-cet" }, "/decide/allotments?year=20261&exam=ini-cet");
+    expect(res.status).toBe(307);
+    expect(Object.fromEntries(new URL(res.headers.get("location")!, "http://test").searchParams)).toEqual({ k: "ini-cet", next: "/decide/allotments?year=20261&exam=ini-cet" });
+    // a made-up cookie: only through /decide/exam (which checks staff and clears it), never straight to the page
+    const typed = await visit({ ...ua, cookie: `${aid}; seatora_exam=ini-cet` }, "/decide/options");
+    expect(new URL(typed.headers.get("location")!, "http://test").pathname).toBe("/decide/exam");
+    // no ?exam=: the forged header is dropped (NEET PG)
+    expect(header(await visit({ ...ua, cookie: aid, "x-seatora-exam": "ini-cet" }, "/decide/options?rank=500"))).toBeNull();
+  });
   it("no ?exam=: no exam header, whatever the request sent or the cookie says (NEET PG)", async () => {
     const res = await visit({ ...ua, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA; seatora_exam=neet-ss", "x-seatora-exam": "neet-ss" }, "/decide/options?rank=500");
     expect(res.headers.get("location")).toBeNull();

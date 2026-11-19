@@ -31,7 +31,7 @@ import { roundLabel, rounds } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { groupsOf, perGroup, roundNameIn } from "@/features/exams/registry";
+import { groupsOf, perGroup, roundNameIn, yearName } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Rank scan" };
@@ -99,6 +99,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const provisional = (rd: string) => meta.sources.some((s) => s.year === year?.year && s.round === rd && s.provisional);
   const R = "/decide/rank-scan";
   const roundOf = (rd: (typeof rounds)[number]) => (year ? roundNameIn(exam, meta.sources, year.year, rd) : roundLabel[rd]);
+  const yearWords = year && yearName(exam, year.year); // INI-CET: "Jan 2026"
   const chips = [
     ...(group ? [{ label: `Your question group (${groupsOf(exam, group).join(", ")})`, param: "grp", href: L.with(R, { grp: "all", page: null }) }] : []),
     ...cf.chips((v) => L.with(R, { course: v, page: null }), (s) => L.without(R, "course", s)),
@@ -182,7 +183,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
           </div>
           {groups.length === 0 && (
             // The real controls: a wider range, every course, every seat category (her profile's are the default).
-            <EmptyState title="No allotments in this range" description={`No seat ${cf.slugs ? "in your courses " : ""}was allotted to ranks ${formatRank(Math.max(1, rank - window))}–${formatRank(rank + window)} in ${year.year}, or none passed the filters.`}>
+            <EmptyState title="No allotments in this range" description={`No seat ${cf.slugs ? "in your courses " : ""}was allotted to ranks ${formatRank(Math.max(1, rank - window))}–${formatRank(rank + window)} in ${yearWords}, or none passed the filters.`}>
               <span className="flex flex-wrap justify-center gap-x-6">
                 {window < MAX_WINDOW && <Link href={L.with(R, { w: String(MAX_WINDOW), page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Widen to ± {formatRank(MAX_WINDOW)}</Link>}
                 {cf.slugs && <Link href={L.with(R, { course: "all", page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Every course</Link>}
@@ -191,13 +192,13 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
             </EmptyState>
           )}
           {groups.map((g) => {
-            const label = `${year.year} ${roundOf(g.round)} allotments`;
+            const label = `${yearWords} ${roundOf(g.round)} allotments`;
             const courseLink = (a: Row) => L.allotments({ course: course(a)?.slug, inst: a.collegeSlug, year: year.year, round: g.round });
             const of = (a: Row) => `${a.collegeName}, ${courseName(a)}, rank ${formatRank(a.rank)}`;
             return (
               <section key={g.round} aria-labelledby={`r-${g.round}`} className="grid grid-cols-1 gap-3">
                 <h2 id={`r-${g.round}`} className="flex flex-wrap items-center gap-2 text-lg font-semibold">
-                  <span><span className="numeric">{year.year}</span> {roundOf(g.round)}</span> <Provisional when={provisional(g.round)} />
+                  <span><span className="numeric">{yearWords}</span> {roundOf(g.round)}</span> <Provisional when={provisional(g.round)} />
                 </h2>
                 <ViewPanes
                   page={VIEW}
@@ -231,7 +232,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                     // Phones: the seat category and a short institute name ride in the pinned Rank cell.
                     <ScrollTable label={label} scrollClassName="max-md:scroll-pl-[8.5rem]">
                       <table className={tbl.table}>
-                        <caption className="sr-only">{year.year} {roundOf(g.round)}: allotments to ranks near {formatRank(rank)}</caption>
+                        <caption className="sr-only">{yearWords} {roundOf(g.round)}: allotments to ranks near {formatRank(rank)}</caption>
                         <thead className={tbl.head}>
                           <tr className={tbl.headRow}>
                             <th scope="col" className={`${tbl.th} sticky left-0 z-[3] bg-card text-right max-md:text-left ${tbl.pin}`}>Rank<span className="md:hidden">, seat, institute</span></th>

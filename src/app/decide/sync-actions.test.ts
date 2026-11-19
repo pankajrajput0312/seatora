@@ -41,6 +41,8 @@ describe("saveSynced / loadSynced per exam", () => {
     user.current = { id: "m", role: "USER" };
     expect(await saveSynced("profile", profile(5), null, "neet-mds")).toBeNull();
     expect(await loadSynced("neet-ss")).toBeNull();
+    expect(await saveSynced("profile", profile(5), null, "ini-cet")).toBeNull();
+    expect(await loadSynced("ini-cet")).toBeNull();
     expect(rows.size).toBe(0);
   });
 

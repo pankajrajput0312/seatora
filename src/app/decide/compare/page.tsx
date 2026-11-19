@@ -28,7 +28,7 @@ import { currentOptionIds, currentSeatLists, getMeta, getOptionsByIds, type Opti
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
-import { DEFAULT_EXAM, examYears, latestOf } from "@/features/exams/registry";
+import { DEFAULT_EXAM, examYears, latestOf, yearName } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Compare" };
 
@@ -53,7 +53,7 @@ function YearLines({ r, E }: { r: OptionRow; E: Exam }) {
         return (
           <div key={y}>
             <dt className="font-semibold">
-              <span className="numeric">{y}</span>: deepest <span className="numeric">{d ? formatRank(d.closing) : "—"}</span>{d && ` (${roundIn(E, y, d.round)})`}
+              <span className="numeric">{yearName(E.key, y)}</span>: deepest <span className="numeric">{d ? formatRank(d.closing) : "—"}</span>{d && ` (${roundIn(E, y, d.round)})`}
             </dt>
             <dd className="text-muted-foreground">
               {cells.map((c, i) => (
@@ -101,10 +101,10 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const L = decideLinks(params);
   const lists: SeatList[] = options.length ? await currentSeatLists(exam) : [];
   const E = await examInfo(exam);
-  const round = lists[0] && `${lists[0].year} ${roundIn(E, lists[0].year, lists[0].round)}`;
+  const round = lists[0] && `${yearName(exam, lists[0].year)} ${roundIn(E, lists[0].year, lists[0].round)}`;
   const fees = E.has.fees; // another exam may have no fee, stipend or bond data: no such rows
   const risk = fees && options.length > 1 && lowestRisk(options.map((r) => ({ name: r.college.name, t: r.fees })));
-  const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
+  const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? yearName(exam, y);
   const latest = latestOf(meta.sources, exam);
   const [older, last] = pastOf(latest);
   // Each option's stat cells (statKeys order), one per row.
@@ -148,8 +148,8 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
         ]
       : []),
     { label: `${latestText(latest)} closing`, cell: (r) => <ClosingCell d={r.latest} year={latest.year} r1={r1Of(r, latest.year)} /> },
-    { label: `${last} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[last]} year={last} /> },
-    { label: `${older} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[older]} year={older} /> },
+    { label: `${yearName(exam, last)} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[last]} year={last} /> },
+    { label: `${yearName(exam, older)} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[older]} year={older} /> },
     { label: "Closing by year and round", cell: (r) => <YearLines r={r} E={E} /> },
     {
       label: "Allotments made (all rounds, all categories)",

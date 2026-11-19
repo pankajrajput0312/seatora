@@ -40,14 +40,17 @@ import {
   mccSourceSchema,
   mccTermSchema,
   movedPlaces,
+  sessionSchemas,
+  sourceKey,
   termSourceName,
+  yearSchema,
   type MccAllotment,
   type MccAllotmentV2,
   type MccCollege,
   type MccCollegeV2,
 } from "../src/features/cutoffs/lib/import-schema.ts";
 import { noticeKinds, roundSteps, seatKinds, stepStatuses } from "../src/features/decide/types.ts";
-import { DEFAULT_EXAM, examKeys, isExam, markerKey, ranksPerGroup } from "../src/features/exams/keys.ts";
+import { DEFAULT_EXAM, examKeys, isExam, markerKey, ranksPerGroup, sessionExams } from "../src/features/exams/keys.ts";
 
 const args = process.argv.slice(2);
 const examAt = args.indexOf("--exam");
@@ -63,6 +66,8 @@ const exam = examArg ?? manifest.exam ?? DEFAULT_EXAM;
 if (!isExam(exam)) throw new Error(`Unknown exam "${exam}": one of ${examKeys.join(", ")}`);
 if (examArg && manifest.exam && examArg !== manifest.exam) throw new Error(`--exam ${examArg}, but the bundle is ${manifest.exam}'s`);
 const pg = exam === DEFAULT_EXAM;
+/** Its years are session codes (INI-CET: 20261 = January 2026); every other exam's are calendar years, as before. */
+const sessions = sessionExams.includes(exam);
 /** Schema 2 adds college MCC ids / profile / type / website, allotment candidate category / option no / previous seat, clinical facts, the fee table. */
 const v2 = manifest.schema_version >= 2;
 const fileEntry = z.object({ count: z.number().int().nonnegative(), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict();
@@ -97,29 +102,29 @@ function parse<S extends z.ZodType>(file: string, schema: S): z.infer<S>[] {
   return out;
 }
 
-const sources = parse("sources.json", mccSourceSchema);
+const sources = parse("sources.json", sessions ? sessionSchemas.source : mccSourceSchema);
 // Partial: a schema 1 college has none of the schema 2 fields.
 const parseColleges = (file: string): (MccCollege & Partial<MccCollegeV2>)[] => (v2 ? parse(file, pg ? mccCollegeV2Schema : mccCollegeV2LooseSchema) : parse(file, mccCollegeSchema));
 const colleges = parseColleges("colleges.ndjson");
 const courses = parse("courses.json", mccCourseSchema);
-const cutoffs = parse("cutoffs.ndjson", mccCutoffSchema);
+const cutoffs = parse("cutoffs.ndjson", sessions ? sessionSchemas.cutoff : mccCutoffSchema);
 const terms = parse("terms.ndjson", mccTermSchema);
 // A BOND whose status is unknown and has no document (src_url null): imported with its words (not checked yet, other
 // colleges' terms, ask the college), its source the bond check itself (no document, no URL).
 const BOND_CHECK = { key: "seatora/bond-check", name: "Seatora bond check (no document yet)", type: "THIRD_PARTY_RESEARCH" as const };
-const allotments: (MccAllotment | MccAllotmentV2)[] = v2 ? parse("allotments.ndjson", pg ? mccAllotmentV2Schema : mccAllotmentV2LooseSchema) : parse("allotments.ndjson", mccAllotmentSchema);
+const allotments: (MccAllotment | MccAllotmentV2)[] = v2 ? parse("allotments.ndjson", pg ? mccAllotmentV2Schema : sessions ? sessionSchemas.allotment : mccAllotmentV2LooseSchema) : parse("allotments.ndjson", mccAllotmentSchema);
 const clinical = v2 ? parse("clinical_facts.ndjson", mccClinicalFactsSchema) : [];
 const feeTable = v2 ? parse("fees_structured.ndjson", mccFeesStructuredSchema) : [];
 
 // Seat lists, notices, round steps, NBEMS aggregates. Strict like import-schema.ts: an extra key aborts.
-const year = z.number().int().min(2000).max(2100);
+const year = yearSchema(sessions);
 const pos = z.number().int().positive();
 const ikey = z.string().regex(/^[A-Z0-9]{1,40}(#(\d{6})?)?$/);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const when = z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}\+05:30)?$/); // a date, or a date-time in IST, as printed
 const nbemsKey = z.string().regex(/^nbems\/\d{4}\/[\w.-]+\.pdf$/);
 const seatSourceSchema = z
-  .object({ key: z.string().regex(/^mcc\/\d{4}\/[\w.-]+\.pdf$/), url: z.url(), year, round: z.enum(mccRounds), kind: z.enum(seatKinds), name: z.string().min(1) })
+  .object({ key: sourceKey(sessions), url: z.url(), year, round: z.enum(mccRounds), kind: z.enum(seatKinds), name: z.string().min(1) })
   .strict();
 const seatSchema = z
   .object({

@@ -29,6 +29,7 @@ import type { PastClosing, SeatLine, SeatSort } from "./find-seats";
 import { SeatCards, seatCourse as courseOf, seatRowKey as rowKey } from "./seat-cards";
 import { ScrollTable } from "../scroll-table";
 import { quotaIn, roundIn, roundNameFrom, type Exam } from "@/features/exams/exam";
+import { yearName, type ExamKey } from "@/features/exams/keys";
 
 // The Seats page's matrix view (src/app/decide/seats): one row per institute, course, quota and seat category, its
 // seats in each round's lists (never added together), its course's terms (TermStatCells: the course's own programme
@@ -46,7 +47,7 @@ export type MatrixRow = Omit<SeatLine, "terms" | "rounds" | "list" | "seats" | "
 const DISPLAY_KEY = "medpath.seatMatrix.hidden";
 /** Hidden until she picks it in Display: it is in every row's details and card too. */
 const DEFAULT_HIDDEN = ["beds"];
-const listName = (l: SeatList) => `${l.year} ${roundNameFrom(l.name, l.round)} ${seatKindLabel[l.kind].toLowerCase()}`;
+const listName = (l: SeatList, exam: ExamKey) => `${yearName(exam, l.year)} ${roundNameFrom(l.name, l.round)} ${seatKindLabel[l.kind].toLowerCase()}`;
 const at = (r: MatrixRow, year: number, round: Round) => r.closings.find((c) => c.year === year && c.round === round);
 
 /** "1,23,456 (12)": closing rank (allotments made). Its cell is right-aligned, tabular and unwrapped already; the markup stays small (there are hundreds). */
@@ -66,12 +67,13 @@ function ClosingValue({ c }: { c: PastClosing | undefined }) {
  * A round with two newly added PDFs dates the badge (listDay), so the two can be told apart.
  */
 function AddedBadges({ r, added }: { r: MatrixRow; added: SeatList[] }) {
+  const exam = useExamInfo().key;
   return added.map((l) => {
     const day = added.length > 1 ? listDay(l) : undefined;
     return (r.byList[l.key] ?? 0) > 0 ? (
       <Badge key={l.key} tone="info" className="mt-1 whitespace-nowrap">
         {`+${formatRank(r.byList[l.key])} newly added${day ? ` (${fmtDay(day)})` : ""}`}
-        <span className="sr-only"> in the {listName(l)} list, never added to the other lists</span>
+        <span className="sr-only"> in the {listName(l, exam)} list, never added to the other lists</span>
       </Badge>
     ) : null;
   });
@@ -130,7 +132,7 @@ export function DisplayMenu({ cols, hidden, setHidden, always = "The institute c
 }
 
 /** The matrix's columns Display can hide (the institute column always shows): only the ones the exam has (`has`: its fees, beds). */
-const matrixCols = (groups: SeatGroup[], ranked: boolean, years: ClosingYear[], has: Pick<Exam["has"], "fees" | "beds">) => [
+const matrixCols = (groups: SeatGroup[], ranked: boolean, years: ClosingYear[], has: Pick<Exam["has"], "fees" | "beds">, exam: ExamKey) => [
   { key: "course", label: "Course" },
   { key: "quota", label: "Quota" },
   { key: "category", label: "Category" },
@@ -138,13 +140,13 @@ const matrixCols = (groups: SeatGroup[], ranked: boolean, years: ClosingYear[], 
   ...groups.map((g) => ({ key: g.key, label: `${g.label} seats` })),
   ...(has.beds ? [{ key: "beds", label: "Beds (as reported)" }] : []),
   ...(ranked ? [{ key: "chances", label: "Your chances" }] : []),
-  ...years.map((y) => ({ key: `closing-${y.year}`, label: `Closing ranks ${y.year}` })),
+  ...years.map((y) => ({ key: `closing-${y.year}`, label: `Closing ranks ${yearName(exam, y.year)}` })),
 ];
 
 /** The matrix table's Display (columns) menu, for the page's toolbar row: the matrix reads the same saved choice. */
 export function SeatMatrixDisplay({ groups, ranked, years }: { groups: SeatGroup[]; ranked: boolean; years: ClosingYear[] }) {
-  const { has } = useExamInfo();
-  const cols = useMemo(() => matrixCols(groups, ranked, years, has), [groups, ranked, years, has]);
+  const { has, key } = useExamInfo();
+  const cols = useMemo(() => matrixCols(groups, ranked, years, has, key), [groups, ranked, years, has, key]);
   const [hidden, save] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   return <DisplayMenu cols={cols} hidden={hidden} setHidden={save} />;
 }
@@ -172,7 +174,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   const L = useDecideLinks();
   const E = useExamInfo();
   const latest = latestIn ?? latestRound(results);
-  const cols = useMemo(() => matrixCols(groups, ranked, years, E.has), [groups, ranked, years, E.has]);
+  const cols = useMemo(() => matrixCols(groups, ranked, years, E.has, E.key), [groups, ranked, years, E.has, E.key]);
   const [hidden] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   const [open, setOpen] = useState<string | null>(null);
   const row = rows.find((r) => rowKey(r) === open) ?? null;
@@ -225,7 +227,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                   )}
                   {ranked && <th rowSpan={2} scope="col" data-col="chances" className={cn(th, "min-w-40")} aria-sort={sorted("reach", "ascending")}>Your chances</th>}
                   {years.map((y) => (
-                    <th key={y.year} colSpan={y.rounds.length} scope="colgroup" data-col={`closing-${y.year}`} className={cn(th, "border-l border-border text-center")}>Closing rank {y.year}</th>
+                    <th key={y.year} colSpan={y.rounds.length} scope="colgroup" data-col={`closing-${y.year}`} className={cn(th, "border-l border-border text-center")}>Closing rank {yearName(E.key, y.year)}</th>
                   ))}
                 </tr>
                 <tr className="text-left">
@@ -239,7 +241,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                   {years.map((y) =>
                     y.rounds.map((rd, i) => (
                       <th key={`${y.year}-${rd}`} scope="col" data-col={`closing-${y.year}`} className={cn(th, "text-right whitespace-nowrap", i === 0 && "border-l border-border")}>
-                        <span className="sr-only">{y.year} </span>{roundIn(E, y.year, rd)}
+                        <span className="sr-only">{yearName(E.key, y.year)} </span>{roundIn(E, y.year, rd)}
                       </th>
                     )),
                   )}
@@ -364,7 +366,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
                   {lists.map((l) => (
                     <div key={l.key} className="contents">
                       <dt>
-                        {l.url ? <a href={l.url} target="_blank" rel="noopener noreferrer" className={link}>{listName(l)}<span className="sr-only"> PDF (opens in a new tab)</span></a> : listName(l)}
+                        {l.url ? <a href={l.url} target="_blank" rel="noopener noreferrer" className={link}>{listName(l, E.key)}<span className="sr-only"> PDF (opens in a new tab)</span></a> : listName(l, E.key)}
                         <span className="block text-xs text-muted-foreground">MCC notice dated {l.publishedAt ? fmtDay(l.publishedAt) : "—"}</span>
                       </dt>
                       <dd className="numeric text-right font-semibold">{r.byList[l.key] != null ? formatRank(r.byList[l.key]) : <Dash />}</dd>
@@ -382,7 +384,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
                     <tbody>
                       {years.map((y) => (
                         <tr key={y.year} className="border-t border-border">
-                          <th scope="row" className="numeric py-1 pr-3 text-left align-top font-semibold">{y.year}</th>
+                          <th scope="row" className="numeric py-1 pr-3 text-left align-top font-semibold">{yearName(E.key, y.year)}</th>
                           <td className="py-1">
                             <ul className="flex flex-wrap gap-x-4 gap-y-1">
                               {y.rounds.map((rd) => {

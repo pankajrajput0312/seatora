@@ -1,0 +1,31 @@
+{
+ "schema_version": 3,
+ "exam": "ini-cet",
+ "built": "2026-11-19T00:00:00+00:00",
+ "files": {
+  "sources.json": {
+   "count": 4,
+   "sha256": "5d007853b1d72020af7d0fbb2910a9e1cc737132a3072771d2792688100f4b12"
+  },
+  "courses.json": {
+   "count": 2,
+   "sha256": "640ff2480011e3ee59f55f83a782c7d81f76d90321accb2213382ce20ebb1048"
+  },
+  "colleges.ndjson": {
+   "count": 2,
+   "sha256": "27067f81972ffc328744699c07ce7390140b08b581151cecc7bc7a95aa1b8d14"
+  },
+  "cutoffs.ndjson": {
+   "count": 10,
+   "sha256": "95e7997bd1afd1065458cb9a96088725ce04f21d7cd5234f18636be4a2d12851"
+  },
+  "allotments.ndjson": {
+   "count": 10,
+   "sha256": "f1632f1fd152279af563e6d9b8b186a99314552ba1b7120f76063c3162ce2ac3"
+  }
+ },
+ "excluded_unparsed_course_rows": 0,
+ "notes": {
+  "fixture": "Synthetic INI-CET bundle (session-code years: 20261 = January 2026) for src/features/exams/exams.db.test.ts. Not real data: never import it anywhere but a throwaway database."
+ }
+}

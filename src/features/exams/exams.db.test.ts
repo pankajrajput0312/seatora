@@ -4,20 +4,23 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { roundNamesOf } from "./exam";
+import { sessionOf, yearName } from "./keys";
 import { pgOutputs, SHARED_KEY } from "./test/pg-outputs";
 
 // Multi-exam rehearsal on a fresh, THROWAWAY local Postgres (it migrates and imports into it): NEET PG's real bundle,
-// the synthetic neet-ss fixture (./test/neet-ss-bundle) and bundles made from it, then the real NEET MDS and NEET SS
-// bundles when given. NEET PG's outputs and rows must not change by a byte, another exam's import must never change a
+// the synthetic neet-ss fixture (./test/neet-ss-bundle) and bundles made from it, the synthetic ini-cet fixture
+// (./test/ini-cet-bundle: session-code years), then the real NEET MDS, NEET SS and INI-CET bundles when given. NEET PG's outputs and rows must not change by a byte, another exam's import must never change a
 // college row that exists, and a re-import of NEET PG must leave the other exams' rows as they were.
 //   createdb seatora_multi_test   (dropdb it first to run again: the test wants no other exam's rows to begin with)
 //   EXAM_TEST_DATABASE_URL=postgresql://localhost/seatora_multi_test MCC_BUNDLE=../neetpg-planner/data/medpath-r3 \
 //   MDS_BUNDLE=../neetpg-planner/data/exams/neet-mds/bundle SS_BUNDLE=../neetpg-planner/data/exams/neet-ss/bundle \
-//   npx vitest run src/features/exams/exams.db.test.ts
+//   INI_BUNDLE=../neetpg-planner/data/exams/ini-cet/bundle npx vitest run src/features/exams/exams.db.test.ts
 const url = process.env.EXAM_TEST_DATABASE_URL;
 const pgBundle = resolve(process.env.MCC_BUNDLE ?? "../neetpg-planner/data/medpath-r3");
-const real = { "neet-mds": process.env.MDS_BUNDLE, "neet-ss": process.env.SS_BUNDLE } as const;
+const real = { "neet-mds": process.env.MDS_BUNDLE, "neet-ss": process.env.SS_BUNDLE, "ini-cet": process.env.INI_BUNDLE } as const;
 const FIXTURE = resolve("src/features/exams/test/neet-ss-bundle");
+const INI_FIXTURE = resolve("src/features/exams/test/ini-cet-bundle");
 const local = !!url && ["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname);
 if (url && !local) throw new Error("EXAM_TEST_DATABASE_URL must be a local database: this test migrates and imports into it");
 if (local) process.env.DATABASE_URL = url; // before anything loads Prisma (@/lib/db)
@@ -64,7 +67,7 @@ async function importOther(dir: string, exam?: string) {
   const own = await ownOnly(exam ?? JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")).exam);
   const before = await colleges();
   const out = importBundle(dir, exam);
-  expect(out).toMatch(/Committed neet-(ss|mds)\. Spot checks passed/);
+  expect(out).toMatch(/Committed (neet-ss|neet-mds|ini-cet)\. Spot checks passed/);
   const after = await colleges();
   const changed = [...before].filter(([k, row]) => after.has(k) && after.get(k) !== row).map(([k]) => k);
   expect(changed.filter((k) => !own.has(k)), "college rows another exam has that this exam's import changed").toEqual([]);
@@ -72,7 +75,7 @@ async function importOther(dir: string, exam?: string) {
 }
 
 /** What staff see of a non-PG exam. */
-async function examOutputs(exam: "neet-ss" | "neet-mds") {
+async function examOutputs(exam: "neet-ss" | "neet-mds" | "ini-cet") {
   const svc = await import("@/features/decide/service");
   return JSON.parse(
     JSON.stringify({
@@ -189,7 +192,23 @@ describe.skipIf(!local || !existsSync(join(pgBundle, "manifest.json")))("multi-e
     ss = await fresh(() => examOutputs("neet-ss"));
   });
 
-  for (const exam of ["neet-mds", "neet-ss"] as const) {
+  let ini: unknown;
+  it("imports the ini-cet fixture (session-code years): NEET PG byte-identical, the other exams untouched, sessions named", async () => {
+    const others = { ss: await rows("neet-ss"), mds: await rows("neet-mds") };
+    await importOther(INI_FIXTURE); // exam from the manifest
+    await unchanged();
+    expect({ ss: await rows("neet-ss"), mds: await rows("neet-mds") }).toEqual(others);
+    ini = await fresh(() => examOutputs("ini-cet"));
+    const { meta, options, allotments } = ini as Awaited<ReturnType<typeof examOutputs>>;
+    expect(meta.years.map((y: { year: number; label: string }) => [y.year, y.label])).toEqual([[20267, "Jul 2026 (R1)"], [20261, "Jan 2026"]]);
+    expect(meta.quotas).toEqual(["Open", "Sponsored"]);
+    expect(options.total).toBeGreaterThan(0);
+    expect(new Set(allotments.rows.map((a: { year: number }) => a.year))).toEqual(new Set([20261, 20267]));
+    expect(roundNamesOf(meta.sources)).toEqual({ "20261|R3": "Open Round" }); // as examInfo names its rounds
+    expect((await rows("ini-cet")).Allotment).toBe(10);
+  });
+
+  for (const exam of ["neet-mds", "neet-ss", "ini-cet"] as const) {
     it.skipIf(!real[exam])(`imports the real ${exam} bundle: NEET PG byte-identical`, async () => {
       const dir = resolve(real[exam]!);
       const m = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"));
@@ -212,6 +231,11 @@ describe.skipIf(!local || !existsSync(join(pgBundle, "manifest.json")))("multi-e
         expect(new Set(f.rows.map((r) => r.terms.programme))).toEqual(new Set(exam === "neet-mds" ? ["MDS"] : ["DM/MCh", "DrNB SS"]));
         expect(f.rows.some((r) => r.terms.years.some((y) => y.fee || y.stipend))).toBe(true);
       }
+      if (exam === "ini-cet") {
+        ini = out;
+        // A year is a session code, named as a session on every label.
+        expect(out.meta.years.every((y: { year: number; label: string }) => sessionOf(y.year) && y.label.startsWith(yearName("ini-cet", y.year)))).toBe(true);
+      }
       if (exam === "neet-ss") {
         ss = out;
         // A rank is within one question group: her group's options only, labelled; no group, nothing labelled.
@@ -231,11 +255,12 @@ describe.skipIf(!local || !existsSync(join(pgBundle, "manifest.json")))("multi-e
   it("re-importing NEET PG leaves the other exams' rows as they were", async () => {
     // colleges' updatedAt aside: NEET PG writes its colleges again, the ones it shares too
     const strip = (r: { colleges: Record<string, unknown>[] }) => ({ ...r, colleges: r.colleges.map((c) => ({ ...c, updatedAt: null })) });
-    const others = async () => ({ ss: strip(await rows("neet-ss")), mds: strip(await rows("neet-mds")) });
+    const others = async () => ({ ss: strip(await rows("neet-ss")), mds: strip(await rows("neet-mds")), ini: strip(await rows("ini-cet")) });
     const before = await others();
     expect(importBundle(pgBundle)).toContain("Committed. Spot checks passed (Kokilaben"); // no --exam, no manifest.exam: NEET PG
     expect(await others()).toEqual(before);
     expect(await fresh(() => examOutputs("neet-ss"))).toEqual(ss);
+    expect(await fresh(() => examOutputs("ini-cet"))).toEqual(ini);
     expect(strip(await rows("neet-pg"))).toEqual(strip(golden.rows as never));
     await (await db()).$disconnect();
   });

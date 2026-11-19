@@ -7,7 +7,7 @@ import { baseCategories, roundLabel, rounds, type Round, type Source } from "@/f
 import { completeYear, examShows, groupsIn, isRestricted, neetPg, roundNameFrom, type Exam, type ExamHas } from "./exam";
 import { DEFAULT_EXAM, isExam, ranksPerGroup, type ExamKey } from "./keys";
 
-export { DEFAULT_EXAM, EXAM_COOKIE, examKeys, isExam, markerKey, ranksPerGroup, scopedKey, type ExamKey } from "./keys";
+export { DEFAULT_EXAM, EXAM_COOKIE, examKeys, isExam, markerKey, ranksPerGroup, scopedKey, sessionExams, yearName, type ExamKey } from "./keys";
 export { groupOf, pageNeeds, type Exam, type ExamHas } from "./exam";
 
 // The bundle contract's required files: cutoffs and allotments. An adapter turns a flag on once its bundle has the data.
@@ -16,6 +16,7 @@ const resultsOnly: ExamHas = { residents: false, fees: false, bonds: false, clin
 // Years, rounds, categories and quotas from the bundles (neetpg-planner data/exams/<key>/bundle, 19 Nov 2026): NEET MDS
 // results 2019-2026 (2026 R1 to R3), NEET SS 2019-2025 (SS 2026 not held yet). Both have MCC's round seat lists.
 const mdsScope = "Seatora covers MCC's NEET MDS counselling (50% All India Quota of government dental colleges, deemed universities, DU / IP / BHU / AMU and AFMS). State quota counselling isn't covered: the State filter shows MCC seats in that state.";
+const iniScope = "Seatora covers INI-CET counselling by AIIMS New Delhi (AIIMS, JIPMER, PGIMER, NIMHANS, SCTIMST seats).";
 export const exams: Record<ExamKey, Exam> = {
   "neet-pg": neetPg,
   // MCC: no category columns in its results ("Open"); ranks are per question group, which rides in the quota label.
@@ -59,14 +60,33 @@ export const exams: Record<ExamKey, Exam> = {
     quotaNames: { "Deemed/Paid Seats": "Self-Financed Merit Seat", "Deemed/Paid": "Self-Financed Merit Seat" },
     has: { ...resultsOnly, seats: true },
   },
+  // AIIMS New Delhi's seat allocation results. Two sessions a year: a year is a session code (keys.ts yearName).
+  "ini-cet": {
+    key: "ini-cet",
+    label: "INI-CET",
+    latestYear: 20267,
+    pastYears: [20257, 20261],
+    rounds: ["R1", "R2", "R3", "stray"],
+    categories: baseCategories,
+    pwd: true,
+    quotas: ["Open"],
+    quotasNote: `None ticked means Open seats: the ones anyone can take. Tick a restricted quota (Sponsored, Foreign National) only if you are eligible. ${iniScope}`,
+    scopeNote: iniScope,
+    rankWord: "Rank",
+    rankName: "INI-CET rank",
+    perGroup: false,
+    exampleRank: "1,500",
+    resultsName: "AIIMS seat allocation results",
+    has: resultsOnly,
+  },
 };
 
 /** The exam's years in order, oldest first (NEET PG: reach.ts YEARS). */
 export const examYears = (exam: ExamKey) => [...exams[exam].pastYears, exams[exam].latestYear];
 
-/** latestRound for the exam: NEET PG's exactly as before; another exam's carries its past years (reach.ts pastOf). */
+/** latestRound for the exam: NEET PG's exactly as before; another exam's carries its past years (reach.ts pastOf) and its key (its years' names). */
 export const latestOf = (sources: Pick<Source, "year" | "round" | "provisional">[], exam: ExamKey): Latest & { provisional: boolean } =>
-  exam === DEFAULT_EXAM ? latestRound(sources) : { ...latestRound(sources, exams[exam].latestYear), pastYears: exams[exam].pastYears };
+  exam === DEFAULT_EXAM ? latestRound(sources) : { ...latestRound(sources, exams[exam].latestYear), pastYears: exams[exam].pastYears, exam };
 
 /** The year headlines name ("Allotments 2025", "2025 deepest"): NEET PG's later past year as before; another exam's latest complete year in its results. */
 export const headYearIn = (exam: ExamKey, sources: Pick<Source, "year" | "round">[]) =>

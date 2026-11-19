@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
 import type { DecideLinks } from "../lib/links";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
+import { yearName } from "@/features/exams/keys";
 import { useChoices, useCompare, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
 import { latestText, reachWindow, type Latest, type Reach } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
@@ -134,7 +135,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
     <div data-item={n} tabIndex={-1} className="grid min-w-0 rounded-xl">
       <ResultCard
         chips={[
-          c ? `${c.year} · ${roundIn(E, c.year, c.d.round)}` : list && `${list.year} ${roundIn(E, list.year, list.round)} seats`,
+          c ? `${yearName(E.key, c.year)} · ${roundIn(E, c.year, c.d.round)}` : list && `${yearName(E.key, list.year)} ${roundIn(E, list.year, list.round)} seats`,
           quotaIn(E, r.quota),
           c && `${c.d.category} seat`,
           c?.d.provisional && <Provisional when />,
@@ -142,7 +143,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
         actions={<><ChoiceStar item={toChoiceItem(r, latest)} /><CompareToggle id={r.id} label={rowLabel(r, E)} /></>}
         stat={{
           // The big number's year and round, so it never reads against the label under it (which counts other rounds).
-          label: c ? `${c.year} ${roundIn(E, c.year, c.d.round)} closing` : "Closing rank",
+          label: c ? `${yearName(E.key, c.year)} ${roundIn(E, c.year, c.d.round)} closing` : "Closing rank",
           value: (
             <>
               <span className="numeric">{c ? formatRank(c.d.closing) : <Dash />}</span>
@@ -165,7 +166,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
             {strip && (
               <dl className="grid grid-cols-2 gap-x-4 px-4 py-2 text-sm">
                 {[last, older].map((y) => (
-                  <div key={y}><dt className="text-xs text-muted-foreground">{y} deepest</dt><dd><ClosingCell d={r.byYear[y]} year={y} /></dd></div>
+                  <div key={y}><dt className="text-xs text-muted-foreground">{yearName(E.key, y)} deepest</dt><dd><ClosingCell d={r.byYear[y]} year={y} /></dd></div>
                 ))}
               </dl>
             )}
@@ -246,13 +247,13 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
           <tr className="text-left text-xs font-semibold text-muted-foreground">
             <th scope="col" className={cn(stick, "w-12 px-2 py-3 print:hidden")}><span className="sr-only">Add to choices</span></th>
             <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course<span className="md:hidden">, {latestText(latest)} closing</span></th>
-            <th scope="col" className={phoneOnly}>{last} deepest</th>
+            <th scope="col" className={phoneOnly}>{yearName(E.key, last)} deepest</th>
             <th scope="col" className={notPhone}>{latestText(latest)} closing</th>
             <th scope="col" className="px-3 py-3">Reach</th>
             {statKeys.map((k) => <th key={k} scope="col" data-col={k} className="px-2 py-3 text-right">{statLabel[k]}</th>)}
             {seatLists.map((l) => <th key={l.key} scope="col" className="px-1.5 py-3 text-right"><SeatsHead list={l} short /></th>)}
-            <th scope="col" className={notPhone}>{last} deepest</th>
-            <th scope="col" className="hidden px-3 py-3 text-right xl:table-cell">{older} deepest</th>
+            <th scope="col" className={notPhone}>{yearName(E.key, last)} deepest</th>
+            <th scope="col" className="hidden px-3 py-3 text-right xl:table-cell">{yearName(E.key, older)} deepest</th>
             {/* Controls, not data: not on paper. */}
             <th scope="col" className="px-3 py-3 print:hidden">Details</th>
             <th scope="col" className="w-12 px-2 py-3 print:hidden"><span className="sr-only">Compare</span></th>

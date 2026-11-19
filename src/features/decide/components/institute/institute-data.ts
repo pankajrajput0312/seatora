@@ -1,5 +1,5 @@
 import "server-only";
-import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
+import { DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
 import { exams } from "@/features/exams/registry";
 import { db } from "@/lib/db";
 import { websiteUrl } from "../../lib/stat-format";
@@ -64,15 +64,16 @@ export type AllotmentMix = { columns: MixColumn[]; groups: { quota: string; rows
  * when it has more than that round). Open quotas first, then the rest by name; null = none in that column. Null when
  * there are no allotments.
  */
-export function allotmentMix(rows: AllotmentCount[], years: YearInfo[], sources: Source[]): AllotmentMix | null {
+export function allotmentMix(rows: AllotmentCount[], years: YearInfo[], sources: Source[], exam: ExamKey = DEFAULT_EXAM): AllotmentMix | null {
+  const yn = (y: number) => yearName(exam, y);
   const [newest] = years;
   if (!newest?.rounds.length || !rows.length) return null;
   const round = newest.rounds.at(-1)!;
   const columns: MixColumn[] = [
-    { label: `${newest.year} ${roundLabel[round]}`, year: newest.year, round, provisional: sources.some((s) => s.year === newest.year && s.round === round && s.provisional) },
+    { label: `${yn(newest.year)} ${roundLabel[round]}`, year: newest.year, round, provisional: sources.some((s) => s.year === newest.year && s.round === round && s.provisional) },
     ...years
       .filter((y) => y.year !== newest.year || y.rounds.length > 1)
-      .map((y) => ({ label: y.year === newest.year ? `${y.year} (${y.rounds.map((r) => roundLabel[r]).join(", ")})` : String(y.year), year: y.year, provisional: y.provisional })),
+      .map((y) => ({ label: y.year === newest.year ? `${yn(y.year)} (${y.rounds.map((r) => roundLabel[r]).join(", ")})` : yn(y.year), year: y.year, provisional: y.provisional })),
   ];
   const quotas = [...new Set(rows.map((r) => r.quota))].sort((a, b) => pos(openQuotas, a) - pos(openQuotas, b) || a.localeCompare(b));
   const cats = [...new Set(rows.map((r) => r.category as string))].sort((a, b) => pos(categoryOrder, a) - pos(categoryOrder, b) || a.localeCompare(b));
@@ -93,7 +94,7 @@ export function allotmentMix(rows: AllotmentCount[], years: YearInfo[], sources:
 export async function allotmentMixAt(collegeKey: string, exam: ExamKey = DEFAULT_EXAM) {
   const cat = await getCatalog(exam);
   const cs = [...cat.pairs.values()].filter((p) => p.college === collegeKey).map((p) => p.cs);
-  return allotmentMix(await countAllotments(cat, cs), cat.meta.years, cat.sources);
+  return allotmentMix(await countAllotments(cat, cs), cat.meta.years, cat.sources, exam);
 }
 
 /**

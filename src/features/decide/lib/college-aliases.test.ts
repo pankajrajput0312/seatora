@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { iniCetIn, iniWord, searchAlternatives, searchMatcher } from "./college-aliases";
+import { iniCetIn, iniElsewhere, iniWord, searchAlternatives, searchMatcher } from "./college-aliases";
 
 const kem = "Seth Gordhandas Sunderdas Medical College Maharashtra Mumbai, Acharya Donde Marg Parel MUMBAI, 400012 MD Radio-Diagnosis";
 
@@ -45,6 +45,8 @@ describe("curated names (round 2)", () => {
   });
   it("INI institutes are named; PGIMER only as Chandigarh's", () => {
     expect([iniCetIn("aiims delhi"), iniCetIn("JIPMER"), iniCetIn("nimhans"), iniCetIn("PGIMER Chandigarh"), iniCetIn("PGIMER"), iniCetIn("pgimer rml")]).toEqual(["AIIMS", "JIPMER", "NIMHANS", "PGIMER Chandigarh", null, null]);
-    expect([iniWord("neet-ss"), iniWord("neet-pg"), iniWord("neet-mds")]).toEqual(["INI-SS", "INI-CET", "INI-CET"]);
+    expect([iniWord("neet-ss"), iniWord("neet-pg"), iniWord("neet-mds"), iniWord("ini-cet")]).toEqual(["INI-SS", "INI-CET", "INI-CET", null]);
+    // INI-CET's own data has AIIMS: no "admits through" note there
+    expect([iniElsewhere("aiims delhi", "neet-pg"), iniElsewhere("aiims delhi", "ini-cet"), iniElsewhere("x", "neet-pg")]).toEqual(["AIIMS admits through INI-CET", null, null]);
   });
 });

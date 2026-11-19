@@ -13,6 +13,7 @@ import { inrFull } from "../lib/stat-format";
 import { deepestOf, latestText, pastOf, reachWindow, seatsBelowNotes, type Deepest, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
 import { statCells, statKeys, statLabel } from "../lib/stat-format";
 import { groupsIn, quotaIn, roundIn } from "@/features/exams/exam";
+import { yearName } from "@/features/exams/keys";
 import { useChoices, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
 import { keepProfileParams, profileFromParams } from "../profile";
 import type { ProgrammeTerms } from "../server/terms";
@@ -103,7 +104,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
   // NEET SS / MDS: each choice's whole-course fee and the list's total (NEET PG: in the Fee (i), as before).
   const whole = E.has.fees && E.key !== "neet-pg";
   const lists = (current && live?.lists) || [];
-  const round = lists[0] && `${lists[0].year} ${roundIn(E, lists[0].year, lists[0].round)}`;
+  const round = lists[0] && `${yearName(E.key, lists[0].year)} ${roundIn(E, lists[0].year, lists[0].round)}`;
   const fresh = live?.key === liveKey;
 
   /** Focus a control of the item with this id after React re-renders, and keep it in view (it may have moved). */
@@ -219,7 +220,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
   const counts = items.reduce((m, i) => m.set(dupKey(i), (m.get(dupKey(i)) ?? 0) + 1), new Map<string, number>());
 
   // The CSV's closings (the newest, as a card's big number, and the deepest of every year) and terms, once loaded.
-  const closingWords = (d: Deepest, year: number) => `${formatRank(d.closing)} (${year} ${roundIn(E, year, d.round)}, ${d.category}${d.provisional ? ", provisional" : ""})`;
+  const closingWords = (d: Deepest, year: number) => `${formatRank(d.closing)} (${yearName(E.key, year)} ${roundIn(E, year, d.round)}, ${d.category}${d.provisional ? ", provisional" : ""})`;
   const csvExtra = (id: string) => {
     const lr = current?.[id];
     if (!lr) return null;

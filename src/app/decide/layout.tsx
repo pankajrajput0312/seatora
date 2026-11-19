@@ -21,7 +21,7 @@ import { roundStatus } from "@/features/decide/server/notices";
 import { examGroupCourses, examGroups, getMeta } from "@/features/decide/service";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { examShows } from "@/features/exams/exam";
-import { DEFAULT_EXAM, examKeys, exams, pageNeeds, perGroup } from "@/features/exams/registry";
+import { DEFAULT_EXAM, examKeys, exams, pageNeeds, perGroup, yearName } from "@/features/exams/registry";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { PlanPrompt } from "@/features/plans/components/plan-prompt";
 import { freeNow, passState, planLine, shortDate } from "@/features/plans/plans";
@@ -67,7 +67,7 @@ export default async function DecideLayout({ children }: { children: React.React
   const rs = meta ? await roundStatus(exams[exam].latestYear, exam).catch(() => null) : null;
   const fill = rs && nextChoiceFilling(stepsNow(rs, new Date()));
   // Another exam has no MCC schedule in the data: its first list is named for the exam, not a NEET PG round.
-  const listName = fill ? `${roundName[fill.round]} · ${rs.year}` : exam === DEFAULT_EXAM ? null : `${exams[exam].label} list`;
+  const listName = fill ? `${roundName[fill.round]} · ${yearName(exam, rs.year)}` : exam === DEFAULT_EXAM ? null : `${exams[exam].label} list`;
   // Admin's nav entry: only for an owner or admin.
   const admin = !!meta && (await staffUser().catch(() => null)) != null;
   // The sidebar's account footer and the header's plan chip: her name, her plan, and "Upgrade" without the Season Pass.

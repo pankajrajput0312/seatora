@@ -1,12 +1,18 @@
 "use client";
 
 import { quotaIn, roundIn } from "@/features/exams/exam";
+import { yearName } from "@/features/exams/keys";
 import { useExamInfo } from "../lib/use-decide-store";
 import type { Round } from "../types";
 
 /** A round's name in that year, as the exam's MCC PDFs call it (NEET SS 2023's Mop-up); NEET PG: roundLabel, as ever. Server or client. */
 export function RoundName({ year, round }: { year: number; round: Round }) {
   return roundIn(useExamInfo(), year, round);
+}
+
+/** A year as the exam names it (exams/keys.ts yearName: INI-CET's "Jan 2026"; NEET PG's "2025", as ever). Server or client. */
+export function YearName({ year, long }: { year: number; long?: boolean }) {
+  return yearName(useExamInfo().key, year, long);
 }
 
 /** One round across `years` (a column of several years): its names in those years, joined ("Stray / Mop-up"). */

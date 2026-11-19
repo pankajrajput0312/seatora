@@ -1,0 +1,34 @@
+[
+ {
+  "key": "aiims/20261/R1.pdf",
+  "url": "https://example.invalid/ini-cet-fixture/20261/R1.pdf",
+  "year": 20261,
+  "round": "R1",
+  "provisional": false,
+  "name": "INI-CET January 2026 Round 1 seat allocation (synthetic test fixture)"
+ },
+ {
+  "key": "aiims/20261/R2.pdf",
+  "url": "https://example.invalid/ini-cet-fixture/20261/R2.pdf",
+  "year": 20261,
+  "round": "R2",
+  "provisional": false,
+  "name": "INI-CET January 2026 Round 2 seat allocation (synthetic test fixture)"
+ },
+ {
+  "key": "aiims/20261/R3.pdf",
+  "url": "https://example.invalid/ini-cet-fixture/20261/R3.pdf",
+  "year": 20261,
+  "round": "R3",
+  "provisional": false,
+  "name": "INI-CET January 2026 Open Round seat allocation (synthetic test fixture)"
+ },
+ {
+  "key": "aiims/20267/R1.pdf",
+  "url": "https://example.invalid/ini-cet-fixture/20267/R1.pdf",
+  "year": 20267,
+  "round": "R1",
+  "provisional": false,
+  "name": "INI-CET July 2026 Round 1 seat allocation (synthetic test fixture)"
+ }
+]

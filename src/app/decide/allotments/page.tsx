@@ -27,7 +27,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { roundLabel, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examGate, examInfo } from "@/features/exams/active";
-import { DEFAULT_EXAM, groupsOf, roundNameIn } from "@/features/exams/registry";
+import { DEFAULT_EXAM, groupsOf, roundNameIn, yearName } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 import { quotaIn, type Exam } from "@/features/exams/exam";
 import { PgOr } from "@/features/decide/components/round-name";
@@ -75,6 +75,9 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const { f, meta, inst, typed, rankError, latest, fromProfile, filters } = v;
   // A round as that year's MCC result names it (NEET SS's Mop-up; NEET PG: R1 … Special stray, as before).
   const roundOf = (a: { year: number; round: Round }) => roundNameIn(exam, meta.sources, a.year, a.round);
+  const yn = (y: number) => yearName(exam, y); // INI-CET: "Jan 2026"
+  // The Round filter: a round as the results name it in its years (INI-CET's "Open Round"; NEET PG: R1 … Special stray).
+  const roundChoice = (r: Round) => [...new Set(meta.years.filter((y) => y.rounds.includes(r)).map((y) => roundOf({ year: y.year, round: r })))].join(" / ") || roundLabel[r];
   const { rows, total, page, unknownTerms, untyped } = v.r;
   // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers: allotmentsView).
   const caps = profileFromParams(params);
@@ -102,8 +105,8 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   };
   const ranks = fromProfile ? null : filters.from != null && filters.to != null ? `Ranks ${formatRank(filters.from)}–${formatRank(filters.to)}` : filters.from != null ? `From rank ${formatRank(filters.from)}` : filters.to != null ? `Up to rank ${formatRank(filters.to)}` : null;
   const active = [
-    set("year") && { label: filters.year ? `Year: ${meta.years.find((y) => y.year === filters.year)?.label ?? filters.year}` : "All years", param: "year", href: here({ year: null }) },
-    set("round") && filters.round && { label: `Round: ${roundLabel[filters.round]}`, param: "round", href: here({ round: null }) },
+    set("year") && { label: filters.year ? `Year: ${meta.years.find((y) => y.year === filters.year)?.label ?? yn(filters.year)}` : "All years", param: "year", href: here({ year: null }) },
+    set("round") && filters.round && { label: `Round: ${roundChoice(filters.round)}`, param: "round", href: here({ round: null }) },
     // Her profile's default (no filter set): one chip saying so; × shows every allotment (the latest round).
     fromProfile && { label: `From your profile: ${fromProfile.courses.length ? `${fromProfile.courses.length === 1 ? courseLabel(fromProfile.courses[0]) : `your ${fromProfile.courses.length} courses`}, ` : ""}ranks ${formatRank(fromProfile.from)}–${formatRank(fromProfile.to)}${fromProfile.quotas ? `, ${groupsOf(exam, fromProfile.quotas).join(", ")}` : ""}`, param: "course", href: showAll },
     ...(fromProfile ? [] : f.course ?? []).map((c) => ({ label: courseLabel(c), param: "course", href: L.without("/decide/allotments", "course", c) })),
@@ -124,7 +127,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   ];
   const rankLink = (a: AllotmentRow, className: string) => (
     <Link href={L.rankScan(a.rank, a.year)} className={className} title="Scan ranks around this one">
-      {formatRank(a.rank)}<span className="sr-only">: scan the ranks around it in {a.year}</span>
+      {formatRank(a.rank)}<span className="sr-only">: scan the ranks around it in {yn(a.year)}</span>
     </Link>
   );
   const courseLink = (a: AllotmentRow) => (
@@ -140,7 +143,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <ResultCard
           key={i}
           chips={[
-            <span key="r" className="inline-flex items-center gap-1.5"><span className="numeric">{a.year} · {roundOf(a)}</span><Provisional when={a.provisional} /></span>,
+            <span key="r" className="inline-flex items-center gap-1.5"><span className="numeric">{yn(a.year)} · {roundOf(a)}</span><Provisional when={a.provisional} /></span>,
             <QuotaName key="q" quota={a.quota} />,
             `${a.category} seat`,
             // Only when it differs from the seat's (the PDF prints an Open candidate as "General").
@@ -206,12 +209,12 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
             <tr key={i} className={tbl.row}>
               <td className={`${td} ${stick} text-right max-md:text-left md:whitespace-nowrap ${tbl.pin}`}>
                 {rankLink(a, "numeric inline-flex min-h-6 min-w-6 items-center justify-end text-[15px] font-semibold hover:text-sky hover:underline max-md:justify-start")}
-                <span className="block text-xs md:hidden"><span className="numeric">{a.year}</span> {roundOf(a)} <Provisional when={a.provisional} /></span>
+                <span className="block text-xs md:hidden"><span className="numeric">{yn(a.year)}</span> {roundOf(a)} <Provisional when={a.provisional} /></span>
                 <span title={inst ? a.courseName : a.college.name} className={`block text-xs text-muted-foreground md:hidden ${tbl.clamp}`}>{inst ? a.courseName : a.college.name}</span>
                 {/* Two stacked targets, each at least 24 × 24 px (WCAG 2.5.8). */}
               </td>
               <td className={`${short} max-md:hidden`}>
-                <span className="font-medium"><span className="numeric">{a.year}</span> {roundOf(a)}</span>
+                <span className="font-medium"><span className="numeric">{yn(a.year)}</span> {roundOf(a)}</span>
                 <span className="block"><Provisional when={a.provisional} /></span>
               </td>
               {/* Two lines at most: the institute, then its course, state, type and beds on one small line. Filtered to one
@@ -275,7 +278,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         {f.mine && <input type="hidden" name="mine" value={f.mine} />}
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
-        <Field label="Round"><Select name="round" value={filters.round} all="All rounds" options={E.rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
+        <Field label="Round"><Select name="round" value={filters.round} all="All rounds" options={E.rounds.map((r) => ({ value: r, label: roundChoice(r) }))} /></Field>
         <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={fromProfile?.courses ?? f.course ?? []} none="All courses" />
         <Field label="Quota"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: quotaIn(E, q) }))} /></Field>
         {E.categories.length > 1 && <Field label="Seat category"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>}
@@ -297,7 +300,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
           <span className="numeric font-semibold text-foreground">{rangeLabel({ rows, total, page, pageSize })}</span> allotments
           {/* The default view (no filter: the latest round) is what Year and Round show; say it for screen readers. */}
-          {latest && <span className="sr-only">, the latest round, {latest.year} {roundLabel[latest.rounds.at(-1)!]}</span>}
+          {latest && <span className="sr-only">, the latest round, {yn(latest.year)} {roundLabel[latest.rounds.at(-1)!]}</span>}
          <ColourLegend className="ml-1 align-middle" /></p>
         </AboutData>
         {total > 0 && (

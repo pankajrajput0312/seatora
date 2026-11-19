@@ -26,14 +26,14 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { getMeta, listInstitutes } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { headYearIn, latestOf } from "@/features/exams/registry";
+import { headYearIn, latestOf, yearName } from "@/features/exams/registry";
 import { quotaIn } from "@/features/exams/exam";
-import { iniCetIn, iniWord } from "@/features/decide/lib/college-aliases";
+import { iniElsewhere } from "@/features/decide/lib/college-aliases";
 
 export const metadata: Metadata = { title: "Institutes" };
 const PAGE_SIZE = 24; // splits evenly into 2, 3 and 4 columns; small enough for a phone to paint fast
 const PATH = "/decide/institutes";
-const sortsFor = (last: number) => [
+const sortsFor = (last: string) => [
   { value: "name", label: "Name" },
   { value: "allotments", label: `Most allotments (${last})` },
   { value: "beds", label: "Most beds (as reported)" },
@@ -62,8 +62,9 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const [meta, info, byTerms, view, byUntyped] = await Promise.all([getMeta(exam), hospitalInfo(exam), institutesByTerms(tf, f.course, exam), chosenView(params, "institutes"), typeless && institutesByTerms(typeless, f.course, exam)]);
   // Allotments of the latest complete year (NEET PG: its later past year, as before).
   const HEAD = headYearIn(exam, meta.sources);
+  const head = yearName(exam, HEAD); // as the exam names it (INI-CET: "Jan 2026")
   // NEET MDS: no hospital beds (dental colleges): no Beds column or sort.
-  const sorts = sortsFor(HEAD).filter((s) => E.has.beds || s.value !== "beds");
+  const sorts = sortsFor(head).filter((s) => E.has.beds || s.value !== "beds");
   const latest = latestOf(meta.sources, exam);
   // Term filters and the beds sort narrow and order the list before it is paged, so reach is read for one page only.
   const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort, only: byTerms?.pass, bedsOf: (key: string) => info.get(key)?.beds?.n };
@@ -99,7 +100,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const allot = (r: (typeof res.rows)[number], className?: string) =>
     r.allotments2025 != null ? (
       <Link href={L.institute(r.college.slug, "allotments", { year: HEAD })} className={className}>
-        {formatRank(r.allotments2025)}<span className="sr-only"> allotments in {HEAD}: see them</span>
+        {formatRank(r.allotments2025)}<span className="sr-only"> allotments in {head}: see them</span>
       </Link>
     ) : (
       <Dash />
@@ -132,7 +133,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
                       <dd><Link href={L.institute(r.college.slug, "courses")} className={`${smallLink} numeric min-w-11 font-semibold text-sky`}>{formatRank(r.courses.length)}<span className="sr-only"> courses: see them</span></Link></dd>
                     </div>
                     <div className="grid border-l border-border px-4 py-1">
-                      <dt className="pt-1 text-xs text-muted-foreground">Allotments {HEAD}</dt>
+                      <dt className="pt-1 text-xs text-muted-foreground">Allotments {head}</dt>
                       <dd className="numeric flex min-h-11 items-center font-semibold">{allot(r, `${smallLink} min-w-11 text-sky`)}</dd>
                     </div>
                   </dl>
@@ -157,7 +158,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
             <th scope="col" className={tbl.th}>Type</th>
             {E.has.beds && <th scope="col" className={`${tbl.th} text-right`}>Beds</th>}
             <th scope="col" className={`${tbl.th} text-right`}>Courses</th>
-            <th scope="col" className={`${tbl.th} text-right`}>Allotments {HEAD}</th>
+            <th scope="col" className={`${tbl.th} text-right`}>Allotments {head}</th>
             {profile && <th scope="col" className={tbl.th}>Best</th>}
           </tr>
         </thead>
@@ -187,7 +188,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Institutes"
-        about={<>Every institute in the MCC results: where it is, its type{E.has.beds && " and beds"}, the courses it offers and how many allotments were made there in {HEAD} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments{E.has.fees ? ", fees and bond" : ""}.</>}
+        about={<>Every institute in the MCC results: where it is, its type{E.has.beds && " and beds"}, the courses it offers and how many allotments were made there in {head} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments{E.has.fees ? ", fees and bond" : ""}.</>}
       />
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
@@ -231,7 +232,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
       </div>
 
       {/* A search naming an INI institute (AIIMS, JIPMER, NIMHANS, PGIMER Chandigarh): why it isn't here, every exam. */}
-      {iniCetIn(f.q) && <p role="note" className="text-sm text-muted-foreground">{iniCetIn(f.q)} admits through {iniWord(exam)}, not MCC&apos;s {E.label} counselling, so it is not in MCC&apos;s data.</p>}
+      {iniElsewhere(f.q, exam) && <p role="note" className="text-sm text-muted-foreground">{iniElsewhere(f.q, exam)}, not MCC&apos;s {E.label} counselling, so it is not in MCC&apos;s data.</p>}
       {res.total === 0 ? <EmptyState title="No institutes match these filters." href={L.to(PATH, { maxfee: "any", bondyrs: "any" })} /> : <ViewPanes page="institutes" view={view} cards={cards} table={table} />}
 
       <Pager page={res.page} pageSize={res.pageSize} total={res.total} href={(n) => L.page(PATH, n)} focusId="results" label="Institutes" />

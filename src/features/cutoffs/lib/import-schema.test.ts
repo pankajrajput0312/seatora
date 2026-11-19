@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { citedSources, mccAllotmentSchema, mccAllotmentV2Schema, mccCutoffSchema, mccFeesStructuredSchema, mccTermSchema, movedPlaces } from "./import-schema";
+import { citedSources, mccAllotmentSchema, mccAllotmentV2LooseSchema, mccAllotmentV2Schema, mccCutoffSchema, mccFeesStructuredSchema, mccSourceSchema, mccTermSchema, movedPlaces, sessionSchemas } from "./import-schema";
 
 const row = {
   ikey: "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8#400710",
@@ -53,6 +53,22 @@ describe("mccAllotmentV2Schema", () => {
     expect(mccAllotmentV2Schema.safeParse({ ...r2, prev_quota: null }).success).toBe(false);
     expect(mccAllotmentV2Schema.safeParse({ ...r2, status: "allotted" }).success).toBe(false);
     expect(mccAllotmentV2Schema.safeParse({ ...r2, name: "Someone" }).success).toBe(false);
+  });
+});
+
+describe("session codes (INI-CET only)", () => {
+  const src = { key: "aiims/20261/R1.pdf", url: "https://example.invalid/x.pdf", year: 20261, round: "R1", provisional: false, name: "INI-CET January 2026 Round 1" };
+  const cut = { ...row, year: 20267, src: "aiims/20267/R1.pdf" };
+  const al = { year: 20261, round: "R1", rank: 5, quota: "Open", category: "Open", ikey: "AIIMSNEWDELHI#110029", degree: "MD", specialty: "GENERALMEDICINE", status: "allotted", src: "aiims/20261/R1.pdf", candidate_category: "General", option_no: null, prev_ikey: null, prev_degree: null, prev_specialty: null, prev_quota: null, prev_remark: null };
+  it("an exam with sessions takes January (1) and July (7) session codes and AIIMS source keys", () => {
+    expect([sessionSchemas.source.safeParse(src).success, sessionSchemas.cutoff.safeParse(cut).success, sessionSchemas.allotment.safeParse(al).success]).toEqual([true, true, true]);
+    for (const year of [2026, 20262, 20260, 19991, 21017, 202601]) expect(sessionSchemas.allotment.safeParse({ ...al, year }).success, String(year)).toBe(false);
+    expect(sessionSchemas.source.safeParse({ ...src, key: "mcc/2026/R1.pdf" }).success).toBe(false);
+  });
+  it("every other exam's schemas are as before: calendar years 2000-2100 and MCC keys only", () => {
+    expect([mccSourceSchema.safeParse(src).success, mccCutoffSchema.safeParse(cut).success, mccAllotmentV2LooseSchema.safeParse(al).success]).toEqual([false, false, false]);
+    expect(mccAllotmentV2LooseSchema.safeParse({ ...al, year: 2026, src: "mcc/2026/R1.pdf" }).success).toBe(true);
+    expect(mccSourceSchema.safeParse({ ...src, key: "mcc/2026/R1.pdf", year: 2101 }).success).toBe(false);
   });
 });
 

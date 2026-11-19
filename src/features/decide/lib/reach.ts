@@ -1,4 +1,5 @@
 import { formatRank } from "@/features/cutoffs/lib/format";
+import { DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
 import { roundLabel, rounds, type BaseCategory, type Category, type Cutoff, type Round, type SeatKind, type Source } from "../types";
 
 /** The years the labels compare (client-safe; service.ts re-exports them). They match the imported MCC results. */
@@ -7,12 +8,14 @@ export const PAST_YEARS: [number, number] = [2024, 2025];
 export const YEARS = [2024, 2025, 2026];
 
 /**
- * The latest year and its newest round with an MCC result in the data (latestRound). `pastYears`: another exam's two past
- * years (exams/registry.ts latestOf); absent = NEET PG's PAST_YEARS (pastOf).
+ * The latest year and its newest round with an MCC result in the data (latestRound). `pastYears`, `exam`: another exam's
+ * two past years and key (exams/registry.ts latestOf); absent = NEET PG's PAST_YEARS (pastOf) and years.
  */
-export type Latest = { year: number; round: Round; pastYears?: [number, number]; /** Set when `round` is a stray round: the latest year's last round before Stray (what "reached" counts). */ main?: Round };
+export type Latest = { year: number; round: Round; pastYears?: [number, number]; /** Set when `round` is a stray round: the latest year's last round before Stray (what "reached" counts). */ main?: Round; exam?: ExamKey };
 /** The past years the labels beside `latest` count. */
 export const pastOf = (latest: Latest): [number, number] => latest.pastYears ?? PAST_YEARS;
+/** A year beside `latest` as its exam names it (exams/keys.ts yearName; NEET PG: the year). */
+const yearOf = (latest: Latest, y: number) => yearName(latest.exam ?? DEFAULT_EXAM, y);
 
 /**
  * THE latest round (one source of truth for every label, note, filter and export): the latest year's newest round with
@@ -33,7 +36,7 @@ const lastCounted = ({ round }: Latest, includeLatest: boolean) => rounds.indexO
 /** "2026 R1", or "2026 R1 to R2" once R2 is in: the latest year's rounds the labels count (R1 when none is). */
 export function latestText(latest: Latest, includeLatest = true) {
   const last = rounds[Math.max(0, lastCounted(latest, includeLatest))];
-  return `${latest.year} ${last === "R1" ? "R1" : `R1 to ${roundLabel[last]}`}`;
+  return `${yearOf(latest, latest.year)} ${last === "R1" ? "R1" : `R1 to ${roundLabel[last]}`}`;
 }
 
 /** Seat categories a candidate can be allotted: Open always, their own category, and PwD seats if PwD. */
@@ -111,11 +114,11 @@ export const roundReachOrder: readonly Reach[] = ["reached-latest", "reached-bot
 export const isStrayRound = (round: Round | undefined) => round === "stray" || round === "special_stray";
 
 /** The MCC results in the data, e.g. "2023 to 2026 R1": oldest year to the newest year's last round (`years` newest first, as meta.years). */
-export function resultsSpan(years: { year: number; rounds: readonly Round[] }[]) {
+export function resultsSpan(years: { year: number; rounds: readonly Round[] }[], exam: ExamKey = DEFAULT_EXAM) {
   if (!years.length) return "";
   const [last, first] = [years[0], years.at(-1)!];
-  const end = `${last.year}${last.rounds.length ? ` ${roundLabel[last.rounds.at(-1)!]}` : ""}`;
-  return first.year === last.year ? end : `${first.year} to ${end}`;
+  const end = `${yearName(exam, last.year)}${last.rounds.length ? ` ${roundLabel[last.rounds.at(-1)!]}` : ""}`;
+  return first.year === last.year ? end : `${yearName(exam, first.year)} to ${end}`;
 }
 
 /** `includeLatest` false: without the latest round (Options' "leave out provisional"). */
@@ -187,19 +190,22 @@ export function classifyReach(rank: number, cutoffs: ReachInput[], { latest, pas
 export const NEVER_ALLOTTED = "Never allotted before";
 
 /** The rounds the labels count, e.g. "2024, 2025 and 2026 R1" (older years show in the grids but are not counted). */
-export const reachWindow = (latest: Latest, [a, b]: [number, number], includeLatest = true, or = false) =>
-  lastCounted(latest, includeLatest) >= 0 ? `${a}, ${b} ${or ? "or" : "and"} ${latestText(latest, includeLatest)}` : `${a} ${or ? "or" : "and"} ${b}`;
+export function reachWindow(latest: Latest, years: [number, number], includeLatest = true, or = false) {
+  const [a, b] = years.map((y) => yearOf(latest, y));
+  return lastCounted(latest, includeLatest) >= 0 ? `${a}, ${b} ${or ? "or" : "and"} ${latestText(latest, includeLatest)}` : `${a} ${or ? "or" : "and"} ${b}`;
+}
 
 /**
  * `includeLatest` false: the labels were made without the latest round (Options' "leave out provisional"). `on`: the
  * label is on that one seat category (a Seats row), not on all of hers together.
  */
 export function reachLabel(reach: Reach, latest: Latest, pastYears: [number, number], includeLatest = true, on?: string): string {
+  const [a, b] = pastYears.map((y) => yearOf(latest, y));
   return {
     // Stray rounds never make "reached": a latest round that is one leaves the label at the round before it (2025 R1 to R2).
     "reached-latest": `Reached in ${latest.main ? latestText({ ...latest, round: latest.main }) : latestText(latest, includeLatest)}`,
-    "reached-both": `Reached in ${pastYears[0]} and ${pastYears[1]}`,
-    "reached-one": `Reached in ${pastYears[0]} or ${pastYears[1]}`,
+    "reached-both": `Reached in ${a} and ${b}`,
+    "reached-one": `Reached in ${a} or ${b}`,
     "within-10": "Within 10% in a past round",
     "stray-only": "Reached only in stray rounds",
     "closed-before": "Closed before your rank",
@@ -255,8 +261,8 @@ export function seatsBelowNotes(ns: SeatsBelow[], latest: Latest, pastYears: [nu
     const facts = on.map(({ category, reach, at }) => {
       const verdict = atVerdict[reach];
       // Stray left out of the label's closing: say so, and give Stray as its own number.
-      const stray = at?.stray ? ` Stray: ${formatRank(at.stray.closing)} in ${at.stray.year}.` : "";
-      if (at && verdict) return `On ${category} seats: deepest ${at.stray ? "before Stray " : "closing "}${formatRank(at.closing)} in ${at.year}${at.round ? ` ${roundLabel[at.round]}` : ""}, ${verdict}.${stray}`;
+      const stray = at?.stray ? ` Stray: ${formatRank(at.stray.closing)} in ${yearOf(latest, at.stray.year)}.` : "";
+      if (at && verdict) return `On ${category} seats: deepest ${at.stray ? "before Stray " : "closing "}${formatRank(at.closing)} in ${yearOf(latest, at.year)}${at.round ? ` ${roundLabel[at.round]}` : ""}, ${verdict}.${stray}`;
       if (verdict) return `On ${category} seats alone: ${reachLabel(reach, latest, pastYears, includeLatest, category)}.`;
       return `On ${category} seats: no allotment in ${reachWindow(latest, pastYears, includeLatest, true)}.`;
     });

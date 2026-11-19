@@ -39,6 +39,8 @@ export type Exam = {
   quotaNames?: Record<string, string>;
   /** Label typos in its bundle (a course or question group name), shown as `to` (display only). */
   typos?: [from: string, to: string][];
+  /** What its result PDFs are, in a source line, when not "MCC allotment results" (INI-CET: AIIMS's). */
+  resultsName?: string;
 };
 
 export const neetPg: Exam = {
@@ -82,8 +84,13 @@ export const examShows = (E: Pick<Exam, "has">, href: string) => {
   return !need || E.has[need];
 };
 
-/** A round as one MCC PDF's name calls it: NEET SS's last round is a "Mop-up" some years, NEET MDS's R3 was till 2022. */
+/**
+ * A round as one MCC PDF's name calls it: NEET SS's last round is a "Mop-up" some years, NEET MDS's R3 was till 2022;
+ * INI-CET's rounds after Round 2 are AIIMS's "Open Round"s ("Open Round 2" where it numbers them).
+ */
 export function roundNameFrom(name: string, round: Round) {
+  const open = /open round(?:[- ]*(\d+))?/i.exec(name);
+  if (open) return open[1] ? `Open Round ${open[1]}` : "Open Round";
   if (/special mop-?up/i.test(name)) return "Special mop-up";
   if (/mop-?up/i.test(name)) return round === "R3" ? "R3 (Mop-up)" : "Mop-up";
   return roundLabel[round];

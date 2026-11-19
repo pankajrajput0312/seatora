@@ -25,7 +25,7 @@ import { roundLabel, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { groupsOf, perGroup, roundNameIn } from "@/features/exams/registry";
+import { groupsOf, perGroup, roundNameIn, yearName } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Rank journey" };
@@ -63,6 +63,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
   const key = (a: Row) => `${a.round}|${a.college}|${a.degree}|${a.specialty}|${a.quota}`;
   const courseLink = (a: Row) => L.allotments({ course: courseOf.get(`${a.degree}|${a.specialty}`)?.slug, inst: a.collegeSlug || undefined, year: year!.year, round: a.round });
   const roundOf = (r: Round) => (year ? roundNameIn(exam, meta.sources, year.year, r) : roundLabel[r]);
+  const yearWords = year && yearName(exam, year.year); // INI-CET: "Jan 2026"
   const of = (a: Row) => `${a.collegeName}, ${a.courseName}, ${roundOf(a.round)}`;
 
   return (
@@ -87,8 +88,8 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
       ) : rows.length === 0 ? (
         <>
           <EmptyState
-            title={`No allotment to rank ${formatRank(rank)} in ${year.year}`}
-            description={`MCC's ${year.year} results (${year.rounds.map(roundOf).join(", ")}) list no seat for this rank in any round.`}
+            title={`No allotment to rank ${formatRank(rank)} in ${yearWords}`}
+            description={`MCC's ${yearWords} results (${year.rounds.map(roundOf).join(", ")}) list no seat for this rank in any round.`}
             href={L.rankScan(rank, year.year)}
             action={`Scan ranks around ${formatRank(rank)}`}
           />
@@ -119,11 +120,11 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
             page={VIEW}
             view={await chosenView(params, VIEW)}
             cards={
-              <ResultCards title={`Rank ${formatRank(rank)}: its seat in each ${year.year} round`} hideTitle>
+              <ResultCards title={`Rank ${formatRank(rank)}: its seat in each ${yearWords} round`} hideTitle>
                 {rows.map((a) => (
                   <ResultCard
                     key={key(a)}
-                    chips={[<span key="r" className="inline-flex items-center gap-1"><span className="numeric">{year.year}</span> · {roundOf(a.round)}<Provisional when={provisional(a.round)} /></span>, a.quota, `${a.category} seat`, statusLabel[a.status] ?? a.status]}
+                    chips={[<span key="r" className="inline-flex items-center gap-1"><span className="numeric">{yearWords}</span> · {roundOf(a.round)}<Provisional when={provisional(a.round)} /></span>, a.quota, `${a.category} seat`, statusLabel[a.status] ?? a.status]}
                     stat={{ label: "Choice no.", value: a.optionNo != null ? <span className="numeric">{formatRank(a.optionNo)}</span> : <Dash /> }}
                     title={a.collegeName}
                     href={a.collegeSlug ? L.institute(a.collegeSlug) : undefined}
@@ -148,9 +149,9 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
             table={
               // Status, quota, seat and candidate category and the choice no. ride in small lines (Round, Institute,
               // Previous seat), so the five term cells stay in view from about 1,024px.
-              <ScrollTable label={`Rank ${formatRank(rank)}, ${year.year}`}>
+              <ScrollTable label={`Rank ${formatRank(rank)}, ${yearWords}`}>
                 <table className={tbl.table}>
-                  <caption className="sr-only">Rank {formatRank(rank)}: its seat in each {year.year} round</caption>
+                  <caption className="sr-only">Rank {formatRank(rank)}: its seat in each {yearWords} round</caption>
                   <thead><tr className={tbl.headRow}>
                     <th scope="col" className={th}>Round, status</th>
                     <th scope="col" className={th}>Institute and seat</th>
@@ -161,7 +162,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
                     {rows.map((a) => (
                       <tr key={key(a)} className={tbl.row}>
                         <th scope="row" className={`${short} text-left font-medium`}>
-                          <span className="numeric">{year.year}</span> {roundOf(a.round)}
+                          <span className="numeric">{yearWords}</span> {roundOf(a.round)}
                           <span className="block"><Provisional when={provisional(a.round)} /></span>
                           <span className="block text-xs font-normal text-muted-foreground">{statusLabel[a.status] ?? a.status}</span>
                         </th>
