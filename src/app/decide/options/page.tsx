@@ -30,7 +30,8 @@ import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toU
 import { getMeta, listOptions, optionsView, unlistedSeats } from "@/features/decide/service";
 import { optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 import { activeExam } from "@/features/exams/active";
-import { DEFAULT_EXAM, exams, latestOf, perGroup } from "@/features/exams/registry";
+import { DEFAULT_EXAM, exams, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
+import { quotaIn } from "@/features/exams/exam";
 
 export const metadata: Metadata = { title: "Options" };
 const PAGE_SIZE = 25; // both the table and the phone cards are in the HTML: 25 rows keep the page light
@@ -70,7 +71,6 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // NEET SS: a rank is within one question group, so nothing is labelled until she picks hers.
   if (perGroup(exam) && !profile.quotas.length) return <AppPage><PageHead title="Options" /><GroupPrompt /></AppPage>;
   const PAST_YEARS = E.pastYears;
-  const sortLabel = sortLabels(PAST_YEARS[1]);
 
   const f = parseSearchParams(filtersSchema, params);
   // Term filters (college type, fee, stipend, bond, leaving): an absent maxfee / bondyrs is her profile's cap.
@@ -78,6 +78,9 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const hasSeats = f.seats === "1" ? "clear" : f.seats === "all" ? false : f.seats;
   const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms, sort: f.sort };
   const [meta, r, view] = await Promise.all([getMeta(exam), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }, exam), chosenView(params, "options")]);
+  // The sorts' year: the latest complete one (NEET PG: its later past year, as before).
+  const HEAD = headYearIn(exam, meta.sources);
+  const sortLabel = sortLabels(HEAD);
   const lists = r.seatLists;
   const roundView = r.view === "round";
   // The round view lists the seats with no past allotment as rows; the other view names them and links Seats.
@@ -132,7 +135,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           ...profile.degrees.map((d) => ({ label: d, param: "deg", href: L.without("/decide/options", "deg", d) })),
         ]),
     // NEET SS: her quotas are her question group, kept (another group's seats aren't hers to compare): no × for them.
-    ...(perGroup(exam) ? [] : profile.quotas.map((q) => ({ label: q, param: "quota", href: L.without("/decide/options", "quota", q) }))),
+    ...(perGroup(exam) ? [] : profile.quotas.map((q) => ({ label: quotaIn(E, q), param: "quota", href: L.without("/decide/options", "quota", q) }))),
     ...profile.states.map((s) => ({ label: s, param: "st", href: L.without("/decide/options", "st", s) })),
     // Her profile's caps, while the page's own fee / bond filter does not replace them.
     profile.maxFeeLakh != null && tp.maxfee == null && { label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: here({ fee: null }) },
@@ -178,7 +181,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         about={
           <>
             Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats,
-            the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${E.quotas.join(", ")})`}. Within 10%: in a past round the closing rank was at
+            the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${E.quotas.map((q) => quotaIn(E, q)).join(", ")})`}. Within 10%: in a past round the closing rank was at
             least 90% of yours ({`${E.rankWord} `}<span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or later) but before your rank.
             {roundView && <> Never allotted before = MCC allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years)}), in any round or seat category, so there is no closing rank to compare.</>}
           </>
@@ -202,7 +205,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
               {formatRank(sum.virtualOnly)} virtual only (seats there fall vacant only if their holder upgrades or leaves){sum.newOnly > 0 && `, ${formatRank(sum.newOnly)} only newly added`};{" "}
               {formatRank(sum.withNew)} with seats in MCC&apos;s newly added list; {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}. {listsTip}{" "}
               Sorted by label (reached, then within 10%, then never allotted before and no allotment in your categories, closed before your rank last), then {round} clear vacancy seats, then the deepest{" "}
-              {PAST_YEARS[1]} closing.
+              {HEAD} closing.
               <span className="mt-2 flex flex-col items-start md:hidden">{viewLinks}</span>
             </InfoTip>
           </p>
@@ -263,7 +266,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
               </>
             )}
             {/* NEET SS: the quota is her question group (her profile's), never another group's. */}
-            {!perGroup(exam) && <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: q }))} selected={profile.quotas} none="Open quotas" info={E.quotasNote} />}
+            {!perGroup(exam) && <FilterDropdown label="Quota" name="quota" options={meta.quotas.map((q) => ({ value: q, label: quotaIn(E, q) }))} selected={profile.quotas} none="Open quotas" info={E.quotasNote} />}
             <FilterDropdown label="State" name="st" options={meta.states.map((s) => ({ value: s, label: s }))} selected={profile.states} none="All states" info={E.scopeNote} />
             {lists.length > 0 && (
               <Field label="Seats">

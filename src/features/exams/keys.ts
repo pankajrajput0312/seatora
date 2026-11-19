@@ -1,7 +1,7 @@
 // Exam keys. No imports: prisma/import-mcc.ts, prisma/snapshot.ts and src/middleware.ts load this too. The rest of an
 // exam (label, years, has…) is in ./registry.ts.
 
-/** The switcher's order. NEET PG's import writes its colleges' fields; another exam's only creates the ones it is first to have. */
+/** The switcher's order. NEET PG's import writes its colleges' fields; another exam's only the ones no other exam has. */
 export const examKeys = ["neet-pg", "neet-ss", "neet-mds"] as const;
 export type ExamKey = (typeof examKeys)[number];
 export const DEFAULT_EXAM: ExamKey = "neet-pg";

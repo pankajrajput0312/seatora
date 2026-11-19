@@ -3,11 +3,11 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { perGroup } from "@/features/exams/registry";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { typedPrefix } from "../lib/choices";
-import { useChoicesFor, useDecideLinks, useExam, useSavedProfile } from "../lib/use-decide-store";
+import { DEFAULT_EXAM } from "@/features/exams/keys";
+import { useChoicesFor, useDecideLinks, useExam, useExamInfo, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams } from "../profile";
 import { navigating } from "./nav-pending";
 import { EmptyState, smallLink, StatCell } from "./ui";
@@ -55,8 +55,9 @@ const STEPS = ["Rank and category", "Courses", "Quotas"];
 /** NEET SS with no question group in her profile (a URL rank alone): nothing is labelled until she picks it. */
 export function GroupPrompt() {
   const L = useDecideLinks();
+  const { label } = useExamInfo();
   return (
-    <EmptyState title="Pick your question group" description="A NEET SS rank is a rank within one question group, so Seatora compares it only with that group's seats. Pick your group in your profile." className="mt-6">
+    <EmptyState title="Pick your question group" description={`A ${label} rank is a rank within one question group, so Seatora compares it only with that group's seats. Pick your group in your profile.`} className="mt-6">
       <Button asChild size="lg"><Link href={L.to(usePathname(), { editProfile: 1 })}>Pick your group</Link></Button>
     </EmptyState>
   );
@@ -68,7 +69,7 @@ export function GroupPrompt() {
  */
 export function SetupCard() {
   const [saved, hydrated] = useSavedForPrompt();
-  const steps = perGroup(useExam()) ? ["Rank and question group", "Courses"] : STEPS;
+  const steps = useExamInfo().perGroup ? ["Rank and question group", "Courses"] : STEPS;
   if (!hydrated || saved) return <p role="status" className="text-body text-muted-foreground">Loading your saved rank and courses…</p>;
   return (
     <section aria-labelledby="setup-h" className="rounded-xl border border-border bg-card p-4 sm:p-5">
@@ -94,11 +95,13 @@ export function SetupCard() {
 export function ChoicesStat({ nextRound }: { nextRound?: string | null }) {
   const [choices, , hydrated] = useChoicesFor(nextRound);
   const L = useDecideLinks();
+  const exam = useExam();
   const list = choices.lists.find((l) => l.id === choices.activeId) ?? choices.lists[0];
   const typed = typedPrefix(list);
   return (
     <StatCell
-      label={hydrated ? `In your ${list.name} list` : "In your choice list"}
+      // Another exam's first list is named "NEET SS list" (layout.tsx): no "list list". NEET PG's labels as they were.
+      label={hydrated ? `In your ${list.name}${exam === DEFAULT_EXAM || !/ list$/i.test(list.name) ? " list" : ""}` : "In your choice list"}
       value={<span className="font-mono">{hydrated ? formatRank(list.items.length) : "—"}</span>}
       note={<Link href={L.choices()} className={smallLink}>{!hydrated ? "Open your list" : typed ? `${formatRank(typed)} typed into MCC` : "None typed into MCC yet"}</Link>}
     />

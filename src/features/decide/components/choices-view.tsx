@@ -11,11 +11,12 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { duplicateList, markTypedUpTo, move, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
 import { pastOf, reachWindow, seatsBelowNotes, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
-import { useChoices, useDecideLinks } from "../lib/use-decide-store";
+import { quotaIn, roundIn } from "@/features/exams/exam";
+import { useChoices, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
 import { keepProfileParams } from "../profile";
 import type { ProgrammeTerms } from "../server/terms";
 import type { RowHospital, SeatsBy } from "../service";
-import { roundLabel, type SeatList } from "../types";
+import type { SeatList } from "../types";
 import { Dash, InstName, ReachBadge } from "./bits";
 import { InfoTip } from "./info-tip";
 import { CompareToggle } from "./option-actions";
@@ -49,7 +50,9 @@ type ReachFor = (ids: string[], profile: string) => Promise<{ lists: SeatList[];
 /** `hasLists`: the server has the newest round's seat lists, so a card keeps room for its seats line while it loads. */
 /** `nextRound`: the choice filling she fills next (MCC's schedule): its list name ("Round 3 · 2026") and dates. */
 /** `latest`: the round the reach labels name (lib/reach.ts latestRound). */
-export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nextRound, latest }: { reachFor?: ReachFor; view: View; maxLists?: number; hasLists?: boolean; nextRound?: { name: string; when: string } | null; latest: Latest }) {
+/** `listsCurrent`: the round of the seat lists is current (no result yet), so a choice with no seats in them is worth a warning. */
+export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nextRound, latest, listsCurrent = true }: { reachFor?: ReachFor; view: View; maxLists?: number; hasLists?: boolean; nextRound?: { name: string; when: string } | null; latest: Latest; listsCurrent?: boolean }) {
+  const E = useExamInfo();
   // Its first list takes the round's name on every Decide page (RenamedSaved, lib/choices.ts nameFirstList).
   const [state, setState, hydrated] = useChoices();
   const L = useDecideLinks();
@@ -69,10 +72,11 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
   const name = (i: ChoiceItem) => `${i.institute}, ${i.course}`;
   const setItems = (next: ChoiceItem[]) => setState((s) => updateActive(s, (l) => ({ ...l, items: next })));
 
-  // Relabel from the current data and her rank and category in the URL; the stored labels are the fallback. With no
-  // rank the terms and hospital still come (they don't depend on it).
+  // Relabel from the current data and her rank and category in the URL (NEET SS: and her question group, its quotas, as
+  // Options and Compare compare); the stored labels are the fallback. With no rank the terms and hospital still come
+  // (they don't depend on it).
   const url = new URLSearchParams(sp.toString());
-  const who = new URLSearchParams([...keepProfileParams(url)].filter(([k]) => k === "rank" || k === "cat" || k === "pwd")).toString();
+  const who = new URLSearchParams([...keepProfileParams(url)].filter(([k]) => k === "rank" || k === "cat" || k === "pwd" || (E.perGroup && k === "quota"))).toString();
   const ranked = new URLSearchParams(who).has("rank");
   const liveKey = n ? JSON.stringify([who, items.map((i) => i.id).sort()]) : "";
   // Labels gathered for this rank and category (kept across edits, so nothing flickers); `fresh` = the last answer
@@ -96,7 +100,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
   }, [hydrated, reachFor, liveKey]);
   const current = live?.who === who ? live.data : null;
   const lists = (current && live?.lists) || [];
-  const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
+  const round = lists[0] && `${lists[0].year} ${roundIn(E, lists[0].year, lists[0].round)}`;
   const fresh = live?.key === liveKey;
 
   /** Focus a control of the item with this id after React re-renders, and keep it in view (it may have moved). */
@@ -188,7 +192,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
 
   // A phone: its share sheet (WhatsApp among them); else WhatsApp's own link. Fee, bond and penalties once loaded.
   const share = async () => {
-    const text = shareText(list, (id) => (current?.[id] ? termsWords(current[id].fees) || null : null), location.origin);
+    const text = shareText(list, (id) => (current?.[id] && E.has.fees ? termsWords(current[id].fees) || null : null), location.origin, E.label);
     if (navigator.share && matchMedia("(pointer: coarse)").matches) {
       try {
         return await navigator.share({ text });
@@ -223,7 +227,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       (counts.get(dupKey(item)) ?? 0) > 1 && "Same institute and course listed more than once",
       closed && `Closed before your rank in every round of ${reachWindow(latest, pastOf(latest))}${lr?.reach ? "" : " (when added)"}`,
       // Seats are matched to the option by institute and course; say what was found, not what MCC printed.
-      lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
+      listsCurrent && lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
       ...seatsBelowNotes(lr?.below ?? [], latest, pastOf(latest)),
       fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
       typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
@@ -302,7 +306,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
         return (
           <li key={item.id} {...drop(i)} className={cn("grid min-w-0 rounded-xl", picking && "ring-2 ring-sky")}>
             <ResultCard
-              chips={[item.quota, reachOf(item, lr), typed && typedBadge]}
+              chips={[quotaIn(E, item.quota), reachOf(item, lr), typed && typedBadge]}
               actions={<>{handle(item, i, picking)}{upDown(item, i)}</>}
               stat={{ label: "Choice", value: formatRank(i + 1) }}
               title={item.institute}
@@ -312,8 +316,8 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
               meta={[item.state ?? "State not listed", lr?.hospital?.type && <TypeBadgeM type={lr.hospital.type} of={item.institute} />, lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />]}
               footer={
                 <>
-                  {lr ? <StatCellsM t={lr.fees} of={name(item)} /> : loading && <Skeleton className="h-[7.75rem] rounded-none sm:h-[4.5rem]" />}
-                  <div className={cn("grid gap-1 px-4 py-2", (lr || loading) && "border-t border-border")}>
+                  {E.has.fees && (lr ? <StatCellsM t={lr.fees} of={name(item)} /> : loading && <Skeleton className="h-[7.75rem] rounded-none sm:h-[4.5rem]" />)}
+                  <div className={cn("grid gap-1 px-4 py-2", E.has.fees && (lr || loading) && "border-t border-border")}>
                     {!lr && loading && hasLists && <Skeleton className="h-11 w-48" />}
                     {lr && lists.length > 0 && (
                       <p className="flex flex-wrap items-center gap-x-3 text-xs">
@@ -349,7 +353,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
             <th scope="col" className={cn(th, "bg-card md:sticky md:left-0 md:z-[3]")}>Choice</th>
             <th scope="col" className={cn(th, "px-3!")}>Your reach</th>
             {lists.length > 0 && <th scope="col" className={cn(th, "px-3! text-right")}>{round} seats</th>}
-            {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={cn(th, "px-3! text-right")}>{statLabel[k]}</th>)}
+            {E.has.fees && statKeys.map((k) => <th key={k} scope="col" data-col={k} className={cn(th, "px-3! text-right")}>{statLabel[k]}</th>)}
           </tr>
         </thead>
         <tbody>
@@ -368,7 +372,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                     </select>
                     <span className="min-w-0 py-1">
                       <Link href={L.institute(item.slug)} className="font-medium hover:text-sky hover:underline"><InstName name={item.institute} state={item.state} /></Link>
-                      <span className="block text-xs text-muted-foreground">{item.course}, {item.quota}</span>
+                      <span className="block text-xs text-muted-foreground">{item.course}, {quotaIn(E, item.quota)}</span>
                       <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                         {item.state ?? "State not listed"}
                         {lr?.hospital?.type && <TypeBadgeM type={lr.hospital.type} of={item.institute} />}
@@ -395,7 +399,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                     ))}
                   </td>
                 )}
-                {lr ? (
+                {!E.has.fees ? null : lr ? (
                   <StatCellsM t={lr.fees} variant="table" of={name(item)} tdClassName="px-3" />
                 ) : (
                   <td colSpan={statKeys.length} className={cn(tbl.td, "text-xs text-muted-foreground")}>{fresh || failed === liveKey || !reachFor ? <Dash /> : "Loading terms…"}</td>
@@ -481,11 +485,11 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
         <>
           {view === "cards" ? cards : table}
           <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
-            {current && ranked ? "Labels, seats and terms: from the current data and your rank." : current ? "Terms: from the current data. Labels marked (when added) are from when you added each option." : "Labels marked (when added) are from when you added each option."}
-            <InfoTip label="labels, seats and terms">
+            {current && ranked ? (E.has.fees ? "Labels, seats and terms: from the current data and your rank." : "Labels and seats: from the current data and your rank.") : current && E.has.fees ? "Terms: from the current data. Labels marked (when added) are from when you added each option." : "Labels marked (when added) are from when you added each option."}
+            <InfoTip label={E.has.fees ? "labels, seats and terms" : "labels and seats"}>
               {current && ranked
-                ? `Reach labels use your current rank and category and previous years' closing ranks.${round ? ` ${round} seats: each choice's seats in the ${lists.map((l) => l.kind).join(", ")} lists, in its quota and your seat categories, "—" when a list has none; the lists overlap, so they are never added.` : ""} Fee, stipend, bond and leaving: each choice's course and quota, as published.`
-                : `Set your rank to see labels and seats for your current profile.${current ? " Fee, stipend, bond and leaving: each choice's course and quota, as published." : ""}`}
+                ? `Reach labels use your current rank and category and previous years' closing ranks.${round ? ` ${round} seats: each choice's seats in the ${lists.map((l) => l.kind).join(", ")} lists, in its quota and your seat categories, "—" when a list has none; the lists overlap, so they are never added.` : ""}${E.has.fees ? " Fee, stipend, bond and leaving: each choice's course and quota, as published." : ""}`
+                : `Set your rank to see labels and seats for your current profile.${current && E.has.fees ? " Fee, stipend, bond and leaving: each choice's course and quota, as published." : ""}`}
             </InfoTip>
           </p>
         </>

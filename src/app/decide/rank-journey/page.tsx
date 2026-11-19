@@ -26,6 +26,7 @@ import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
 import { activeExam } from "@/features/exams/active";
 import { exams, groupsOf, perGroup, roundNameIn } from "@/features/exams/registry";
+import { QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Rank journey" };
 const VIEW = "rank-journey";
@@ -74,13 +75,13 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
 
       <FilterBar action="/decide/rank-journey" params={params} cols="md:grid-cols-[1fr_1fr_auto]">
         <Field label={E.rankName}>
-          <input name="air" inputMode="numeric" defaultValue={typed ?? rank ?? ""} placeholder="e.g. 42,284" aria-invalid={invalid || undefined} aria-describedby={invalid ? "air-error" : undefined} className={`${control} numeric`} />
+          <input name="air" inputMode="numeric" defaultValue={typed ?? rank ?? ""} placeholder={`e.g. ${E.exampleRank}`} aria-invalid={invalid || undefined} aria-describedby={invalid ? "air-error" : undefined} className={`${control} numeric`} />
         </Field>
         <Field label="Year"><Select name="year" value={year ? String(year.year) : undefined} options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
       </FilterBar>
 
       {invalid ? (
-        <p id="air-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example 42,284.</p>
+        <p id="air-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example {E.exampleRank}.</p>
       ) : !rank || !year ? (
         <EmptyState title="Enter a rank" description={`Type ${E.rankName === "All India Rank" ? "an" : "a"} ${E.rankName} above, or set your rank, to see that rank's seat in every round of one year's MCC results.`} />
       ) : rows.length === 0 ? (
@@ -175,7 +176,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
                           </span>
                           <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                             {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.collegeName} />}
-                            <span>{a.quota} · Seat: {a.category}{a.candidateCategory && ` · Candidate: ${a.candidateCategory}`}</span>
+                            <span><QuotaName quota={a.quota} year={a.year} /> · Seat: {a.category}{a.candidateCategory && ` · Candidate: ${a.candidateCategory}`}</span>
                           </span>
                         </td>
                         <td className={`${td} min-w-36 max-w-60`}>

@@ -26,18 +26,20 @@ import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { roundLabel, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { examGate } from "@/features/exams/active";
-import { activeExam } from "@/features/exams/active";
-import { DEFAULT_EXAM, exams, groupsOf, roundNameIn } from "@/features/exams/registry";
+import { activeExam, examGate, examInfo } from "@/features/exams/active";
+import { DEFAULT_EXAM, groupsOf, roundNameIn } from "@/features/exams/registry";
+import { QuotaName } from "@/features/decide/components/round-name";
+import { quotaIn, type Exam } from "@/features/exams/exam";
 
 export const metadata: Metadata = { title: "Allotments" };
 const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
-// Columns the Display menu can hide (rank, round and institute always show), in table order: the numbers first.
-const cols = [
-  ...statKeys.map((k) => ({ key: k, label: statLabel[k] })),
+// Columns the Display menu can hide (rank, round and institute always show), in table order: the numbers first. Only
+// the exam's: no term columns without its fee data, no candidate category where its results print one category (NEET SS).
+const colsOf = (E: Exam) => [
+  ...(E.has.fees ? statKeys.map((k) => ({ key: k, label: statLabel[k] })) : []),
   { key: "quota", label: "Quota" },
   { key: "seat", label: "Seat category" },
-  { key: "cand", label: "Candidate category" },
+  ...(E.categories.length > 1 ? [{ key: "cand", label: "Candidate category" }] : []),
   { key: "option", label: "Choice no." },
   { key: "status", label: "Status" },
   { key: "prev", label: "Previous seat" },
@@ -67,7 +69,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const L = decideLinks(params);
   const pageSize = await pageSizeFor(PAGE_SIZE);
   const exam = await activeExam();
-  const E = exams[exam];
+  const E = await examInfo(exam);
   const [v, view] = await Promise.all([allotmentsView(params, pageSize, exam), chosenView(params, "allotments")]);
   if (!v) notFound();
   const { f, meta, inst, typed, rankError, latest, fromProfile, filters } = v;
@@ -194,7 +196,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
           {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={`${th} text-right whitespace-nowrap`}><StatHead k={k} /></th>)}
           <th scope="col" data-col="quota" className={th}>Quota</th>
           <th scope="col" data-col="seat" className={th}>Seat category</th>
-          <th scope="col" data-col="cand" className={th}>Candidate category</th>
+          {E.categories.length > 1 && <th scope="col" data-col="cand" className={th}>Candidate category</th>}
           <th scope="col" data-col="option" className={`${th} text-right`}>Choice no.</th>
           <th scope="col" data-col="status" className={th}>Status</th>
           <th scope="col" data-col="prev" className={th}>Previous seat</th>
@@ -236,9 +238,9 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
               </td>
               {/* Compact: one (i) a column (its header), not 250 a page; each card's (i)s have the exact words. */}
               <TermStatCells t={a.fees} variant="compact" of={of(a)} tdClassName="px-3 py-2" />
-              <td data-col="quota" className={short}>{a.quota}</td>
+              <td data-col="quota" className={short}><QuotaName quota={a.quota} year={a.year} /></td>
               <td data-col="seat" className={short}>{a.category}</td>
-              <td data-col="cand" className={short}>{a.candidateCategory ?? <Dash />}</td>
+              {E.categories.length > 1 && <td data-col="cand" className={short}>{a.candidateCategory ?? <Dash />}</td>}
               <td data-col="option" className={`${short} numeric text-right`}>{a.optionNo != null ? formatRank(a.optionNo) : <Dash />}</td>
               <td data-col="status" className={short}>{statusLabel[a.status] ?? a.status}</td>
               <td data-col="prev" className={`${td} min-w-48`}><PrevSeatCell prev={a.prev} L={L} /></td>
@@ -275,7 +277,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
         <Field label="Round"><Select name="round" value={filters.round} all="All rounds" options={E.rounds.map((r) => ({ value: r, label: roundLabel[r] }))} /></Field>
         <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={fromProfile?.courses ?? f.course ?? []} none="All courses" />
-        <Field label="Quota"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: q }))} /></Field>
+        <Field label="Quota"><Select name="aq" value={f.aq} all="All quotas" options={meta.quotas.map((q) => ({ value: q, label: quotaIn(E, q) }))} /></Field>
         {E.categories.length > 1 && <Field label="Seat category"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>}
         <Field label="Rank from"><input {...rankInput("from")} /></Field>
         <Field label="Rank to"><input {...rankInput("to")} /></Field>
@@ -302,7 +304,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle page="allotments" view={view} />
             {exam === DEFAULT_EXAM && <CsvLink href={L.with("/api/v1/allotments/export", { page: null, [VIEW_PARAM]: null })} what={`these ${formatRank(total)} allotments`} total={total} />}
-            {view === "table" && <AllotmentsDisplay cols={cols} />}
+            {view === "table" && <AllotmentsDisplay cols={colsOf(E)} />}
           </div>
         )}
       </div>

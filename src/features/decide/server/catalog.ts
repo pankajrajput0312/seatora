@@ -2,9 +2,12 @@ import "server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { cache as perRequest } from "react";
 import { requireDecideAccess } from "@/features/auth/lib/session";
+import { tidyLabel } from "@/features/exams/exam";
+import { exams } from "@/features/exams/registry";
 import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import { db } from "@/lib/db";
 import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Source, type Term } from "../types";
+import { termSourceName } from "@/features/cutoffs/lib/import-schema";
 import { bucketOfDegree } from "./terms";
 import { specialtyName } from "../lib/specialty-search";
 import { catalogRows, markerOf, snapshotAt } from "./snapshot";
@@ -42,6 +45,8 @@ export type Catalog = {
   retired: Map<string, string>;
   /** Slug of a college under a retired key (hashed like the key) → the key its college has now. */
   retiredSlug: Map<string, string>;
+  /** Another exam's fee source: the MCC institute-profile snapshots its fee table was made from (empty for NEET PG). */
+  feeDocs: { name: string; url: string | null }[];
   meta: {
     courses: Course[];
     specialties: { code: string; name: string }[];
@@ -79,6 +84,7 @@ export function indexCatalog(p: {
   options: { cs: string; quota: string; year: number; n: number }[];
   terms: Term[];
   retired?: { oldKey: string; oldSlug: string | null; newKey: string | null }[];
+  feeDocs?: Catalog["feeDocs"];
 }): Catalog {
   const pairs = new Map(p.pairs.map((x) => [x.cs, x]));
   const collegeByKey = new Map(p.colleges.map((c) => [c.key, c]));
@@ -115,6 +121,7 @@ export function indexCatalog(p: {
     sourceById: new Map(p.sources),
     retired: new Map(retired.map((r) => [r.oldKey, r.newKey])),
     retiredSlug: new Map(retired.flatMap((r) => (r.oldSlug ? [[r.oldSlug, r.newKey]] : []))),
+    feeDocs: p.feeDocs ?? [],
     meta: {
       courses,
       // One name per specialty: a mixed-case MCC name over an ALL-CAPS one, tidied; listed A–Z.
@@ -166,12 +173,27 @@ async function loadCatalog(exam: ExamKey, version: string): Promise<Catalog> {
   const recordsOf = (t: { collegeId: string; program: string; kind: string }) => (t.kind === "FEE" || t.kind === "STIPEND" ? feeRecords.get(`${t.collegeId}|${t.program}`) : undefined);
   const collegeKey = new Map(colleges.map((c) => [c.id, c.key]));
   const spec = new Map(specialties.map((s) => [s.id, s]));
+  // Another exam's bundle may carry only the fee table (MCC's institute profiles, no terms.ndjson): each college +
+  // program with records and no FEE or STIPEND term gets one FEE term, its source the profile, its records attached, so
+  // server/terms.ts reads it as NEET PG's. NEET PG's terms are its own (its FEE / STIPEND terms always exist).
+  const termed = new Set(terms.filter((t) => t.kind === "FEE" || t.kind === "STIPEND").map((t) => `${t.collegeId}|${t.program}`));
+  const feeOnly: Term[] =
+    exam === DEFAULT_EXAM
+      ? []
+      : [...feeRecords].flatMap(([k, recs]) => {
+          const [collegeId, program] = k.split("|");
+          const college = collegeKey.get(collegeId);
+          const r = recs[0];
+          const url = r.fee_text_src?.url ?? r.sources[0]?.url ?? null;
+          return termed.has(k) || !college ? [] : [{ college, program: program as Term["program"], kind: "FEE" as const, text: r.fee_text ?? "As the MCC institute profile declares it", amountInr: null, source: { name: r.sources.find((x) => x.url === url)?.label ?? (url ? termSourceName(url) : "MCC institute profile"), url, type: "OFFICIAL" as const }, details: { records: recs } }];
+        });
   return indexCatalog({
     exam,
     // Beds and year established are not in the MCC data; type (inferred, College.typeBasis) is imported (bundle schema
     // 2) but not shown yet. Never guessed. website: the MCC profile's (a fee cell "On college website ↗" links it).
     colleges: colleges.map((c) => ({ key: c.key, slug: c.slug, name: c.name, state: c.state, pincode: c.pincode, address: c.address, type: null, beds: null, established: null, website: c.website })),
-    courses: specialties.map((s) => ({ degree: s.degree, specialty: s.code ?? "", name: s.name, slug: s.slug })),
+    // Another exam's course names with their bundle typos tidied (exams/exam.ts tidyLabel); NEET PG's as they are.
+    courses: specialties.map((s) => ({ degree: s.degree, specialty: s.code ?? "", name: tidyLabel(exams[exam], s.name), slug: s.slug })),
     // Allotment-result PDFs only; term documents have no year or round and travel with their term.
     sources: sources.flatMap((s): [string, Source][] =>
       s.counsellingYear != null && s.round ? [[s.id, { key: s.key, url: s.url, year: s.counsellingYear, round: s.round as Round, provisional: s.provisional, name: s.name }]] : [],
@@ -187,8 +209,9 @@ async function loadCatalog(exam: ExamKey, version: string): Promise<Catalog> {
       source: { name: t.source.name, url: t.source.url, type: t.source.type },
       ...(detailsOf.has(t.id) && { details: detailsOf.get(t.id) }),
       ...(recordsOf(t) && { details: { records: recordsOf(t)! } }),
-    })),
+    })).concat(feeOnly),
     retired,
+    feeDocs: exam === DEFAULT_EXAM ? [] : sources.filter((s) => s.key.startsWith("raw/profiles_")).map((s) => ({ name: s.name, url: s.url })),
   });
 }
 

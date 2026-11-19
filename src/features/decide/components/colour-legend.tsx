@@ -1,5 +1,8 @@
+"use client";
+
 import { cn } from "@/lib/cn";
 import { feeBandText } from "../lib/stat-format";
+import { useExamInfo } from "../lib/use-decide-store";
 import { InfoTip } from "./info-tip";
 import { collegeTypeClass } from "./institute/college-type";
 import { levelClass } from "./stat-cells";
@@ -17,6 +20,8 @@ const Row = ({ head, children }: { head: string; children: React.ReactNode }) =>
 const Val = ({ c, children }: { c: string; children: React.ReactNode }) => <span className={cn("numeric font-semibold", c)}>{children}</span>;
 
 export function ColourLegend({ className }: { className?: string }) {
+  // The exam's own key: no fee, stipend or bond rows without its fee data; fee bands are NEET PG's course types only.
+  const { key, has } = useExamInfo();
   return (
     <span className={cn("inline-flex items-center gap-0.5 text-xs text-muted-foreground", className)}>
       Colour key
@@ -30,7 +35,7 @@ export function ColourLegend({ className }: { className?: string }) {
           <span className={cn(badge, collegeTypeClass.deemed)}>Deemed</span>
           <span className={cn(badge, collegeTypeClass.private)}>Private</span>
         </Row>
-        <Row head="Bond">
+        {has.fees && <><Row head="Bond">
           <Val c={levelClass.good}>No bond</Val>
           <Val c="">No bond (no colour): private / trust status inferred from the name, or a state rule may apply</Val>
           <Val c={levelClass.caution}>1Y–2Y</Val>
@@ -38,15 +43,21 @@ export function ColourLegend({ className }: { className?: string }) {
           <Val c={levelClass.heavy}>₹25 L or more to pay</Val>
           <Val c="text-muted-foreground font-normal">None declared / Not published / —</Val>
         </Row>
-        <Row head="Fee a year">
-          <Val c={levelClass.good}>low</Val>
-          <Val c="">middle (no colour)</Val>
-          <Val c={levelClass.heavy}>high</Val>
-        </Row>
-        <span className="block text-muted-foreground">{feeBandText}</span>
+        {key === "neet-pg" ? (
+          <>
+            <Row head="Fee a year">
+              <Val c={levelClass.good}>low</Val>
+              <Val c="">middle (no colour)</Val>
+              <Val c={levelClass.heavy}>high</Val>
+            </Row>
+            <span className="block text-muted-foreground">{feeBandText}</span>
+          </>
+        ) : (
+          <Row head="Fee a year"><Val c="">no colour</Val></Row>
+        )}
         <Row head="Stipend a month">
           <Val c={levelClass.caution}>below NBEMS min</Val>
-        </Row>
+        </Row></>}
         <Row head="Seats in the round">
           <Val c="text-leaf">clear</Val>
           <Val c="text-sun">virtual</Val>

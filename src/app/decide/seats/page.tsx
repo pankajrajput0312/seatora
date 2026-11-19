@@ -29,9 +29,11 @@ import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, toURLSearchParams, type Profile } from "@/features/decide/profile";
 import { allotmentTrends, getMeta } from "@/features/decide/service";
 import { fmtDay, listDay } from "@/features/decide/lib/format";
-import { roundLabel, rounds, seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
+import { rounds, seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
 import { activeExam, examGate } from "@/features/exams/active";
 import { DEFAULT_EXAM, examYears, exams, latestOf, restrictedQuota, type ExamKey } from "@/features/exams/registry";
+import { roundNameFrom } from "@/features/exams/exam";
+import { quotaIn } from "@/features/exams/exam";
 
 export const metadata: Metadata = { title: "Seats" };
 const PAGE_SIZE = 50;
@@ -57,7 +59,7 @@ const seatGroups = (lists: SeatList[]): SeatGroup[] =>
   [...new Set(lists.map((l) => `${l.year}-${l.round}`))].map((g) => {
     const ls = lists.filter((l) => `${l.year}-${l.round}` === g);
     // ponytail: a round with two clear (or virtual) PDFs shows the newest; none has so far (only newly added lists come in twos).
-    return { key: `seats-${g}`, label: `${ls[0].year} ${roundLabel[ls[0].round]}`, clear: ls.find((l) => l.kind === "clear") ?? null, virtual: ls.find((l) => l.kind === "virtual") ?? null, added: ls.filter((l) => l.kind === "new") };
+    return { key: `seats-${g}`, label: `${ls[0].year} ${roundNameFrom(ls[0].name, ls[0].round)}`, clear: ls.find((l) => l.kind === "clear") ?? null, virtual: ls.find((l) => l.kind === "virtual") ?? null, added: ls.filter((l) => l.kind === "new") };
   });
 
 export default async function SeatsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -103,7 +105,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   const keep = keepProfileParams(params);
   const matching = r.seats[list.key] ?? 0;
   const title = listTitle(list);
-  const round = `${list.year} ${roundLabel[list.round]}`;
+  const round = `${list.year} ${roundNameFrom(list.name, list.round)}`;
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const caption = matrix
@@ -117,7 +119,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   const active = [
     f.q && { label: `Search: “${f.q}”`, param: "q", href: here({ q: null }) },
     // One chip per quota, state and list: the × takes that one out.
-    ...f.quota.map((q) => ({ label: q, param: "quota", href: L.without("/decide/seats", "quota", q) })),
+    ...f.quota.map((q) => ({ label: quotaIn(exams[exam], q), param: "quota", href: L.without("/decide/seats", "quota", q) })),
     ...f.st.map((s) => ({ label: s, param: "st", href: L.without("/decide/seats", "st", s) })),
     ...(matrix ? f.has : []).map((k) => ({ label: `${round}: ${hasWords[k].toLowerCase()}`, param: "has", href: L.without("/decide/seats", "has", k) })),
     f.scat && { label: f.scat === "all" ? "All seat categories" : `${f.scat} seats`, param: "scat", href: here({ scat: null }) },
@@ -333,8 +335,8 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
           <ViewPanes
             page="seats"
             view={view}
-            cards={<SeatCards rows={r.rows} list={list} lists={several ? roundLists : [list]} ranked={!!profile} L={L} title={caption} latest={latest} exam={exam} />}
-            table={<SeatTable rows={r.rows} lists={r.lists} current={list.key} sort={sort} ranked={!!profile} L={L} caption={caption} latest={latest} exam={exam} />}
+            cards={<SeatCards rows={r.rows} list={list} lists={several ? roundLists : [list]} ranked={!!profile} L={L} title={caption} latest={latest} exam={exams[exam]} />}
+            table={<SeatTable rows={r.rows} lists={r.lists} current={list.key} sort={sort} ranked={!!profile} L={L} caption={caption} latest={latest} exam={exams[exam]} />}
           />
           <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: latest.year }]} terms={termDocs(r.rows.map((x) => x.fees))} />
         </>

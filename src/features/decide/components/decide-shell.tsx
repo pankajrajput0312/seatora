@@ -13,8 +13,9 @@ import { LogoMark } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { LogOutButton } from "@/features/auth/components/log-out-button";
-import { formatRank } from "@/features/cutoffs/lib/format";
-import { DEFAULT_EXAM, examKeys, exams, perGroup, scopedKey, showsPage, type ExamKey } from "@/features/exams/registry";
+import { compactRank, formatRank } from "@/features/cutoffs/lib/format";
+import { examShows, neetPg, type Exam } from "@/features/exams/exam";
+import { DEFAULT_EXAM, scopedKey, type ExamKey } from "@/features/exams/keys";
 import { MAX_COMPARE } from "../lib/choices";
 import { pageFilters, withFilters } from "../lib/links";
 import { readLocal } from "../lib/local-store";
@@ -70,21 +71,23 @@ const bottom = [
 /** `account`: the signed-in user (layout.tsx) for the sidebar's footer and the header's plan chip; null signed out. */
 /** `listName`: the round she fills next, for her first choice list's name (RenamedSaved). */
 /**
- * `exam`: staff only (layout.tsx): the exam shown, with a switcher in the header; the nav leaves out pages it has no data
- * for, and every saved thing (her profile, choice lists, compare tray) is that exam's own (ExamContext).
+ * `exam`: staff only (layout.tsx): the exam shown, with a switcher (`choices`: every exam, with the pages each lacks) in
+ * the header; the nav leaves out pages it has no data for, and every saved thing (her profile, choice lists, compare
+ * tray) is that exam's own (ExamContext). Without it NEET PG (exams/exam.ts): no other exam's words reach the browser.
  */
 export function DecideShell(props: ShellProps) {
   return (
-    <ExamContext value={props.exam ?? DEFAULT_EXAM}>
+    <ExamContext value={props.exam ?? neetPg}>
       <Shell {...props} />
     </ExamContext>
   );
 }
-type ShellProps = { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; exam?: ExamKey; account: ShellAccount | null; listName?: string | null; children: React.ReactNode };
+export type ExamChoice = { key: ExamKey; label: string; lacks: string[] };
+type ShellProps = { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; exam?: Exam; choices?: ExamChoice[]; account: ShellAccount | null; listName?: string | null; children: React.ReactNode };
 
-function Shell({ meta, phone, ask, admin, exam, account, listName, children }: ShellProps) {
-  const ex = exam ?? DEFAULT_EXAM;
-  const E = exams[ex];
+function Shell({ meta, phone, ask, admin, exam, choices, account, listName, children }: ShellProps) {
+  const E = exam ?? neetPg;
+  const ex = E.key;
   const pathname = usePathname();
   const sp = useSearchParams();
   const router = useRouter();
@@ -212,7 +215,7 @@ function Shell({ meta, phone, ask, admin, exam, account, listName, children }: S
   // The sidebar: the Plan … Research groups, then Account (Refer & earn), then Help with Ask and Admin for those who have
   // them. Her name, plan and "Upgrade" are the footer (AccountFooter), pinned to the sidebar's and the menu's bottom.
   const help = sections.at(-1)!;
-  const shows = ({ href }: { href: string }) => !exam || showsPage(exam, href);
+  const shows = ({ href }: { href: string }) => examShows(E, href);
   const nav = [
     ...sections.slice(0, -1),
     { title: "Account", items: [{ href: "/decide/refer", label: "Refer & earn", icon: Gift }] },
@@ -220,14 +223,16 @@ function Shell({ meta, phone, ask, admin, exam, account, listName, children }: S
   ]
     .map((sec) => ({ ...sec, items: sec.items.filter(shows) }))
     .filter((sec) => sec.items.length);
-  // Staff's exam switcher: ?exam= becomes the seatora_exam cookie (src/middleware.ts), which only staff's pages heed. The
-  // URL's profile and page filters are this exam's: they go, and the next exam's saved profile comes in (none: none).
-  // A page that exam lacks opens Home; an institute page, the institutes (its slug may be another exam's).
+  // Staff's exam switcher: ?exam= goes to /decide/exam (src/middleware.ts), which sets the seatora_exam cookie for staff
+  // only (app/decide/exam/route.ts). The URL's profile and page filters are this exam's: they go, and the next exam's
+  // saved profile comes in (none: none). A page that exam lacks opens Home; an institute page, the institutes (its slug
+  // may be another exam's).
   const pickExam = (k: ExamKey) => {
     const saved = profileSchema.safeParse(readLocal<unknown>(scopedKey(PROFILE_KEY, k), null));
     const next = saved.success ? profileToParams(saved.data) : new URLSearchParams();
     next.set("exam", k);
-    const path = pathname.startsWith("/decide/institutes/") ? "/decide/institutes" : showsPage(k, pathname) ? pathname : "/decide";
+    const lacks = choices?.find((c) => c.key === k)?.lacks ?? [];
+    const path = pathname.startsWith("/decide/institutes/") ? "/decide/institutes" : lacks.includes(pathname) ? "/decide" : pathname;
     navigating();
     // A full load: the layout (this shell's exam, the dialog's courses, every saved store) is the next exam's too; a
     // client navigation keeps the layout as it was.
@@ -248,13 +253,13 @@ function Shell({ meta, phone, ask, admin, exam, account, listName, children }: S
               // Phones: the chips drop words by the bar's width in rem (a container query, so a larger text size drops them
               // sooner), then shrink (globals.css): never over the logo.
               <span data-topbar-end className="flex min-w-0 items-center gap-2.5">
-                {exam && (
-                  <select aria-label="Exam" value={exam} onChange={(e) => pickExam(e.target.value as ExamKey)} className="hit h-8 rounded-full border border-input bg-card px-2.5 text-xs font-semibold">
-                    {examKeys.map((k) => <option key={k} value={k}>{exams[k].label}</option>)}
+                {choices && (
+                  <select aria-label="Exam" value={ex} onChange={(e) => pickExam(e.target.value as ExamKey)} className="hit h-8 rounded-full border border-input bg-card px-2.5 text-xs font-semibold">
+                    {choices.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
                   </select>
                 )}
                 {account && (
-                  <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className="hit inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap">
+                  <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className={cn("hit inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap", !account.upgrade && "@max-[25rem]/topbar:hidden")}>
                     <span className="sr-only">Your plan: </span>
                     <span className={cn("truncate font-semibold", account.upgrade && "@max-[25rem]/topbar:hidden")}>{account.upgrade ? "Free" : account.plan.split(" · ")[0]}</span>
                     {account.upgrade && <span className="-mr-1.5 rounded-full bg-[#5ccfe6] px-2 py-0.5 font-semibold text-[#0b0e12]">Upgrade</span>}
@@ -272,9 +277,9 @@ function Shell({ meta, phone, ask, admin, exam, account, listName, children }: S
                   </span>
                 )}
                 {/* Phones: the rank and its edit button as one chip here (the sidebar, with its rank card, is in the drawer). */}
-                <button type="button" data-profile-edit aria-label={shown ? `${E.rankWord} ${formatRank(shown.rank)} ${profileSub(ex, shown)}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(true)}
+                <button type="button" data-profile-edit aria-label={shown ? `${E.rankWord} ${formatRank(shown.rank)} ${profileSub(E, shown)}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(true)}
                   className="hit inline-flex h-8 min-w-0 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
-                  {shown ? <><span className="numeric truncate font-semibold"><span className="@max-[23.75rem]/topbar:hidden">{`${E.rankWord} `}</span>{formatRank(shown.rank)}</span><span className="truncate text-muted-foreground @max-[25rem]/topbar:hidden">{perGroup(ex) ? `· ${profileSub(ex, shown)}` : <>· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</>}</span></> : <span className="truncate">{hydrated ? <>Set <span className="@max-[23.75rem]/topbar:hidden">your </span>rank</> : "Loading…"}</span>}
+                  {shown ? <><span className="numeric shrink-0 font-semibold"><span className="@max-[23.75rem]/topbar:hidden">{`${E.rankWord} `}</span><span className="@max-[21.25rem]/topbar:hidden">{formatRank(shown.rank)}</span><span className="hidden @max-[21.25rem]/topbar:inline">{compactRank(shown.rank)}</span></span><span className="truncate text-muted-foreground @max-[25rem]/topbar:hidden">{E.perGroup ? `· ${profileSub(E, shown)}` : <>· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</>}</span></> : <span className="truncate">{hydrated ? <>Set <span className="@max-[23.75rem]/topbar:hidden">your </span>rank</> : "Loading…"}</span>}
                   <Pencil className="size-3 shrink-0 text-muted-foreground" aria-hidden />
                 </button>
                 <Link href="/" className="hidden min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground md:inline-flex">Back to site</Link>
@@ -293,7 +298,7 @@ function Shell({ meta, phone, ask, admin, exam, account, listName, children }: S
                   <>
                     <p className="mt-0.5 text-2xl font-bold tracking-tight">{formatRank(shown.rank)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {perGroup(ex) ? profileSub(ex, shown) : <>{shown.category}{shown.pwd ? " PwD" : ""}</>}, {shown.pairs?.length ? `${shown.pairs.length} ${shown.pairs.length === 1 ? "course" : "courses"}` : shown.specialties.length ? `${shown.specialties.length} ${shown.specialties.length === 1 ? "specialty" : "specialties"}` : "all specialties"}
+                      {E.perGroup ? profileSub(E, shown) : <>{shown.category}{shown.pwd ? " PwD" : ""}</>}, {shown.pairs?.length ? `${shown.pairs.length} ${shown.pairs.length === 1 ? "course" : "courses"}` : shown.specialties.length ? `${shown.specialties.length} ${shown.specialties.length === 1 ? "specialty" : "specialties"}` : "all specialties"}
                     </p>
                   </>
                 ) : (

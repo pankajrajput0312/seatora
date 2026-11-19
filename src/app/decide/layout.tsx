@@ -18,9 +18,10 @@ import { EmptyState } from "@/features/decide/components/ui";
 import { deviceView } from "@/features/decide/components/view-toggle";
 import { nextChoiceFilling, roundName, stepsNow } from "@/features/decide/lib/round-status";
 import { roundStatus } from "@/features/decide/server/notices";
-import { examGroups, getMeta } from "@/features/decide/service";
-import { activeExam } from "@/features/exams/active";
-import { DEFAULT_EXAM, exams, perGroup } from "@/features/exams/registry";
+import { examGroupCourses, examGroups, getMeta } from "@/features/decide/service";
+import { activeExam, examInfo } from "@/features/exams/active";
+import { examShows } from "@/features/exams/exam";
+import { DEFAULT_EXAM, examKeys, exams, pageNeeds, perGroup } from "@/features/exams/registry";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { PlanPrompt } from "@/features/plans/components/plan-prompt";
 import { freeNow, passState, planLine, shortDate } from "@/features/plans/plans";
@@ -41,6 +42,10 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: { default: "Decide", template: "%s · Decide · Seatora" } };
 export const viewport: Viewport = { themeColor: "#f3f6f9", viewportFit: "cover" }; // chart paper (--color-background inside .app)
 
+/** Staff's exam switcher: every exam, with the pages it has no data for (the switcher opens Home instead). */
+const examChoices = () =>
+  Promise.all(examKeys.map(async (key) => { const E = await examInfo(key); return { key, label: E.label, lacks: Object.keys(pageNeeds).filter((href) => !examShows(E, href)) }; }));
+
 export default async function DecideLayout({ children }: { children: React.ReactNode }) {
   // No database (or it is down): an honest "Data unavailable" inside the app shell, never stand-in data.
   let meta: ProfileMeta | null = null;
@@ -48,7 +53,7 @@ export default async function DecideLayout({ children }: { children: React.React
   const exam = await activeExam();
   try {
     const m = await getMeta(exam);
-    meta = { courses: m.courses, specialties: m.specialties, degrees: m.degrees, quotas: m.quotas, states: m.states, ...(perGroup(exam) && { groups: await examGroups(exam) }) };
+    meta = { courses: m.courses, specialties: m.specialties, degrees: m.degrees, quotas: m.quotas, states: m.states, ...(perGroup(exam) && { groups: await examGroups(exam), groupCourses: await examGroupCourses(exam) }) };
   } catch (e) {
     unstable_rethrow(e); // the sign-in redirect when access is gone
     console.error("[decide] data unavailable", e);
@@ -79,7 +84,7 @@ export default async function DecideLayout({ children }: { children: React.React
   return (
     <div className={`app ${app.variable} ${mono.variable} min-h-screen`}>
       <AstryxProvider>
-        <DecideShell phone={phone} ask={ask} admin={admin} exam={admin ? exam : undefined} account={account} listName={listName} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
+        <DecideShell phone={phone} ask={ask} admin={admin} exam={admin ? await examInfo(exam) : undefined} choices={admin ? await examChoices() : undefined} account={account} listName={listName} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (
             <NavPending>{children}</NavPending>
           ) : (

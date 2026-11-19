@@ -5,9 +5,10 @@ import type { DecideLinks } from "../lib/links";
 import { LATER_ROUNDS_NOTE, pastOf, reachLabel, seatsBelowNotes, type Deepest, type Latest } from "../lib/reach";
 import type { ChoiceItem } from "../lib/choices";
 import type { OptionRow } from "../service";
-import { roundLabel, rounds, seatKindLabel, type Round, type SeatList, type Term } from "../types";
+import { rounds, seatKindLabel, type Round, type SeatList, type Term } from "../types";
 import { Closing, Dash, Provisional, TermText } from "./bits";
 import { smallLink } from "./ui";
+import { RoundName, RoundNames } from "./round-name";
 
 // Server-safe on purpose (no "use client"): the institute and compare pages render these on the server, and the
 // Options list (option-actions.tsx, a client component) renders them in the browser.
@@ -42,8 +43,8 @@ export const seatKindShort = (k: SeatList["kind"]) => (k === "new" ? "newly adde
  * the year is in each cell's name and the source line).
  */
 export function SeatsHead({ list, short }: { list: SeatList; short?: boolean }) {
-  if (short) return <span className="whitespace-nowrap">{roundLabel[list.round]}<span className="block font-normal">{seatKindShort(list.kind)}<span className="sr-only"> seats</span></span></span>;
-  return <span className="whitespace-nowrap">{roundLabel[list.round]} seats<span className="block font-normal">{seatKindLabel[list.kind].toLowerCase()}</span></span>;
+  if (short) return <span className="whitespace-nowrap"><RoundName year={list.year} round={list.round} /><span className="block font-normal">{seatKindShort(list.kind)}<span className="sr-only"> seats</span></span></span>;
+  return <span className="whitespace-nowrap"><RoundName year={list.year} round={list.round} /> seats<span className="block font-normal">{seatKindLabel[list.kind].toLowerCase()}</span></span>;
 }
 
 /** `n` seats of one option (`at`, named `name`) in one list, linking to them on Seats; "—" when the list prints none. `end`: right-aligned (columns). */
@@ -54,7 +55,7 @@ export function SeatsLink({ n, list, L, at, name, end }: { n: number | null | un
   if (n == null) return <Dash />;
   return (
     <Link href={L.seats({ list: list.key, ...at })} className={`${smallLink} numeric min-w-11 font-semibold ${seatKindClass[list.kind]} ${end ? "justify-end" : ""}`}>
-      {formatRank(n)}<span className="sr-only"> seats in the {list.year} {roundLabel[list.round]} {seatKindLabel[list.kind].toLowerCase()} list: {name}</span>
+      {formatRank(n)}<span className="sr-only"> seats in the {list.year} <RoundName year={list.year} round={list.round} /> {seatKindLabel[list.kind].toLowerCase()} list: {name}</span>
     </Link>
   );
 }
@@ -70,10 +71,10 @@ export function SeatsBelowNote({ r, latest, includeLatest = true }: { r: Pick<Op
 }
 
 /** A closing rank with its round and seat category, marked Provisional when its MCC result is. */
-export function ClosingCell({ d }: { d: Deepest | null | undefined }) {
+export function ClosingCell({ d, year }: { d: Deepest | null | undefined; year?: number }) {
   return (
     <>
-      <Closing d={d} />
+      <Closing d={d} year={year} />
       {d?.provisional && <span className="mt-1 block"><Provisional when /></span>}
     </>
   );
@@ -101,7 +102,7 @@ export function RoundGrid({ row, caption }: { row: Pick<OptionRow, "grid" | "rea
         <thead>
           <tr className="text-muted-foreground">
             <th scope="col" className="py-1 pr-3 text-left font-normal">Year</th>
-            {used.map((r) => <th key={r} scope="col" className="px-2 py-1 text-right font-normal">{roundLabel[r as Round]}</th>)}
+            {used.map((r) => <th key={r} scope="col" className="px-2 py-1 text-right font-normal"><RoundNames years={years.filter((y) => row.grid[y]?.[r])} round={r} /></th>)}
           </tr>
         </thead>
         <tbody>

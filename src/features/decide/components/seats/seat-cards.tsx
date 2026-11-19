@@ -3,14 +3,15 @@ import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import type { DecideLinks } from "../../lib/links";
 import type { Latest } from "../../lib/reach";
-import { DEFAULT_EXAM, restrictedQuota, type ExamKey } from "@/features/exams/registry";
-import { roundLabel, seatKindLabel, type SeatKind, type SeatList } from "../../types";
+import { isRestricted, neetPg, type Exam } from "@/features/exams/exam";
+import { seatKindLabel, type SeatKind, type SeatList } from "../../types";
 import { Dash, Provisional, ReachBadge } from "../bits";
 import { Beds } from "../pages/beds";
 import { ResultCard, ResultCards } from "../result-card";
 import { TermStatCells } from "../stat-cells";
 import { TypeBadge } from "../type-badge";
 import type { SeatLine } from "./find-seats";
+import { RoundName } from "../round-name";
 
 // Seat rows as compact cards (the Seats page's Cards view, every view: matrix, one list, compare): the round, quota and
 // seat category on top, the picked list's seats as the big number, the institute, course and its other lists' seats,
@@ -30,7 +31,7 @@ const shortKind: Record<SeatKind, string> = { clear: "Clear", virtual: "Virtual"
  * round (All rounds) shows its newest list with seats instead, its round in the chip. `onDetails`: the matrix's drawer,
  * by row key (a Details button per card). `latest`: lib/reach.ts latestRound.
  */
-export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, latest, exam = DEFAULT_EXAM }: {
+export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, latest, exam = neetPg }: {
   rows: CardRow[];
   list: SeatList;
   lists: SeatList[];
@@ -40,7 +41,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
   onDetails?: (key: string) => void;
   latest: Latest;
   /** The exam shown: which quotas are restricted. */
-  exam?: ExamKey;
+  exam?: Exam;
 }) {
   const sameRound = (a: SeatList, b: SeatList) => a.year === b.year && a.round === b.round;
   return (
@@ -58,9 +59,9 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
           <ResultCard
             key={`${k}|${i}`}
             chips={[
-              `${own.year} · ${roundLabel[own.round]}`,
+              <>{own.year} · <RoundName year={own.year} round={own.round} /></>,
               r.quota ?? "Quota not printed",
-              r.quota != null && restrictedQuota(exam, r.quota) && <Badge tone="warning">Restricted</Badge>,
+              r.quota != null && isRestricted(exam, r.quota) && <Badge tone="warning">Restricted</Badge>,
               `${r.category} seat`,
             ]}
             actions={onDetails && (
@@ -85,7 +86,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
                   {d ? (
                     <span>
                       {/* As deepestText: "Deepest 2025: 60,351 (Stray)", every round counted. */}
-                      Deepest <span className="numeric">{d.year}:</span> <span className="numeric font-semibold text-foreground">{formatRank(d.closing)}</span> ({roundLabel[d.round]})
+                      Deepest <span className="numeric">{d.year}:</span> <span className="numeric font-semibold text-foreground">{formatRank(d.closing)}</span> (<RoundName year={d.year} round={d.round} />)
                       {d.provisional && <> <Provisional when /></>}
                     </span>
                   ) : (

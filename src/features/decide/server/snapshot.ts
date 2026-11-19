@@ -57,14 +57,25 @@ export async function catalogRows(db: PrismaClient, exam: ExamKey = DEFAULT_EXAM
   return { sources, colleges, specialties, pairs, terms, options, details, retired, feeTable };
 }
 
-export type InfoRow = { key: string; ids: string[] | null; url: string | null; web: string | null; type: string | null; basis: string | null; beds: number | null; kind: string | null; meta: ValueMeta | null; own: boolean | null };
-/** hospitalInfo's rows (components/institute/institute-data.ts): the exam's colleges, with its clinical facts. */
+/** `pg` (another exam's rows only): NEET PG has the college too, so its row is NEET PG's record of the institution. */
+export type InfoRow = { key: string; ids: string[] | null; url: string | null; web: string | null; type: string | null; basis: string | null; beds: number | null; kind: string | null; meta: ValueMeta | null; own: boolean | null; pg?: boolean };
+/**
+ * hospitalInfo's rows (components/institute/institute-data.ts): the exam's colleges, with their hospital's clinical
+ * facts. Those are about the institution, not an exam: NEET PG's record of it (the only one), whichever exam is read.
+ */
 export const infoRows = (db: PrismaClient, exam: ExamKey = DEFAULT_EXAM) =>
-  db.$queryRaw<InfoRow[]>`
+  exam === DEFAULT_EXAM
+    ? db.$queryRaw<InfoRow[]>`
     SELECT c.key, c."mccIds" AS ids, c."mccProfileUrl" AS url, c.website AS web, c.type, c."typeBasis" AS basis,
       (f.data->'facts'->>'beds_total')::int AS beds, f.data->'facts'->>'beds_kind' AS kind,
       COALESCE(f.data->'values_meta'->'facts.beds_total', f.data->'values_meta'->'facts') AS meta, f.data->'values_meta' ? 'facts.beds_total' AS own
-    FROM "College" c JOIN "CollegeExam" e ON e."collegeId" = c.id AND e.exam = ${exam} LEFT JOIN "ClinicalFacts" f ON f."collegeId" = c.id AND f.exam = ${exam}`;
+    FROM "College" c JOIN "CollegeExam" e ON e."collegeId" = c.id AND e.exam = ${exam} LEFT JOIN "ClinicalFacts" f ON f."collegeId" = c.id AND f.exam = ${exam}`
+    : db.$queryRaw<InfoRow[]>`
+    SELECT c.key, c."mccIds" AS ids, c."mccProfileUrl" AS url, c.website AS web, c.type, c."typeBasis" AS basis,
+      (f.data->'facts'->>'beds_total')::int AS beds, f.data->'facts'->>'beds_kind' AS kind,
+      COALESCE(f.data->'values_meta'->'facts.beds_total', f.data->'values_meta'->'facts') AS meta, f.data->'values_meta' ? 'facts.beds_total' AS own,
+      EXISTS (SELECT 1 FROM "CollegeExam" p WHERE p."collegeId" = c.id AND p.exam = ${DEFAULT_EXAM}) AS pg
+    FROM "College" c JOIN "CollegeExam" e ON e."collegeId" = c.id AND e.exam = ${exam} LEFT JOIN "ClinicalFacts" f ON f."collegeId" = c.id AND f.exam = ${DEFAULT_EXAM}`;
 
 /** A seat list row (SeatCount) as listSeats reads it (server/seats.ts). */
 export type SeatDbRow = { l: string; k: string; dg: string; sc: string; slug: string | null; name: string | null; q: string | null; c: string; n: number; cs: string | null };

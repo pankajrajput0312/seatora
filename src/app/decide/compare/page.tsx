@@ -19,15 +19,16 @@ import { parseSearchParams } from "@/features/decide/lib/params";
 import { deepestOf, eligibleCategories, LATER_ROUNDS_NOTE, latestText, pastOf } from "@/features/decide/lib/reach";
 import { inrFull } from "@/features/decide/lib/stat-format";
 import { lowestRisk } from "@/features/decide/lib/term-filters";
-import { roundLabel, rounds, seatKindLabel, type SeatList } from "@/features/decide/types";
+import { rounds, seatKindLabel, type SeatList } from "@/features/decide/types";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { statCells, statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { Paywall } from "@/features/plans/components/paywall";
 import { currentPlan } from "@/features/plans/usage";
 import { currentOptionIds, currentSeatLists, getMeta, getOptionsByIds, type OptionRow } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { activeExam } from "@/features/exams/active";
-import { examYears, exams, latestOf } from "@/features/exams/registry";
+import { activeExam, examInfo } from "@/features/exams/active";
+import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
+import { examYears, latestOf } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Compare" };
 
@@ -41,7 +42,7 @@ const paramsSchema = z.object({ ids: z.array(z.string().min(1).max(300)).default
  * Closing ranks by year and round, one block a year (newest first), no scroller of its own: "2025: deepest 60,351
  * (Stray)" (the one definition, lib/reach.ts deepestOf), then each round with its seat category, wrapping in the column.
  */
-function YearLines({ r }: { r: OptionRow }) {
+function YearLines({ r, E }: { r: OptionRow; E: Exam }) {
   const years = Object.keys(r.grid).map(Number).sort((a, b) => b - a);
   if (!years.length) return <span className="text-xs text-muted-foreground">{r.reach === "new" ? "Never allotted before: no closing rank in any round." : "No closing rank on these seat categories in any round."}</span>;
   return (
@@ -52,12 +53,12 @@ function YearLines({ r }: { r: OptionRow }) {
         return (
           <div key={y}>
             <dt className="font-semibold">
-              <span className="numeric">{y}</span>: deepest <span className="numeric">{d ? formatRank(d.closing) : "—"}</span>{d && ` (${roundLabel[d.round]})`}
+              <span className="numeric">{y}</span>: deepest <span className="numeric">{d ? formatRank(d.closing) : "—"}</span>{d && ` (${roundIn(E, y, d.round)})`}
             </dt>
             <dd className="text-muted-foreground">
               {cells.map((c, i) => (
                 <span key={c.round} className="inline-block whitespace-nowrap pr-1">
-                  {roundLabel[c.round]} <span className="numeric text-foreground">{formatRank(c.closing)}</span> {c.category}{i < cells.length - 1 && " ·"}
+                  {roundIn(E, y, c.round)} <span className="numeric text-foreground">{formatRank(c.closing)}</span> {c.category}{i < cells.length - 1 && " ·"}
                 </span>
               ))}
             </dd>
@@ -99,8 +100,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const options = known.slice(0, cap);
   const L = decideLinks(params);
   const lists: SeatList[] = options.length ? await currentSeatLists(exam) : [];
-  const round = lists[0] && `${lists[0].year} ${roundLabel[lists[0].round]}`;
-  const fees = exams[exam].has.fees; // another exam may have no fee, stipend or bond data: no such rows
+  const E = await examInfo(exam);
+  const round = lists[0] && `${lists[0].year} ${roundIn(E, lists[0].year, lists[0].round)}`;
+  const fees = E.has.fees; // another exam may have no fee, stipend or bond data: no such rows
   const risk = fees && options.length > 1 && lowestRisk(options.map((r) => ({ name: r.college.name, t: r.fees })));
   const yearLabel = (y: number) => meta.years.find((x) => x.year === y)?.label ?? String(y);
   const latest = latestOf(meta.sources, exam);
@@ -108,10 +110,11 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   // Each option's stat cells (statKeys order), one per row.
   const terms = new Map(options.map((r) => [r.id, statCells(r.fees)]));
   const rows: { label: string; cell: (r: OptionRow) => React.ReactNode }[] = [
-    { label: "Quota", cell: (r) => r.quota },
+    { label: "Quota", cell: (r) => quotaIn(E, r.quota) },
     { label: "State", cell: (r) => r.college.state ?? <Dash /> },
     { label: "Type", cell: (r) => (r.hospital?.type ? <TypeBadge type={r.hospital.type} of={r.college.name} /> : <Dash />) },
-    { label: "Beds (as reported)", cell: (r) => (r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} of={`${r.college.name}, ${courseName(r)}, ${r.quota}`} /> : <Dash />) },
+    // NEET MDS: no hospital beds (dental colleges): no row.
+    ...(E.has.beds ? [{ label: "Beds (as reported)", cell: (r: OptionRow) => (r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} of={`${r.college.name}, ${courseName(r)}, ${r.quota}`} /> : <Dash />) }] : []),
     {
       label: "Your reach",
       cell: (r) =>
@@ -140,10 +143,10 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           { label: "If you leave", cell: (r: OptionRow) => <IfYouLeave r={r} leaving={terms.get(r.id)!.find((c) => c.key === "leaving")!.full} /> },
         ]
       : []),
-    { label: `${latestText(latest)} closing`, cell: (r) => <ClosingCell d={r.latest} /> },
-    { label: `${last} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[last]} /> },
-    { label: `${older} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[older]} /> },
-    { label: "Closing by year and round", cell: (r) => <YearLines r={r} /> },
+    { label: `${latestText(latest)} closing`, cell: (r) => <ClosingCell d={r.latest} year={latest.year} /> },
+    { label: `${last} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[last]} year={last} /> },
+    { label: `${older} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[older]} year={older} /> },
+    { label: "Closing by year and round", cell: (r) => <YearLines r={r} E={E} /> },
     {
       label: "Allotments made (all rounds, all categories)",
       cell: (r) => (

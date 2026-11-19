@@ -16,6 +16,7 @@ import { baseCategories, openQuotas, optionId, roundLabel, rounds, seatKindLabel
 import { collegeTypeLabel } from "../institute/college-type";
 import { reportedCount } from "../institute/hospital-bits";
 import { hospitalInfo, type HospitalInfo, type ReportedBeds } from "../institute/institute-data";
+import { roundNameFrom } from "@/features/exams/exam";
 
 export const seatSorts = ["reach", "closing", "seats", "college", "state", "fee", "bond"] as const;
 export type SeatSort = (typeof seatSorts)[number];
@@ -313,7 +314,7 @@ export async function seatsView(f: SeatsParams, profile: Profile | null, pageSiz
   if (!list) return { ...base, r: null };
   const cats = f.scat === "all" ? undefined : f.scat ? [f.scat] : (mine ?? undefined);
   // As on Options: with a profile, no quota ticked means the open quotas, never the restricted ones.
-  const quotas = f.squota ? [f.squota] : profile ? profileQuotas(profile, exam) : f.quota;
+  const quotas = f.squota ? [f.squota] : profile ? profileQuotas(profile, exams[exam].quotas) : f.quota;
   const r = await findSeats(
     {
       list: list.key,
@@ -353,7 +354,7 @@ export const csvLine = (xs: (string | number | null | undefined)[]) => xs.map(fi
 
 const listName = (l: SeatList, lists: SeatList[]) => {
   const day = lists.some((x) => x !== l && x.kind === l.kind && x.year === l.year && x.round === l.round) ? listDay(l) : undefined;
-  return `${l.year} ${roundLabel[l.round]} ${seatKindLabel[l.kind].toLowerCase()}${day ? ` (${day} PDF)` : ""}`;
+  return `${l.year} ${roundNameFrom(l.name, l.round)} ${seatKindLabel[l.kind].toLowerCase()}${day ? ` (${day} PDF)` : ""}`;
 };
 /** "2026 R2 clear vacancy seats", "2026 R2 newly added seats". */
 const seatsCol = (l: SeatList, lists: SeatList[]) => `${listName(l, lists)}${l.kind === "new" ? "" : " seats"}`;

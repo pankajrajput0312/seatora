@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { activeExam } from "@/features/exams/active";
+import { roundNameFrom } from "@/features/exams/exam";
 import { DEFAULT_EXAM, exams, roundNameIn } from "@/features/exams/registry";
 import { fmtDay } from "../lib/format";
 import { roundName } from "../lib/round-status";
 import { listNotices } from "../server/notices";
+import { getCatalog } from "../server/catalog";
 import { seatChanges, seatLists } from "../server/seats";
 import { getMeta } from "../service";
 import type { DecideLinks } from "../lib/links";
@@ -47,7 +49,9 @@ export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLin
   const sameDay = once(each.flatMap((e) => e.sameDay));
   const { year, round } = lists[0];
   const noticesHref = L.to("/decide/counselling", { tab: "announcements", kind: "seat_matrix", year, round });
-  const named = lists.length === 1 ? `the ${listTitle(lists[0])} list` : `the ${year} ${roundLabel[round]} seat lists`;
+  const named = lists.length === 1 ? `the ${listTitle(lists[0])} list` : `the ${year} ${roundNameFrom(lists[0].name, round)} seat lists`;
+  // Another exam has no MCC notices in the data (no Schedule page): no link to them.
+  const notices = exams[exam].has.notices;
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
       {/* The later and same-day notices are in the page's Sources too. The page's own MCC documents are numbered first
@@ -67,7 +71,7 @@ export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLin
           })}
           Seats MCC added or removed after {lists.length === 1 ? "it" : "them"} are not applied here.
           {sameDay.length > 0 && <> Published the same day as the list, so it may already include {sameDay.length === 1 ? "this notice" : "these notices"}: {noticeLinks(sameDay)}.</>}{" "}
-          <Link href={noticesHref} className={`${smallLink} text-sky`}>All MCC seat notices, PG {year} {roundName[round]}</Link>
+          {notices && <Link href={noticesHref} className={`${smallLink} text-sky`}>All MCC seat notices, {exam === DEFAULT_EXAM ? "PG" : exams[exam].label} {year} {roundName[round]}</Link>}
         </InfoTip>
       </span>
       {later.length > 0 && (
@@ -106,6 +110,8 @@ export async function DataSource({ used, terms, results = true }: { used?: Used[
       links: pdfs.filter((s) => s.year === y).map((s) => ({ label: roundNameIn(exam, meta.sources, s.year, s.round), url: s.url, title: s.name, provisional: s.provisional, order: rounds.indexOf(s.round) })),
     })),
     ...(terms ?? []).flatMap((t) => (t ? [{ name: t.name, url: t.url, type: t.type }] : [])),
+    // Another exam's fee figures: also the MCC profile snapshot they were read from (NEET PG: none).
+    ...(terms?.length ? (await getCatalog(exam)).feeDocs.map((d) => ({ ...d, type: "OFFICIAL" as const })) : []),
   ];
   if (!docs.length) return null;
   const provisional = pdfs.filter((s) => s.provisional).sort((a, b) => b.year - a.year || rounds.indexOf(a.round) - rounds.indexOf(b.round));

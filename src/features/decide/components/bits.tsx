@@ -7,6 +7,7 @@ import { pastOf, reachLabel, reachTone, type Deepest, type Latest, type Reach } 
 import { roundLabel, type Term } from "../types";
 import { InfoTip } from "./info-tip";
 import { SourceRef } from "./page-sources";
+import { RoundName } from "./round-name";
 
 export const HISTORY_CAPTION =
   "Based on previous years' closing ranks. History, not a prediction — seat matrix, category and competition change every round.";
@@ -68,13 +69,13 @@ export function ReachBadge({ reach, provisional, latest, includeLatest = true, o
   );
 }
 
-/** A deepest closing rank with its round and seat category; "—" (with sr-only text) when missing. */
-export function Closing({ d }: { d: Deepest | null | undefined }) {
+/** A deepest closing rank with its round (named as that `year`'s PDFs call it, when given) and seat category; "—" (with sr-only text) when missing. */
+export function Closing({ d, year }: { d: Deepest | null | undefined; year?: number }) {
   if (!d) return <Dash />;
   return (
     <span className="numeric">
       <span className="text-[15px] font-semibold">{formatRank(d.closing)}</span>
-      <span className="block text-xs font-normal text-muted-foreground">{roundLabel[d.round]}, {d.category} seat</span>
+      <span className="block text-xs font-normal text-muted-foreground">{year == null ? roundLabel[d.round] : <RoundName year={year} round={d.round} />}, {d.category} seat</span>
     </span>
   );
 }

@@ -4,7 +4,8 @@ import { LATEST_YEAR, latestRound, latestText, PAST_YEARS, pastOf, reachLabel, r
 import { CHOICES_KEY, COMPARE_KEY } from "@/features/decide/lib/choices";
 import { PROFILE_KEY, profileQuotas } from "@/features/decide/profile";
 import { baseCategories, openQuotas, openQuotasNote, quotaScopeNote, rounds, type Source } from "@/features/decide/types";
-import { DEFAULT_EXAM, examFor, examKeys, exams, examYears, groupOf, groupsOf, isExam, latestOf, markerKey, pageNeeds, restrictedQuota, roundNameIn, scopedKey, showsPage } from "./registry";
+import { completeYear, examShows, headYearOf, neetPg, quotaIn, roundIn, roundNamesOf, tidyLabel } from "./exam";
+import { DEFAULT_EXAM, examFor, examKeys, exams, examYears, groupOf, groupsOf, headYearIn, isExam, latestOf, markerKey, pageNeeds, restrictedQuota, roundNameIn, scopedKey, showsPage } from "./registry";
 
 const src = (year: number, round: Source["round"], name = "", provisional = false): Source => ({ key: `${year}/${round}`, url: null, year, round, provisional, name });
 
@@ -17,10 +18,10 @@ describe("exam registry", () => {
     expect(examYears("neet-pg")).toEqual([2024, 2025, 2026]);
   });
 
-  it("NEET SS and MDS: results and MCC's seat lists, nothing else yet (from their bundles)", () => {
+  it("NEET SS and MDS: results and MCC's seat lists (fees once their data has them: active.tsx examInfo); NEET SS shows its hospitals' beds", () => {
     for (const k of ["neet-ss", "neet-mds"] as const) {
-      const { allotments, seats, ...rest } = exams[k].has;
-      expect([allotments, seats, Object.values(rest).some(Boolean)]).toEqual([true, true, false]);
+      const { allotments, seats, beds, ...rest } = exams[k].has;
+      expect([allotments, seats, beds, Object.values(rest).some(Boolean)]).toEqual([true, true, k === "neet-ss", false]);
     }
   });
 
@@ -83,9 +84,9 @@ describe("NEET SS question groups and quotas", () => {
   it("open quotas per exam: NEET PG's as before, NEET SS none (she picks her group)", () => {
     const none = { quotas: [] };
     expect(profileQuotas(none)).toBe(openQuotas);
-    expect(profileQuotas(none, "neet-mds")).toEqual(["All India", "Deemed/Paid Seats"]);
-    expect(profileQuotas(none, "neet-ss")).toEqual([]);
-    expect(profileQuotas({ quotas: ["All India (Medical Group)"] }, "neet-ss")).toEqual(["All India (Medical Group)"]);
+    expect(profileQuotas(none, exams["neet-mds"].quotas)).toEqual(["All India", "Deemed/Paid Seats"]);
+    expect(profileQuotas(none, exams["neet-ss"].quotas)).toEqual([]);
+    expect(profileQuotas({ quotas: ["All India (Medical Group)"] }, exams["neet-ss"].quotas)).toEqual(["All India (Medical Group)"]);
     expect([restrictedQuota("neet-pg", "Non-Resident Indian"), restrictedQuota("neet-pg", "DNB Quota"), restrictedQuota("neet-mds", "Muslim Minority"), restrictedQuota("neet-ss", "All India (Medical Group)")]).toEqual([true, false, true, false]);
   });
 });
@@ -121,5 +122,39 @@ describe("nav and page gating (pageNeeds)", () => {
       expect(existsSync(file), file).toBe(true);
       expect(readFileSync(file, "utf8"), file).toContain(`examGate("${href}")`);
     }
+  });
+});
+
+describe("from the data: round names, the complete year, quota words (exams/exam.ts)", () => {
+  const ss = [src(2023, "R1"), src(2023, "stray", "MCC NEET SS 2023 Mop-Up Round allotment result (final)"), src(2024, "stray"), src(2025, "R1"), src(2025, "R2"), src(2025, "special_stray", "MCC NEET SS 2025 Special Stray Vacancy Round allotment result (final)")];
+  it("every round named otherwise than roundLabel, by year; roundIn falls back to roundLabel (NEET PG: always)", () => {
+    const names = roundNamesOf([...ss, src(2021, "special_stray", "MCC NEET SS 2021 Special Mop-Up Round clear vacancy (list as published)")]);
+    expect(names).toEqual({ "2023|stray": "Mop-up", "2021|special_stray": "Special mop-up" });
+    expect([roundIn({ roundNames: names }, 2023, "stray"), roundIn({ roundNames: names }, 2024, "stray"), roundIn(neetPg, 2023, "stray")]).toEqual(["Mop-up", "Stray", "Stray"]);
+  });
+  it("the latest complete year: a later year has results, or it has one after Round 2", () => {
+    expect(completeYear(ss)).toBe(2025); // SS 2025's special stray
+    expect(completeYear([src(2025, "stray"), src(2026, "R1"), src(2026, "R2"), src(2026, "R3")])).toBe(2026); // MDS 2026 R3
+    expect(completeYear([src(2025, "R3"), src(2026, "R1"), src(2026, "R2")])).toBe(2025);
+    expect(completeYear([])).toBeNull();
+    // NEET PG's headline year stays its later past year whatever its data; another exam's from its results
+    expect(headYearIn("neet-pg", [src(2026, "R3")])).toBe(PAST_YEARS[1]);
+    expect(headYearIn("neet-ss", ss)).toBe(2025);
+    expect(headYearIn("neet-ss", [])).toBe(exams["neet-ss"].pastYears[1]);
+    expect(headYearOf(neetPg)).toBe(PAST_YEARS[1]);
+  });
+  it("quota and group words as MCC prints them, display only; NEET PG's as they are", () => {
+    const mds = exams["neet-mds"];
+    expect([quotaIn(mds, "Deemed/Paid Seats", 2025), quotaIn(mds, "Deemed/Paid Seats", 2026), quotaIn(mds, "Deemed/Paid Seats"), quotaIn(mds, "All India")]).toEqual(["Management/Paid Seats", "Self-Financed Merit Seat", "Self-Financed Merit Seat", "All India"]);
+    expect(quotaIn(exams["neet-ss"], "All India (Ent Group)")).toBe("All India (ENT Group)");
+    expect(tidyLabel(exams["neet-ss"], "Plastic and Reconstructructive Surgery")).toBe("Plastic and Reconstructive Surgery");
+    expect(tidyLabel(neetPg, "Plastic and Reconstructructive Surgery")).toBe("Plastic and Reconstructructive Surgery");
+    expect([quotaIn(neetPg, "Deemed/Paid Seats"), quotaIn(neetPg, "All India (Ent Group)")]).toEqual(["Deemed/Paid Seats", "All India (Ent Group)"]);
+  });
+  it("NEET PG's client object is the registry's", () => {
+    expect(exams["neet-pg"]).toBe(neetPg);
+    expect(Object.entries(exams).every(([k, e]) => e.key === k)).toBe(true);
+    expect(examShows(exams["neet-ss"], "/decide/fees")).toBe(false);
+    expect(examShows({ has: { ...exams["neet-ss"].has, fees: true } }, "/decide/fees")).toBe(true);
   });
 });

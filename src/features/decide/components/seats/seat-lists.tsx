@@ -5,10 +5,10 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { fmtDay, listDay } from "../../lib/format";
 import type { DecideLinks } from "../../lib/links";
-import { DEFAULT_EXAM, restrictedQuota, type ExamKey } from "@/features/exams/registry";
+import { isRestricted, neetPg, type Exam } from "@/features/exams/exam";
 import { pastOf, reachWindow, type Latest } from "../../lib/reach";
 import { statKeys, statLabel } from "../../lib/stat-format";
-import { roundLabel, rounds, seatKindLabel, type Round, type SeatKind, type SeatList } from "../../types";
+import { rounds, seatKindLabel, type Round, type SeatKind, type SeatList } from "../../types";
 import { Dash, InstName, Provisional, ReachBadge } from "../bits";
 import { InfoTip } from "../info-tip";
 import { TermStatCells } from "../stat-cells";
@@ -17,6 +17,8 @@ import { smallLink, tbl } from "../ui";
 import { PAST_ROUNDS, type SeatLine, type SeatSort } from "./find-seats";
 import { seatCourse as courseOf } from "./seat-cards";
 import { ScrollTable } from "../scroll-table";
+import { roundNameFrom } from "@/features/exams/exam";
+import { RoundName } from "../round-name";
 
 // Seats page parts (src/app/decide/seats): one MCC seat list at a time, never added to another list.
 
@@ -27,11 +29,12 @@ export const seatKindNote: Record<SeatKind, string> = {
 };
 
 export { fmtDay } from "../../lib/format";
-export const listTitle = (l: SeatList) => `${l.year} ${roundLabel[l.round]} ${seatKindLabel[l.kind].toLowerCase()}`;
+/** The round as the list's own PDF names it (NEET SS 2023's "Mop-up"; NEET PG's: roundLabel). */
+export const listTitle = (l: SeatList) => `${l.year} ${roundNameFrom(l.name, l.round)} ${seatKindLabel[l.kind].toLowerCase()}`;
 /** "2026 R1 clear vacancy seats"; the new list's label already ends in seats ("newly added seats"). */
 export const listSeats = (l: SeatList) => `${listTitle(l)}${l.kind === "new" ? "" : " seats"}`;
 
-const groupOf = (l: SeatList) => `${l.year} ${roundLabel[l.round]}`;
+const groupOf = (l: SeatList) => `${l.year} ${roundNameFrom(l.name, l.round)}`;
 
 /** Link chips, one per list PDF, grouped by year and round (seatLists() order); earlier rounds fold away unless picked. */
 export function SeatListPicker({ lists, current, href }: { lists: SeatList[]; current: string; href: (key: string) => string }) {
@@ -87,7 +90,7 @@ export function UnlistedSeats({ u, profile, here, href, options }: { u: { list: 
   return (
     <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
       {/* "2026 R2 clear vacancy seats", "2026 R2 newly added seats" (that list's name already says seats). */}
-      <span><span className="numeric">{formatRank(u.seats)}</span> {u.list.kind === "new" ? `${u.list.year} ${roundLabel[u.list.round]} newly added` : listTitle(u.list)} {u.seats === 1 ? "seat" : "seats"}{here && " here"} never allotted before</span>
+      <span><span className="numeric">{formatRank(u.seats)}</span> {u.list.kind === "new" ? `${u.list.year} ${roundNameFrom(u.list.name, u.list.round)} newly added` : listTitle(u.list)} {u.seats === 1 ? "seat" : "seats"}{here && " here"} never allotted before</span>
       <InfoTip label={`${listSeats(u.list)} never allotted before`}>
         {u.seats === 1 ? "It is" : "They are"} in <span className="numeric">{formatRank(u.options)}</span> {one ? "course and quota" : "courses and quotas"}
         {profile ? " that match your courses, quotas, states and seat categories" : ""} with no past MCC allotments, so there is no closing rank to
@@ -113,7 +116,7 @@ function PastClosings({ r, name, latest }: { r: SeatLine; name: string; latest: 
       {d ? (
         <span className="numeric">
           <span className="text-[15px] font-semibold">{formatRank(d.closing)}</span>
-          <span className="block text-xs text-muted-foreground">{d.year} {roundLabel[d.round]}</span>
+          <span className="block text-xs text-muted-foreground">{d.year} <RoundName year={d.year} round={d.round} /></span>
         </span>
       ) : (
         <Dash />
@@ -124,7 +127,7 @@ function PastClosings({ r, name, latest }: { r: SeatLine; name: string; latest: 
         <dl className="grid grid-cols-[auto_auto] gap-x-3 text-right">
           {all.map((c) => (
             <Fragment key={`${c.year}-${c.round}`}>
-              <dt className="numeric text-left text-muted-foreground">{c.year} {roundLabel[c.round]}</dt>
+              <dt className="numeric text-left text-muted-foreground">{c.year} <RoundName year={c.year} round={c.round} /></dt>
               <dd className="numeric">{c.closing != null ? <>{formatRank(c.closing)}{c.provisional && " (provisional)"}</> : <Dash />}</dd>
             </Fragment>
           ))}
@@ -140,7 +143,7 @@ function PastClosings({ r, name, latest }: { r: SeatLine; name: string; latest: 
  * added; `current` orders the seats sort), the deepest past closing on the row's quota and seat category, and her reach
  * label on it (`ranked`; `latest`: lib/reach.ts latestRound).
  */
-export function SeatTable({ rows, lists, current, sort, caption, ranked, L, latest, exam = DEFAULT_EXAM }: { rows: SeatLine[]; lists: SeatList[]; current: string; sort: SeatSort; caption: string; ranked: boolean; L: DecideLinks; latest: Latest; exam?: ExamKey }) {
+export function SeatTable({ rows, lists, current, sort, caption, ranked, L, latest, exam = neetPg }: { rows: SeatLine[]; lists: SeatList[]; current: string; sort: SeatSort; caption: string; ranked: boolean; L: DecideLinks; latest: Latest; exam?: Exam }) {
   const td = "px-3 py-3 align-top md:px-4";
   const th = cn(tbl.th, "px-3 align-bottom md:px-4");
   const sticky = "sticky left-0 z-[1] w-40 min-w-40 border-r border-border bg-card md:w-72 md:min-w-72";
@@ -181,7 +184,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L, late
                   </span>
                   <span className="mt-1 flex flex-wrap gap-1">
                     {r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />}
-                    {r.quota != null && restrictedQuota(exam, r.quota) && <Badge tone="warning">Restricted quota</Badge>}
+                    {r.quota != null && isRestricted(exam, r.quota) && <Badge tone="warning">Restricted quota</Badge>}
                   </span>
                 </th>
                 <td className={td}>{r.category}</td>

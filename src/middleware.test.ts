@@ -26,3 +26,19 @@ describe("middleware: seatora_aid", () => {
     expect((await visit({ "user-agent": chrome, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA" })).cookies.get("seatora_aid")).toBeUndefined();
   });
 });
+
+describe("middleware: ?exam= never sets the exam cookie", () => {
+  it("sends a Decide page with ?exam= to /decide/exam, the page without it as next; no seatora_exam for anyone", async () => {
+    const res = await visit({ "user-agent": chrome, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA" }, "/decide/options?rank=500&exam=neet-ss&sp=X");
+    expect(res.status).toBe(307);
+    const to = new URL(res.headers.get("location")!);
+    expect(to.pathname).toBe("/decide/exam");
+    expect(Object.fromEntries(to.searchParams)).toEqual({ k: "neet-ss", next: "/decide/options?rank=500&sp=X" });
+    expect(res.cookies.get("seatora_exam")).toBeUndefined();
+    expect(res.headers.get("set-cookie") ?? "").not.toMatch(/seatora_exam/);
+    // without ?exam=, as before (the gate: off in tests)
+    const plain = await visit({ "user-agent": chrome, cookie: "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA" }, "/decide/options?rank=500");
+    expect(plain.headers.get("location")).toBeNull();
+    expect(plain.headers.get("set-cookie") ?? "").not.toMatch(/seatora_exam/);
+  });
+});

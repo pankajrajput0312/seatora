@@ -69,9 +69,12 @@ export async function findCutoffs(cat: Catalog, q: CutoffQuery): Promise<Cutoff[
  */
 export async function findReachInputs(
   cat: Catalog,
-  q: { cs?: string[]; categories?: string[]; pastYears: [number, number]; latestYear: number },
+  q: { cs?: string[]; categories?: string[]; pastYears: [number, number]; latestYear: number; headYear?: number },
 ): Promise<Map<string, ReachInput[]>> {
   const [y1, y2] = q.pastYears;
+  // The year whose deepest row carries its round and category (headlines, the Overview strip): the later past year, or
+  // (another exam whose latest year is complete) the latest year.
+  const hy = q.headYear ?? y2;
   if (cat.mem) {
     const rows = await findCutoffs(cat, { cs: q.cs, categories: q.categories, years: [y1, y2, q.latestYear] });
     const out = new Map<string, ReachInput[]>();
@@ -90,7 +93,7 @@ export async function findReachInputs(
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y2} AND round <> ALL(${strayRounds})) AS b,
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y1} AND round = ANY(${strayRounds})) AS "as",
       MAX("closingRank") FILTER (WHERE "counsellingYear" = ${y2} AND round = ANY(${strayRounds})) AS bs,
-      MAX(lpad("closingRank"::text, 7, '0') || '|' || (9 - array_position(${sqlRounds}::text[], round)) || '|' || round || '|' || category) FILTER (WHERE "counsellingYear" = ${y2}) AS bx,
+      MAX(lpad("closingRank"::text, 7, '0') || '|' || (9 - array_position(${sqlRounds}::text[], round)) || '|' || round || '|' || category) FILTER (WHERE "counsellingYear" = ${hy}) AS bx,
       ${Prisma.join(latestCols)}
     FROM "Cutoff"
     WHERE exam = ${cat.exam} AND "counsellingYear" = ANY(${[y1, y2, q.latestYear]})
@@ -108,9 +111,10 @@ export async function findReachInputs(
     // bx is the year's deepest of every round: its round and category go on the entry it is (R1 to R3, or a stray round).
     const bx = r.bx != null && Number(r.bx.split("|")[0]);
     const at = { round: round as Round, category: category as Category };
-    if (r.b != null) list.push({ year: y2, closing: r.b, ...(bx === r.b && !isStrayRound(at.round) && at) });
-    if (r.bs != null) list.push({ year: y2, closing: r.bs, round: "stray", ...(bx === r.bs && isStrayRound(at.round) && at) });
-    for (const [i, x] of rounds.entries()) if (r[`c${i}`] != null) list.push({ year: q.latestYear, round: x, closing: r[`c${i}`]! });
+    const head = hy === y2; // bx is the later past year's (NEET PG: always)
+    if (r.b != null) list.push({ year: y2, closing: r.b, ...(head && bx === r.b && !isStrayRound(at.round) && at) });
+    if (r.bs != null) list.push({ year: y2, closing: r.bs, round: "stray", ...(head && bx === r.bs && isStrayRound(at.round) && at) });
+    for (const [i, x] of rounds.entries()) if (r[`c${i}`] != null) list.push({ year: q.latestYear, round: x, closing: r[`c${i}`]!, ...(!head && hy === q.latestYear && x === at.round && bx === r[`c${i}`] && { category: at.category }) });
     out.set(optionId({ ...pair, quota: r.q }), list);
   }
   return out;

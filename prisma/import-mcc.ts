@@ -3,8 +3,8 @@
 // Usage: npm run db:import [-- [--exam <key>] <bundle dir>]   (default ../neetpg-planner/data/medpath-r3, or MCC_BUNDLE;
 // exam: --exam, else manifest.exam, else neet-pg; src/features/exams/keys.ts)
 // One exam per run: everything below is that exam's rows only, so importing one exam leaves every other exam's as it was.
-// Colleges are shared (one row per institute): NEET PG's import writes its colleges' fields; another exam's only creates
-// a college it is first to have, never changes an existing row. An exam's colleges are its CollegeExam rows, and a
+// Colleges are shared (one row per institute): NEET PG's import writes its colleges' fields; another exam's writes only
+// the colleges no other exam has (new, or its own alone), never a row another exam has. An exam's colleges are its CollegeExam rows, and a
 // college goes only when no exam has it. Exams other than neet-pg may leave out the optional files (seats, terms, fees,
 // clinical facts, notices, round status, NBEMS aggregates, aliases), and leave a choice number or candidate category null
 // where their PDFs print none.
@@ -29,7 +29,9 @@ import {
   mccCategories,
   mccClinicalFactsSchema,
   mccCollegeSchema,
+  mccCollegeV2LooseSchema,
   mccCollegeV2Schema,
+  mccProfileSnapshots,
   mccCourseSchema,
   mccCutoffSchema,
   mccFeesStructuredSchema,
@@ -97,7 +99,7 @@ function parse<S extends z.ZodType>(file: string, schema: S): z.infer<S>[] {
 
 const sources = parse("sources.json", mccSourceSchema);
 // Partial: a schema 1 college has none of the schema 2 fields.
-const parseColleges = (file: string): (MccCollege & Partial<MccCollegeV2>)[] => (v2 ? parse(file, mccCollegeV2Schema) : parse(file, mccCollegeSchema));
+const parseColleges = (file: string): (MccCollege & Partial<MccCollegeV2>)[] => (v2 ? parse(file, pg ? mccCollegeV2Schema : mccCollegeV2LooseSchema) : parse(file, mccCollegeSchema));
 const colleges = parseColleges("colleges.ndjson");
 const courses = parse("courses.json", mccCourseSchema);
 const cutoffs = parse("cutoffs.ndjson", mccCutoffSchema);
@@ -329,7 +331,7 @@ feeTable.forEach((r, i) => {
 // Schema 2 FEE / STIPEND terms are made from fees_structured.ndjson (the planner's fee_terms): a term must have fee-table
 // records for its college + program, which are stored once, in FeesStructured, and attached back by the catalog. If a term
 // still carries details.records (older exports), they must be exactly those records.
-const BUCKET: Record<string, string> = { "MD/MS": "MD", Diploma: "MD", DNB: "DNB", "NBEMS Diploma": "DNB" };
+const BUCKET: Record<string, string> = { "MD/MS": "MD", Diploma: "MD", DNB: "DNB", "NBEMS Diploma": "DNB", MDS: "MD", "DM/MCh": "MD", "DrNB SS": "DNB" };
 const feeById = new Map(feeTable.map((r) => [r.id, JSON.stringify(r)]));
 const feeIdsOf = Map.groupBy(feeTable, (r) => `${r.key}|${BUCKET[r.programme]}`);
 terms.forEach((t, i) => {
@@ -507,6 +509,13 @@ async function main() {
       }
       const check = await tx.dataSource.upsert({ where: sk(BOND_CHECK.key), create: { exam, ...BOND_CHECK }, update: { name: BOND_CHECK.name, type: BOND_CHECK.type }, select: { id: true } });
       sourceId.set(BOND_CHECK.key, check.id);
+      // Another exam's fee table: the MCC institute-profile snapshots it was made from (manifest.sources), as its fee source.
+      if (!pg && feeTable.length)
+        for (const s of mccProfileSnapshots(manifestJson.sources)) {
+          const data = { name: s.name, url: s.url, type: "OFFICIAL" as const, counsellingYear: s.year, round: null, publishedAt: s.fetched ? new Date(`${s.fetched}T00:00:00Z`) : null };
+          const row = await tx.dataSource.upsert({ where: sk(s.key), create: { exam, key: s.key, ...data }, update: data, select: { id: true } });
+          sourceId.set(s.key, row.id);
+        }
       // seat list PDFs: round stays null on the DataSource (year, round, kind on SeatSource), so the catalog never takes
       // one for an allotment result. Dated by the MCC notice that links the PDF, else no date.
       for (const s of seatSources) {
@@ -533,8 +542,9 @@ async function main() {
       }
 
       // colleges: slug is set once at creation and never changed, so URLs stay stable. Seat-list-only colleges get the
-      // earliest seat list they appear in as source. Another exam than NEET PG only creates the colleges it is first to
-      // have: an existing row (NEET PG's above all) is never changed by it, only its id taken.
+      // earliest seat list they appear in as source. Another exam than NEET PG writes only the colleges no other exam has
+      // (new ones, and its own: corrected names and types); a row another exam has (NEET PG's above all) is never changed
+      // by it, only its id taken.
       const firstSource = new Map<string, string>();
       for (const c of [...cutoffs, ...seats.filter((s) => seatCollegeKeys.has(s.ikey))]) {
         const cur = firstSource.get(c.ikey);
@@ -548,7 +558,7 @@ async function main() {
       const slugOwner = new Map((await tx.college.findMany({ select: { slug: true, key: true } })).map((r) => [r.slug, r.key]));
       const collegeId = new Map<string, string>();
       const byKey = new Map(dbColleges.map((c) => [c.key, c]));
-      const kept = (k: string) => !pg && byKey.has(k);
+      const kept = (k: string) => !pg && byKey.has(k) && othersHave(byKey.get(k)!);
       const written = [...colleges, ...seatColleges].filter((c) => !kept(c.key));
       for (const c of [...colleges, ...seatColleges]) if (kept(c.key)) collegeId.set(c.key, byKey.get(c.key)!.id);
       for (const c of written) {
@@ -576,7 +586,7 @@ async function main() {
       await tx.collegeExam.deleteMany({ where: { exam, collegeId: { notIn: ids } } });
       await tx.collegeExam.createMany({ data: ids.map((collegeId) => ({ exam, collegeId })), skipDuplicates: true });
       // A college NEET PG no longer has that another exam keeps, whose source is NEET PG's: that source may go below, so it
-      // takes the other exam's earliest result PDF. Another exam's import never changes a college: its source stays (below).
+      // takes the other exam's earliest result PDF. Another exam's import never changes a shared college: its source stays (below).
       if (pg && leftColleges.length)
         await tx.$executeRaw`
           UPDATE "College" c SET "sourceId" = (
@@ -618,7 +628,7 @@ async function main() {
       // references them any more. Admitted-list sources (no round, written by import-residents), the marker and a source
       // a college another exam keeps still names stay.
       const goneSources = await tx.dataSource.deleteMany({
-        where: { exam, OR: [{ round: { not: null } }, { key: { startsWith: "http" } }, { seatSource: { isNot: null } }, { meritList: { isNot: null } }], key: { notIn: [...sourceId.keys()] }, colleges: { none: {} } },
+        where: { exam, OR: [{ round: { not: null } }, { key: { startsWith: "http" } }, { key: { startsWith: "raw/profiles_" } }, { seatSource: { isNot: null } }, { meritList: { isNot: null } }], key: { notIn: [...sourceId.keys()] }, colleges: { none: {} } },
       });
 
       const specialtyId = new Map<string, string>();
@@ -924,7 +934,7 @@ async function main() {
         meritPositions: meritRows.length,
         clinicalFacts: clinical.length,
         feesStructured: feeTable.length,
-        collegeTypes: v2 ? written.length : 0,
+        collegeTypes: v2 ? written.filter((c) => c.type).length : 0,
         collegeMccIds: written.filter((c) => c.mcc_ids?.length).length,
         collegeWebsites: written.filter((c) => c.website).length,
         allotmentCandidateCategories: allotments.filter((a) => "candidate_category" in a && a.candidate_category != null).length,

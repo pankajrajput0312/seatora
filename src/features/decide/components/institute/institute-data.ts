@@ -1,5 +1,6 @@
 import "server-only";
 import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
+import { exams } from "@/features/exams/registry";
 import { db } from "@/lib/db";
 import { websiteUrl } from "../../lib/stat-format";
 import { anyTermFilter, termVerdict, type TermFilters, type TermVerdict } from "../../lib/term-filters";
@@ -103,6 +104,12 @@ export type ReportedBeds = { n: number; kind: string | null; meta: ValueMeta | n
 /** College's schema 2 fields: every MCC id, its MCC profile, the website that profile declares, the inferred type, reported beds. */
 export type HospitalInfo = { mccIds: string[]; mccProfileUrl: string | null; website: string | null; type: CollegeType | null; beds: ReportedBeds | null };
 
+/**
+ * A type its adapter only guessed ("default: no government word in the name"): another exam's own college (no NEET PG
+ * row) shows "type not known" rather than Private. A college NEET PG has keeps NEET PG's record, as NEET PG shows it.
+ */
+export const unsureType = (basis: string) => /\bdefault\b/i.test(basis);
+
 const infoMemo = new WeakMap<Catalog, Promise<Map<string, HospitalInfo>>>();
 /** HospitalInfo of every college by College.key: one read per catalog (a new import is a new catalog). Empty in tests (memory catalog). */
 export async function hospitalInfo(exam: ExamKey = DEFAULT_EXAM): Promise<Map<string, HospitalInfo>> {
@@ -121,8 +128,8 @@ export async function hospitalInfo(exam: ExamKey = DEFAULT_EXAM): Promise<Map<st
               mccIds: r.ids ?? [],
               mccProfileUrl: r.url,
               website: r.web,
-              type: r.type && r.basis ? { value: r.type as CollegeType["value"], basis: r.basis } : null,
-              beds: r.beds != null ? { n: r.beds, kind: r.kind, meta: r.meta, own: !!r.own } : null,
+              type: r.type && r.basis && (r.pg !== false || !unsureType(r.basis)) ? { value: r.type as CollegeType["value"], basis: r.basis } : null,
+              beds: r.beds != null && exams[exam].has.beds ? { n: r.beds, kind: r.kind, meta: r.meta, own: !!r.own } : null,
             },
           ]),
         ),

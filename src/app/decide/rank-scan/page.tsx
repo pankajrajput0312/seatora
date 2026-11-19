@@ -32,6 +32,7 @@ import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
 import { activeExam } from "@/features/exams/active";
 import { exams, groupsOf, perGroup, roundNameIn } from "@/features/exams/registry";
+import { QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Rank scan" };
 const VIEW = "rank-scan";
@@ -130,7 +131,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         search={
           <label className="flex min-w-0 items-center gap-2 text-sm">
             <span className="shrink-0 text-xs font-semibold text-muted-foreground">Rank</span>
-            <input name="scan" inputMode="numeric" enterKeyHint="search" defaultValue={typed ?? rank ?? ""} placeholder="e.g. 42,284" aria-invalid={invalid || undefined} aria-describedby={invalid ? "scan-error" : undefined} className={`${control} numeric min-w-0`} />
+            <input name="scan" inputMode="numeric" enterKeyHint="search" defaultValue={typed ?? rank ?? ""} placeholder={`e.g. ${E.exampleRank}`} aria-invalid={invalid || undefined} aria-describedby={invalid ? "scan-error" : undefined} className={`${control} numeric min-w-0`} />
           </label>
         }
       >
@@ -154,7 +155,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
       <ActiveFilters items={chips} clear={clear} />
 
       {invalid ? (
-        <p id="scan-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example 42,284.</p>
+        <p id="scan-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example {E.exampleRank}.</p>
       ) : !rank || !year ? (
         <EmptyState title="Enter a rank to scan" description={`Type ${E.rankName === "All India Rank" ? "an" : "a"} ${E.rankName} above, or set your rank, to see the allotments made to ranks around it.`} />
       ) : (
@@ -254,7 +255,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                                 <span className="block"><Link href={courseLink(a)} className={subLink}>{courseName(a)}</Link></span>
                                 <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                                   {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.collegeName} />}
-                                  <span>{a.quota}{a.remark && ` · ${a.remark}`}</span>
+                                  <span><QuotaName quota={a.quota} year={a.year} />{a.remark && ` · ${a.remark}`}</span>
                                 </span>
                               </td>
                               <TermStatCells t={a.fees} variant="compact" of={of(a)} tdClassName={termCol.td} />

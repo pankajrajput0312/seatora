@@ -51,15 +51,24 @@ const fingerprint = async () => (await import("@/features/decide/server/snapshot
 const examsOf = async (key: string) =>
   (await (await db()).$queryRawUnsafe<{ exam: string }[]>(`SELECT e.exam FROM "CollegeExam" e JOIN "College" c ON c.id = e."collegeId" WHERE c.key = $1 ORDER BY 1`, key)).map((r) => r.exam);
 
-/** Another exam's import: it must commit, and every college row that was there and still is must be exactly as it was. */
+/** Keys of the colleges only `exam` has (no other exam's CollegeExam row): the only rows its import may change. */
+const ownOnly = async (exam: string) =>
+  new Set(
+    (await (await db()).$queryRawUnsafe<{ key: string }[]>(`SELECT c.key FROM "College" c WHERE EXISTS (SELECT 1 FROM "CollegeExam" e WHERE e."collegeId" = c.id AND e.exam = $1) AND NOT EXISTS (SELECT 1 FROM "CollegeExam" e WHERE e."collegeId" = c.id AND e.exam <> $1)`, exam)).map((r) => r.key),
+  );
+/**
+ * Another exam's import: it must commit, and every college row that was there and still is must be exactly as it was,
+ * but the ones only that exam had (its own corrections). Returns the import's output and the keys it changed.
+ */
 async function importOther(dir: string, exam?: string) {
+  const own = await ownOnly(exam ?? JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")).exam);
   const before = await colleges();
   const out = importBundle(dir, exam);
   expect(out).toMatch(/Committed neet-(ss|mds)\. Spot checks passed/);
   const after = await colleges();
   const changed = [...before].filter(([k, row]) => after.has(k) && after.get(k) !== row).map(([k]) => k);
-  expect(changed, "college rows another exam's import changed").toEqual([]);
-  return out;
+  expect(changed.filter((k) => !own.has(k)), "college rows another exam has that this exam's import changed").toEqual([]);
+  return { out, changed };
 }
 
 /** What staff see of a non-PG exam. */
@@ -76,8 +85,8 @@ async function examOutputs(exam: "neet-ss" | "neet-mds") {
 }
 
 type Row = Record<string, unknown> & { ikey: string; rank: number; prev_ikey?: string | null };
-/** The fixture as `exam`'s bundle with only the colleges `keep` keeps (and their allotments and cutoffs), `rename`d. */
-function bundle(exam: string, keep: (key: string) => boolean, rename: Record<string, string> = {}) {
+/** The fixture as `exam`'s bundle with only the colleges `keep` keeps (and their allotments and cutoffs), `rename`d, `retype`d. */
+function bundle(exam: string, keep: (key: string) => boolean, rename: Record<string, string> = {}, retype: Record<string, { value: string; basis: string } | null> = {}) {
   const dir = mkdtempSync(join(tmpdir(), `${exam}-`));
   const m = JSON.parse(readFileSync(join(FIXTURE, "manifest.json"), "utf8"));
   const read = (f: string) => readFileSync(join(FIXTURE, f), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
@@ -92,7 +101,7 @@ function bundle(exam: string, keep: (key: string) => boolean, rename: Record<str
     "courses.json": JSON.parse(readFileSync(join(FIXTURE, "courses.json"), "utf8")),
     "colleges.ndjson": read("colleges.ndjson")
       .filter((c) => keep(c.key))
-      .map((c) => ({ ...c, name: rename[c.key] ?? c.name })),
+      .map((c) => ({ ...c, name: rename[c.key] ?? c.name, type: c.key in retype ? retype[c.key] : c.type })),
     "cutoffs.ndjson": cutoffs,
     "allotments.ndjson": allotments,
   };
@@ -158,6 +167,23 @@ describe.skipIf(!local || !existsSync(join(pgBundle, "manifest.json")))("multi-e
     ss = await fresh(() => examOutputs("neet-ss"));
   });
 
+  it("a college only one exam has takes that exam's corrections; one another exam has (NEET PG's) never", async () => {
+    const d = await db();
+    const pgShared = await d.college.findUnique({ where: { key: SHARED_KEY } });
+    // One is NEET MDS's alone now: its bundle's new name and type are written, its slug kept.
+    const slug = (await d.college.findUnique({ where: { key: ONE }, select: { slug: true } }))!.slug;
+    const { changed } = await importOther(bundle("neet-mds", (k) => k === ONE, { [ONE]: "SS Fixture Institute One (corrected)" }, { [ONE]: null }));
+    expect(changed).toEqual([ONE]);
+    const one = await d.$queryRawUnsafe<{ name: string; slug: string; type: string | null; typeBasis: string | null }[]>(`SELECT name, slug, type, "typeBasis" FROM "College" WHERE key = $1`, ONE);
+    expect(one).toEqual([{ name: "SS Fixture Institute One (corrected)", slug, type: null, typeBasis: null }]);
+    // The shared college, renamed and retyped by NEET SS: still NEET PG's row, byte for byte.
+    const again = await importOther(bundle("neet-ss", (k) => k === SHARED_KEY, { [SHARED_KEY]: "Renamed by NEET SS" }, { [SHARED_KEY]: { value: "private", basis: "synthetic test fixture" } }));
+    expect(again.changed).toEqual([]);
+    expect(await d.college.findUnique({ where: { key: SHARED_KEY } })).toEqual(pgShared);
+    await unchanged();
+    ss = await fresh(() => examOutputs("neet-ss"));
+  });
+
   for (const exam of ["neet-mds", "neet-ss"] as const) {
     it.skipIf(!real[exam])(`imports the real ${exam} bundle: NEET PG byte-identical`, async () => {
       const dir = resolve(real[exam]!);
@@ -173,6 +199,14 @@ describe.skipIf(!local || !existsSync(join(pgBundle, "manifest.json")))("multi-e
       for (const k of keys.filter((x) => pgKeys.has(x))) expect(await examsOf(k)).toContain("neet-pg");
       const out = await fresh(() => examOutputs(exam));
       expect(out.options.total).toBeGreaterThan(0);
+      // Its fee table (MCC institute profiles), when the bundle has one: stored as its own, read into its own programmes.
+      const fees = m.files["fees_structured.ndjson"]?.count ?? 0;
+      expect(mine.FeesStructured).toBe(fees);
+      if (fees) {
+        const f = await fresh(async () => (await import("@/features/decide/service")).listFees({}, undefined, exam));
+        expect(new Set(f.rows.map((r) => r.terms.programme))).toEqual(new Set(exam === "neet-mds" ? ["MDS"] : ["DM/MCh", "DrNB SS"]));
+        expect(f.rows.some((r) => r.terms.years.some((y) => y.fee || y.stipend))).toBe(true);
+      }
       if (exam === "neet-ss") {
         ss = out;
         // A rank is within one question group: her group's options only, labelled; no group, nothing labelled.

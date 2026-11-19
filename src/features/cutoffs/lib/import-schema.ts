@@ -39,20 +39,25 @@ export type MccCollege = z.infer<typeof mccCollegeSchema>;
 /** Institution type of the bundle (a name and quota heuristic, not an official field: `basis` says how it was inferred). */
 export const collegeTypes = ["govt", "private", "trust", "deemed", "central", "esic", "municipal", "armed_forces", "psu", "railway", "govt_private"] as const;
 /** Schema 2 adds: every MCC institute id the seat PDFs print for the college, its main id's MCC profile, the type, the website its own MCC profile declares. */
-export const mccCollegeV2Schema = mccCollegeSchema
-  .extend({
-    mcc_ids: z.array(z.string().regex(/^\d{6}$/)),
-    mcc_profile_url: z.url().nullable(),
-    type: z.object({ value: z.enum(collegeTypes), basis: z.string().min(1) }).strict(),
-    /** As declared on the MCC profile ("www.…"), so not always a full URL; one link, never an address or an e-mail. */
-    website: z.string().regex(/^[^\s@,]+$/).nullable(),
-  })
-  .strict()
-  .refine((c) => (c.mcc_profile_url == null) === (c.mcc_ids.length === 0) && (!c.mcc_profile_url || c.mcc_ids.some((id) => c.mcc_profile_url!.endsWith(`InstituteId=${id}`))), {
-    message: "mcc_profile_url must be the profile of one of mcc_ids (null only without ids)",
-    path: ["mcc_profile_url"],
-  });
-export type MccCollegeV2 = z.infer<typeof mccCollegeV2Schema>;
+const collegeType = z.object({ value: z.enum(collegeTypes), basis: z.string().min(1) }).strict();
+/** `unknownType`: an exam other than NEET PG may say a college's type is not known (null), never a guess. */
+const collegeV2 = (unknownType: boolean) =>
+  mccCollegeSchema
+    .extend({
+      mcc_ids: z.array(z.string().regex(/^\d{6}$/)),
+      mcc_profile_url: z.url().nullable(),
+      type: unknownType ? collegeType.nullable() : collegeType,
+      /** As declared on the MCC profile ("www.…"), so not always a full URL; one link, never an address or an e-mail. */
+      website: z.string().regex(/^[^\s@,]+$/).nullable(),
+    })
+    .strict()
+    .refine((c) => (c.mcc_profile_url == null) === (c.mcc_ids.length === 0) && (!c.mcc_profile_url || c.mcc_ids.some((id) => c.mcc_profile_url!.endsWith(`InstituteId=${id}`))), {
+      message: "mcc_profile_url must be the profile of one of mcc_ids (null only without ids)",
+      path: ["mcc_profile_url"],
+    });
+export const mccCollegeV2Schema = collegeV2(false);
+export const mccCollegeV2LooseSchema = collegeV2(true);
+export type MccCollegeV2 = z.infer<typeof mccCollegeV2LooseSchema>;
 
 export const mccCourseSchema = z
   .object({
@@ -372,7 +377,8 @@ const includesHostel = z.enum(["yes", "no", "not_stated"]);
 const forfeitItem = z.object({ inr: money.nullable(), percent: z.number().nonnegative().max(100).optional(), text: z.string().min(1).optional() }).strict();
 export const feeDisplays = ["numbers", "verbatim"] as const;
 export const seatGroups = ["All India", "Deemed/Paid", "NRI", "DNB Quota"] as const;
-export const feeProgrammes = ["MD/MS", "Diploma", "DNB", "NBEMS Diploma"] as const;
+/** NEET PG's four; NEET MDS's "MDS", NEET SS's "DM/MCh" and "DrNB SS" (their MCC institute profiles). */
+export const feeProgrammes = ["MD/MS", "Diploma", "DNB", "NBEMS Diploma", "MDS", "DM/MCh", "DrNB SS"] as const;
 /**
  * One college × programme × seat-type group of data/curated/terms_structured.json: fee and stipend per course year
  * (null = not stated, never 0), bond, leaving penalty, MCC counselling forfeit, each figure's `src` = an `n` of
@@ -500,5 +506,19 @@ export const mccManifestSchema = z.object({
   files: z.record(z.string(), z.object({ count: z.number().int().nonnegative(), sha256: z.string().regex(/^[0-9a-f]{64}$/) })),
   excluded_unparsed_course_rows: z.number().int().nonnegative(),
   notes: z.record(z.string(), z.string()),
+  /** Every document the adapter read (a list, or by key), with its sha256; the importer takes the fee profile snapshots (mccProfileSnapshots). */
+  sources: z.unknown().optional(),
 });
+/**
+ * The MCC institute-profile snapshots a bundle's fee table was made from (manifest.sources, key "raw/profiles_<year>.json":
+ * NEET MDS and NEET SS), as DataSource rows: the fee source pages name. Entries that aren't one are skipped.
+ */
+export function mccProfileSnapshots(sources: unknown) {
+  const entries = Array.isArray(sources) ? sources : sources && typeof sources === "object" ? Object.entries(sources).map(([key, v]) => ({ key, ...(v as object) })) : [];
+  const snap = z.object({ key: z.string().regex(/^raw\/profiles_(\d{4})\.json$/), title: z.string().min(1), url: z.url(), fetched: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
+  return entries.flatMap((e) => {
+    const r = snap.safeParse(e);
+    return r.success ? [{ key: r.data.key, name: `${r.data.title}${r.data.fetched ? `, read ${r.data.fetched}` : ""}`, url: r.data.url, year: Number(/(\d{4})/.exec(r.data.key)![1]), fetched: r.data.fetched ?? null }] : [];
+  });
+}
 export type MccManifest = z.infer<typeof mccManifestSchema>;

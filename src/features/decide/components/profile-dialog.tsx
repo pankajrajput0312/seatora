@@ -7,27 +7,42 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { DEFAULT_EXAM, exams, groupOf, groupsOf, perGroup, type ExamKey } from "@/features/exams/registry";
-import { BOND_YEAR_CHOICES, coursesFromPicks, feeChoices, picksOf, profileSchema, type Profile } from "../profile";
-import { useExam } from "../lib/use-decide-store";
+import { groupOf, groupsIn, quotaIn, tidyLabel, type Exam } from "@/features/exams/exam";
+import { DEFAULT_EXAM } from "@/features/exams/keys";
+import { BOND_YEAR_CHOICES, coursesFromPicks, feeChoices, pairKey, picksOf, profileSchema, type Profile } from "../profile";
+import { useExamInfo } from "../lib/use-decide-store";
 import { control } from "./ui";
 import { matchesSpecialty } from "../lib/specialty-search";
 
 /** "Open (General/UR)": what Open means, where she picks it and on her rank chip; the stored value stays "Open". */
 export const categoryName = (c: string) => (c === "Open" ? "Open (General/UR)" : c);
 /** What her rank chip and card say beside the rank: her category ("OBC PwD"); NEET SS: her question group. */
-export const profileSub = (exam: ExamKey, p: Pick<Profile, "category" | "pwd" | "quotas">) =>
-  perGroup(exam) ? groupsOf(exam, p.quotas).join(", ") || "No question group" : `${categoryName(p.category)}${p.pwd ? " PwD" : ""}`;
+export const profileSub = (E: Exam, p: Pick<Profile, "category" | "pwd" | "quotas">) =>
+  E.perGroup ? groupsIn(E, p.quotas).map((g) => tidyLabel(E, g)).join(", ") || "No question group" : `${categoryName(p.category)}${p.pwd ? " PwD" : ""}`;
 
-/** `groups`: NEET SS's question groups of its latest year (the group system she sits now), for her pick. */
-export type ProfileMeta = { courses: { degree: string; specialty: string }[]; specialties: { code: string; name: string }[]; degrees: string[]; quotas: string[]; states: string[]; groups?: string[] };
+/**
+ * `groups`: NEET SS's question groups of its latest year (the group system she sits now), for her pick; `groupCourses`:
+ * each group's courses ("degree~SPECIALTY", service.ts examGroupCourses), the only ones she can pick with it.
+ */
+export type ProfileMeta = { courses: { degree: string; specialty: string }[]; specialties: { code: string; name: string }[]; degrees: string[]; quotas: string[]; states: string[]; groups?: string[]; groupCourses?: Record<string, string[]> };
+
+/**
+ * NEET SS: the courses of her question group (none picked: none), and her picks kept to them. Her courses are always
+ * exact pairs there, so no course outside the group is ever in her profile.
+ */
+export function groupCourseList(meta: Pick<ProfileMeta, "courses" | "groupCourses">, group: string | undefined) {
+  const mine = new Set(group ? (meta.groupCourses?.[group] ?? []) : []);
+  return meta.courses.filter((c) => mine.has(pairKey(c)));
+}
+export const keepToGroup = (picked: Record<string, string[]>, allowed: { degree: string; specialty: string }[]) =>
+  Object.fromEntries(Object.entries(picked).flatMap(([s, ds]) => (allowed.some((c) => c.specialty === s) ? [[s, ds.filter((d) => allowed.some((c) => c.specialty === s && c.degree === d))]] : [])));
 
 const empty: Profile = { rank: 0, category: "Open", pwd: false, specialties: [], degrees: [], quotas: [], states: [], maxFeeLakh: null, maxBondYears: null };
 
 // The first-run setup asks these in order (fee and bond, optional, with the quotas); states are in the full editor.
 // Another exam asks only what it has: no fee or bond data (NEET MDS), no category or quota but a question group (NEET SS).
-const stepsOf = (exam: ExamKey) =>
-  exam === DEFAULT_EXAM ? ["Rank and category", "Courses", "Quotas and budget"] : perGroup(exam) ? ["Rank and question group", "Courses"] : ["Rank and category", "Courses", exams[exam].has.fees ? "Quotas and budget" : "Quotas"];
+const stepsOf = (E: Exam) =>
+  E.key === DEFAULT_EXAM ? ["Rank and category", "Courses", "Quotas and budget"] : E.perGroup ? ["Rank and question group", "Courses"] : ["Rank and category", "Courses", E.has.fees ? "Quotas and budget" : "Quotas"];
 
 const pill = "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-input bg-secondary px-3 text-sm has-checked:border-sky";
 
@@ -50,10 +65,10 @@ function Checks({ legend, options, value, onChange, note = "None ticked = all." 
 
 /** The profile editor; with `setup` (no profile yet) the guided first run: one step at a time, then Options. */
 export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup = false }: { open: boolean; onOpenChange: (o: boolean) => void; profile: Profile | null; meta: ProfileMeta; onSave: (p: Profile) => void; setup?: boolean }) {
-  const exam = useExam();
-  const E = exams[exam];
-  const steps = stepsOf(exam);
-  const grouped = perGroup(exam);
+  const E = useExamInfo();
+  const exam = E.key;
+  const steps = stepsOf(E);
+  const grouped = E.perGroup;
   const [draft, setDraft] = useState<Profile>(profile ?? empty);
   const [rankText, setRankText] = useState(profile ? String(profile.rank) : "");
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +86,10 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
     setTimeout(() => stepHead.current?.focus());
   };
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setDraft((d) => ({ ...d, [k]: v }));
-  const offered = (s: string) => meta.courses.filter((c) => c.specialty === s).map((c) => c.degree);
+  // NEET SS: only her question group's courses (none until she picks it).
+  const group = grouped ? groupsIn(E, draft.quotas)[0] : undefined;
+  const choosable = grouped ? groupCourseList(meta, group) : meta.courses;
+  const offered = (s: string) => choosable.filter((c) => c.specialty === s).map((c) => c.degree);
   /** A newly ticked specialty: all its degrees, or the degrees she ticked before (when it has any of them). */
   const fresh = (s: string) => {
     const ds = offered(s).filter((d) => draft.degrees.includes(d));
@@ -80,7 +98,13 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
   const pickSpecialties = (v: string[]) => setPicked((p) => Object.fromEntries(v.map((s) => [s, p[s] ?? fresh(s)])));
   const pickDegrees = (s: string, ds: string[]) => setPicked((p) => ({ ...p, [s]: offered(s).filter((d) => ds.includes(d)) }));
   // Null: specialties ticked but no degree in any, so no course; saving would mean every course (empty = all), so ask.
-  const courses = coursesFromPicks(picked, draft.degrees, meta.courses);
+  const courses = grouped
+    ? (() => {
+        const ps = Object.entries(keepToGroup(picked, choosable)).flatMap(([specialty, ds]) => ds.map((degree) => pairKey({ degree, specialty })));
+        const ticked = Object.keys(picked).length > 0;
+        return ticked && !ps.length ? null : { specialties: [...new Set(ps.map((x) => x.split("~")[1]))], degrees: [], ...(ps.length ? { pairs: ps } : {}) };
+      })()
+    : coursesFromPicks(picked, draft.degrees, meta.courses);
   const current = () => courses && { ...draft, pairs: undefined, ...courses };
 
   const rank = () => Number(rankText.replace(/\D/g, ""));
@@ -113,7 +137,10 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
     if (step < steps.length - 1) go(step + 1);
     else save();
   };
-  const specialtyOptions = meta.specialties.filter((sp) => picked[sp.code] || matchesSpecialty(find, sp.name)).map((sp) => ({ value: sp.code, label: sp.name }));
+  // NEET SS: each specialty with its degrees ("DM Medical Gastroenterology" beside "DrNB Gastroenterology"), her group's only.
+  const specialtyOptions = meta.specialties
+    .filter((sp) => (!grouped || offered(sp.code).length > 0) && (picked[sp.code] || matchesSpecialty(find, sp.name)))
+    .map((sp) => ({ value: sp.code, label: grouped ? `${offered(sp.code).join(" / ")} ${sp.name}` : sp.name }));
 
   const exportJson = () => {
     const c = current();
@@ -152,7 +179,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
             onChange={(e) => { setRankText(e.target.value); setError(null); }}
             // Select it all on focus, so typing replaces her old rank instead of adding digits to it.
             onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.setSelectionRange(0, t.value.length)); }}
-            placeholder="e.g. 42,284"
+            placeholder={`e.g. ${E.exampleRank}`}
             aria-invalid={!!rankMsg}
             aria-describedby={rankMsg ? "profile-error" : undefined}
             className={`numeric ${control}`}
@@ -178,14 +205,19 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
           <label className="grid gap-1.5 text-sm font-medium">
             Question group
             <select
-              value={groupsOf(exam, draft.quotas)[0] ?? ""}
-              onChange={(e) => { set("quotas", meta.quotas.filter((q) => groupOf(q) === e.target.value)); setGroupMsg(false); }}
+              value={groupsIn(E, draft.quotas)[0] ?? ""}
+              onChange={(e) => {
+                const g = e.target.value;
+                set("quotas", meta.quotas.filter((q) => groupOf(q) === g));
+                setPicked((p) => keepToGroup(p, groupCourseList(meta, g || undefined))); // another group's courses go
+                setGroupMsg(false);
+              }}
               aria-invalid={groupMsg && !!groupError}
               aria-describedby="group-note"
               className={control}
             >
               <option value="">Pick your group</option>
-              {(meta.groups ?? []).map((g) => <option key={g} value={g}>{g}</option>)}
+              {(meta.groups ?? []).map((g) => <option key={g} value={g}>{tidyLabel(E, g)}</option>)}
             </select>
           </label>
         )}
@@ -198,11 +230,11 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
       <label className="grid gap-1.5 text-sm font-medium sm:max-w-sm">
         Find a specialty
         {/* Enter here filters, never saves or moves on. */}
-        <input type="search" value={find} onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.preventDefault()} placeholder="e.g. anaes" className={control} />
+        <input type="search" value={find} onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.preventDefault()} placeholder={exam === DEFAULT_EXAM ? "e.g. anaes" : "Part of a name"} className={control} />
       </label>
       <Checks
         legend="Specialties"
-        note={setup ? "Tick each specialty you would take; then, below, untick any degree you would not. None ticked = every course." : undefined}
+        note={grouped && !group ? "Pick your question group first: only its courses are listed." : grouped ? `Your question group's courses (${tidyLabel(E, group!)}). None ticked = every one of them.` : setup ? "Tick each specialty you would take; then, below, untick any degree you would not. None ticked = every course." : undefined}
         options={specialtyOptions}
         value={Object.keys(picked)}
         onChange={pickSpecialties}
@@ -211,7 +243,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
       {Object.keys(picked).length ? (
         <fieldset>
           <legend className="text-sm font-medium">Degrees</legend>
-          <p className="text-xs text-muted-foreground">Per specialty: untick a degree to leave that course out, e.g. keep only DNB for Family Medicine.</p>
+          <p className="text-xs text-muted-foreground">Per specialty: untick a degree to leave that course out{exam === DEFAULT_EXAM ? ", e.g. keep only DNB for Family Medicine" : ""}.</p>
           <div className="mt-2 grid gap-3">
             {meta.specialties.filter((s) => picked[s.code]).map((s) => {
               const all = offered(s.code);
@@ -245,7 +277,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
           )}
         </fieldset>
       ) : (
-        <Checks legend="Degrees" note="None ticked = all. Tick a specialty to choose its degrees." options={meta.degrees.map((d) => ({ value: d, label: d }))} value={draft.degrees} onChange={(v) => set("degrees", v)} />
+        !grouped && <Checks legend="Degrees" note="None ticked = all. Tick a specialty to choose its degrees." options={meta.degrees.map((d) => ({ value: d, label: d }))} value={draft.degrees} onChange={(v) => set("degrees", v)} />
       )}
     </>
   );
@@ -253,7 +285,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, setup
     <Checks
       legend="Quotas"
       note={E.quotasNote}
-      options={meta.quotas.map((q) => ({ value: q, label: q }))}
+      options={meta.quotas.map((q) => ({ value: q, label: quotaIn(E, q) }))}
       value={draft.quotas}
       onChange={(v) => set("quotas", v)}
     />

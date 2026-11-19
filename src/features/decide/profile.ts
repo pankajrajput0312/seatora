@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_EXAM, exams, type ExamKey } from "@/features/exams/registry";
-import { baseCategories } from "./types";
+import { baseCategories, openQuotas } from "./types";
 
 /** One exact course as "degree~SPECIALTY", e.g. "DNB~FAMILYMEDICINE" (the `c` URL param). */
 export const pairSchema = z.string().max(200).regex(/^[^~,]+~[^~,]+$/, "degree~SPECIALTY, e.g. DNB~FAMILYMEDICINE");
@@ -90,8 +89,8 @@ export function picksOf(p: ProfileCourses, courses: { degree: string; specialty:
   return out;
 }
 
-/** The quotas her profile covers: the ones she ticked, else the exam's open quotas (NEET SS: none, she picks her group). */
-export const profileQuotas = (p: Pick<Profile, "quotas">, exam: ExamKey = DEFAULT_EXAM) => (p.quotas.length ? p.quotas : exams[exam].quotas);
+/** The quotas her profile covers: the ones she ticked, else the exam's open quotas (`open`, exams' `quotas`; default NEET PG's; NEET SS: none, she picks her group). */
+export const profileQuotas = (p: Pick<Profile, "quotas">, open: string[] = openQuotas) => (p.quotas.length ? p.quotas : open);
 
 const list = (p: URLSearchParams, k: string) => p.getAll(k).flatMap((v) => v.split(",")).map((v) => v.trim()).filter(Boolean);
 const num = (v: string | null | undefined) => (v != null && v.trim() !== "" ? Number(v) : null);

@@ -25,8 +25,9 @@ import { readTermFilters, termChips, termValueLabel } from "@/features/decide/li
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, listInstitutes } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { activeExam } from "@/features/exams/active";
-import { exams, latestOf } from "@/features/exams/registry";
+import { activeExam, examInfo } from "@/features/exams/active";
+import { headYearIn, latestOf } from "@/features/exams/registry";
+import { quotaIn } from "@/features/exams/exam";
 
 export const metadata: Metadata = { title: "Institutes" };
 const PAGE_SIZE = 24; // splits evenly into 2, 3 and 4 columns; small enough for a phone to paint fast
@@ -53,10 +54,13 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const { params: tp, filters: tf } = readTermFilters(params, profile);
   const pg = { page: f.page, pageSize: PAGE_SIZE };
   const exam = await activeExam();
-  const E = exams[exam];
+  const E = await examInfo(exam);
   const { latestYear: LATEST_YEAR, pastYears: PAST_YEARS } = E;
-  const sorts = sortsFor(PAST_YEARS[1]);
   const [meta, info, byTerms, view] = await Promise.all([getMeta(exam), hospitalInfo(exam), institutesByTerms(tf, f.course, exam), chosenView(params, "institutes")]);
+  // Allotments of the latest complete year (NEET PG: its later past year, as before).
+  const HEAD = headYearIn(exam, meta.sources);
+  // NEET MDS: no hospital beds (dental colleges): no Beds column or sort.
+  const sorts = sortsFor(HEAD).filter((s) => E.has.beds || s.value !== "beds");
   const latest = latestOf(meta.sources, exam);
   // Term filters and the beds sort narrow and order the list before it is paged, so reach is read for one page only.
   const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort, only: byTerms?.pass, bedsOf: (key: string) => info.get(key)?.beds?.n };
@@ -84,14 +88,14 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
     r.best && (
       <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
         <ReachBadge reach={r.bestReach} provisional={r.best.provisional} latest={latest} />
-        <span className="text-xs text-muted-foreground">{r.best.course.degree} {r.best.course.name}, {r.best.quota}</span>
+        <span className="text-xs text-muted-foreground">{r.best.course.degree} {r.best.course.name}, {quotaIn(E, r.best.quota)}</span>
       </span>
     );
   // The number opens that year's allotments on the institute's Allotments tab.
   const allot = (r: (typeof res.rows)[number], className?: string) =>
     r.allotments2025 != null ? (
-      <Link href={L.institute(r.college.slug, "allotments", { year: PAST_YEARS[1] })} className={className}>
-        {formatRank(r.allotments2025)}<span className="sr-only"> allotments in {PAST_YEARS[1]}: see them</span>
+      <Link href={L.institute(r.college.slug, "allotments", { year: HEAD })} className={className}>
+        {formatRank(r.allotments2025)}<span className="sr-only"> allotments in {HEAD}: see them</span>
       </Link>
     ) : (
       <Dash />
@@ -124,7 +128,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
                       <dd><Link href={L.institute(r.college.slug, "courses")} className={`${smallLink} numeric min-w-11 font-semibold text-sky`}>{formatRank(r.courses.length)}<span className="sr-only"> courses: see them</span></Link></dd>
                     </div>
                     <div className="grid border-l border-border px-4 py-1">
-                      <dt className="pt-1 text-xs text-muted-foreground">Allotments {PAST_YEARS[1]}</dt>
+                      <dt className="pt-1 text-xs text-muted-foreground">Allotments {HEAD}</dt>
                       <dd className="numeric flex min-h-11 items-center font-semibold">{allot(r, `${smallLink} min-w-11 text-sky`)}</dd>
                     </div>
                   </dl>
@@ -147,9 +151,9 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
             <th scope="col" className={`${tbl.th} sticky left-0 z-[3] border-r border-border bg-card ${tbl.pin}`}>Institute</th>
             <th scope="col" className={tbl.th}>State</th>
             <th scope="col" className={tbl.th}>Type</th>
-            <th scope="col" className={`${tbl.th} text-right`}>Beds</th>
+            {E.has.beds && <th scope="col" className={`${tbl.th} text-right`}>Beds</th>}
             <th scope="col" className={`${tbl.th} text-right`}>Courses</th>
-            <th scope="col" className={`${tbl.th} text-right`}>Allotments {PAST_YEARS[1]}</th>
+            <th scope="col" className={`${tbl.th} text-right`}>Allotments {HEAD}</th>
             {profile && <th scope="col" className={tbl.th}>Best</th>}
           </tr>
         </thead>
@@ -163,7 +167,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
                 </th>
                 <td className={tbl.td}>{r.college.state ?? <Dash />}</td>
                 <td className={`${tbl.td} whitespace-nowrap`}>{h?.type ? <TypeBadge type={h.type} of={r.college.name} /> : <Dash />}</td>
-                <td className={`${tbl.num} whitespace-nowrap`}>{h?.beds ? <Beds b={h.beds} inst={r.college.name} /> : <Dash />}</td>
+                {E.has.beds && <td className={`${tbl.num} whitespace-nowrap`}>{h?.beds ? <Beds b={h.beds} inst={r.college.name} /> : <Dash />}</td>}
                 <td className={tbl.num}><Link href={L.institute(r.college.slug, "courses")} className="text-sky hover:underline">{formatRank(r.courses.length)}</Link></td>
                 <td className={tbl.num}>{allot(r, "text-sky hover:underline")}</td>
                 {profile && <td className={tbl.td}>{bestOf(r) || <Dash />}</td>}
@@ -179,7 +183,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Institutes"
-        about={<>Every institute in the MCC results: where it is, its type and beds, the courses it offers and how many allotments were made there in {PAST_YEARS[1]} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments{E.has.fees ? ", fees and bond" : ""}.</>}
+        about={<>Every institute in the MCC results: where it is, its type{E.has.beds && " and beds"}, the courses it offers and how many allotments were made there in {HEAD} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments{E.has.fees ? ", fees and bond" : ""}.</>}
       />
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
@@ -228,12 +232,12 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
       <div className="grid gap-1">
         {profile && <HistoryNote more="A card's badge is the best history among the options there that match your profile, with the course and quota it comes from." />}
         <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
-          Type: inferred from name and quota, or Seatora&apos;s research; not official. Beds: self-reported by the hospital.
-          <InfoTip label="type and beds">
-            College type is inferred from the institute&apos;s name and quotas, or comes from Seatora&apos;s research on the hospital (its badge says which); never an official field. Beds are what the hospital itself published ({SELF_REPORTED.toLowerCase()}); its Hospital facts tab gives the period, the source and the date Seatora checked it.
+          Type: inferred from name and quota, or Seatora&apos;s research; not official.{E.has.beds && " Beds: self-reported by the hospital."}
+          <InfoTip label={E.has.beds ? "type and beds" : "type"}>
+            College type is inferred from the institute&apos;s name and quotas, or comes from Seatora&apos;s research on the hospital (its badge says which); never an official field.{E.has.beds && <> Beds are what the hospital itself published ({SELF_REPORTED.toLowerCase()}); its Hospital facts tab gives the period, the source and the date Seatora checked it.</>}
           </InfoTip>
         </p>
-        <DataSource used={profile ? [{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR }] : [{ year: PAST_YEARS[1] }]} />
+        <DataSource used={profile ? [{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR }] : [{ year: HEAD }]} />
       </div>
     </AppPage>
   );

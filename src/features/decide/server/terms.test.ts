@@ -203,7 +203,7 @@ it("an unknown shape is kept as published, never dropped", () => {
 
 it("programmes from degrees, in display order", () => {
   expect(programmesOf(["DNB", "MS", "Diploma", "NBEMS Diploma", "MD"])).toEqual(["MD/MS", "Diploma", "DNB", "NBEMS Diploma"]);
-  expect(["MD", "MS", "DrNB", "MCh", "MPH"].map(programmeOfDegree)).toEqual(["MD/MS", "MD/MS", "DNB", "MCh", "MPH"]);
+  expect(["MD", "MS", "DrNB", "MCh", "MPH"].map((d) => programmeOfDegree(d))).toEqual(["MD/MS", "MD/MS", "DNB", "MCh", "MPH"]);
 });
 
 it("a documented bond: years from the text's head, amounts per programme from the record, the record's penalty items", () => {

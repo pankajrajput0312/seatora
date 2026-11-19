@@ -71,12 +71,13 @@ export function duplicateList(state: ChoicesState, sourceId: string): ChoicesSta
 export const termsWords = (t: ProgrammeTerms) => statCells(t).filter((c) => c.key !== "stipend" && !c.missing).map((c) => `${c.label}: ${c.full}`).join("; ");
 
 /** The list for WhatsApp, in order, one line a choice (`terms`: its termsWords, null while not loaded), then a link to Seatora. */
-export function shareText(list: ChoiceList, terms: (id: string) => string | null, url: string) {
+/** `exam`: the exam's name ("NEET PG"). */
+export function shareText(list: ChoiceList, terms: (id: string) => string | null, url: string, exam = "NEET PG") {
   const lines = list.items.map((i, n) => {
     const t = terms(i.id);
     return `${n + 1}. ${i.institute} — ${i.course}, ${i.quota}${t ? `. ${t}` : ""}`;
   });
-  return [`My NEET PG choice list (${list.name}), in order:`, ...lines, "", `Made with Seatora: ${url}`].join("\n");
+  return [`My ${exam} choice list (${list.name}), in order:`, ...lines, "", `Made with Seatora: ${url}`].join("\n");
 }
 
 /** The PIN in the item's college key (types.ts optionId: "NAME…#PIN~degree~specialty~quota"); null when the key has none. */

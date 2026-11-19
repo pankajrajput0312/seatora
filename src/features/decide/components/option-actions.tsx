@@ -9,10 +9,11 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
 import type { DecideLinks } from "../lib/links";
-import { useChoices, useCompare, useDecideLinks } from "../lib/use-decide-store";
+import { quotaIn, roundIn } from "@/features/exams/exam";
+import { useChoices, useCompare, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
 import { latestText, type Latest } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
-import { roundLabel, type SeatList } from "../types";
+import type { SeatList } from "../types";
 import { Dash, HistoryNote, InstName, Provisional, ReachBadge } from "./bits";
 import { AboutData } from "./filter-form";
 import { FocusItem } from "./focus-item";
@@ -25,6 +26,7 @@ import { TypeBadge } from "./type-badge";
 import { smallLink, tbl } from "./ui";
 import { ViewPanes, ViewToggle, type View } from "./view-toggle";
 import { ScrollTable } from "./scroll-table";
+import { QuotaName } from "./round-name";
 
 export function ChoiceStar({ item }: { item: ChoiceItem }) {
   const [state, setState] = useChoices();
@@ -75,6 +77,7 @@ type Years = { latest: Latest; pastYears: [number, number]; includeLatest: boole
 
 /** Cross-links for one option, each a 44px target (a new option has no closing ranks or allotments to link). */
 function Related({ r, L }: { r: ListRow; L: DecideLinks }) {
+  const { has } = useExamInfo();
   const link = cn(smallLink, "text-sky");
   return (
     <>
@@ -84,7 +87,7 @@ function Related({ r, L }: { r: ListRow; L: DecideLinks }) {
           <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={link}>Allotments</Link>
         </>
       )}
-      <Link href={L.institute(r.college.slug, "fees")} className={link}>Fees & bond</Link>
+      {has.fees && <Link href={L.institute(r.college.slug, "fees")} className={link}>Fees & bond</Link>}
     </>
   );
 }
@@ -121,6 +124,7 @@ const rowLabel = (r: ListRow) => `${r.college.name}, ${courseName(r)}, ${r.quota
  * deepest closings; the round's seats per list; the term stat cells; Rounds by year and the cross-links.
  */
 function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open, toggle }: { r: ListRow; L: DecideLinks; n: number } & Years & Open) {
+  const E = useExamInfo();
   const c = cardClosing(r, latest.year, pastYears, includeLatest);
   const [older, last] = pastYears;
   const list = seatLists[0];
@@ -130,15 +134,15 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
     <div data-item={n} tabIndex={-1} className="grid min-w-0 rounded-xl">
       <ResultCard
         chips={[
-          c ? `${c.year} · ${roundLabel[c.d.round]}` : list && `${list.year} ${roundLabel[list.round]} seats`,
-          r.quota,
+          c ? `${c.year} · ${roundIn(E, c.year, c.d.round)}` : list && `${list.year} ${roundIn(E, list.year, list.round)} seats`,
+          quotaIn(E, r.quota),
           c && `${c.d.category} seat`,
           c?.d.provisional && <Provisional when />,
         ]}
         actions={<><ChoiceStar item={toChoiceItem(r, latest)} /><CompareToggle id={r.id} label={rowLabel(r)} /></>}
         stat={{
           // The big number's year and round, so it never reads against the label under it (which counts other rounds).
-          label: c ? `${c.year} ${roundLabel[c.d.round]} closing` : "Closing rank",
+          label: c ? `${c.year} ${roundIn(E, c.year, c.d.round)} closing` : "Closing rank",
           value: (
             <>
               <span className="numeric">{c ? formatRank(c.d.closing) : <Dash />}</span>
@@ -159,13 +163,13 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
             {strip && (
               <dl className="grid grid-cols-2 gap-x-4 px-4 py-2 text-sm">
                 {[last, older].map((y) => (
-                  <div key={y}><dt className="text-xs text-muted-foreground">{y} deepest</dt><dd><ClosingCell d={r.byYear[y]} /></dd></div>
+                  <div key={y}><dt className="text-xs text-muted-foreground">{y} deepest</dt><dd><ClosingCell d={r.byYear[y]} year={y} /></dd></div>
                 ))}
               </dl>
             )}
             {list && (
               <p className={cn("flex flex-wrap items-center gap-x-3 px-4 text-xs", strip && "border-t border-border")}>
-                <span className="text-muted-foreground">{roundLabel[list.round]} seats</span>
+                <span className="text-muted-foreground">{roundIn(E, list.year, list.round)} seats</span>
                 {seatLists.map((l) => (
                   <span key={l.key} className="inline-flex items-center gap-1">
                     <span className="text-muted-foreground">{seatKindShort(l.kind)}</span>
@@ -236,20 +240,20 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
               {/* Row header: only what names the option, so it reads short for every cell. */}
               <th scope="row" className={cn(stickName, "px-3 py-3 text-left font-normal")}>
                 <Link href={L.institute(r.college.slug)} title={r.college.name} className="font-semibold hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
-                <span className={cn("block max-md:text-xs", tbl.clamp)}>{courseName(r)}<span className="text-muted-foreground">, {r.quota}<span className="max-md:hidden">, {r.college.state ?? "state not listed"}</span></span></span>
+                <span className={cn("block max-md:text-xs", tbl.clamp)}>{courseName(r)}<span className="text-muted-foreground">, <QuotaName quota={r.quota} /><span className="max-md:hidden">, {r.college.state ?? "state not listed"}</span></span></span>
                 <span className="block max-md:hidden"><HospitalLine h={r.hospital} of={r.college.name} /></span>
                 <span className="mt-1 block text-xs text-muted-foreground md:hidden">
                   {latestText(latest)} <span className="numeric text-sm font-semibold text-foreground">{r.latest ? formatRank(r.latest.closing) : "—"}</span>
                   {r.latest?.provisional && <span className="mt-0.5 block"><Provisional when /></span>}
                 </span>
               </th>
-              <td className={phoneOnly}><ClosingCell d={r.byYear[last]} /></td>
+              <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>
               <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} /><SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} /></td>
               <TermStatCells t={r.fees} variant="table" of={rowLabel(r)} tdClassName="px-2!" />
               {seatLists.map((l) => <td key={l.key} className="px-1.5 py-1 text-right"><SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} /></td>)}
-              <td className={notPhone}><ClosingCell d={r.latest} /></td>
-              <td className={notPhone}><ClosingCell d={r.byYear[last]} /></td>
-              <td className="hidden px-3 py-3 text-right xl:table-cell"><ClosingCell d={r.byYear[older]} /></td>
+              <td className={notPhone}><ClosingCell d={r.latest} year={latest.year} /></td>
+              <td className={notPhone}><ClosingCell d={r.byYear[last]} year={last} /></td>
+              <td className="hidden px-3 py-3 text-right xl:table-cell"><ClosingCell d={r.byYear[older]} year={older} /></td>
               <td className="px-3 py-1 text-xs print:hidden">
                 <span className="flex min-w-[10rem] flex-wrap items-center gap-x-4">
                   {/* Opens the grid in the full-width row below, so this row stays narrow. */}

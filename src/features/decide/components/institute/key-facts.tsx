@@ -12,6 +12,7 @@ import { statKeys, statLabel } from "../../lib/stat-format";
 import type { OptionRow } from "../../service";
 import { roundLabel, seatKinds, type SeatList } from "../../types";
 import { KEY_ROWS_PHONE, newestClosing } from "./key-facts-data";
+import { QuotaName } from "../round-name";
 
 // The institute page's key facts, above the tabs (the Rank & Seats layout): one row per course (hers with a profile,
 // else the main ones) with Fee, Stipend, Bond, Bond ₹, Leaving (each (i): years 1-2-3 and the exact words), the newest
@@ -98,7 +99,7 @@ export function KeyFacts({ rows, total, mine, cats, list, name, slug, L }: { row
               <tr key={r.id} className="border-b border-border last:border-0">
                 <th scope="row" className="px-3 py-2 text-left align-top font-medium">
                   <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link><New r={r} />
-                  <span className="block text-xs font-normal text-muted-foreground">{r.quota}</span>
+                  <span className="block text-xs font-normal text-muted-foreground"><QuotaName quota={r.quota} /></span>
                 </th>
                 <TermStatCells t={r.fees} variant="table" short of={of(r)} tdClassName="px-3 py-2" />
                 <td className="px-3 py-2 text-right align-top"><Seats r={r} /></td>
@@ -116,7 +117,7 @@ export function KeyFacts({ rows, total, mine, cats, list, name, slug, L }: { row
             <div className="flex items-start justify-between gap-3 px-3 pt-2">
               <span className="min-w-0">
                 <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="py-2 text-sm font-semibold hover:text-sky hover:underline">{courseName(r)}</Link><New r={r} />
-                <span className="block text-xs text-muted-foreground">{r.quota}</span>
+                <span className="block text-xs text-muted-foreground"><QuotaName quota={r.quota} /></span>
               </span>
               <span className="shrink-0 text-right text-xs text-muted-foreground">Last closing<span className="block text-sm text-foreground"><Last r={r} /></span></span>
             </div>

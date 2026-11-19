@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { cache } from "react";
 import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
-import { examYears, exams, groupOf, latestOf, perGroup } from "@/features/exams/registry";
+import { examYears, exams, groupOf, headYearIn, latestOf, perGroup } from "@/features/exams/registry";
 import { hospitalInfo, type HospitalInfo } from "./components/institute/institute-data";
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
 import { searchMatcher } from "./lib/college-aliases";
@@ -290,7 +290,7 @@ async function rowsFor(cat: Catalog, opts: Opt[], profile: Profile | null, inclu
 function inProfile(cat: Catalog, o: Pick<Opt, "college" | "degree" | "specialty"> & { quota: string | null }, p: Profile | null) {
   if (!p) return true;
   const state = cat.collegeByKey.get(o.college)?.state ?? null;
-  return profileHasCourse(p, o) && o.quota != null && profileQuotas(p, cat.exam).includes(o.quota) && (!p.states.length || (state != null && p.states.includes(state)));
+  return profileHasCourse(p, o) && o.quota != null && profileQuotas(p, exams[cat.exam].quotas).includes(o.quota) && (!p.states.length || (state != null && p.states.includes(state)));
 }
 /** The course and quota's terms (the same figures as the Fees page and the stat cells), for the term filters. */
 const optTerms = (cat: Catalog, o: Pick<Opt, "college" | "degree" | "specialty"> & { quota: string | null }) => courseTerms(cat, o.college, o.degree, o.specialty, o.quota ?? undefined);
@@ -313,17 +313,20 @@ type Ranked = { o: Opt; reach: Reach; provisional: boolean; deepest: ReachInput 
  */
 async function rankOptions(cat: Catalog, opts: Opt[], profile: Profile | null, includeProvisional: boolean): Promise<Ranked[]> {
   const { pastYears, latestYear } = exams[cat.exam];
+  const head = headYearIn(cat.exam, cat.sources);
   const inputs = await reachInputs(cat, {
     cs: opts.length < cat.options.length / 2 ? [...new Set(opts.map((o) => o.cs))] : undefined,
     categories: profile ? eligibleCategories(profile.category, profile.pwd) : undefined,
     pastYears,
     latestYear,
+    // NEET PG: absent (its later past year), so its query is as it was.
+    ...(head !== pastYears[1] && { headYear: head }),
   });
   const latest = latestOf(cat.sources, cat.exam);
   const ranked = opts.map((o) => {
     const list = inputs.get(o.id) ?? [];
     const label = profile ? labelOf(profile.rank, list, includeProvisional, latest) : { reach: "no-data" as const, provisional: false };
-    const deepest = list.filter((c) => c.year === pastYears[1]).reduce<ReachInput | undefined>((a, c) => (!a || c.closing > a.closing ? c : a), undefined);
+    const deepest = list.filter((c) => c.year === head).reduce<ReachInput | undefined>((a, c) => (!a || c.closing > a.closing ? c : a), undefined);
     return { o, ...label, deepest };
   });
   return ranked.sort((a, b) => reachOrder.indexOf(a.reach) - reachOrder.indexOf(b.reach) || (b.deepest?.closing ?? 0) - (a.deepest?.closing ?? 0));
@@ -470,7 +473,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   // Seats of every option in her profile (courses, quotas, seat categories) when the view or a seats filter needs them,
   // in one read beside the labels; else just the page's, below.
   const [profileSeats, labelled, labelledUnknown] = await Promise.all([
-    round || kind ? optionSeats(lists, profile ? { ...profileCourseFilter(profile), quotas: profileQuotas(profile, cat.exam), categories: seatCats(profile) } : {}, cat.exam) : null,
+    round || kind ? optionSeats(lists, profile ? { ...profileCourseFilter(profile), quotas: profileQuotas(profile, exams[cat.exam].quotas), categories: seatCats(profile) } : {}, cat.exam) : null,
     rankOptions(cat, opts, profile, includeProvisional),
     unknownOpts.length ? rankOptions(cat, unknownOpts, profile, includeProvisional) : [],
   ]);
@@ -613,7 +616,8 @@ const namedPrev = (cat: Catalog, p: Allotment["prev"]) => p && { ...p, ...seatNa
  * (her quotas), else `quota`. `search`: institute or state words.
  */
 export type LastRanksFilters = {
-  degree?: string; specialty?: string; courses?: { degree: string; specialty: string }[]; category?: string; quota?: string; quotas?: string[]; search?: string;
+  /** `categories`: closings on any of these seat categories (another exam's default: the ones she can take); else `category`'s. */
+  degree?: string; specialty?: string; courses?: { degree: string; specialty: string }[]; category?: string; categories?: string[]; quota?: string; quotas?: string[]; search?: string;
   years?: number[]; sort?: { year: number; round: Round; dir: "asc" | "desc" }; terms?: TermFilters;
   /** Only options with some round (from year `since`) closing between `min` and `max` (either may be open). */
   closing?: { min?: number; max?: number; since?: number };
@@ -638,7 +642,7 @@ export async function lastRanks(f: LastRanksFilters, pg?: PageQuery, exam: ExamK
   };
   const opts = cat.options.filter((o) => course(o) && (!quotas || quotas.includes(o.quota)) && text(o) && optMatches(cat, o, null, f.terms ?? null, types));
   const groups = groupByOption(await findCutoffs(cat, { cs: [...new Set(opts.map((o) => o.cs))], quotas, years: f.years?.length ? f.years : undefined }));
-  const eligible = f.category ? new Set([f.category]) : undefined;
+  const eligible = f.categories?.length ? new Set(f.categories) : f.category ? new Set([f.category]) : undefined;
   const built = await withHospital(opts.map((o) => buildRow(cat, o, groups.get(o.id) ?? [], null, true, eligible)), cat.exam);
   let rows = built.filter((r) => Object.keys(r.grid).length > 0);
   const columns = [...new Set(rows.flatMap((r) => Object.keys(r.grid).map(Number)))].sort().map((year) => ({
@@ -694,6 +698,22 @@ export async function examGroups(exam: ExamKey) {
   return [...new Set(cat.options.filter((o) => o.byYear[y]).flatMap((o) => groupOf(o.quota) ?? []))].sort();
 }
 
+/**
+ * NEET SS: each question group of its latest year (examGroups) → the courses ("degree~SPECIALTY") MCC allotted under it
+ * in any year, so her course picks can only be her group's. Empty for other exams.
+ */
+export async function examGroupCourses(exam: ExamKey): Promise<Record<string, string[]>> {
+  const groups = new Set(await examGroups(exam));
+  if (!groups.size) return {};
+  const cat = await getCatalog(exam);
+  const out: Record<string, Set<string>> = {};
+  for (const o of cat.options) {
+    const g = groupOf(o.quota);
+    if (g && groups.has(g)) (out[g] ??= new Set()).add(pairKey(o));
+  }
+  return Object.fromEntries(Object.entries(out).map(([g, xs]) => [g, [...xs].sort()]));
+}
+
 /** Counselling notices: none until announcements are imported from MCC with their official links. Never made up. */
 export async function getNotices(): Promise<Notice[]> {
   await getCatalog(); // same availability as the rest of Decide
@@ -726,7 +746,7 @@ const STRIP_DOTS = 1500;
 export async function dashboard(profile: Profile, exam: ExamKey = DEFAULT_EXAM) {
   const cat = await getCatalog(exam);
   const ranked = await rankOptions(cat, cat.options.filter((o) => optMatches(cat, o, profile)), profile, true);
-  const [, last] = exams[exam].pastYears;
+  const last = headYearIn(exam, cat.sources);
   const byCourse = new Map<string, { course: Course; points: StripPoint[]; opts: Opt[] }>();
   for (const { o, deepest: d } of ranked) {
     const course = cat.courseOf.get(`${o.degree}|${o.specialty}`)!;
@@ -798,8 +818,8 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
     .filter((c) => !f.type || c.type === f.type)
     .filter((c) => !f.only || f.only.has(c.key))
     .filter((c) => !f.course?.length || (byCollege.get(c.key) ?? []).some((o) => [f.course].flat().includes(cat.courseOf.get(`${o.degree}|${o.specialty}`)!.slug)))
-    // `allotments2025`: the later past year's (NEET PG: 2025; the name kept for its readers).
-    .map((college) => ({ college, allotments2025: sumYear(byCollege.get(college.key) ?? [], exams[exam].pastYears[1]) }));
+    // `allotments2025`: the headline year's (NEET PG: its later past year, 2025; the name kept for its readers).
+    .map((college) => ({ college, allotments2025: sumYear(byCollege.get(college.key) ?? [], headYearIn(exam, cat.sources)) }));
   const by = f.sort ?? "name";
   const beds = (c: (typeof colleges)[number]["college"]) => (f.bedsOf ? f.bedsOf(c.key) : c.beds) ?? -1;
   colleges.sort((a, b) =>

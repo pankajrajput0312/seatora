@@ -26,9 +26,10 @@ import { statKeys, statLabel, type StatKey } from "@/features/decide/lib/stat-fo
 import { termChips, termFilterLists, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getDecideData, getMeta, listFees, type FeeSort } from "@/features/decide/service";
-import { programmeNames, programmes } from "@/features/decide/server/terms";
+import { examProgrammes, programmes } from "@/features/decide/server/terms";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { examGate } from "@/features/exams/active";
+import { activeExam, examGate } from "@/features/exams/active";
+import { DEFAULT_EXAM } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Fees & bond" };
 const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
@@ -47,11 +48,13 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const L = decideLinks(params);
   const f = parseSearchParams(schema, params, termFilterLists);
   const profile = profileFromParams(params);
-  const [meta, { courses }, info] = await Promise.all([getMeta(), getDecideData(), hospitalInfo()]);
-  const d = feeDefaults(profile, courses);
+  // The exam's (NEET PG, or another exam's once its data has fees: examGate): its courses, programmes and fee records.
+  const exam = await activeExam();
+  const [meta, { courses }, info] = await Promise.all([getMeta(exam), getDecideData(exam), hospitalInfo(exam)]);
+  const d = feeDefaults(profile, courses, exam);
   // Her courses by default (one row per institute × course, its own terms), "All courses" for whole programmes.
   const cf = courseFilter(params, profile, meta.courses);
-  const [res, view] = await Promise.all([listFees({ ...feesFilters(f, d), courses: cf.slugs ?? undefined }, { page: f.page, pageSize: await pageSizeFor(PAGE_SIZE) }), chosenView(params, "fees")]);
+  const [res, view] = await Promise.all([listFees({ ...feesFilters(f, d), courses: cf.slugs ?? undefined }, { page: f.page, pageSize: await pageSizeFor(PAGE_SIZE) }, exam), chosenView(params, "fees")]);
   const noun = cf.slugs ? "courses" : "programmes";
   /** The row's course ("DNB Family Medicine"), else its whole programme ("DNB, every course"). */
   const rowTitle = (r: (typeof rows)[number]) => (r.course ? `${r.course.degree} ${r.course.name}` : `${programmeTitle(r.terms)}, every course`);
@@ -196,7 +199,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         <FilterDropdown label="Course" name="course" search options={cf.choices} selected={cf.selected} none={cf.none} info={cf.mine.length ? "None ticked means your courses: a row per institute and course, with that course's own terms. Tick All courses for whole programmes." : undefined} />
         <Field label="Programme">
           <Select name="program" value={f.program} all={d.programmes ? `Your profile: ${d.programmes.join(", ")}` : "All programmes"}
-            options={[...(d.programmes ? [{ value: "all", label: "All programmes" }] : []), ...programmeNames.map((p) => ({ value: programmes[p].slug, label: p }))]} />
+            options={[...(d.programmes ? [{ value: "all", label: "All programmes" }] : []), ...examProgrammes(exam).map((p) => ({ value: programmes[p].slug, label: p }))]} />
         </Field>
         <Field label="State">
           <Select name="state" value={f.state} all={d.states ? `Your profile: ${d.states.join(", ")}` : "All states"}
@@ -229,7 +232,8 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         {res.total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <ViewToggle page="fees" view={view} />
-            <CsvLink href={`/api/v1/fees/export?${params}`} what={`these ${formatRank(res.total)} ${noun}`} />
+            {/* /api/v1 is NEET PG's: another exam has no CSV yet. */}
+            {exam === DEFAULT_EXAM && <CsvLink href={`/api/v1/fees/export?${params}`} what={`these ${formatRank(res.total)} ${noun}`} />}
           </div>
         )}
       </div>

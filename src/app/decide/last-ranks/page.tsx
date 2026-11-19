@@ -24,14 +24,16 @@ import { statKeys } from "@/features/decide/lib/stat-format";
 import { anyTermFilter, readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, profileQuotas, toURLSearchParams } from "@/features/decide/profile";
 import { courseFilter } from "@/features/decide/lib/course-filter";
-import { LATER_ROUNDS_NOTE } from "@/features/decide/lib/reach";
+import { eligibleCategories, LATER_ROUNDS_NOTE } from "@/features/decide/lib/reach";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { courseName } from "@/features/decide/components/options-view";
 import { getCollege, getMeta, lastRanks, type OptionRow } from "@/features/decide/service";
-import { baseCategories, roundLabel, rounds, type Round } from "@/features/decide/types";
+import { baseCategories, rounds, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { activeExam } from "@/features/exams/active";
-import { exams, perGroup, roundNameIn } from "@/features/exams/registry";
+import { activeExam, examInfo } from "@/features/exams/active";
+import { DEFAULT_EXAM, exams, perGroup, roundNameIn } from "@/features/exams/registry";
+import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
+import { RoundNames, QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Last ranks" };
 // ponytail: 25 a page: each card carries its five term cells and their (i)s (both views are in the page).
@@ -81,7 +83,7 @@ function YearGrid({ r, cols, rds, caption, rank }: { r: OptionRow; cols: Col[]; 
         <thead>
           <tr className="text-muted-foreground">
             <th scope="col" className="px-1.5 py-1.5 text-left font-semibold">Year</th>
-            {rds.map((rd) => <th key={rd} scope="col" className="px-1.5 py-1.5 text-right font-semibold">{roundLabel[rd]}</th>)}
+            {rds.map((rd) => <th key={rd} scope="col" className="px-1.5 py-1.5 text-right font-semibold"><RoundNames years={cols.filter((c) => c.rounds.includes(rd)).map((c) => c.year)} round={rd} /></th>)}
           </tr>
         </thead>
         <tbody>
@@ -101,8 +103,9 @@ function YearGrid({ r, cols, rds, caption, rank }: { r: OptionRow; cols: Col[]; 
   );
 }
 
-function LastRankCard({ r, cols, rds, stat, mcc, L, mine, rank }: {
+function LastRankCard({ r, cols, rds, stat, mcc, L, mine, rank, E }: {
   r: OptionRow;
+  E: Exam;
   cols: Col[];
   rds: Round[];
   /** The sorted column; else each card shows its own newest closing (its newest year's R1, else that year's first round). */
@@ -120,7 +123,7 @@ function LastRankCard({ r, cols, rds, stat, mcc, L, mine, rank }: {
       className={mine ? "border-sky" : undefined}
       chips={[r.quota]}
       actions={<Link href={L.allotments({ course: course.slug, inst: r.college.slug })} className={`${smallLink} px-3 text-xs text-sky`}>Allotments</Link>}
-      stat={big ? { label: `${big.year} ${roundLabel[big.round]}`, value: <span className="numeric">{big.cell ? formatRank(big.cell.closing) : <Dash />}</span> } : undefined}
+      stat={big ? { label: `${big.year} ${roundIn(E, big.year, big.round)}`, value: <span className="numeric">{big.cell ? formatRank(big.cell.closing) : <Dash />}</span> } : undefined}
       title={r.college.name}
       href={L.institute(r.college.slug)}
       external={mcc ? { href: mcc, label: `MCC profile: ${r.college.name}` } : undefined}
@@ -144,17 +147,21 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const tp = readTermFilters(params, profile);
   const exam = await activeExam();
   const E = exams[exam];
+  const EI = await examInfo(exam);
   const meta = await getMeta(exam);
   // Every one of her courses by default (lib/course-filter.ts), the picked ones otherwise; no profile courses: the first course.
   const cf = courseFilter(params, profile, meta.courses);
   const picked = cf.slugs ? meta.courses.filter((c) => cf.slugs!.has(c.slug)) : [];
   const courses = picked.length ? picked : [meta.courses[0]];
   const course = courses[0];
-  const category = f.lcat ?? profile?.category ?? "Open";
+  // NEET PG: one seat category (hers, or the one picked). Another exam with nothing picked: every seat category she can
+  // take (Open and her own, as Options and Rank scan), so a seat only Open is offered on (deemed) still shows.
+  const mineCats = !f.lcat && exam !== DEFAULT_EXAM && profile ? eligibleCategories(profile.category, profile.pwd) : null;
+  const category = mineCats ? mineCats.join(" or ") : (f.lcat ?? profile?.category ?? "Open");
   // Her quotas (the open ones when she ticked none) unless one is picked, or "all".
   const quota = f.lquota && meta.quotas.includes(f.lquota) ? f.lquota : undefined;
   const allQuotas = f.lquota === "all";
-  const mineQ = profile ? profileQuotas(profile, exam) : [];
+  const mineQ = profile ? profileQuotas(profile, exams[exam].quotas) : [];
   const quotas = quota ? [quota] : allQuotas || !mineQ.length ? undefined : mineQ;
   const [sortYear, sortRound] = f.sort?.split("-") ?? [];
   const sort = f.sort ? { year: Number(sortYear), round: sortRound as Round, dir: f.dir } : undefined;
@@ -167,7 +174,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const closingLabel = !closing ? null
     : rmin || rmax ? `Closing ${rmin && rmax ? `${formatRank(rmin)}–${formatRank(rmax)}` : rmin ? `${formatRank(rmin)} or later` : `up to ${formatRank(rmax!)}`}`
     : f.rk === "reached" ? `Would have got ${E.rankWord} ${formatRank(myRank!)}` : `Near ${E.rankWord} ${formatRank(myRank!)} (±10%)`;
-  const base = { courses: courses.map((c) => ({ degree: c.degree, specialty: c.specialty })), category, quotas, search: f.q, sort, closing: closing && { ...closing, since: f.since } };
+  const base = { courses: courses.map((c) => ({ degree: c.degree, specialty: c.specialty })), ...(mineCats ? { categories: mineCats } : { category }), quotas, search: f.q, sort, closing: closing && { ...closing, since: f.since } };
   const [lr, all, inst, info, view] = await Promise.all([
     lastRanks({ ...base, terms: tp.filters }, undefined, exam),
     // A term filter set: every row as well, to count those left out only for a value not declared (as Rank scan), and
@@ -192,7 +199,8 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   // The card's big number: the sorted column (else each row's newest closing).
   const stat = sort && cols.some((c) => c.year === sort.year) ? { year: sort.year, round: sort.round } : null;
   const courseLabel = courses.length === 1 ? `${course.degree} ${course.name}` : courses.map((c) => `${c.degree} ${c.name}`).join(", ");
-  const quotaLabel = quotas ? quotas.join(", ") : "every quota";
+  const qn = (q: string) => quotaIn(E, q);
+  const quotaLabel = quotas ? quotas.map(qn).join(", ") : "every quota";
   const caption = `Closing ranks for ${courseLabel}, ${category} seats, ${quotaLabel}`;
   const LR = "/decide/last-ranks";
   const sortHref = (key: string) => L.with("/decide/last-ranks", { sort: key, dir: f.sort === key && f.dir === "desc" ? "asc" : "desc", page: null });
@@ -202,7 +210,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
     ...(f.q ? [{ label: `Search: “${f.q}”`, param: "q", href: L.with(LR, { q: null, page: null }) }] : []),
     ...(closingLabel ? [{ label: closingLabel, param: "rk", href: L.with(LR, { rk: null, rmin: null, rmax: null, page: null }) }] : []),
     ...cf.chips((v) => L.with(LR, { course: v, page: null }), (s) => L.without(LR, "course", s)).filter((c) => c.label !== "All courses"),
-    ...(quota ? [{ label: quota, param: "lquota", href: L.with(LR, { lquota: null, page: null }) }] : allQuotas ? [{ label: "All quotas", param: "lquota", href: L.with(LR, { lquota: null, page: null }) }] : quotas ? [{ label: `Your quotas (${quotas.join(", ")})`, param: "lquota", href: L.with(LR, { lquota: "all", page: null }) }] : []),
+    ...(quota ? [{ label: qn(quota), param: "lquota", href: L.with(LR, { lquota: null, page: null }) }] : allQuotas ? [{ label: "All quotas", param: "lquota", href: L.with(LR, { lquota: null, page: null }) }] : quotas ? [{ label: `Your quotas (${quotaLabel})`, param: "lquota", href: L.with(LR, { lquota: "all", page: null }) }] : []),
     // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers); "any" lifts one.
     ...(profile?.maxFeeLakh != null && tp.params.maxfee == null ? [{ label: `Your cap: ${termValueLabel.maxfee(profile.maxFeeLakh)}`, param: "maxfee", href: L.with("/decide/last-ranks", { maxfee: "any", page: null }) }] : []),
     ...(profile?.maxBondYears != null && tp.params.bondyrs == null ? [{ label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: L.with("/decide/last-ranks", { bondyrs: "any", page: null }) }] : []),
@@ -259,7 +267,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                   <Link href={L.institute(r.college.slug)} title={r.college.name} className="font-medium hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
                   <span className="block text-xs">{courseName(r)}</span>
                   <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-                    <span>{r.college.state ?? <Dash />}, {r.quota}</span>
+                    <span>{r.college.state ?? <Dash />}, <QuotaName quota={r.quota} /></span>
                     {r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />}
                   </span>
                   <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={`${smallLink} text-xs text-sky`}>Allotments</Link>
@@ -314,14 +322,14 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         {/* Her courses by default (none ticked); the shared searchable chips, never a 100-item native list. */}
         <FilterDropdown label="Course" name="course" search options={cf.choices.filter((c) => c.value !== "all")} selected={cf.typed} none={cf.mine.length ? `Your courses (${cf.mine.length})` : `${course.degree} ${course.name}`} info={cf.mine.length ? "None ticked means your courses." : undefined} />
-        {E.categories.length > 1 && <Field label="Seat category"><Select name="lcat" value={category} options={(E.pwd ? [...E.categories, ...E.categories.map((c) => `${c} PwD`)] : E.categories).map((c) => ({ value: c, label: c }))} /></Field>}
-        <Field label="Quota"><Select name="lquota" value={f.lquota} all={mineQ.length ? `Your quotas (${mineQ.join(", ")})` : "All quotas"} options={[...(mineQ.length ? [{ value: "all", label: "All quotas" }] : []), ...meta.quotas.map((q) => ({ value: q, label: q }))]} /></Field>
+        {E.categories.length > 1 && <Field label="Seat category"><Select name="lcat" value={mineCats ? undefined : category} all={mineCats ? `Yours (${category})` : undefined} options={(E.pwd ? [...E.categories, ...E.categories.map((c) => `${c} PwD`)] : E.categories).map((c) => ({ value: c, label: c }))} /></Field>}
+        <Field label="Quota"><Select name="lquota" value={f.lquota} all={mineQ.length ? `Your quotas (${mineQ.map(qn).join(", ")})` : "All quotas"} options={[...(mineQ.length ? [{ value: "all", label: "All quotas" }] : []), ...meta.quotas.map((q) => ({ value: q, label: qn(q) }))]} /></Field>
         {myRank != null && (
           <Field label="Your rank">
             <Select name="rk" value={f.rk} all="Any closing rank" options={[{ value: "reached", label: `Would have got ${E.rankWord} ${formatRank(myRank)}` }, { value: "near", label: `Near ${E.rankWord} ${formatRank(myRank)} (±10%)` }]} />
           </Field>
         )}
-        <Field label="Closing rank from"><input name="rmin" inputMode="numeric" defaultValue={f.rmin ?? ""} placeholder="e.g. 40,000" className={`${control} numeric`} /></Field>
+        <Field label="Closing rank from"><input name="rmin" inputMode="numeric" defaultValue={f.rmin ?? ""} placeholder={exam === DEFAULT_EXAM ? "e.g. 40,000" : `e.g. ${E.exampleRank}`} className={`${control} numeric`} /></Field>
         <Field label="Closing rank to"><input name="rmax" inputMode="numeric" defaultValue={f.rmax ?? ""} placeholder="e.g. 60,000" className={`${control} numeric`} /></Field>
         <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
         {E.has.fees && <TermFilterControls f={tp.params} caps={profile} />}
@@ -369,7 +377,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
       {/* Her institute (a link from it, #inst-…) in view in either view: its card above the list. */}
       {pinned && (
         <div id={`inst-${pinned.college.slug}`} tabIndex={-1} className="scroll-mt-24">
-          <LastRankCard r={pinned} cols={cols} rds={rds} stat={stat} mcc={mcc(pinned)} L={L} mine rank={myRank} />
+          <LastRankCard r={pinned} cols={cols} rds={rds} stat={stat} mcc={mcc(pinned)} L={L} mine rank={myRank} E={EI} />
         </div>
       )}
 
@@ -381,7 +389,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
           view={view}
           cards={
             <ResultCards title={caption} hideTitle>
-              {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} mine={inst?.slug === r.college.slug} rank={myRank} />)}
+              {rows.map((r) => <LastRankCard key={r.id} r={r} cols={cols} rds={rds} stat={stat} mcc={mcc(r)} L={L} mine={inst?.slug === r.college.slug} rank={myRank} E={EI} />)}
             </ResultCards>
           }
           table={table}

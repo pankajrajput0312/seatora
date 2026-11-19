@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import { termFilters, termFilterShape } from "../lib/term-filters";
 import { profileHasCourse, type Profile } from "../profile";
 import { feeSorts, type FeeFilters, type FeeRow } from "../service";
@@ -31,11 +32,11 @@ export const feesParamsSchema = z.object({
 });
 export type FeesParams = z.infer<typeof feesParamsSchema>;
 
-/** Her profile's programmes (from her courses; null when she ticked none), states and caps: the defaults. */
-export function feeDefaults(profile: Profile | null, courses: Course[]) {
+/** Her profile's programmes (from her courses, the exam's: programmeOfDegree; null when she ticked none), states and caps: the defaults. */
+export function feeDefaults(profile: Profile | null, courses: Course[], exam: ExamKey = DEFAULT_EXAM) {
   const ticked = !!profile && (profile.specialties.length > 0 || profile.degrees.length > 0 || !!profile.pairs?.length);
   return {
-    programmes: ticked ? programmesOf(courses.filter((c) => profileHasCourse(profile, c)).map((c) => c.degree)) : null,
+    programmes: ticked ? programmesOf(courses.filter((c) => profileHasCourse(profile, c)).map((c) => c.degree), exam) : null,
     states: profile?.states.length ? profile.states : null,
     maxFeeLakh: profile?.maxFeeLakh ?? null,
     maxBondYears: profile?.maxBondYears ?? null,

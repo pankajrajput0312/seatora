@@ -2,7 +2,8 @@
 
 import { createContext, use, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { DEFAULT_EXAM, scopedKey, type ExamKey } from "@/features/exams/keys";
+import { neetPg, type Exam } from "@/features/exams/exam";
+import { scopedKey } from "@/features/exams/keys";
 import { PROFILE_KEY, profileSchema, type Profile } from "../profile";
 import { CHOICES_KEY, compareSchema, COMPARE_KEY, defaultChoices, parseChoices, type ChoicesState } from "./choices";
 import { decideLinks } from "./links";
@@ -12,8 +13,11 @@ import { useLocal } from "./local-store";
  * The exam Decide shows (DecideShell provides it: staff's pick, else NEET PG). Every saved thing (profile, choice lists,
  * compare tray) is the exam's own: NEET PG keeps its keys, another exam has its own (exams/keys.ts scopedKey).
  */
-export const ExamContext = createContext<ExamKey>(DEFAULT_EXAM);
-export const useExam = () => use(ExamContext);
+export const ExamContext = createContext<Exam>(neetPg);
+/** The exam's key. */
+export const useExam = () => use(ExamContext).key;
+/** The exam's words, years, quotas and flags (exams/exam.ts; another exam's only for staff, from the server). */
+export const useExamInfo = () => use(ExamContext);
 /** A localStorage key for the exam shown. */
 export const useScopedKey = (key: string) => scopedKey(key, useExam());
 

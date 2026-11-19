@@ -1,6 +1,7 @@
 import "server-only";
 import { formatINR } from "@/features/cutoffs/lib/format";
 import { seatGroups, termSourceName, type BondDetails, type PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
+import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import type { Catalog } from "./catalog";
 import type { SourceType } from "@/types/provenance";
 import type { FeeTableRecord, Term } from "../types";
@@ -22,11 +23,21 @@ export const programmes = {
   // The MCh and MPH taken through NEET PG: 6-year (direct) MCh, 2-year MPH (course lengths, not from the terms).
   MCh: { slug: "mch", bucket: "MD", years: 6, kind: "super", figures: false },
   MPH: { slug: "mph", bucket: "MD", years: 2, kind: "degree", figures: false },
+  // NEET MDS and NEET SS (their bundles' fee tables, MCC's institute profiles): MDS (and its PG Diploma), D.M. / M.Ch., DrNB.
+  MDS: { slug: "mds", bucket: "MD", years: 3, kind: "degree", figures: true },
+  "DM/MCh": { slug: "dm-mch", bucket: "MD", years: 3, kind: "super", figures: true },
+  "DrNB SS": { slug: "drnb-ss", bucket: "DNB", years: 3, kind: "super", figures: true },
 } as const;
 export type Programme = keyof typeof programmes;
 export const programmeNames = Object.keys(programmes) as Programme[];
+/** The programmes an exam's courses can be: the Fees page offers only these. */
+export const examProgrammes = (exam: ExamKey): Programme[] =>
+  exam === "neet-mds" ? ["MDS"] : exam === "neet-ss" ? ["DM/MCh", "DrNB SS"] : ["MD/MS", "Diploma", "DNB", "NBEMS Diploma", "MCh", "MPH"];
 
-export function programmeOfDegree(degree: string): Programme {
+/** A course's programme. NEET MDS: every course is MDS's; NEET SS: D.M. and M.Ch. one, DrNB the other (NEET PG's 6-year MCh is its own). */
+export function programmeOfDegree(degree: string, exam: ExamKey = DEFAULT_EXAM): Programme {
+  if (exam === "neet-mds") return "MDS";
+  if (exam === "neet-ss") return degree === "DrNB" ? "DrNB SS" : "DM/MCh";
   if (degree === "MD" || degree === "MS") return "MD/MS";
   if (degree === "DrNB") return "DNB";
   return degree in programmes ? (degree as Programme) : /^(DNB|NBEMS)/.test(degree) ? "DNB" : "MD/MS";
@@ -779,8 +790,8 @@ export function normalizeProgramme(programme: Programme, terms: Term[], sharedBy
 }
 
 /** The programmes a college offers (from its courses), in the order MD/MS, Diploma, DNB, NBEMS Diploma, MCh, MPH. */
-export function programmesOf(degrees: Iterable<string>): Programme[] {
-  const have = new Set([...degrees].map(programmeOfDegree));
+export function programmesOf(degrees: Iterable<string>, exam: ExamKey = DEFAULT_EXAM): Programme[] {
+  const have = new Set([...degrees].map((d) => programmeOfDegree(d, exam)));
   return programmeNames.filter((p) => have.has(p));
 }
 
@@ -810,7 +821,7 @@ export function collegeTerms(cat: Catalog, college: string): ProgrammeTerms[] {
   if (!out) {
     const terms = m.terms.get(college) ?? [];
     const website = cat.collegeByKey?.get(college)?.website ?? null;
-    out = programmesOf(m.degrees.get(college) ?? []).map((p) => ({ ...normalizeProgramme(p, terms, m.sharedBy), website }));
+    out = programmesOf(m.degrees.get(college) ?? [], cat.exam).map((p) => ({ ...normalizeProgramme(p, terms, m.sharedBy), website }));
     m.out.set(college, out);
   }
   return out;
@@ -826,7 +837,7 @@ export function collegeTerms(cat: Catalog, college: string): ProgrammeTerms[] {
  */
 function withFeeVariant(cat: Catalog, t: ProgrammeTerms, college: string, degree: string, specialty: string | undefined, quota: string | undefined): ProgrammeTerms {
   if (!specialty) return t;
-  const p = programmeOfDegree(degree);
+  const p = programmeOfDegree(degree, cat.exam);
   const own = indexOf(cat).terms.get(college)?.filter((x) => x.program === programmes[p].bucket) ?? [];
   const recs = recordsOf(p, own.find((x) => x.kind === "FEE"), own.find((x) => x.kind === "STIPEND"));
   const v = recs ? recordFor(recs, quota)?.fee_variants : undefined;
@@ -851,7 +862,7 @@ export function courseTerms(cat: Catalog, college: string, degree: string, speci
 }
 
 function courseTermsBase(cat: Catalog, college: string, degree: string, specialty?: string, quota?: string): ProgrammeTerms {
-  const p = programmeOfDegree(degree);
+  const p = programmeOfDegree(degree, cat.exam);
   const m = indexOf(cat);
   const k = quota ? `${college}|${p}|${quota}` : null;
   let t = k ? m.byQuota.get(k) : undefined;

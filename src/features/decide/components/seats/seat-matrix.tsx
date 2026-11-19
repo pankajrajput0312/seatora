@@ -11,12 +11,12 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { fmtDay, listDay } from "../../lib/format";
 import { useLocal } from "../../lib/local-store";
-import { exams, restrictedQuota } from "@/features/exams/registry";
+import { isRestricted } from "@/features/exams/exam";
 import { LATER_ROUNDS_NOTE, latestRound, pastOf, reachWindow, type Latest } from "../../lib/reach";
-import { useExam } from "../../lib/use-decide-store";
+import { useExamInfo } from "../../lib/use-decide-store";
 import { useDecideLinks } from "../../lib/use-decide-store";
 import { statKeys, statLabel } from "../../lib/stat-format";
-import { roundLabel, seatKindLabel, type Round, type SeatList, type Source } from "../../types";
+import { seatKindLabel, type Round, type SeatList, type Source } from "../../types";
 import { Dash, HISTORY_CAPTION, Provisional, ReachBadge } from "../bits";
 import { programmeTitle, TermSources } from "../fees";
 import { Beds } from "../pages/beds";
@@ -28,6 +28,7 @@ import { ViewPanes, type View } from "../view-toggle";
 import type { PastClosing, SeatLine, SeatSort } from "./find-seats";
 import { SeatCards, seatCourse as courseOf, seatRowKey as rowKey } from "./seat-cards";
 import { ScrollTable } from "../scroll-table";
+import { quotaIn, roundIn, roundNameFrom, type Exam } from "@/features/exams/exam";
 
 // The Seats page's matrix view (src/app/decide/seats): one row per institute, course, quota and seat category, its
 // seats in each round's lists (never added together), its course's terms (TermStatCells: the course's own programme
@@ -45,7 +46,7 @@ export type MatrixRow = Omit<SeatLine, "terms" | "rounds" | "list" | "seats" | "
 const DISPLAY_KEY = "medpath.seatMatrix.hidden";
 /** Hidden until she picks it in Display: it is in every row's details and card too. */
 const DEFAULT_HIDDEN = ["beds"];
-const listName = (l: SeatList) => `${l.year} ${roundLabel[l.round]} ${seatKindLabel[l.kind].toLowerCase()}`;
+const listName = (l: SeatList) => `${l.year} ${roundNameFrom(l.name, l.round)} ${seatKindLabel[l.kind].toLowerCase()}`;
 const at = (r: MatrixRow, year: number, round: Round) => r.closings.find((c) => c.year === year && c.round === round);
 
 /** "1,23,456 (12)": closing rank (allotments made). Its cell is right-aligned, tabular and unwrapped already; the markup stays small (there are hundreds). */
@@ -128,21 +129,22 @@ export function DisplayMenu({ cols, hidden, setHidden, always = "The institute c
   );
 }
 
-/** The matrix's columns Display can hide (the institute column always shows). */
-const matrixCols = (groups: SeatGroup[], ranked: boolean, years: ClosingYear[]) => [
+/** The matrix's columns Display can hide (the institute column always shows): only the ones the exam has (`has`: its fees, beds). */
+const matrixCols = (groups: SeatGroup[], ranked: boolean, years: ClosingYear[], has: Pick<Exam["has"], "fees" | "beds">) => [
   { key: "course", label: "Course" },
   { key: "quota", label: "Quota" },
   { key: "category", label: "Category" },
-  ...statKeys.map((k) => ({ key: k, label: statLabel[k] })),
+  ...(has.fees ? statKeys.map((k) => ({ key: k, label: statLabel[k] })) : []),
   ...groups.map((g) => ({ key: g.key, label: `${g.label} seats` })),
-  { key: "beds", label: "Beds (as reported)" },
+  ...(has.beds ? [{ key: "beds", label: "Beds (as reported)" }] : []),
   ...(ranked ? [{ key: "chances", label: "Your chances" }] : []),
   ...years.map((y) => ({ key: `closing-${y.year}`, label: `Closing ranks ${y.year}` })),
 ];
 
 /** The matrix table's Display (columns) menu, for the page's toolbar row: the matrix reads the same saved choice. */
 export function SeatMatrixDisplay({ groups, ranked, years }: { groups: SeatGroup[]; ranked: boolean; years: ClosingYear[] }) {
-  const cols = useMemo(() => matrixCols(groups, ranked, years), [groups, ranked, years]);
+  const { has } = useExamInfo();
+  const cols = useMemo(() => matrixCols(groups, ranked, years, has), [groups, ranked, years, has]);
   const [hidden, save] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   return <DisplayMenu cols={cols} hidden={hidden} setHidden={save} />;
 }
@@ -168,9 +170,9 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   latest?: Latest;
 }) {
   const L = useDecideLinks();
-  const exam = useExam();
+  const E = useExamInfo();
   const latest = latestIn ?? latestRound(results);
-  const cols = useMemo(() => matrixCols(groups, ranked, years), [groups, ranked, years]);
+  const cols = useMemo(() => matrixCols(groups, ranked, years, E.has), [groups, ranked, years, E.has]);
   const [hidden] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   const [open, setOpen] = useState<string | null>(null);
   const row = rows.find((r) => rowKey(r) === open) ?? null;
@@ -198,7 +200,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
       <ViewPanes
         page="seats"
         view={view}
-        cards={<SeatCards rows={rows} list={list} lists={lists} ranked={ranked} L={L} title={caption} onDetails={show} latest={latest} exam={exam} />}
+        cards={<SeatCards rows={rows} list={list} lists={lists} ranked={ranked} L={L} title={caption} onDetails={show} latest={latest} exam={E} />}
         table={
           <ScrollTable id="seat-matrix" scope="seat-matrix" label={caption} scrollClassName="scroll-pl-44 md:scroll-pl-68">
             <table className={tbl.table}>
@@ -216,9 +218,11 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                   {groups.map((g) => (
                     <th key={g.key} colSpan={2} scope="colgroup" data-col={g.key} className={cn(th, "border-l border-border text-center")}>{g.label} seats</th>
                   ))}
-                  <th rowSpan={2} scope="col" data-col="beds" className={cn(th, "text-right")} title={SELF_REPORTED}>
-                    Beds<span className="block font-normal">as reported</span>
-                  </th>
+                  {E.has.beds && (
+                    <th rowSpan={2} scope="col" data-col="beds" className={cn(th, "text-right")} title={SELF_REPORTED}>
+                      Beds<span className="block font-normal">as reported</span>
+                    </th>
+                  )}
                   {ranked && <th rowSpan={2} scope="col" data-col="chances" className={cn(th, "min-w-40")} aria-sort={sorted("reach", "ascending")}>Your chances</th>}
                   {years.map((y) => (
                     <th key={y.year} colSpan={y.rounds.length} scope="colgroup" data-col={`closing-${y.year}`} className={cn(th, "border-l border-border text-center")}>Closing rank {y.year}</th>
@@ -234,7 +238,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                   {years.map((y) =>
                     y.rounds.map((rd, i) => (
                       <th key={`${y.year}-${rd}`} scope="col" data-col={`closing-${y.year}`} className={cn(th, "text-right whitespace-nowrap", i === 0 && "border-l border-border")}>
-                        <span className="sr-only">{y.year} </span>{roundLabel[rd]}
+                        <span className="sr-only">{y.year} </span>{roundIn(E, y.year, rd)}
                       </th>
                     )),
                   )}
@@ -267,7 +271,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                       <td data-col="course" className={td}>{courseOf(r)}</td>
                       <td data-col="quota" className={td}>
                         {r.quota ?? "Not printed"}
-                        {r.quota != null && restrictedQuota(exam, r.quota) && <Badge tone="warning" className="mt-1">Restricted</Badge>}
+                        {r.quota != null && isRestricted(E, r.quota) && <Badge tone="warning" className="mt-1">Restricted</Badge>}
                       </td>
                       <td data-col="category" className={cn(td, "whitespace-nowrap")}>{r.category}</td>
                       <TermStatCells t={r.fees} variant="table" short of={`${r.college.name}, ${name}`} />
@@ -280,9 +284,11 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                           <td data-col={g.key} className={num}>{g.virtual && r.byList[g.virtual.key] != null ? <span className="font-semibold text-sun">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>
                         </Fragment>
                       ))}
-                      <td data-col="beds" className={num}>
-                        {r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} /> : <Dash />}
-                      </td>
+                      {E.has.beds && (
+                        <td data-col="beds" className={num}>
+                          {r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} /> : <Dash />}
+                        </td>
+                      )}
                       {ranked && (
                         <td data-col="chances" className={td}>
                           {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} on={r.category} /> : <span className="text-xs text-muted-foreground">{r.noLabel}</span>}
@@ -320,7 +326,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
   refocus: () => void;
 }) {
   const L = useDecideLinks();
-  const exam = useExam();
+  const E = useExamInfo();
   const pdf = (year: number, round: Round) => results.find((s) => s.year === year && s.round === round);
   const lists = groups.flatMap((g) => [g.clear, g.virtual, ...g.added].filter((l): l is SeatList => !!l));
   const link = "underline hover:text-sky";
@@ -342,7 +348,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
                 <div>
                   <Dialog.Title className="text-xl font-semibold">{r.college.name}</Dialog.Title>
                   <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-                    {courseOf(r)} · {r.quota ?? "quota not printed"}{r.quota != null && restrictedQuota(exam, r.quota) && " (restricted quota)"} · {r.category} seats · {r.college.state ?? "state not listed"}
+                    {courseOf(r)} · {r.quota != null ? quotaIn(E, r.quota) : "quota not printed"}{r.quota != null && isRestricted(E, r.quota) && " (restricted quota)"} · {r.category} seats · {r.college.state ?? "state not listed"}
                   </Dialog.Description>
                 </div>
                 <Dialog.Close asChild>
@@ -368,7 +374,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
 
               <section aria-labelledby="row-closing" className="grid gap-2">
                 <h3 id="row-closing" className="font-semibold">Closing ranks on {r.quota ?? "this quota"}, {r.category} seats</h3>
-                <p className="text-xs text-muted-foreground">The highest {exams[exam].rankName} MCC allotted in that round; allotments made in brackets (not seats). Each round links its MCC result PDF. {LATER_ROUNDS_NOTE}</p>
+                <p className="text-xs text-muted-foreground">The highest {E.rankName} MCC allotted in that round; allotments made in brackets (not seats). Each round links its MCC result PDF. {LATER_ROUNDS_NOTE}</p>
                 <div className="overflow-x-auto overflow-y-hidden">
                   <table className="text-sm">
                     <caption className="sr-only">Closing rank and allotments by year and round: {r.college.name}, {courseOf(r)}</caption>
@@ -383,7 +389,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
                                 const s = pdf(y.year, rd);
                                 return (
                                   <li key={rd} className="numeric">
-                                    <span className="text-muted-foreground">{s?.url ? <a href={s.url} target="_blank" rel="noopener noreferrer" title={s.name} className={link}>{roundLabel[rd]}<span className="sr-only">: {s.name}, PDF (opens in a new tab)</span></a> : roundLabel[rd]}: </span>
+                                    <span className="text-muted-foreground">{s?.url ? <a href={s.url} target="_blank" rel="noopener noreferrer" title={s.name} className={link}>{roundIn(E, y.year, rd)}<span className="sr-only">: {s.name}, PDF (opens in a new tab)</span></a> : roundIn(E, y.year, rd)}: </span>
                                     {c ? <>{formatRank(c.closing)} ({formatRank(c.n)}<span className="sr-only"> allotted</span>)</> : <Dash />}
                                     {c?.provisional && <> <Provisional when /></>}
                                   </li>
@@ -406,18 +412,20 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
                 </section>
               )}
 
-              <section aria-labelledby="row-terms" className="grid gap-2">
-                <h3 id="row-terms" className="font-semibold">Fee, stipend, bond and leaving penalty: {programmeTitle(r.fees)}</h3>
-                {/* The row's own cells, so the drawer never reads differently from it. */}
-                <TermStatCells t={r.fees} of={`${r.college.name}, ${courseOf(r)}, ${r.quota}`} className="rounded-lg border border-border" />
-                <p className="text-xs text-muted-foreground">Year by year, with each figure&apos;s source and the bond&apos;s exact words: the institute&apos;s Fees &amp; bond tab.</p>
-                <TermSources t={r.fees} />
-              </section>
+              {E.has.fees && (
+                <section aria-labelledby="row-terms" className="grid gap-2">
+                  <h3 id="row-terms" className="font-semibold">Fee, stipend, bond and leaving penalty: {programmeTitle(r.fees)}</h3>
+                  {/* The row's own cells, so the drawer never reads differently from it. */}
+                  <TermStatCells t={r.fees} of={`${r.college.name}, ${courseOf(r)}, ${r.quota}`} className="rounded-lg border border-border" />
+                  <p className="text-xs text-muted-foreground">Year by year, with each figure&apos;s source and the bond&apos;s exact words: the institute&apos;s Fees &amp; bond tab.</p>
+                  <TermSources t={r.fees} />
+                </section>
+              )}
 
               <section aria-labelledby="row-hospital" className="grid gap-2">
                 <h3 id="row-hospital" className="font-semibold">The institute</h3>
                 <dl className="grid gap-3 text-sm">
-                  <div>
+                  {E.has.beds && <div>
                     <dt className="text-xs font-semibold text-muted-foreground">Hospital beds, as reported</dt>
                     <dd className="grid gap-1">
                       {r.hospital?.beds ? (
@@ -432,7 +440,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
                         <span><Dash /> <span className="text-xs text-muted-foreground">Seatora has not found a bed count this hospital published.</span></span>
                       )}
                     </dd>
-                  </div>
+                  </div>}
                   {r.hospital?.type && (
                     <div>
                       <dt className="text-xs font-semibold text-muted-foreground">Type</dt>
@@ -445,8 +453,8 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
               <nav aria-label="More on this option" className="flex flex-wrap gap-x-4">
                 <Link href={L.institute(r.college.slug)} className={cn(smallLink, "text-sky")}>Institute page</Link>
                 {r.course && <Link href={L.lastRanks(r.course.slug, { inst: r.college.slug })} className={cn(smallLink, "text-sky")}>Last ranks</Link>}
-                <Link href={L.institute(r.college.slug, "fees")} className={cn(smallLink, "text-sky")}>Fees & bond</Link>
-                <Link href={L.institute(r.college.slug, "clinical")} className={cn(smallLink, "text-sky")}>Hospital facts</Link>
+                {E.has.fees && <Link href={L.institute(r.college.slug, "fees")} className={cn(smallLink, "text-sky")}>Fees & bond</Link>}
+                {E.has.clinical && <Link href={L.institute(r.college.slug, "clinical")} className={cn(smallLink, "text-sky")}>Hospital facts</Link>}
               </nav>
             </>
           )}
