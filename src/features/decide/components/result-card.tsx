@@ -128,9 +128,11 @@ export function ResultCard({ chips, actions, stat, title, href, external, subtit
  * `id`: the heading's id (a Pager focus target; it takes focus). `hideTitle`: the heading for screen readers only
  * (the page shows its own). Inside ViewPanes leave `id` out: both panes are in the page, so an id would repeat.
  */
-export function ResultCards({ title, count, id, level = 2, hideTitle, children, className }: {
+export function ResultCards({ title, count, note, id, level = 2, hideTitle, children, className }: {
   title: string;
   count?: Node;
+  /** A line under the heading (what the cards have in common). */
+  note?: Node;
   id?: string;
   level?: 2 | 3;
   hideTitle?: boolean;
@@ -146,6 +148,7 @@ export function ResultCards({ title, count, id, level = 2, hideTitle, children, 
         {title}
         {present(count) && <> <span className="numeric font-normal text-muted-foreground">({count})</span></>}
       </H>
+      {present(note) && <p className="-mt-2 text-sm text-muted-foreground">{note}</p>}
       <ul role="list" className="grid gap-3 lg:grid-cols-2">
         {Children.map(children, (c) => present(c) && <li className="grid min-w-0">{c}</li>)}
       </ul>

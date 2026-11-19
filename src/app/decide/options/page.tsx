@@ -18,14 +18,14 @@ import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
 import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { GroupPrompt } from "@/features/decide/components/dashboard-parts";
-import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
+import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
 import { iniCetIn, iniWord } from "@/features/decide/lib/college-aliases";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
-import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
+import { readTermFilters, termChips, termValueLabel, untypedOnly } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, listOptions, optionsView, unlistedSeats } from "@/features/decide/service";
 import { optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
@@ -77,7 +77,14 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const { params: tp, filters: terms } = readTermFilters(params, profile);
   const hasSeats = f.seats === "1" ? "clear" : f.seats === "all" ? false : f.seats;
   const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms, sort: f.sort };
-  const [meta, r, view] = await Promise.all([getMeta(exam), listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }, exam), chosenView(params, "options")]);
+  // A college type picked: the options it left out only because their type is not known (counted, never silently).
+  const typeless = untypedOnly(terms);
+  const [meta, r, view, untyped] = await Promise.all([
+    getMeta(exam),
+    listOptions(profile, filters, { page: f.page, pageSize: PAGE_SIZE }, exam),
+    chosenView(params, "options"),
+    typeless ? listOptions(profile, { ...filters, terms: typeless }, { page: 1, pageSize: 1 }, exam).then((x) => x.total) : 0,
+  ]);
   // The sorts' year: the latest complete one (NEET PG: its later past year, as before).
   const HEAD = headYearIn(exam, meta.sources);
   const sortLabel = sortLabels(HEAD);
@@ -303,7 +310,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
                 {optionSorts.filter((s) => E.has.fees || (s !== "fee" && s !== "stipend")).map((s) => <option key={s} value={s}>{sortLabel[s]}</option>)}
               </select>
             </Field>
-            {E.has.fees && <TermFilterControls f={tp} caps={profile} />}
+            <TermFilterControls f={tp} caps={profile} fees={E.has.fees} />
             {latest.provisional && (
               <span className="flex min-h-12 items-center gap-1 border-b border-border text-sm">
                 <label className="flex min-h-11 cursor-pointer items-center gap-3">
@@ -320,6 +327,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       <ActiveFilters items={active} clear={clearAll} />
       {/* Another exam: what her fee / bond cap (or a term filter) hides is said up front, with the way back. */}
       {capNote}
+      <UntypedNote n={untyped} noun={untyped === 1 ? "option" : "options"} href={here({ ctype: null })} />
 
       {/* One row that scrolls sideways (never wraps), the closed-before toggle its last chip. */}
       <nav aria-label="Filter by reach" className="chip-row flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] *:shrink-0 *:whitespace-nowrap">
@@ -367,6 +375,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           includeLatest={!f.prov}
           seatLists={lists}
           view={view}
+          // Label order: the options with no allotment on her seat categories (and those closed before her rank) under their own heading.
+          grouping={!f.sort || f.sort === "label" ? { counts: r.counts } : null}
           historyMore={
             <>
               {`Closing = the highest ${E.rankName} allotted in that round on a seat of that category; here `}{seats} seats, the ones you can take. {latestText(latest)} is {latest.round === "R1" ? "that round alone" : "the deepest of those rounds"}. Labels

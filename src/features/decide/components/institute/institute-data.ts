@@ -3,7 +3,7 @@ import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import { exams } from "@/features/exams/registry";
 import { db } from "@/lib/db";
 import { websiteUrl } from "../../lib/stat-format";
-import { anyTermFilter, termVerdict, type TermFilters, type TermVerdict } from "../../lib/term-filters";
+import { anyTermFilter, termVerdict, typeFails, type TermFilters, type TermVerdict } from "../../lib/term-filters";
 import { profileHasCourse, type Profile } from "../../profile";
 import { dataVersion, getCatalog, type Catalog, type YearInfo } from "../../server/catalog";
 import { infoRows, snapshotAt } from "../../server/snapshot";
@@ -182,7 +182,7 @@ export async function institutesByTerms(tf: TermFilters, course?: string | strin
   for (const c of cat.colleges) {
     if (best.has(c.key)) continue;
     const t = info.get(c.key)?.type?.value;
-    best.set(c.key, (tf.types?.length && (!t || !tf.types.includes(t))) || tf.maxBondYears === 0 ? "fail" : capped ? "unknown" : "pass");
+    best.set(c.key, typeFails(t, tf) || tf.maxBondYears === 0 ? "fail" : capped ? "unknown" : "pass");
   }
   const keys = (v: TermVerdict) => new Set([...best].filter(([, x]) => x === v).map(([k]) => k));
   const pass = keys("pass");

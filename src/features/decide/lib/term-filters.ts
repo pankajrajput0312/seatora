@@ -14,7 +14,7 @@ import type { ProgrammeTerms } from "../server/terms";
 // silently: a row whose filtered value is unknown is left out (and counted: `unknownTerms` on the lists) unless the
 // "Include not declared" box is ticked (nd=keep). "No bond" (bondyrs=0) only ever lists a record that says no bond (one
 // adding that a state law's service may apply is unknown, as its cells say: listed with nd=keep), and a type filter
-// never lists a college with no type in the data, ticked or not. An NBEMS maximum fee or minimum stipend is not the
+// never lists a college with no type in the data, ticked or not: each page says how many it left out (untypedOnly). An NBEMS maximum fee or minimum stipend is not the
 // college's figure: inside the cap it passes, outside it the figure is unknown (as a "+ DA" basic stipend under a floor).
 
 export type TypeValue = CollegeType["value"];
@@ -59,6 +59,8 @@ export type TermParams = z.infer<typeof termParamsSchema>;
  */
 export type TermFilters = {
   types?: TypeValue[];
+  /** Colleges with no type in the data pass the type check too (never a URL param: what a page counts as "type not known", untypedOnly). */
+  untyped?: boolean;
   maxFee?: number | null;
   minStipend?: number | null;
   maxBondYears?: number | null;
@@ -92,7 +94,17 @@ export function readTermFilters(p: URLSearchParams, profile?: Pick<Profile, "max
 export const profileTermFilters = (p: Pick<Profile, "maxFeeLakh" | "maxBondYears">): TermFilters => termFilters({}, p);
 
 export const anyTermFilter = (f: TermFilters | null | undefined) =>
-  !!f && (!!f.types?.length || [f.maxFee, f.minStipend, f.maxBondYears, f.maxBondInr, f.maxLeavingInr].some((v) => v != null));
+  !!f && (!!f.types?.length || !!f.untyped || [f.maxFee, f.minStipend, f.maxBondYears, f.maxBondInr, f.maxLeavingInr].some((v) => v != null));
+
+/** Whether a college type (null: not in the data) fails the filters' type check: a type filter lists only its types (and with `untyped`, the colleges with none). */
+export const typeFails = (type: TypeValue | null | undefined, f: TermFilters) => (!!f.types?.length || !!f.untyped) && (type == null ? !f.untyped : !f.types?.includes(type));
+
+/**
+ * The same filters, with a college type picked, turned to the colleges whose type is not known that pass every other
+ * filter: what the type filter leaves out unsaid otherwise (each page lists with these and says how many). Null
+ * without a type filter.
+ */
+export const untypedOnly = (f: TermFilters | null | undefined): TermFilters | null => (f?.types?.length ? { ...f, types: [], untyped: true } : null);
 
 /** The number each sort, cap and CSV uses; null = not declared, or declared in words only. Ranges: the highest (cautious) figure. */
 export const feeValue = {
@@ -120,7 +132,7 @@ function bounded(v: number | null, a: ProgrammeTerms["bond"]["amount"] | null, c
 export type TermVerdict = "pass" | "fail" | "unknown";
 
 export function termVerdict(t: ProgrammeTerms, type: TypeValue | null | undefined, f: TermFilters): TermVerdict {
-  if (f.types?.length && (type == null || !f.types.includes(type))) return "fail";
+  if (typeFails(type, f)) return "fail";
   // "No bond": a record saying so passes, a declared bond fails; one not declared, not read or not clear (or a no-bond
   // record a state law's service may override) is unknown, so "Include not published" lists it, as every other cap.
   if (f.maxBondYears === 0 && t.bond.status === "declared") return "fail";

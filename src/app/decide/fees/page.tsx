@@ -100,7 +100,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             subtitle={rowTitle(r)}
             meta={[
               r.college.state ?? "State not listed",
-              h?.type && <TypeBadge type={h.type} of={r.college.name} />,
+              <TypeBadge key="type" type={h?.type} of={r.college.name} />,
               h?.beds && <Beds b={h.beds} inst={r.college.name} of={of(r)} unit />,
             ]}
             footer={<TermStatCells t={t} of={of(r)} />}
@@ -144,7 +144,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                   <span className="mt-0.5 block font-normal max-md:text-xs">{rowTitle(r)}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs font-normal text-muted-foreground max-md:hidden">
                     {r.college.state ?? <NotDeclared what="state not available" />}
-                    {type && <TypeBadge type={type} of={r.college.name} />}
+                    <TypeBadge type={type} of={r.college.name} />
                   </span>
                 </th>
                 <TermStatCells t={t} variant="table" years total={total} of={of(r)} tdClassName="text-[15px]" />

@@ -7,7 +7,7 @@ import { hospitalInfo, type HospitalInfo } from "./components/institute/institut
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
 import { searchMatcher } from "./lib/college-aliases";
 import { anyTermFilter, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
-import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, pastOf, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Latest, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
+import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, LATEST_YEAR, PAST_YEARS, pastOf, reachedFrom, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Latest, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { pairKey, profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
@@ -83,6 +83,8 @@ export type OptionRow = {
   reach: Reach;
   /** The label rests on the provisional latest round (latestRound): without that round it would be another label. */
   reachProvisional: boolean;
+  /** A "reached" label's first round (lib/reach.ts reachedFrom): R1, or the year where only a later round reached her rank. */
+  reachFrom?: { year: number; round: Round };
   /** With a profile: the label on each of her seat categories alone (`reach` is on all of them together). */
   reachBy?: Partial<Record<Category, Reach>>;
   /** Beside `reachBy`: the closing each of those labels rests on (lib/reach.ts reachEvidence), null without one. */
@@ -236,6 +238,7 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], her: Profile | null, inc
   const reachBy = profile && !eligibleOverride && !o.fresh ? Object.fromEntries([...eligible!].map((c) => [c, classifyReach(profile.rank, mine.filter((x) => x.category === c), opt)])) : undefined;
   // The closing each of those labels rests on, for the notes that say them beside the option's own (seatsBelowNotes).
   const reachAt = reachBy && Object.fromEntries(Object.entries(reachBy).map(([c, r]) => [c, reachEvidence(mine.filter((x) => x.category === c), r!, opt)]));
+  const reachFrom = profile && reachedFrom(profile.rank, mine, label.reach, opt);
   return {
     id: o.id,
     college: { key: college.key, slug: college.slug, name: college.name, state: college.state, type: college.type },
@@ -243,6 +246,7 @@ function buildRow(cat: Catalog, o: Opt, list: Cutoff[], her: Profile | null, inc
     quota: o.quota,
     reach: label.reach,
     reachProvisional: label.provisional,
+    ...(reachFrom && { reachFrom }),
     ...(reachBy && { reachBy, reachAt }),
     latest: deepest.get(latest.year) ?? null,
     byYear: Object.fromEntries(years.map((y) => [y, deepest.get(y) ?? null])),
@@ -302,7 +306,7 @@ function optMatches(cat: Catalog, o: Pick<Opt, "college" | "degree" | "specialty
   return inProfile(cat, o, p) && (!anyTermFilter(tf) || termsPass(optTerms(cat, o), types?.get(o.college)?.type?.value, tf!));
 }
 /** College types, read only when a type filter needs them. */
-const typesFor = (tf: TermFilters | null | undefined, exam: ExamKey) => (tf?.types?.length ? hospitalInfo(exam) : Promise.resolve(undefined));
+const typesFor = (tf: TermFilters | null | undefined, exam: ExamKey) => (tf?.types?.length || tf?.untyped ? hospitalInfo(exam) : Promise.resolve(undefined));
 
 type Ranked = { o: Opt; reach: Reach; provisional: boolean; deepest: ReachInput | undefined };
 

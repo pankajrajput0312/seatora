@@ -11,7 +11,7 @@ import { MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
 import type { DecideLinks } from "../lib/links";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { useChoices, useCompare, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
-import { latestText, type Latest } from "../lib/reach";
+import { latestText, reachWindow, type Latest, type Reach } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
 import type { SeatList } from "../types";
 import { Dash, HistoryNote, InstName, Provisional, ReachBadge } from "./bits";
@@ -19,7 +19,7 @@ import { AboutData } from "./filter-form";
 import { FocusItem } from "./focus-item";
 import { toast } from "./nav-pending";
 import { Beds } from "./pages/beds";
-import { cardClosing, ClosingCell, courseName, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, seatKindShort, toChoiceItem, type ListRow } from "./options-view";
+import { cardClosing, ClosingCell, courseName, R1Line, r1Of, RoundGrid, SeatsBelowNote, SeatsCell, SeatsHead, seatKindShort, toChoiceItem, type ListRow } from "./options-view";
 import { ResultCard, ResultCards } from "./result-card";
 import { TermStatCells } from "./stat-cells";
 import { TypeBadge } from "./type-badge";
@@ -104,13 +104,12 @@ const phoneOnly = "px-3 py-3 text-right md:hidden";
 const notPhone = "px-3 py-3 text-right max-md:hidden";
 
 
-/** The table row header's type badge and beds (the cards put them in their meta line); nothing when the import has neither. */
+/** The table row header's type badge ("Type not known" when the data has none) and beds (the cards put them in their meta line). */
 function HospitalLine({ h, of }: { h: ListRow["hospital"]; of: string }) {
-  if (!h?.type && !h?.beds) return null;
   return (
     <span className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-      {h.type && <TypeBadge type={h.type} of={of} />}
-      {h.beds && <Beds b={h.beds} inst={of} unit />}
+      <TypeBadge type={h?.type} of={of} />
+      {h?.beds && <Beds b={h.beds} inst={of} unit />}
     </span>
   );
 }
@@ -147,8 +146,10 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
           value: (
             <>
               <span className="numeric">{c ? formatRank(c.d.closing) : <Dash />}</span>
+              {/* A deepest closing from a later round: Round 1's own beside it. */}
+              {c && c.d.round !== "R1" && <span className="block leading-normal tracking-normal"><R1Line r1={r1Of(r, c.year)} /></span>}
               <span className="mt-1 block max-w-28 text-xs leading-normal font-normal tracking-normal">
-                <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} />
+                <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} from={r.reachFrom} />
               </span>
             </>
           ),
@@ -157,7 +158,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
         href={L.institute(r.college.slug)}
         external={mcc ? { href: mcc, label: `MCC profile: ${r.college.name}` } : undefined}
         subtitle={courseName(r)}
-        meta={[r.college.state ?? "State not listed", r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />, r.hospital?.beds && <Beds b={r.hospital.beds} inst={r.college.name} unit />]}
+        meta={[r.college.state ?? "State not listed", <TypeBadge key="type" type={r.hospital?.type} of={r.college.name} />, r.hospital?.beds && <Beds b={r.hospital.beds} inst={r.college.name} unit />]}
         footer={
           <>
             {/* The past years' deepest closings, as the table's columns (the big number is the newest); none at all: left out. */}
@@ -201,8 +202,29 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
  * "Rounds by year" grid is rendered only once she opens it (it is most of a row's markup). `start` = rows before these,
  * for data-item numbering (focus after Show more: FocusItem picks the visible pane's).
  */
-function OptionsList({ rows, caption, start, L, view, latest, pastYears, includeLatest, seatLists }: { rows: ListRow[]; caption: string; start: number; L: DecideLinks; view: View } & Years) {
+/**
+ * Options' groups that never read as seats she can get: no allotment on her seat categories (nothing to compare her
+ * rank with) and closed before her rank. In the label order (Options' default sort) each is one run of rows, headed by
+ * its title and count; `counts`: per label, as the reach chips.
+ */
+type Grouping = { counts: Record<Reach, number> } | null;
+const grouped = ["no-data", "closed-before"] as const satisfies Reach[];
+const groupOf = (r: ListRow) => (grouped as readonly Reach[]).includes(r.reach) ? (r.reach as (typeof grouped)[number]) : null;
+function groupWords(g: (typeof grouped)[number], { latest, pastYears, includeLatest }: Years) {
+  return g === "no-data"
+    ? { title: "No allotment in your seat categories", note: `MCC allotted none of your seat categories on these in ${reachWindow(latest, pastYears, includeLatest, true)}, so there is no closing rank to compare with yours. Not a sign of a seat you can take.` }
+    : { title: "Closed before your rank", note: `The closing rank came before yours in every round of ${reachWindow(latest, pastYears, includeLatest)}.` };
+}
+/** Each row's group heading where a group's run starts (the page's first row too), else null. */
+const groupStarts = (rows: ListRow[], grouping: Grouping) => rows.map((r, i) => (grouping && groupOf(r) && (i === 0 || groupOf(rows[i - 1]) !== groupOf(r)) ? groupOf(r) : null));
+
+function OptionsList({ rows, caption, start, L, view, latest, pastYears, includeLatest, seatLists, grouping }: { rows: ListRow[]; caption: string; start: number; L: DecideLinks; view: View; grouping: Grouping } & Years) {
   const E = useExamInfo();
+  const heads = groupStarts(rows, grouping);
+  const head = (g: (typeof grouped)[number]) => {
+    const w = groupWords(g, { latest, pastYears, includeLatest, seatLists });
+    return { ...w, n: grouping!.counts[g] };
+  };
   const [older, last] = pastYears;
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string, on: boolean) =>
@@ -238,6 +260,17 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
         </thead>
         <tbody>
           {rows.flatMap((r, i) => [
+            heads[i] && (
+              <tr key={`${r.id}-group`} className="border-t border-border bg-muted/40">
+                <th scope="colgroup" colSpan={9 + statKeys.length + seatLists.length} className="px-3 py-2 text-left font-normal">
+                  {/* Sticky: the heading stays in view while the row scrolls sideways. */}
+                  <span className="sticky left-3 block max-w-[min(42rem,calc(100vw-3rem))]">
+                    <span className="font-semibold">{head(heads[i]).title}</span> <span className="numeric text-muted-foreground">({formatRank(head(heads[i]).n)})</span>
+                    <span className="block text-xs text-muted-foreground">{head(heads[i]).note}</span>
+                  </span>
+                </th>
+              </tr>
+            ),
             <tr key={r.id} data-item={start + i + 1} tabIndex={-1} className="border-t border-border align-top hover:bg-muted/40">
               <td className={cn(stick, "px-2 py-2 print:hidden")}><ChoiceStar item={toChoiceItem(r, latest)} /></td>
               {/* Row header: only what names the option, so it reads short for every cell. */}
@@ -246,13 +279,15 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
                 <span className={cn("block max-md:text-xs", tbl.clamp)}>{courseName(r)}<span className="text-muted-foreground">, <QuotaName quota={r.quota} /><span className="max-md:hidden">, {r.college.state ?? "state not listed"}</span></span></span>
                 <span className="block max-md:hidden"><HospitalLine h={r.hospital} of={r.college.name} /></span>
                 <span className="mt-1 block text-xs text-muted-foreground md:hidden">
-                  {latestText(latest)} <span className="numeric text-sm font-semibold text-foreground">{r.latest ? formatRank(r.latest.closing) : "—"}</span>
+                  {/* The closing's own round (the deepest of the year's rounds), and R1's when it is a later round's. */}
+                  {r.latest ? `${latest.year} ${roundIn(E, latest.year, r.latest.round)}` : latestText(latest)} <span className="numeric text-sm font-semibold text-foreground">{r.latest ? formatRank(r.latest.closing) : "—"}</span>
+                  {r.latest && r.latest.round !== "R1" && <R1Line r1={r1Of(r, latest.year)} />}
                   {r.latest?.provisional && <span className="mt-0.5 block"><Provisional when /></span>}
                 </span>
               </th>
               <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>
-              <td className={notPhone}><ClosingCell d={r.latest} year={latest.year} /></td>
-              <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} /><SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} /></td>
+              <td className={notPhone}><ClosingCell d={r.latest} year={latest.year} r1={r1Of(r, latest.year)} /></td>
+              <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} from={r.reachFrom} /><SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} /></td>
               <TermStatCells t={r.fees} variant="table" of={rowLabel(r, E)} tdClassName="px-2!" />
               {seatLists.map((l) => <td key={l.key} className="px-1.5 py-1 text-right"><SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} /></td>)}
               <td className={notPhone}><ClosingCell d={r.byYear[last]} year={last} /></td>
@@ -279,11 +314,24 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
       </table>
     </ScrollTable>
   );
-  const cards = (
-    <ResultCards title={caption} hideTitle>
-      {rows.map((r, i) => <OptionCard key={r.id} r={r} L={L} n={start + i + 1} {...years} open={open} toggle={toggle} />)}
+  // A group's run is its own titled list (a heading over its cards); the rows before the first group, the page's list.
+  const runs = rows.reduce<{ g: (typeof grouped)[number] | null; at: number; rows: ListRow[] }[]>((xs, r, i) => {
+    if (heads[i] || !xs.length) xs.push({ g: heads[i], at: i, rows: [] });
+    xs.at(-1)!.rows.push(r);
+    return xs;
+  }, []);
+  const cards = runs.map((run) => (
+    <ResultCards
+      key={run.at}
+      title={run.g ? head(run.g).title : caption}
+      count={run.g && formatRank(head(run.g).n)}
+      note={run.g && head(run.g).note}
+      hideTitle={!run.g}
+      className={run.g ? "mt-2" : undefined}
+    >
+      {run.rows.map((r, i) => <OptionCard key={r.id} r={r} L={L} n={start + run.at + i + 1} {...years} open={open} toggle={toggle} />)}
     </ResultCards>
-  );
+  ));
   return <ViewPanes page="options" view={view} cards={cards} table={table} />;
 }
 
@@ -293,7 +341,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
  * `tools`: after the Cards | Table toggle beside the count (the CSV download). `historyMore`: what the closing
  * ranks count, behind the history note's (i).
  */
-export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, moreHref, tools, notes, historyMore, view, latest, pastYears, includeLatest, seatLists }: {
+export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, moreHref, tools, notes, historyMore, view, latest, pastYears, includeLatest, seatLists, grouping = null }: {
   initial: ListRow[];
   page: number;
   pageSize: number;
@@ -309,6 +357,8 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
   historyMore?: React.ReactNode;
   /** Cards or table on show (chosenView "options"). */
   view: View;
+  /** The label order (Options' default sort): the no-allotment and closed-before groups headed (Grouping). */
+  grouping?: Grouping;
 } & Years) {
   const L = useDecideLinks();
   const [rows, setRows] = useState(initial);
@@ -351,7 +401,7 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
           {tools}
         </div>
       </div>
-      <OptionsList rows={rows} caption={caption} start={start} L={L} view={view} latest={latest} pastYears={pastYears} includeLatest={includeLatest} seatLists={seatLists} />
+      <OptionsList rows={rows} caption={caption} start={start} L={L} view={view} latest={latest} pastYears={pastYears} includeLatest={includeLatest} seatLists={seatLists} grouping={grouping} />
       {shown < total && moreHref && (
         <div className="grid justify-items-center">
           <Button asChild variant="secondary"><Link href={moreHref}>Next {formatRank(Math.min(pageSize, total - shown))}</Link></Button>

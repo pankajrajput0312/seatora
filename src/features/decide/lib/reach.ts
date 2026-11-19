@@ -10,7 +10,7 @@ export const YEARS = [2024, 2025, 2026];
  * The latest year and its newest round with an MCC result in the data (latestRound). `pastYears`: another exam's two past
  * years (exams/registry.ts latestOf); absent = NEET PG's PAST_YEARS (pastOf).
  */
-export type Latest = { year: number; round: Round; pastYears?: [number, number] };
+export type Latest = { year: number; round: Round; pastYears?: [number, number]; /** Set when `round` is a stray round: the latest year's last round before Stray (what "reached" counts). */ main?: Round };
 /** The past years the labels beside `latest` count. */
 export const pastOf = (latest: Latest): [number, number] => latest.pastYears ?? PAST_YEARS;
 
@@ -21,8 +21,10 @@ export const pastOf = (latest: Latest): [number, number] => latest.pastYears ?? 
  */
 export function latestRound(sources: Pick<Source, "year" | "round" | "provisional">[], year = LATEST_YEAR): Latest & { provisional: boolean } {
   const mine = sources.filter((s) => s.year === year);
-  const round = rounds.filter((r) => mine.some((s) => s.round === r)).at(-1) ?? "R1";
-  return { year, round, provisional: mine.some((s) => s.round === round && s.provisional) };
+  const had = rounds.filter((r) => mine.some((s) => s.round === r));
+  const round = had.at(-1) ?? "R1";
+  const main = isStrayRound(round) ? had.filter((r) => !isStrayRound(r)).at(-1) : undefined;
+  return { year, round, provisional: mine.some((s) => s.round === round && s.provisional), ...(main && { main }) };
 }
 
 /** Index in `rounds` of the latest year's last round the labels count: its newest, the one before without it (-1: none). */
@@ -142,6 +144,23 @@ export function reachEvidence(cutoffs: ReachInput[], reach: Reach, window: Windo
 }
 
 /**
+ * A "reached" label's first round (classifyReach's window, R1 to R3, never Stray): in each year the label rests on
+ * (the latest year; both past years; the one past year), the earliest round whose closing reached her rank; of those,
+ * the latest. So R1 means Round 1 reached her rank in every one of those years; else `year` is the one where only a
+ * later round did. Null for any other label.
+ */
+export function reachedFrom(rank: number, cutoffs: ReachInput[], reach: Reach, window: Window): { year: number; round: Round } | null {
+  const years = reach === "reached-latest" ? [window.latest.year] : reach === "reached-both" || reach === "reached-one" ? window.pastYears : [];
+  const hit = inWindow(cutoffs, window).filter((c) => c.round && !isStrayRound(c.round) && c.closing >= rank);
+  let out: { year: number; round: Round } | null = null;
+  for (const year of years) {
+    const first = rounds.find((r) => hit.some((c) => c.year === year && c.round === r));
+    if (first && (!out || rounds.indexOf(first) > rounds.indexOf(out.round))) out = { year, round: first };
+  }
+  return out;
+}
+
+/**
  * History-only label for how a rank compares with past closing ranks. "Reached" means the rank was within the
  * closing rank of that round, R1 to R3 only (isStrayRound). "reached-latest": in any round of the latest year so far
  * (R1 up to its newest, latestText), as a past year counts every round. Never a chance or prediction.
@@ -177,7 +196,8 @@ export const reachWindow = (latest: Latest, [a, b]: [number, number], includeLat
  */
 export function reachLabel(reach: Reach, latest: Latest, pastYears: [number, number], includeLatest = true, on?: string): string {
   return {
-    "reached-latest": `Reached in ${latestText(latest, includeLatest)}`,
+    // Stray rounds never make "reached": a latest round that is one leaves the label at the round before it (2025 R1 to R2).
+    "reached-latest": `Reached in ${latest.main ? latestText({ ...latest, round: latest.main }) : latestText(latest, includeLatest)}`,
     "reached-both": `Reached in ${pastYears[0]} and ${pastYears[1]}`,
     "reached-one": `Reached in ${pastYears[0]} or ${pastYears[1]}`,
     "within-10": "Within 10% in a past round",

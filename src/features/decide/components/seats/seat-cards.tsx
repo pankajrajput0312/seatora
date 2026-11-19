@@ -100,7 +100,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
             }
             meta={[
               r.college.state ?? "State not listed",
-              r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />,
+              <TypeBadge key="type" type={r.hospital?.type} of={r.college.name} />,
               r.hospital?.beds && <Beds b={r.hospital.beds} inst={r.college.name} of={name} unit />,
             ]}
             footer={<TermStatCells t={r.fees} of={name} />}

@@ -185,7 +185,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L, late
                     {courseOf(r)}, {r.quota != null ? <QuotaName quota={r.quota} /> : "quota not printed"}, {r.college.state ?? "state not listed"}
                   </span>
                   <span className="mt-1 flex flex-wrap gap-1">
-                    {r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />}
+                    <TypeBadge type={r.hospital?.type} of={r.college.name} />
                     {r.quota != null && isRestricted(exam, r.quota) && <Badge tone="warning">Restricted quota</Badge>}
                   </span>
                 </th>

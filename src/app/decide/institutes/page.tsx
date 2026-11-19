@@ -13,7 +13,7 @@ import { SELF_REPORTED } from "@/features/decide/components/institute/hospital-b
 import { Beds } from "@/features/decide/components/pages/beds";
 import { hospitalInfo, institutesByTerms } from "@/features/decide/components/institute/institute-data";
 import { ResultCard } from "@/features/decide/components/result-card";
-import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
+import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
@@ -21,7 +21,7 @@ import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
-import { readTermFilters, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
+import { readTermFilters, termChips, termValueLabel, untypedOnly } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getMeta, listInstitutes } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
@@ -57,7 +57,9 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const exam = await activeExam();
   const E = await examInfo(exam);
   const { latestYear: LATEST_YEAR, pastYears: PAST_YEARS } = E;
-  const [meta, info, byTerms, view] = await Promise.all([getMeta(exam), hospitalInfo(exam), institutesByTerms(tf, f.course, exam), chosenView(params, "institutes")]);
+  // A college type picked: the institutes it left out only because their type is not known (byUntyped).
+  const typeless = untypedOnly(tf);
+  const [meta, info, byTerms, view, byUntyped] = await Promise.all([getMeta(exam), hospitalInfo(exam), institutesByTerms(tf, f.course, exam), chosenView(params, "institutes"), typeless && institutesByTerms(typeless, f.course, exam)]);
   // Allotments of the latest complete year (NEET PG: its later past year, as before).
   const HEAD = headYearIn(exam, meta.sources);
   // NEET MDS: no hospital beds (dental colleges): no Beds column or sort.
@@ -65,9 +67,10 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   const latest = latestOf(meta.sources, exam);
   // Term filters and the beds sort narrow and order the list before it is paged, so reach is read for one page only.
   const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort, only: byTerms?.pass, bedsOf: (key: string) => info.get(key)?.beds?.n };
-  const [res, unknown] = await Promise.all([
+  const [res, unknown, untyped] = await Promise.all([
     listInstitutes(profile, filters, pg, exam),
     byTerms ? listInstitutes(null, { ...filters, only: byTerms.unknown }, { page: 1, pageSize: 1 }, exam).then((r) => r.total) : 0,
+    byUntyped ? listInstitutes(null, { ...filters, only: byUntyped.pass }, { page: 1, pageSize: 1 }, exam).then((r) => r.total) : 0,
   ]);
 
   const courseLabel = (slug: string) => {
@@ -117,7 +120,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
               meta={[
                 r.college.state,
                 r.college.pincode && <span key="pin">PIN <span className="numeric">{r.college.pincode}</span></span>,
-                h?.type && <TypeBadge type={h.type} of={r.college.name} />,
+                <TypeBadge key="type" type={h?.type} of={r.college.name} />,
                 h?.beds && <Beds b={h.beds} inst={r.college.name} unit />,
               ]}
               footer={
@@ -167,7 +170,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
                   <Link href={L.institute(r.college.slug)} title={r.college.name} className={`wrap-anywhere hover:text-sky hover:underline ${tbl.clamp}`}>{r.college.name}</Link>
                 </th>
                 <td className={tbl.td}>{r.college.state ?? <Dash />}</td>
-                <td className={`${tbl.td} whitespace-nowrap`}>{h?.type ? <TypeBadge type={h.type} of={r.college.name} /> : <Dash />}</td>
+                <td className={`${tbl.td} whitespace-nowrap`}><TypeBadge type={h?.type} of={r.college.name} /></td>
                 {E.has.beds && <td className={`${tbl.num} whitespace-nowrap`}>{h?.beds ? <Beds b={h.beds} inst={r.college.name} /> : <Dash />}</td>}
                 <td className={tbl.num}><Link href={L.institute(r.college.slug, "courses")} className="text-sky hover:underline">{formatRank(r.courses.length)}</Link></td>
                 <td className={tbl.num}>{allot(r, "text-sky hover:underline")}</td>
@@ -206,9 +209,10 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.state ?? []} none="All states" />
         <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={f.course ?? []} none="Any course" />
         <Field label="Sort"><Select name="sort" value={f.sort} options={[...sorts]} /></Field>
-        {E.has.fees && <TermFilterControls f={tp} caps={profile} />}
+        <TermFilterControls f={tp} caps={profile} fees={E.has.fees} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
+      <UntypedNote n={untyped} noun={untyped === 1 ? "institute" : "institutes"} href={L.with(PATH, { ctype: null, page: null })} />
 
       <div className={toolbarRow}>
         <AboutData>

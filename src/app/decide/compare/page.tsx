@@ -7,7 +7,7 @@ import { AppPage } from "@/features/decide/components/app-page";
 import { DataSource } from "@/features/decide/components/data-source";
 import { Dash, HistoryNote, InstName, PageHead, ReachBadge } from "@/features/decide/components/bits";
 import { CompareFromDevice, RemoveFromCompare } from "@/features/decide/components/compare-controls";
-import { ClosingCell, courseName } from "@/features/decide/components/options-view";
+import { ClosingCell, courseName, r1Of } from "@/features/decide/components/options-view";
 import { Sup } from "@/features/decide/components/fees";
 import { Beds } from "@/features/decide/components/pages/beds";
 import { StatCellView } from "@/features/decide/components/stat-cells";
@@ -112,14 +112,14 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   const rows: { label: string; cell: (r: OptionRow) => React.ReactNode }[] = [
     { label: "Quota", cell: (r) => quotaIn(E, r.quota) },
     { label: "State", cell: (r) => r.college.state ?? <Dash /> },
-    { label: "Type", cell: (r) => (r.hospital?.type ? <TypeBadge type={r.hospital.type} of={r.college.name} /> : <Dash />) },
+    { label: "Type", cell: (r) => <TypeBadge type={r.hospital?.type} of={r.college.name} /> },
     // NEET MDS: no hospital beds (dental colleges): no row.
     ...(E.has.beds ? [{ label: "Beds (as reported)", cell: (r: OptionRow) => (r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} of={`${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} /> : <Dash />) }] : []),
     {
       label: "Your reach",
       cell: (r) =>
         profile ? (
-          <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} />
+          <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} from={r.reachFrom} />
         ) : (
           <Link href={L.with("/decide/compare", { editProfile: "1" })} className={`${smallLink} text-sky`}>Set your rank to see</Link>
         ),
@@ -147,7 +147,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           { label: "If you leave", cell: (r: OptionRow) => <IfYouLeave r={r} leaving={terms.get(r.id)!.find((c) => c.key === "leaving")!.full} /> },
         ]
       : []),
-    { label: `${latestText(latest)} closing`, cell: (r) => <ClosingCell d={r.latest} year={latest.year} /> },
+    { label: `${latestText(latest)} closing`, cell: (r) => <ClosingCell d={r.latest} year={latest.year} r1={r1Of(r, latest.year)} /> },
     { label: `${last} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[last]} year={last} /> },
     { label: `${older} deepest closing`, cell: (r) => <ClosingCell d={r.byYear[older]} year={older} /> },
     { label: "Closing by year and round", cell: (r) => <YearLines r={r} E={E} /> },

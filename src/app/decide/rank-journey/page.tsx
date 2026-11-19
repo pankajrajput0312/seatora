@@ -175,7 +175,7 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
                             <Link href={courseLink(a)} className={subLink} title="Every allotment on this course here that round">{a.courseName}</Link>
                           </span>
                           <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-                            {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.collegeName} />}
+                            <TypeBadge type={a.hospital?.type} of={a.collegeName} />
                             <span><QuotaName quota={a.quota} /> · Seat: {a.category}{a.candidateCategory && ` · Candidate: ${a.candidateCategory}`}</span>
                           </span>
                         </td>

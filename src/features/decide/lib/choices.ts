@@ -1,7 +1,7 @@
 // Pure choice-list logic (tested). Items are snapshots so a list renders without refetching.
 import { z } from "zod";
 import type { ProgrammeTerms } from "../server/terms";
-import { statCells, statKeys, statLabel, type StatCell } from "./stat-format";
+import { inrFull, statCells, statKeys, statLabel, type StatCell } from "./stat-format";
 import { groupOf } from "@/features/exams/exam";
 
 export type ChoiceItem = {
@@ -87,6 +87,20 @@ export function shareText(list: ChoiceList, terms: (id: string) => string | null
  * NEET SS: the choices of another question group than hers (`groups`, from her quotas): her rank isn't one there, so
  * Copy, Share and CSV leave them out unless asked. None when she has no group (or another exam).
  */
+/** A whole-course fee read "up to": a year's figure is an NBEMS maximum or a range's top (feeValue: the cautious figure). */
+const upTo = (t: ProgrammeTerms) => t.years.some((y) => y.fee?.kind === "maximum" || y.fee?.min != null);
+/** One choice's whole-course fee as words (NEET SS and MDS choice lists): "₹4,50,000 (3 years)", or "not published". */
+export const wholeCourseWords = (t: ProgrammeTerms) =>
+  t.wholeCourseFee == null ? "not published" : `${upTo(t) ? "up to " : ""}${inrFull(t.wholeCourseFee)} (${t.durationYears} ${t.durationYears === 1 ? "year" : "years"})`;
+/**
+ * The shortlist's whole-course fees added up: `total` over the `n` choices that publish one (`upTo`: one of them is a
+ * maximum or a range's top), `missing` the ones that publish none, never counted as ₹0. Stipend is never taken off.
+ */
+export function wholeCourseTotal(ts: ProgrammeTerms[]) {
+  const known = ts.filter((t) => t.wholeCourseFee != null);
+  return { total: known.reduce((n, t) => n + t.wholeCourseFee!, 0), n: known.length, missing: ts.length - known.length, upTo: known.some(upTo) };
+}
+
 export const otherGroupItems = (items: ChoiceItem[], groups: string[]) => (groups.length ? items.filter((i) => !groups.includes(groupOf(i.quota) ?? "")) : []);
 
 /** The PIN in the item's college key (types.ts optionId: "NAME…#PIN~degree~specialty~quota"); null when the key has none. */

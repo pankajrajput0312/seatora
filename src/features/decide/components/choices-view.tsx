@@ -8,14 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { cellWords, duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, type ChoiceItem } from "../lib/choices";
+import { cellWords, duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, wholeCourseTotal, wholeCourseWords, type ChoiceItem } from "../lib/choices";
+import { inrFull } from "../lib/stat-format";
 import { deepestOf, latestText, pastOf, reachWindow, seatsBelowNotes, type Deepest, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
 import { statCells, statKeys, statLabel } from "../lib/stat-format";
 import { groupsIn, quotaIn, roundIn } from "@/features/exams/exam";
 import { useChoices, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
 import { keepProfileParams, profileFromParams } from "../profile";
 import type { ProgrammeTerms } from "../server/terms";
-import type { RowHospital, SeatsBy } from "../service";
+import type { OptionRow, RowHospital, SeatsBy } from "../service";
 import type { SeatList } from "../types";
 import { Dash, InstName, ReachBadge } from "./bits";
 import { InfoTip } from "./info-tip";
@@ -31,7 +32,7 @@ import { ViewToggle, type View } from "./view-toggle";
 import { ScrollTable } from "./scroll-table";
 
 /** `reach` null: no rank in the address (terms and hospital only; the stored label stays). */
-type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; fees: ProgrammeTerms; hospital: RowHospital; otherGroup?: boolean; latest: Deepest | null; byYear: Record<number, Deepest | null> }>;
+type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; fees: ProgrammeTerms; hospital: RowHospital; otherGroup?: boolean; latest: Deepest | null; byYear: Record<number, Deepest | null>; r1?: number | null; from?: OptionRow["reachFrom"] }>;
 
 // Memoised: a reorder re-renders every row, but each one's terms, type and beds (their (i) tips and source refs, the
 // bulk of a long list) only change when the live data does.
@@ -99,6 +100,8 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     };
   }, [hydrated, reachFor, liveKey]);
   const current = live?.who === who ? live.data : null;
+  // NEET SS / MDS: each choice's whole-course fee and the list's total (NEET PG: in the Fee (i), as before).
+  const whole = E.has.fees && E.key !== "neet-pg";
   const lists = (current && live?.lists) || [];
   const round = lists[0] && `${lists[0].year} ${roundIn(E, lists[0].year, lists[0].round)}`;
   const fresh = live?.key === liveKey;
@@ -304,7 +307,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     </span>
   );
   const reachOf = (item: ChoiceItem, lr: Live[string] | undefined) =>
-    lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} latest={latest} otherGroup={lr.otherGroup} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>;
+    lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} latest={latest} otherGroup={lr.otherGroup} from={lr.from} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>;
   const typedBadge = <Badge tone="success"><Check className="mr-1 size-3" aria-hidden />Typed into MCC</Badge>;
   const seatsOf = (item: ChoiceItem, lr: Live[string], l: SeatList) => (
     <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${quotaIn(E, item.quota)}`} />
@@ -333,11 +336,12 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
               href={L.institute(item.slug)}
               external={lr?.hospital?.mccProfileUrl ? { href: lr.hospital.mccProfileUrl, label: `MCC profile: ${item.institute}` } : undefined}
               subtitle={item.course}
-              meta={[item.state ?? "State not listed", lr?.hospital?.type && <TypeBadgeM type={lr.hospital.type} of={item.institute} />, lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />]}
+              meta={[item.state ?? "State not listed", lr && <TypeBadge key="type"M type={lr.hospital?.type} of={item.institute} />, lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />]}
               footer={
                 <>
                   {E.has.fees && (lr ? <StatCellsM t={lr.fees} of={name(item)} /> : loading && <Skeleton className="h-[7.75rem] rounded-none sm:h-[4.5rem]" />)}
                   <div className={cn("grid gap-1 px-4 py-2", E.has.fees && (lr || loading) && "border-t border-border")}>
+                    {whole && lr && <p className="text-sm"><span className="text-muted-foreground">Fee, whole course: </span><span className={cn("numeric", lr.fees.wholeCourseFee == null ? "text-muted-foreground" : "font-semibold")}>{wholeCourseWords(lr.fees)}</span></p>}
                     {!lr && loading && hasLists && <Skeleton className="h-11 w-48" />}
                     {lr && lists.length > 0 && (
                       <p className="flex flex-wrap items-center gap-x-3 text-xs">
@@ -374,7 +378,10 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
             <th scope="col" className={cn(th, "px-3! text-right")}>{latestText(latest)} closing</th>
             <th scope="col" className={cn(th, "px-3!")}>Your reach</th>
             {lists.length > 0 && <th scope="col" className={cn(th, "px-3! text-right")}>{round} seats</th>}
-            {E.has.fees && statKeys.map((k) => <th key={k} scope="col" data-col={k} className={cn(th, "px-3! text-right")}>{statLabel[k]}</th>)}
+            {E.has.fees && statKeys.flatMap((k) => [
+              <th key={k} scope="col" data-col={k} className={cn(th, "px-3! text-right")}>{statLabel[k]}</th>,
+              ...(whole && k === "fee" ? [<th key="feetotal" scope="col" data-col="feetotal" className={cn(th, "px-3! text-right")}>Fee, whole course</th>] : []),
+            ])}
           </tr>
         </thead>
         <tbody>
@@ -396,7 +403,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                       <span className="block text-xs text-muted-foreground">{item.course}, {quotaIn(E, item.quota)}</span>
                       <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                         {item.state ?? "State not listed"}
-                        {lr?.hospital?.type && <TypeBadgeM type={lr.hospital.type} of={item.institute} />}
+                        {lr && <TypeBadgeM type={lr.hospital?.type} of={item.institute} />}
                         {lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />}
                         {typed && typedBadge}
                       </span>
@@ -410,7 +417,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                   </span>
                 </th>
                 {/* Beside the choice, as on Options, so it is in view without scrolling sideways. */}
-                <td className={cn(tbl.td, "px-3! text-right")}>{lr ? <ClosingCell d={lr.latest} year={latest.year} /> : <Dash />}</td>
+                <td className={cn(tbl.td, "px-3! text-right")}>{lr ? <ClosingCell d={lr.latest} year={latest.year} r1={lr.r1} /> : <Dash />}</td>
                 <td className={cn(tbl.td, "px-3! text-xs")}>{reachOf(item, lr)}</td>
                 {lists.length > 0 && (
                   <td className={cn(tbl.td, "px-3! py-1! text-right text-xs")}>
@@ -423,9 +430,9 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                   </td>
                 )}
                 {!E.has.fees ? null : lr ? (
-                  <StatCellsM t={lr.fees} variant="table" of={name(item)} tdClassName="px-3" />
+                  <StatCellsM t={lr.fees} variant="table" of={name(item)} tdClassName="px-3" total={whole} />
                 ) : (
-                  <td colSpan={statKeys.length} className={cn(tbl.td, "text-xs text-muted-foreground")}>{fresh || failed === liveKey || !reachFor ? <Dash /> : "Loading terms…"}</td>
+                  <td colSpan={statKeys.length + (whole ? 1 : 0)} className={cn(tbl.td, "text-xs text-muted-foreground")}>{fresh || failed === liveKey || !reachFor ? <Dash /> : "Loading terms…"}</td>
                 )}
               </tr>
             );
@@ -477,6 +484,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
           </span>
         </label>
       </div>}
+      {whole && n > 0 && current && <WholeCourse items={items.map((i) => current[i.id]?.fees ?? null)} />}
       {others.length > 0 && (
         <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-sun" data-print-hide>
           {withOthers
@@ -526,5 +534,23 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * NEET SS / MDS: the list's whole-course fees added up (lib/choices.ts wholeCourseTotal); a choice with no published
+ * fee (or none in the current data) counted apart, never as ₹0; stipend said apart, never taken off.
+ */
+function WholeCourse({ items }: { items: (ProgrammeTerms | null)[] }) {
+  const w = wholeCourseTotal(items.filter((t): t is ProgrammeTerms => !!t));
+  const missing = w.missing + items.filter((t) => !t).length;
+  return (
+    <p className="text-sm">
+      <span className="text-muted-foreground">Fee, whole course, all {items.length}: </span>
+      {w.n ? <span className="numeric font-semibold">{w.upTo && "up to "}{inrFull(w.total)}</span> : <span className="text-muted-foreground">not published for any</span>}
+      {w.n > 0 && missing > 0 && <span className="text-muted-foreground"> for {w.n}</span>}
+      {missing > 0 && <span className="text-sun">; {missing} with no published fee (not counted as ₹0)</span>}
+      <span className="text-muted-foreground">. Stipend apart: each choice&apos;s Stipend (a month), never taken off the fee.</span>
+    </p>
   );
 }

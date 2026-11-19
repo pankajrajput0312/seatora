@@ -150,7 +150,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
           none={mineCats.length ? `Yours (${mineCats.join(", ")})` : "All seat categories"}
           info={mineCats.length ? "None ticked means the seat categories you can take. Tick All seat categories for every one." : undefined}
         />}
-        {E.has.fees && <TermFilterControls f={tp.params} caps={profile} />}
+        <TermFilterControls f={tp.params} caps={profile} fees={E.has.fees} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
 
@@ -254,7 +254,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                                 <Link href={L.institute(a.collegeSlug)} className="inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline max-md:hidden">{a.collegeName}</Link>
                                 <span className="block"><Link href={courseLink(a)} className={subLink}>{courseName(a)}</Link></span>
                                 <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-                                  {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.collegeName} />}
+                                  <TypeBadge type={a.hospital?.type} of={a.collegeName} />
                                   <span><QuotaName quota={a.quota} />{a.remark && ` · ${a.remark}`}</span>
                                 </span>
                               </td>

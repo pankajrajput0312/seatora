@@ -5,6 +5,7 @@ import { canUseDecide } from "@/features/auth/lib/session";
 import { profileFromParams } from "@/features/decide/profile";
 import { choiceOptions } from "@/features/decide/service";
 import { activeExam } from "@/features/exams/active";
+import { exams } from "@/features/exams/registry";
 
 const inputSchema = z.object({ ids: z.array(z.string().min(1).max(300)).max(1000), profile: z.string().max(2000) });
 
@@ -14,7 +15,7 @@ const inputSchema = z.object({ ids: z.array(z.string().min(1).max(300)).max(1000
  * virtual, new; never added) with `below` (OptionRow.seatsBelow), as on Options, and its course and quota's terms
  * (`fees`, for the stat cells) and `hospital` (type, beds). Unknown ids are left out of `options`. With no rank in
  * `profile` only the terms and hospital (they don't depend on it): `reach` null, no seat lists or seats (her seat
- * categories are unknown). `latest` and `byYear`: its closings on her seat categories (OptionRow's; none without a rank), for the CSV. Null when the input is invalid, there's no data or no access (Server Actions can be POSTed
+ * categories are unknown). `latest` and `byYear`: its closings on her seat categories (OptionRow's; none without a rank), for the CSV; `r1` the latest year's R1 closing and `from` the label's first round (OptionRow.reachFrom). Null when the input is invalid, there's no data or no access (Server Actions can be POSTed
  * to any route, past the middleware).
  * (A server action: a list can hold hundreds of ids, more than /api/v1/options/compare takes.)
  */
@@ -25,11 +26,13 @@ export async function liveReach(ids: string[], profile: string) {
   try {
     if (!(await canUseDecide())) return null;
     const uniq = [...new Set(input.data.ids)];
-    const { lists, rows } = await choiceOptions(uniq, p, await activeExam());
+    const exam = await activeExam();
+    const { lists, rows } = await choiceOptions(uniq, p, exam);
+    const year = exams[exam].latestYear; // `latest`'s year: R1's closing beside it (r1)
     return {
       lists: p ? lists : [],
       options: Object.fromEntries(
-        rows.map((o) => [o.id, { ...(p ? { reach: o.reach, provisional: o.reachProvisional, seats: o.seatsBy ?? {}, below: o.seatsBelow ?? [], latest: o.latest, byYear: o.byYear, ...(o.otherGroup && { otherGroup: true }) } : { reach: null, provisional: false, seats: {}, below: [], latest: null, byYear: {} }), fees: o.fees, hospital: o.hospital ?? null }]),
+        rows.map((o) => [o.id, { ...(p ? { reach: o.reach, provisional: o.reachProvisional, seats: o.seatsBy ?? {}, below: o.seatsBelow ?? [], latest: o.latest, byYear: o.byYear, r1: o.grid[year]?.R1?.closing ?? null, ...(o.reachFrom && { from: o.reachFrom }), ...(o.otherGroup && { otherGroup: true }) } : { reach: null, provisional: false, seats: {}, below: [], latest: null, byYear: {} }), fees: o.fees, hospital: o.hospital ?? null }]),
       ),
     };
   } catch (e) {

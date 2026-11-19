@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Amount, Bond, Figure, ProgrammeTerms } from "../server/terms";
-import { anyTermFilter, lowestRisk, readTermFilters, splitByTerms, termChips, termFilters, termMoreOpen, termParamsSchema, termsPass, termVerdict } from "./term-filters";
+import { anyTermFilter, lowestRisk, readTermFilters, splitByTerms, termChips, termFilters, termMoreOpen, termParamsSchema, termsPass, termVerdict, untypedOnly } from "./term-filters";
 
 const none: Amount = { state: "none", min: null, max: null, perYear: null, varies: false, more: false, extra: null };
 const amt = (max: number, min = max): Amount => ({ ...none, state: "figure", min, max });
@@ -59,6 +59,15 @@ describe("filters", () => {
     expect(termVerdict(known, "govt", { types: ["govt", "esic"] })).toBe("pass");
     expect(termVerdict(known, "private", { types: ["govt"] })).toBe("fail");
     expect(termsPass(known, null, { types: ["govt"], keepUnknown: true })).toBe(false);
+  });
+  it("type not known: untypedOnly keeps only the colleges with no type that pass every other filter (what a page counts)", () => {
+    expect(untypedOnly({ maxFee: 200000 })).toBeNull(); // no type picked: nothing left out for its type
+    const u = untypedOnly({ types: ["govt"], maxFee: 200000 })!;
+    expect(u).toEqual({ types: [], untyped: true, maxFee: 200000 });
+    expect(anyTermFilter(u)).toBe(true);
+    expect(termVerdict(known, null, u)).toBe("pass");
+    expect(termVerdict(known, "govt", u)).toBe("fail");
+    expect(termVerdict(known, null, { ...u, maxFee: 100000 })).toBe("fail");
   });
 
   it("fee per year: year 1 at most; a range by its highest; an NBEMS maximum passes under the cap, is unknown over it", () => {

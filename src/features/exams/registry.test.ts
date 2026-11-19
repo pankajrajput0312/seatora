@@ -52,8 +52,9 @@ describe("per-exam years and labels", () => {
   });
   it("NEET SS: its own latest year (2025), its past years in every label", () => {
     const l = latestOf(ss, "neet-ss");
-    expect(l).toEqual({ year: 2025, round: "special_stray", provisional: false, pastYears: [2023, 2024] });
-    expect(reachLabel("reached-latest", l, pastOf(l))).toBe("Reached in 2025 R1 to Special stray");
+    // "Reached" never counts a stray round: its label stops at the round before (main).
+    expect(l).toEqual({ year: 2025, round: "special_stray", main: "R2", provisional: false, pastYears: [2023, 2024] });
+    expect(reachLabel("reached-latest", l, pastOf(l))).toBe("Reached in 2025 R1 to R2");
     expect(reachLabel("reached-both", l, pastOf(l))).toBe("Reached in 2023 and 2024");
     expect(reachWindow(l, pastOf(l))).toBe("2023, 2024 and 2025 R1 to Special stray");
   });

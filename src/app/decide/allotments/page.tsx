@@ -15,7 +15,7 @@ import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { termDocs } from "@/features/decide/components/fees";
 import { ResultCard, ResultCards } from "@/features/decide/components/result-card";
 import { StatHead, TermStatCells } from "@/features/decide/components/stat-cells";
-import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
+import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { VIEW_PARAM, ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
@@ -75,7 +75,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const { f, meta, inst, typed, rankError, latest, fromProfile, filters } = v;
   // A round as that year's MCC result names it (NEET SS's Mop-up; NEET PG: R1 … Special stray, as before).
   const roundOf = (a: { year: number; round: Round }) => roundNameIn(exam, meta.sources, a.year, a.round);
-  const { rows, total, page, unknownTerms } = v.r;
+  const { rows, total, page, unknownTerms, untyped } = v.r;
   // Her profile's caps apply here as on Options and Fees (an absent maxfee / bondyrs is hers: allotmentsView).
   const caps = profileFromParams(params);
   const rankInput = (name: "from" | "to") => ({
@@ -119,7 +119,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   // State • type badge • beds: the card's meta line (the table's line under the course has the same).
   const instMeta = (a: AllotmentRow) => [
     a.college.state,
-    a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.college.name} />,
+    <TypeBadge key="type" type={a.hospital?.type} of={a.college.name} />,
     a.hospital?.beds && <Beds beds={a.hospital.beds} of={a.college.name} />,
   ];
   const rankLink = (a: AllotmentRow, className: string) => (
@@ -229,7 +229,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
                       <span aria-hidden>·</span><span className="sr-only">, </span>
                       <span>{a.college.state}</span>
                       <span className="inline-flex items-center gap-x-1.5 whitespace-nowrap">
-                        {a.hospital?.type && <TypeBadge type={a.hospital.type} of={a.college.name} />}
+                        <TypeBadge type={a.hospital?.type} of={a.college.name} />
                         {a.hospital?.beds && <Beds beds={a.hospital.beds} of={a.college.name} />}
                       </span>
                     </span>
@@ -281,7 +281,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         {E.categories.length > 1 && <Field label="Seat category"><Select name="acat" value={f.acat} all="All" options={allotmentCategories.map((c) => ({ value: c, label: c }))} /></Field>}
         <Field label="Rank from"><input {...rankInput("from")} /></Field>
         <Field label="Rank to"><input {...rankInput("to")} /></Field>
-        {E.has.fees && <TermFilterControls f={f} caps={caps} />}
+        <TermFilterControls f={f} caps={caps} fees={E.has.fees} />
       </FilterBar>
       <ActiveFilters items={active} clear={showAll} />
       {fromProfile && (
@@ -310,6 +310,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       </div>
       </div>
 
+      <UntypedNote n={untyped} noun={untyped === 1 ? "allotment" : "allotments"} href={here({ ctype: null })} />
       {unknownTerms > 0 && (
         <p className="text-sm text-muted-foreground">
           <span className="numeric">{formatRank(unknownTerms)}</span> more allotments have no published figure for that filter.{" "}

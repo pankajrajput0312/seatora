@@ -4,6 +4,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { shortName } from "../lib/format";
 import { pastOf, reachLabel, reachTone, type Deepest, type Latest, type Reach } from "../lib/reach";
+import type { OptionRow } from "../service";
 import { roundLabel, type Term } from "../types";
 import { InfoTip } from "./info-tip";
 import { SourceRef } from "./page-sources";
@@ -55,7 +56,7 @@ export function Provisional({ when }: { when: boolean | null | undefined }) {
  * `latest`: lib/reach.ts latestRound. `on`: the label is on that one seat category (Seats rows), so its no-data wording
  * names it.
  */
-export function ReachBadge({ reach, provisional, latest, includeLatest = true, on, otherGroup }: { reach: Reach; provisional?: boolean; latest: Latest; includeLatest?: boolean; on?: string; otherGroup?: boolean }) {
+export function ReachBadge({ reach, provisional, latest, includeLatest = true, on, otherGroup, from }: { reach: Reach; provisional?: boolean; latest: Latest; includeLatest?: boolean; on?: string; otherGroup?: boolean; from?: OptionRow["reachFrom"] }) {
   // NEET SS: her rank isn't compared with another question group's seats (OptionRow.otherGroup).
   if (otherGroup) return <Badge tone="neutral" className="text-muted-foreground">Another question group</Badge>;
   return (
@@ -65,8 +66,19 @@ export function ReachBadge({ reach, provisional, latest, includeLatest = true, o
         {reachLabel(reach, latest, pastOf(latest), includeLatest, on)}
       </Badge>
       <Provisional when={provisional} />
+      {from && <ReachedFrom from={from} reach={reach} />}
     </span>
   );
+}
+
+/**
+ * Under a "reached" label (OptionRow.reachFrom): "In Round 1", or "Only in a later round (R3)", with the year when the
+ * label rests on two, so an option first reached in R2 or R3 never reads like a Round 1 seat.
+ */
+function ReachedFrom({ from, reach }: { from: NonNullable<OptionRow["reachFrom"]>; reach: Reach }) {
+  const year = reach !== "reached-latest" && <span className="numeric">{from.year}: </span>;
+  if (from.round === "R1") return <span className="block w-full text-xs text-muted-foreground">{reach === "reached-one" && year}In Round 1</span>;
+  return <span className="block w-full text-xs text-sun">{year}Only in a later round (<RoundName year={from.year} round={from.round} />)</span>;
 }
 
 /** A deepest closing rank with its round (named as that `year`'s PDFs call it, when given) and seat category; "—" (with sr-only text) when missing. */

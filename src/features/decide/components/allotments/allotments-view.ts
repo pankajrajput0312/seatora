@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { DEFAULT_EXAM, perGroup, type ExamKey } from "@/features/exams/registry";
 import { pageValue, parseSearchParams, rankValue } from "../../lib/params";
-import { anyTermFilter, feeValue, termFilterLists, termFilters, termFilterShape } from "../../lib/term-filters";
+import { anyTermFilter, feeValue, termFilterLists, termFilters, termFilterShape, untypedOnly } from "../../lib/term-filters";
 import { profileFromParams, profileHasCourse } from "../../profile";
 import { getCollege, getMeta, listAllotments } from "../../service";
 import { baseCategories, roundLabel, rounds, termLabel, type Allotment, type PrevSeat, type Source, type Term } from "../../types";
@@ -86,14 +86,17 @@ export async function allotmentsView(params: URLSearchParams, pageSize: number, 
   // `unknownTerms`: the rows "Include not declared" (nd=keep) would add, i.e. left out only because a filtered figure is
   // not declared (keep is a superset: it only lets unknown values through). Counted only when that box is unticked.
   const keep = anyTermFilter(filters.terms) && !filters.terms.keepUnknown ? { ...filters, terms: { ...filters.terms, keepUnknown: true } } : null;
-  const [r, info, all] = await Promise.all([
+  // `untyped`: with a college type picked, the rows it left out only because their college's type is not known.
+  const typeless = untypedOnly(filters.terms);
+  const [r, info, all, untyped] = await Promise.all([
     listAllotments(filters, { page: f.page, pageSize }, inst?.key, exam),
     hospitalInfo(exam),
     keep && listAllotments(keep, { page: 1, pageSize: 1 }, inst?.key, exam),
+    typeless ? listAllotments({ ...filters, terms: typeless }, { page: 1, pageSize: 1 }, inst?.key, exam).then((x) => x.total) : 0,
   ]);
   // Each row's MCC institute profile (the card's external link); null when the import has none.
   const rows = r.rows.map((a) => ({ ...a, mccProfileUrl: info.get(a.college.key)?.mccProfileUrl ?? null }));
-  return { f, meta, inst, typed, rankError, latest, fromProfile, filters, r: { ...r, rows, unknownTerms: all ? all.total - r.total : 0 } };
+  return { f, meta, inst, typed, rankError, latest, fromProfile, filters, r: { ...r, rows, unknownTerms: all ? all.total - r.total : 0, untyped } };
 }
 export type AllotmentRow = NonNullable<Awaited<ReturnType<typeof allotmentsView>>>["r"]["rows"][number];
 

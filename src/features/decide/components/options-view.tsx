@@ -73,13 +73,29 @@ export function SeatsBelowNote({ r, latest, includeLatest = true }: { r: Pick<Op
   return seatsBelowNotes(r.seatsBelow ?? [], latest, pastOf(latest), includeLatest).map((t) => <span key={t} className="mt-1 block max-w-xs text-xs text-sun">{t}</span>);
 }
 
-/** A closing rank with its round and seat category, marked Provisional when its MCC result is. */
-export function ClosingCell({ d, year }: { d: Deepest | null | undefined; year?: number }) {
+/**
+ * A closing rank with its round and seat category, marked Provisional when its MCC result is. `r1`: that year's R1
+ * closing on her seat categories (r1Of), said under a deepest closing from a later round ("R1: 2,108", "None in R1").
+ */
+export function ClosingCell({ d, year, r1 }: { d: Deepest | null | undefined; year?: number; r1?: number | null }) {
   return (
     <>
       <Closing d={d} year={year} />
+      {d && d.round !== "R1" && r1 !== undefined && <R1Line r1={r1} />}
       {d?.provisional && <span className="mt-1 block"><Provisional when /></span>}
     </>
+  );
+}
+
+/** That year's R1 closing on her seat categories (the grid's), null when R1 allotted none on them. */
+export const r1Of = (r: Pick<OptionRow, "grid">, year: number) => r.grid[year]?.R1?.closing ?? null;
+
+/** Beside a deepest closing from a later round: Round 1's own closing, or that R1 allotted none on her seat categories. */
+export function R1Line({ r1 }: { r1: number | null }) {
+  return (
+    <span className="block text-xs font-normal whitespace-nowrap text-muted-foreground">
+      {r1 == null ? "None in R1" : <>R1: <span className="numeric font-semibold text-foreground">{formatRank(r1)}</span></>}
+    </span>
   );
 }
 

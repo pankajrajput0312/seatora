@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, otherGroupItems, parseChoices, shareText, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, type ChoiceItem, type RenamedCollege } from "./choices";
+import { defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, otherGroupItems, parseChoices, shareText, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, wholeCourseTotal, wholeCourseWords, type ChoiceItem, type RenamedCollege } from "./choices";
+import type { ProgrammeTerms } from "../server/terms";
 
 const item = (id: string): ChoiceItem => ({ id, institute: `Inst ${id}`, slug: id, state: "S", course: "DNB Anaesthesiology", quota: "DNB Quota", reachLabel: "", closedEveryRound: false });
 
@@ -121,5 +122,17 @@ describe("otherGroupItems (NEET SS)", () => {
   });
   it("the share text names the exam", () => {
     expect(shareText({ ...defaultChoices.lists[0], items: [item("a")] }, () => null, "https://x", "NEET SS")).toMatch(/^My NEET SS choice list/);
+  });
+});
+
+describe("wholeCourseTotal (NEET SS / MDS choice lists)", () => {
+  const t = (fee: number | null, years = 3, range = false) =>
+    ({ durationYears: years, wholeCourseFee: fee, years: [{ year: 1, fee: fee == null ? null : { inr: fee / years, ...(range && { min: 1 }) }, stipend: null }] }) as unknown as ProgrammeTerms;
+  it("adds the published whole-course fees; a choice with none is counted apart, never as ₹0", () => {
+    expect(wholeCourseTotal([t(300000), t(null), t(450000)])).toEqual({ total: 750000, n: 2, missing: 1, upTo: false });
+    expect(wholeCourseTotal([t(300000, 3, true)]).upTo).toBe(true);
+    expect(wholeCourseTotal([])).toEqual({ total: 0, n: 0, missing: 0, upTo: false });
+    expect(wholeCourseWords(t(null))).toBe("not published");
+    expect(wholeCourseWords(t(450000))).toBe("₹4,50,000 (3 years)");
   });
 });

@@ -263,7 +263,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                         {/* State, type and Details share a line (the whole row opens the details too, so the button can be the small one). */}
                         <span className="flex flex-wrap items-center gap-x-1.5">
                           <span className="text-xs text-muted-foreground">{r.college.state ?? "State not listed"}</span>
-                          {r.hospital?.type && <TypeChip type={r.hospital.type} of={r.college.name} />}
+                          <TypeChip type={r.hospital?.type} of={r.college.name} />
                           <Button type="button" variant="ghost" size="sm" className="-ml-1 px-2 text-sky" data-row={k} onClick={() => show(k)} aria-haspopup="dialog">
                             Details<span className="sr-only">: {name}</span>
                           </Button>
@@ -442,12 +442,10 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
                       )}
                     </dd>
                   </div>}
-                  {r.hospital?.type && (
-                    <div>
-                      <dt className="text-xs font-semibold text-muted-foreground">Type</dt>
-                      <dd><TypeChip type={r.hospital.type} of={r.college.name} /></dd>
-                    </div>
-                  )}
+                  <div>
+                    <dt className="text-xs font-semibold text-muted-foreground">Type</dt>
+                    <dd><TypeChip type={r.hospital?.type} of={r.college.name} /></dd>
+                  </div>
                 </dl>
               </section>
 

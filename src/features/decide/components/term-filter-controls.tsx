@@ -1,13 +1,15 @@
+import Link from "next/link";
+import { formatRank } from "@/features/cutoffs/lib/format";
 import { termChoices, termValueLabel, typeValues, withCurrent, type TermParams } from "../lib/term-filters";
 import type { Profile } from "../profile";
 import { FilterDropdown } from "./filter-dropdown";
 import { FilterSection } from "./filter-form";
 import { typeCategoryLabel } from "./institute/college-type";
-import { control, Field } from "./ui";
+import { control, Field, smallLink } from "./ui";
 import { PgOr } from "./round-name";
 
 // The term filters' controls (lib/term-filters.ts params) for the Filters sheet (FiltersPanel) of a list page: College
-// type (a checkbox section), then one "Fees & bond" section with a row per figure (native selects; each option names its
+// type (a checkbox section; every exam), then (an exam with fee data) one "Fees & bond" section with a row per figure (native selects; each option names its
 // value, "Fee up to ₹5 L/yr") and "Include not published". They work without JS.
 
 function TermSelect({ name, label, value, any, options }: {
@@ -35,7 +37,7 @@ const choices = (k: keyof typeof termChoices, v: number | null) => withCurrent(t
  * `f`: the parsed params (readTermFilters(...).params). `caps`: her profile's fee and bond caps where the page applies
  * them (Options, Fees): "Your cap: …" is the default and "Any" clears it.
  */
-export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Profile, "maxFeeLakh" | "maxBondYears"> | null }) {
+export function TermFilterControls({ f, caps, fees = true }: { f: TermParams; caps?: Pick<Profile, "maxFeeLakh" | "maxBondYears"> | null; /** false: the exam has no fee data: College type only. */ fees?: boolean }) {
   const fee = caps?.maxFeeLakh ?? null;
   const yrs = caps?.maxBondYears ?? null;
   return (
@@ -46,9 +48,9 @@ export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Pro
         options={typeValues.map((t) => ({ value: t, label: typeCategoryLabel[t] }))}
         selected={f.ctype ?? []}
         none="Any"
-        info="Types are inferred from the name and quota, not official."
+        info="Types are inferred from the name and quota, not official. None ticked: every college, those whose type isn't known too. Ticked: those types only; the page says how many with type not known it leaves out."
       />
-      <FilterSection
+      {fees && <FilterSection
         title="Fees & bond"
         none={fee != null || yrs != null ? "Your caps" : "Any"}
         info={
@@ -84,7 +86,21 @@ export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Pro
           <input type="checkbox" name="nd" value="keep" defaultChecked={f.nd === "keep"} className="size-5 accent-sky" />
           Include not published (none declared, doc not read)
         </label>
-      </FilterSection>
+      </FilterSection>}
     </>
+  );
+}
+
+/**
+ * With a college type picked: how many `noun` (options, institutes, allotments) the filter left out only because their
+ * college's type is not known (lib/term-filters.ts untypedOnly), and `href`, the list with every type. Nothing when none.
+ */
+export function UntypedNote({ n, noun, href }: { n: number; noun: string; href: string }) {
+  if (!n) return null;
+  return (
+    <p role="status" className="text-sm text-muted-foreground">
+      <span className="numeric font-semibold text-foreground">{formatRank(n)}</span> {noun} with type not known left out by the College type filter.{" "}
+      <Link href={href} className={`${smallLink} text-sky`}>Show every type</Link>
+    </p>
   );
 }

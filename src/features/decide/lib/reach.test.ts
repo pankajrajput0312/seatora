@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cutoff, Round, Source } from "../types";
-import { bestClosing, buildGrid, classifyReach, deepestByYear, deepestOf, deepestText, eligibleCategories, latestRound, latestText, reachEvidence, reachLabel, reachWindow, resultsSpan, seatsBelow, seatsBelowNotes } from "./reach";
+import { bestClosing, buildGrid, classifyReach, deepestByYear, deepestOf, deepestText, eligibleCategories, latestRound, latestText, reachedFrom, reachEvidence, reachLabel, reachWindow, resultsSpan, seatsBelow, seatsBelowNotes } from "./reach";
 
 const c = (year: number, round: Round, closing: number, category: Cutoff["category"] = "Open"): Cutoff => ({
   college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY", year, round, quota: "All India", category,
@@ -152,6 +152,27 @@ describe("the latest round (latestRound): the labels count the latest year's R1 
   });
   it("2026 R2 final: not provisional", () => {
     expect(latestRound(results({ round: "R1", provisional: false }, { round: "R2", provisional: false }))).toEqual({ year: 2026, round: "R2", provisional: false });
+  });
+  it("a stray latest round: the reached label stops at the round before Stray (NEET SS 2025: R1, R2, Special stray)", () => {
+    const ss = [{ year: 2025, round: "R1", provisional: false }, { year: 2025, round: "R2", provisional: false }, { year: 2025, round: "special_stray", provisional: false }] as const;
+    const l = { ...latestRound([...ss], 2025), pastYears: [2023, 2024] as [number, number] };
+    expect(l).toMatchObject({ year: 2025, round: "special_stray", main: "R2" });
+    expect(reachLabel("reached-latest", l, [2023, 2024])).toBe("Reached in 2025 R1 to R2");
+    expect(reachLabel("reached-latest", l, [2023, 2024], false)).toBe("Reached in 2025 R1 to R2");
+    expect(reachWindow(l, [2023, 2024])).toBe("2023, 2024 and 2025 R1 to Special stray"); // any allotment: Stray counts
+  });
+});
+
+describe("reachedFrom: Round 1, or only a later round", () => {
+  const w = { latest: { year: 2026, round: "R3" as const }, pastYears: [2024, 2025] as [number, number], includeLatest: true };
+  it("the earliest round that reached her rank in the label's year(s), never Stray", () => {
+    expect(reachedFrom(42000, [c(2026, "R1", 45000), c(2026, "R3", 50000)], "reached-latest", w)).toEqual({ year: 2026, round: "R1" });
+    expect(reachedFrom(42000, [c(2026, "R1", 30000), c(2026, "R3", 43000), c(2026, "stray", 60000)], "reached-latest", w)).toEqual({ year: 2026, round: "R3" });
+    // Both past years: R1 only when R1 reached in both; else the year where only a later round did.
+    expect(reachedFrom(42000, [c(2024, "R1", 43000), c(2025, "R1", 44000)], "reached-both", w)).toEqual({ year: 2024, round: "R1" });
+    expect(reachedFrom(42000, [c(2024, "R1", 43000), c(2025, "R1", 40000), c(2025, "R2", 44000)], "reached-both", w)).toEqual({ year: 2025, round: "R2" });
+    expect(reachedFrom(42000, [c(2024, "R2", 43000), c(2025, "R1", 20000)], "reached-one", w)).toEqual({ year: 2024, round: "R2" });
+    expect(reachedFrom(42000, [c(2025, "R1", 20000)], "closed-before", w)).toBeNull();
   });
 });
 

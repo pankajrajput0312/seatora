@@ -14,7 +14,7 @@ import { hospitalInfo } from "@/features/decide/components/institute/institute-d
 import { bigClosing, cardMeta } from "@/features/decide/components/ranks/rank-cards";
 import { ResultCard, ResultCards } from "@/features/decide/components/result-card";
 import { StatHead, TermStatCells } from "@/features/decide/components/stat-cells";
-import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
+import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
@@ -22,7 +22,7 @@ import { chosenView } from "@/features/decide/server/view";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankRange } from "@/features/decide/lib/params";
 import { statKeys } from "@/features/decide/lib/stat-format";
-import { anyTermFilter, readTermFilters, splitByTerms, termChips, termValueLabel } from "@/features/decide/lib/term-filters";
+import { anyTermFilter, readTermFilters, splitByTerms, termChips, termsPass, termValueLabel, untypedOnly } from "@/features/decide/lib/term-filters";
 import { profileFromParams, profileQuotas, toURLSearchParams } from "@/features/decide/profile";
 import { courseFilter } from "@/features/decide/lib/course-filter";
 import { eligibleCategories, LATER_ROUNDS_NOTE } from "@/features/decide/lib/reach";
@@ -191,6 +191,9 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const at = inst ? lr.rows.findIndex((r) => r.college.slug === inst.slug) : -1;
   const hidden = !!inst && at < 0 && !!all?.rows.some((r) => r.college.slug === inst.slug);
   const unknown = all ? splitByTerms(all.rows, tp.filters, (r) => r.fees, (r) => r.hospital?.type?.value).unknown.length : 0;
+  // A college type picked: the rows it left out only because their type is not known.
+  const typeless = untypedOnly(tp.filters);
+  const untyped = all && typeless ? all.rows.filter((r) => termsPass(r.fees, r.hospital?.type?.value, typeless)).length : 0;
   const page = Math.min(Math.max(1, Math.ceil(lr.total / PAGE_SIZE)), f.page ?? (at >= 0 ? Math.floor(at / PAGE_SIZE) + 1 : 1));
   const rows = lr.rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   // Newest year first; rounds R1 → special stray within a year (the service's order).
@@ -269,7 +272,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
                   <span className="block text-xs">{courseName(r)}</span>
                   <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                     <span>{r.college.state ?? <Dash />}, <QuotaName quota={r.quota} /></span>
-                    {r.hospital?.type && <TypeBadge type={r.hospital.type} of={r.college.name} />}
+                    <TypeBadge type={r.hospital?.type} of={r.college.name} />
                   </span>
                   <Link href={L.allotments({ course: r.course.slug, inst: r.college.slug })} className={`${smallLink} text-xs text-sky`}>Allotments</Link>
                 </th>
@@ -333,9 +336,10 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         <Field label="Closing rank from"><input name="rmin" defaultValue={f.rmin ?? ""} aria-invalid={range.bad.includes(f.rmin ?? "") || undefined} aria-describedby={range.bad.length ? "range-note" : undefined} placeholder={exam === DEFAULT_EXAM ? "e.g. 40,000 or 40k" : `e.g. ${E.exampleRank}`} className={`${control} numeric`} /></Field>
         <Field label="Closing rank to"><input name="rmax" defaultValue={f.rmax ?? ""} aria-invalid={range.bad.includes(f.rmax ?? "") || undefined} aria-describedby={range.bad.length ? "range-note" : undefined} placeholder={exam === DEFAULT_EXAM ? "e.g. 60,000 or 0.6L" : "e.g. 5k"} className={`${control} numeric`} /></Field>
         <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: String(c.year) }))} /></Field>
-        {E.has.fees && <TermFilterControls f={tp.params} caps={profile} />}
+        <TermFilterControls f={tp.params} caps={profile} fees={E.has.fees} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />
+      <UntypedNote n={untyped} noun={untyped === 1 ? "option" : "options"} href={L.with("/decide/last-ranks", { ctype: null, page: null })} />
       {(range.swapped || range.bad.length > 0) && (
         <p id="range-note" role="status" className="text-sm text-sun">
           {range.bad.length > 0 && <>“{range.bad.join("”, “")}” isn&apos;t a rank (a whole number from 1, or 40k / 4.5L), so it was left out. </>}

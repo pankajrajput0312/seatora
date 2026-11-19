@@ -51,7 +51,7 @@ export const termCol = {
 /** A card's meta line: state, the type badge, beds (each left out when not known). `of`: the institute, naming the beds (i). */
 export const cardMeta = (r: { state: string | null; hospital?: RowHospital }, of: string) => [
   r.state,
-  r.hospital?.type && <TypeBadge type={r.hospital.type} of={of} />,
+  <TypeBadge key="type" type={r.hospital?.type} of={of} />,
   r.hospital?.beds && <Beds b={r.hospital.beds} inst={of} unit />,
 ];
 

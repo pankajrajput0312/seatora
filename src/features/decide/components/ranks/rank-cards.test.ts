@@ -31,5 +31,8 @@ it("meta skips what is not known; More filters opens when one of them is set", (
   expect(html).toContain(">Govt<");
   expect(html).toContain("1,538");
   expect(html).toContain('aria-label="About beds, MAMC"');
-  expect(renderToStaticMarkup(h("div", null, ...cardMeta({ state: null, hospital: null }, "X")))).toBe("<div></div>");
+  // No type in the data: said in words (never no badge, which read as Government); no state or beds: left out.
+  const none = renderToStaticMarkup(h("div", null, ...cardMeta({ state: null, hospital: null }, "X")));
+  expect(none).toContain(">Type not known<");
+  expect(none).not.toContain("beds");
 });

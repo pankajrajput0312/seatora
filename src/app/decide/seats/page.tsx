@@ -238,7 +238,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
               info={`Ticked: rows with seats in any ticked ${round} list.`}
             />
           )}
-          {E.has.fees && <TermFilterControls f={f} caps={profile} />}
+          <TermFilterControls f={f} caps={profile} fees={E.has.fees} />
           {E.categories.length > 1 && (
             <Field label="Seat category">
               <select name="scat" defaultValue={f.scat ?? ""} className={control}>
