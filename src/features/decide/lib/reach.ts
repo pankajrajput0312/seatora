@@ -165,6 +165,20 @@ export function reachedFrom(rank: number, cutoffs: ReachInput[], reach: Reach, w
 }
 
 /**
+ * Round 1's closing in the newest of a "reached" label's years where Round 1 reached her rank: "Your picture"'s margin.
+ * Round 1 only: a later round can close far deeper (INI-CET's Open Round), so it never sets a margin. Null when
+ * Round 1 never reached her rank in those years, or for any other label.
+ */
+export function r1Reached(grid: Partial<Record<number, Partial<Record<Round, { closing: number }>>>>, reach: Reach, latest: Latest, rank: number) {
+  const years = reach === "reached-latest" ? [latest.year] : reach === "reached-both" || reach === "reached-one" ? [...pastOf(latest)].reverse() : [];
+  for (const year of years) {
+    const c = grid[year]?.R1;
+    if (c && c.closing >= rank) return { year, closing: c.closing };
+  }
+  return null;
+}
+
+/**
  * History-only label for how a rank compares with past closing ranks. "Reached" means the rank was within the
  * closing rank of that round, R1 to R3 only (isStrayRound). "reached-latest": in any round of the latest year so far
  * (R1 up to its newest, latestText), as a past year counts every round. Never a chance or prediction.

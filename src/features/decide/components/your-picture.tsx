@@ -58,7 +58,7 @@ export function YourPicture({ pic, profile, E, latest, includeLatest = true, L, 
         {count(pic.later, <>Only in a later round{later.length ? ` (${later.join(" or ")})` : ""}</>, "text-sun")}
         {count(pic.counts["closed-before"], "Closed before your rank", "text-muted-foreground", closedHref)}
       </dl>
-      {(pic.cheapest || s) && (
+      {(pic.cheapest || s || pic.govtLater > 0) && (
         <dl className="mt-3 grid gap-3 border-t border-border pt-3 text-sm md:grid-cols-2">
           {pic.cheapest && fee && (
             <div className="min-w-0">
@@ -70,18 +70,23 @@ export function YourPicture({ pic, profile, E, latest, includeLatest = true, L, 
               </dd>
             </div>
           )}
-          {s && (
-            <div className="min-w-0">
-              <dt className="text-xs text-muted-foreground">Government with the most margin</dt>
+          <div className="min-w-0">
+            <dt className="text-xs text-muted-foreground">Government with the most margin in Round 1</dt>
+            {s ? (
               <dd>
-                Closed <span className="numeric font-semibold">{formatRank(s.at.closing)}</span> in {yearName(E.key, s.at.year)}{s.at.round && ` ${roundShort(s.at.round, E.key)}`} at{" "}
+                Closed <span className="numeric font-semibold">{formatRank(s.at.closing)}</span> in {yearName(E.key, s.at.year)} R1 at{" "}
                 <Link href={L.institute(s.row.college.slug)} className={`${smallLink} font-semibold`}>{s.row.college.name}</Link>
                 <span className="block text-xs text-muted-foreground">
                   {what(s.row, E)}; {s.at.closing > profile.rank ? <><span className="numeric">{formatRank(s.at.closing - profile.rank)}</span> ranks past yours</> : "at your rank"}
                 </span>
               </dd>
-            </div>
-          )}
+            ) : (
+              <dd>
+                None reached your rank in Round 1
+                {pic.govtLater > 0 && <span className="block text-xs text-muted-foreground"><span className="numeric">{formatRank(pic.govtLater)}</span> {pic.govtLater === 1 ? "government option reached it" : "government options reached it"} only in a later round</span>}
+              </dd>
+            )}
+          </div>
         </dl>
       )}
     </section>

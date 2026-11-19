@@ -31,7 +31,8 @@ const newTab = <span className="sr-only"> (opens in a new tab)</span>;
 
 /**
  * `chips`: the header row, left to right ("2026 · R1", "All India Quota", "Open"); empty ones are skipped.
- * `actions`: icon buttons at the header's right (wishlist, compare; 44px each).
+ * `actions`: icon buttons at the header's right (wishlist, compare; 44px each); with no chip to show, at the body's top
+ * right instead (stacked on phones), so a card never spends a row on two icons.
  * `stat`: the big number on the left, e.g. `{ label: "Rank", value: formatRank(1) }` (proportional figures).
  * `title` + `href`: the institute (an in-app link). `external`: its MCC profile, a small "MCC ↗" link beside the heading
  * (outside it, so the heading is named by the institute alone; one name on every card: "Open on MCC: <title>"), or the title
@@ -60,7 +61,9 @@ export function ResultCard({ chips, actions, stat, title, href, external, subtit
   const icon = <ExternalLink className="size-4" strokeWidth={2} aria-hidden />;
   // Inline vertical padding widens the link's hit area to 44px without moving the lines around it.
   const link = "py-3 hover:text-sky hover:underline";
-  const head = chips?.some(present) || actions;
+  // The header row is for chips; actions alone sit in the body (bodyActions).
+  const head = chips?.some(present);
+  const bodyActions = !!actions && !head;
   return (
     <article className={cn("flex min-w-0 flex-col rounded-xl border border-border bg-card", className)}>
       <div className="flex flex-row-reverse items-start gap-3 px-4 py-3">
@@ -107,6 +110,8 @@ export function ResultCard({ chips, actions, stat, title, href, external, subtit
             <span className="text-2xl leading-tight font-bold tracking-tight">{stat.value}</span>
           </div>
         )}
+        {/* After the title and number in reading order; order-first puts it rightmost (the row is reversed). */}
+        {bodyActions && <div className="order-first -mt-2 -mr-3 flex shrink-0 flex-col sm:flex-row">{actions}</div>}
       </div>
       {head && (
         // The row's height is its action buttons' (44px); chips alone keep the compact phone height.

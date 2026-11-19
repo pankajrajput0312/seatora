@@ -8,7 +8,7 @@ import { hospitalInfo, type HospitalInfo } from "./components/institute/institut
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
 import { searchMatcher } from "./lib/college-aliases";
 import { anyTermFilter, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
-import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, isStrayRound, LATEST_YEAR, PAST_YEARS, pastOf, reachedFrom, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Latest, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
+import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, isStrayRound, LATEST_YEAR, PAST_YEARS, pastOf, r1Reached, reachedFrom, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Latest, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { pairKey, profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
 import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "./server/queries";
@@ -619,19 +619,19 @@ const REACHED: Reach[] = ["reached-latest", "reached-both", "reached-one"];
 /**
  * "Your picture" (Options and Home): of the options `f` lists, the reached ones by the round that first reached her
  * rank (OptionRow.reachFrom: Round 1, or only a later one), `counts` as the reach chips; the cheapest reached one by
- * its fee a year (the college's own yearly figure: never the NBEMS ceiling or an amount at admission alone), and the government one (college type, as inferred)
- * with the deepest closing its label rests on (`at`: reachEvidence, R1 to R3 of the counted years). History only.
+ * its fee a year (the college's own yearly figure: never the NBEMS ceiling or an amount at admission alone), and the
+ * government one (college type, as inferred) with the most margin in Round 1 (`at`: lib/reach.ts r1Reached; never a
+ * later round's closing, which can be an outlier), else how many government ones reached it only later. History only.
  */
 export async function optionsPicture(profile: Profile, f: OptionFilters = {}, exam: ExamKey = DEFAULT_EXAM) {
   const [r, cat] = await Promise.all([listOptions(profile, { ...f, reach: REACHED, sort: undefined }, undefined, exam), getCatalog(exam)]);
   const latest = latestOf(cat.sources, exam);
-  const window = { latest, pastYears: pastOf(latest), includeLatest: f.includeProvisional ?? true };
   // A fee a year only: never the NBEMS ceiling, never an amount at admission whose later years differ or aren't stated.
   const fee = (x: OptionRow) => (x.fees.years[0]?.fee?.kind === "maximum" || feeBasis(x.fees) !== "yearly" ? null : feeValue.fee1(x.fees));
   const cheapest = r.rows.reduce<OptionRow | null>((a, x) => (fee(x) != null && (!a || fee(x)! < fee(a)!) ? x : a), null);
-  const govt = r.rows.flatMap((row) => {
-    if (!row.hospital?.type || typeCategory[row.hospital.type.value] !== "govt") return [];
-    const at = reachEvidence(Object.entries(row.grid).flatMap(([y, g]) => Object.entries(g).map(([round, c]) => ({ year: +y, round: round as Round, closing: c!.closing }))), row.reach, window);
+  const govt = r.rows.filter((row) => row.hospital?.type && typeCategory[row.hospital.type.value] === "govt");
+  const inR1 = govt.flatMap((row) => {
+    const at = row.reachFrom?.round === "R1" ? r1Reached(row.grid, row.reach, latest, profile.rank) : null;
     return at ? [{ row, at }] : [];
   });
   return {
@@ -639,7 +639,9 @@ export async function optionsPicture(profile: Profile, f: OptionFilters = {}, ex
     later: r.rows.filter((x) => x.reachFrom && x.reachFrom.round !== "R1").length,
     counts: r.counts,
     cheapest,
-    safest: govt.reduce<(typeof govt)[number] | null>((a, x) => (!a || x.at.closing > a.at.closing ? x : a), null),
+    // Round 1's margin only (a later round's closing can be an outlier); none: `govtLater` says how many reached later.
+    safest: inR1.reduce<(typeof inR1)[number] | null>((a, x) => (!a || x.at.closing > a.at.closing ? x : a), null),
+    govtLater: govt.filter((x) => x.reachFrom && x.reachFrom.round !== "R1").length,
   };
 }
 export type OptionsPicture = Awaited<ReturnType<typeof optionsPicture>>;

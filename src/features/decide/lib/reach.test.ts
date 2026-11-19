@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cutoff, Round, Source } from "../types";
-import { bestClosing, buildGrid, classifyReach, deepestByYear, deepestOf, deepestText, eligibleCategories, latestRound, latestText, reachedFrom, reachEvidence, reachLabel, reachWindow, resultsSpan, seatsBelow, seatsBelowNotes } from "./reach";
+import { bestClosing, buildGrid, classifyReach, deepestByYear, deepestOf, deepestText, eligibleCategories, latestRound, latestText, r1Reached, reachedFrom, reachEvidence, reachLabel, reachWindow, resultsSpan, seatsBelow, seatsBelowNotes } from "./reach";
 
 const c = (year: number, round: Round, closing: number, category: Cutoff["category"] = "Open"): Cutoff => ({
   college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY", year, round, quota: "All India", category,
@@ -207,5 +207,18 @@ describe("bestClosing (Last ranks' closing-rank filter)", () => {
     expect(bestClosing(grid, { min: 39_814, max: 48_662 })).toBe(47_000);
     expect(bestClosing(grid, { max: 35_000 })).toBe(30_000);
     expect(bestClosing(grid, {})).toBe(47_000);
+  });
+});
+
+describe("r1Reached: Your picture's margin, Round 1 only", () => {
+  const latest = { year: 2026, round: "R2" as const };
+  // R1 reached 5,000 in 2025 (6,000) and 2024 (5,500); 2025's R3 closed far deeper (40,000): never the margin.
+  const grid = { 2024: { R1: { closing: 5500 } }, 2025: { R1: { closing: 6000 }, R3: { closing: 40000 } }, 2026: { R1: { closing: 4000 }, R2: { closing: 7000 } } };
+  it("Round 1's closing in the newest of the label's years where it reached her rank, never a later round's", () => {
+    expect(r1Reached(grid, "reached-both", latest, 5000)).toEqual({ year: 2025, closing: 6000 });
+  });
+  it("none when only a later round reached her rank, or for a label that isn't reached", () => {
+    expect(r1Reached(grid, "reached-latest", latest, 5000)).toBeNull(); // 2026: R1 4,000, only R2 reached
+    expect(r1Reached(grid, "within-10", latest, 5000)).toBeNull();
   });
 });
