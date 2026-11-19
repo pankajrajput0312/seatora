@@ -27,7 +27,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { roundLabel, roundShort, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examGate, examInfo } from "@/features/exams/active";
-import { authorityOf, DEFAULT_EXAM, groupsOf, perGroup, roundNameIn, termsDocOf, yearName, type ExamKey } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, groupsOf, perGroup, rankListOf, rankListParam, roundNameIn, termsDocOf, yearName, type ExamKey } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 import { quotaIn, type Exam } from "@/features/exams/exam";
 import { PgOr } from "@/features/decide/components/round-name";
@@ -41,10 +41,13 @@ const colsOf = (E: Exam) => [
   { key: "quota", label: "Quota" },
   { key: "seat", label: "Seat category" },
   ...(E.categories.length > 1 ? [{ key: "cand", label: "Candidate category" }] : []),
-  { key: "option", label: "Choice no." },
+  // AIIMS (INI-CET) prints no choice number and no previous seat: no such columns.
+  ...(printsPrev(E.key) ? [{ key: "option", label: "Choice no." }] : []),
   { key: "status", label: "Status" },
-  { key: "prev", label: "Previous seat" },
+  ...(printsPrev(E.key) ? [{ key: "prev", label: "Previous seat" }] : []),
 ];
+/** Its results print a choice number and the seat held a round earlier (MCC's R2 / R3); AIIMS's print neither. */
+const printsPrev = (exam: ExamKey) => authorityOf(exam) === "MCC";
 
 /** The page's (i) beside its title: what a row is and what each part means (in the exam's words: MCC's, INI-CET's AIIMS). */
 const aboutOf = (exam: ExamKey) => (
@@ -54,9 +57,21 @@ const aboutOf = (exam: ExamKey) => (
     scan the allotments around it that year, Journey for that rank&apos;s seat in every round of the year, a course for its last
     ranks at that institute.<br /><br />
     Seat category is the seat&apos;s; candidate category the candidate&apos;s own, as the PDF prints it (an OBC, SC, ST or EWS
-    candidate often holds an Open seat). Status: allotted (R1 and stray rounds), fresh or upgraded (R2, R3). Choice no. and the
-    previous seat (the one held a round earlier, with the remark printed there) are in R2 and R3 results only, and those list
-    only new or upgraded allotments.<br /><br />
+    candidate often holds an Open seat).{" "}
+    {printsPrev(exam) ? (
+      <>
+        Status: allotted (R1 and stray rounds), fresh or upgraded (R2, R3). Choice no. and the
+        previous seat (the one held a round earlier, with the remark printed there) are in R2 and R3 results only, and those list
+        only new or upgraded allotments.
+      </>
+    ) : (
+      <>
+        Status: allotted (Round 1), fresh or upgraded (Round 2 and the Open Round: a candidate who kept the seat held is not
+        listed again). {authorityOf(exam)} prints no choice number and no previous seat. MDS ranks on its own list, so an MDS row says
+        &quot;MDS rank list&quot;: the same rank on the MD, MS, DM and MCh list is another candidate.
+      </>
+    )}
+    <br /><br />
     Fee, stipend, bond and leaving penalty are that seat&apos;s course and quota as published (<PgOr pg="DNB seats follow NBEMS; MD, MS and Diploma seats the college" other={termsDocOf(exam)} />);
     each (i) has the exact words and source. College type is inferred, not official; beds are self-reported by the hospital.
   </>
@@ -125,10 +140,15 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
     <TypeBadge key="type" type={a.hospital?.type} of={a.college.name} />,
     a.hospital?.beds && <Beds beds={a.hospital.beds} of={a.college.name} />,
   ];
+  // INI-CET: MDS ranks on a list of its own: its rows say so, and the scan reads that list (registry rankListParam).
+  const mdsRank = (a: AllotmentRow) => rankListOf(exam, a.degree) !== "";
   const rankLink = (a: AllotmentRow, className: string) => (
-    <Link href={L.rankScan(a.rank, a.year)} className={className} title="Scan ranks around this one">
-      {formatRank(a.rank)}<span className="sr-only">: scan the ranks around it in {yn(a.year)}</span>
-    </Link>
+    <>
+      <Link href={L.rankScan(a.rank, a.year, rankListParam(exam, a.degree))} className={className} title="Scan ranks around this one">
+        {formatRank(a.rank)}<span className="sr-only">: {mdsRank(a) ? `${a.degree} rank list, ` : ""}scan the ranks around it in {yn(a.year)}</span>
+      </Link>
+      {mdsRank(a) && <span aria-hidden className="block text-xs font-normal text-muted-foreground">{a.degree} rank list</span>}
+    </>
   );
   const courseLink = (a: AllotmentRow) => (
     <Link href={L.lastRanks(a.courseSlug, { inst: a.college.slug })} className="inline-flex min-h-6 items-center hover:text-sky hover:underline">{a.courseName}</Link>
@@ -200,9 +220,9 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
           <th scope="col" data-col="quota" className={th}>Quota</th>
           <th scope="col" data-col="seat" className={th}>Seat category</th>
           {E.categories.length > 1 && <th scope="col" data-col="cand" className={th}>Candidate category</th>}
-          <th scope="col" data-col="option" className={`${th} text-right`}>Choice no.</th>
+          {printsPrev(exam) && <th scope="col" data-col="option" className={`${th} text-right`}>Choice no.</th>}
           <th scope="col" data-col="status" className={th}>Status</th>
-          <th scope="col" data-col="prev" className={th}>Previous seat</th>
+          {printsPrev(exam) && <th scope="col" data-col="prev" className={th}>Previous seat</th>}
         </tr></thead>
         <tbody>
           {rows.map((a, i) => (
@@ -244,9 +264,9 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
               <td data-col="quota" className={short}><QuotaName quota={a.quota} /></td>
               <td data-col="seat" className={short}>{a.category}</td>
               {E.categories.length > 1 && <td data-col="cand" className={short}>{a.candidateCategory ?? <Dash />}</td>}
-              <td data-col="option" className={`${short} numeric text-right`}>{a.optionNo != null ? formatRank(a.optionNo) : <Dash />}</td>
+              {printsPrev(exam) && <td data-col="option" className={`${short} numeric text-right`}>{a.optionNo != null ? formatRank(a.optionNo) : <Dash />}</td>}
               <td data-col="status" className={short}>{statusLabel[a.status] ?? a.status}</td>
-              <td data-col="prev" className={`${td} min-w-48`}><PrevSeatCell prev={a.prev} L={L} /></td>
+              {printsPrev(exam) && <td data-col="prev" className={`${td} min-w-48`}><PrevSeatCell prev={a.prev} L={L} /></td>}
             </tr>
           ))}
         </tbody>

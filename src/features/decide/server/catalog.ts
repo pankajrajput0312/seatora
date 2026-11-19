@@ -165,12 +165,18 @@ const WORKING_NOTE = /;?\s*\b(?:I|we) (?:did not|could not|have not|didn't|could
 export const scrubNotes = <T,>(x: T): T => JSON.parse(JSON.stringify(x).replace(WORKING_NOTE, (m) => (m.startsWith(";") ? "." : "")));
 
 /**
- * A fee record's documents with a session-code year named as the exam names it (INI-CET's prospectus "20271" → "Jan
- * 2027"; display only: server/terms.ts and fees.tsx show a number year, the label already names the session). Every other
- * exam's records as they are.
+ * A fee record in the exam's words, display only: INI-CET's documents' session-code years named ("20271" → "Jan 2027";
+ * server/terms.ts and fees.tsx show a number year, the label already names the session) and its year notes' field name
+ * in words ("listed in other_fees" → "listed under Other fees"). Every other exam's records exactly as they are.
  */
-export const namedSessions = <R extends { sources: { year?: number | string | null }[] }>(exam: ExamKey, r: R): R =>
-  sessionExams.includes(exam) ? { ...r, sources: r.sources.map((x) => (typeof x.year === "number" ? { ...x, year: yearName(exam, x.year) } : x)) } : r;
+export const namedSessions = <R extends { sources: { year?: number | string | null }[]; fee_per_year?: ({ note?: string | null } | null)[] }>(exam: ExamKey, r: R): R =>
+  sessionExams.includes(exam)
+    ? {
+        ...r,
+        sources: r.sources.map((x) => (typeof x.year === "number" ? { ...x, year: yearName(exam, x.year) } : x)),
+        ...(r.fee_per_year && { fee_per_year: r.fee_per_year.map((f) => (f?.note ? { ...f, note: f.note.replace(/\bother_fees\b/g, "Other fees") } : f)) }),
+      }
+    : r;
 
 async function loadCatalog(exam: ExamKey, version: string): Promise<Catalog> {
   // NEET PG: the build's snapshot while no import has committed since (zero DB egress), else Postgres.

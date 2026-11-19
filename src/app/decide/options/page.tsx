@@ -180,8 +180,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // What the round's seat lists are, behind the (i) of the summary (round view) or of the link to that view.
   const listsTip = lists.length > 0 && (
     <>
-      From {by}&apos;s {round} lists:{" "}
-      {lists.map((l, i) => (
+      From {by}&apos;s {round} {sp ? "seat position" : "lists:"}{" "}
+      {!sp && lists.map((l, i) => (
         <Fragment key={l.key}>
           {i > 0 && ", "}
           {kindName(l.kind, exam).toLowerCase()}

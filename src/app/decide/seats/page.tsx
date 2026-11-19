@@ -188,7 +188,8 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
         <nav aria-label="Seats view" className="flex flex-wrap gap-2">
           <Link href={here({ view: null })} aria-current={matrix ? "true" : undefined} className={chip(matrix)}>Seat matrix</Link>
           <Link href={here({ view: "list", rounds: null, has: null })} aria-current={f.view === "list" ? "true" : undefined} className={chip(f.view === "list")}>One list</Link>
-          <Link href={here({ view: "compare", rounds: null, has: null })} aria-current={compare ? "true" : undefined} className={chip(compare)}>Compare the {round} lists</Link>
+          {/* INI-CET: one list a session, nothing to compare side by side. */}
+          {(!sp || compare) && <Link href={here({ view: "compare", rounds: null, has: null })} aria-current={compare ? "true" : undefined} className={chip(compare)}>Compare the {round} lists</Link>}
         </nav>
         {matrix && (
           <nav aria-label="Seat matrix rounds" className="flex flex-wrap gap-2 sm:border-l sm:border-border sm:pl-2">

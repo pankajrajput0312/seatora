@@ -175,6 +175,21 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   const E = useExamInfo();
   const latest = latestIn ?? latestRound(results);
   const cols = useMemo(() => matrixCols(groups, ranked, years, E.has, E.key), [groups, ranked, years, E.has, E.key]);
+  // INI-CET (one seat position a session): its seats column right after the category, before the terms.
+  const seatsFirst = kindName("clear", E.key) === "Seat position";
+  const groupHeads = groups.map((g) => (
+    <th key={g.key} colSpan={g.virtual ? 2 : 1} scope="colgroup" data-col={g.key} className={cn(th, "border-l border-border text-center")}>{g.label} seats</th>
+  ));
+  const seatCells = (r: MatrixRow) =>
+    groups.map((g) => (
+      <Fragment key={g.key}>
+        <td data-col={g.key} className={cn(num, "border-l border-border")}>
+          {g.clear && r.byList[g.clear.key] != null ? <span className="font-semibold text-leaf">{formatRank(r.byList[g.clear.key])}</span> : <Dash />}
+          <AddedBadges r={r} added={g.added} />
+        </td>
+        {g.virtual && <td data-col={g.key} className={num}>{r.byList[g.virtual.key] != null ? <span className="font-semibold text-sun">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>}
+      </Fragment>
+    ));
   const [hidden] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   const [open, setOpen] = useState<string | null>(null);
   const row = rows.find((r) => rowKey(r) === open) ?? null;
@@ -213,13 +228,13 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                   <th rowSpan={2} scope="col" data-col="course" className={cn(th, "min-w-40")}>Course</th>
                   <th rowSpan={2} scope="col" data-col="quota" className={th}>Quota</th>
                   <th rowSpan={2} scope="col" data-col="category" className={th}>Category</th>
+                  {/* INI-CET: the session's seat position first, so a phone sees it without scrolling past the terms. */}
+                  {seatsFirst && groupHeads}
                   {/* The course's terms right after the course (as on Options): in view without scrolling sideways. */}
                   {statKeys.map((k) => (
                     <th key={k} rowSpan={2} scope="col" data-col={k} className={cn(th, "text-right")} aria-sort={(sort === "fee" && k === "fee") || (sort === "bond" && k === "bond") ? "ascending" : undefined}>{statLabel[k]}</th>
                   ))}
-                  {groups.map((g) => (
-                    <th key={g.key} colSpan={g.virtual ? 2 : 1} scope="colgroup" data-col={g.key} className={cn(th, "border-l border-border text-center")}>{g.label} seats</th>
-                  ))}
+                  {!seatsFirst && groupHeads}
                   {E.has.beds && (
                     <th rowSpan={2} scope="col" data-col="beds" className={cn(th, "text-right")} title={SELF_REPORTED}>
                       Beds<span className="block font-normal">as reported</span>
@@ -277,16 +292,9 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                         {r.quota != null && isRestricted(E, r.quota) && <Badge tone="warning" className="mt-1">Restricted</Badge>}
                       </td>
                       <td data-col="category" className={cn(td, "whitespace-nowrap")}>{seatCategoryName(r.category)}</td>
+                      {seatsFirst && seatCells(r)}
                       <TermStatCells t={r.fees} variant="table" short of={`${r.college.name}, ${name}`} />
-                      {groups.map((g) => (
-                        <Fragment key={g.key}>
-                          <td data-col={g.key} className={cn(num, "border-l border-border")}>
-                            {g.clear && r.byList[g.clear.key] != null ? <span className="font-semibold text-leaf">{formatRank(r.byList[g.clear.key])}</span> : <Dash />}
-                            <AddedBadges r={r} added={g.added} />
-                          </td>
-                          {g.virtual && <td data-col={g.key} className={num}>{r.byList[g.virtual.key] != null ? <span className="font-semibold text-sun">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>}
-                        </Fragment>
-                      ))}
+                      {!seatsFirst && seatCells(r)}
                       {E.has.beds && (
                         <td data-col="beds" className={num}>
                           {r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} /> : <Dash />}

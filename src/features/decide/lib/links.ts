@@ -59,7 +59,8 @@ export function decideLinks(params: URLSearchParams | string = "") {
       to("/decide/last-ranks", { course, lcat: o.category, lquota: o.quota, inst: o.inst }, o.inst ? `#inst-${o.inst}` : ""),
     allotments: (o: { course?: string; inst?: string; year?: number; round?: string; quota?: string; category?: string; state?: string; from?: number; to?: number } = {}) =>
       to("/decide/allotments", { course: o.course, inst: o.inst, year: o.year, round: o.round, aq: o.quota, acat: o.category, state: o.state, from: o.from, to: o.to }),
-    rankScan: (rank: number, year?: number) => to("/decide/rank-scan", { scan: rank, year }),
+    /** `list`: INI-CET's rank list ("mds" or "main", registry rankListParam), so the scan reads the allotment's own list. */
+    rankScan: (rank: number, year?: number, list?: string) => to("/decide/rank-scan", { scan: rank, year, list }),
     /** One rank's seat in every round of a year (`air`: never the profile's `rank`). */
     rankJourney: (rank: number, year?: number) => to("/decide/rank-journey", { air: rank, year }),
     /** `all`: the view of every option with past allotments (view=all), whose counts the Overview shows. */

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ExternalLink, Globe } from "lucide-react";
@@ -44,7 +45,7 @@ import { checkAndCount, currentPlan } from "@/features/plans/usage";
 import { kindName } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { authorityOf, DEFAULT_EXAM, headYearIn, inExamWords, latestOf, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, headYearIn, inExamWords, latestOf, rankListParam, restrictedQuota, yearName } from "@/features/exams/registry";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { QuotaName } from "@/features/decide/components/round-name";
@@ -534,11 +535,19 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             </div>
             {round.map(({ list, rows }, i) => {
               const n = rows.reduce((a, r) => a + r.seats, 0);
+              // INI-CET: the open seats, and each restricted quota's (Sponsored, Foreign National…) said apart, never one total.
+              const restricted = E.quotaScoped ? [...Map.groupBy(rows.filter((r) => r.quota != null && restrictedQuota(exam, r.quota)), (r) => r.quota!)].map(([q, xs]) => [q, xs.reduce((a, r) => a + r.seats, 0)] as const) : [];
+              const open = n - restricted.reduce((a, [, m]) => a + m, 0);
               return (
                 <section key={list.key} aria-labelledby={`seats-${i}`} className="grid gap-3">
                   <h3 id={`seats-${i}`} className="flex flex-wrap items-center gap-x-2 text-base font-semibold">
                     {kindName(list.kind, exam)}
-                    {rows.length > 0 && <span className="numeric text-sm font-normal text-muted-foreground">{formatRank(n)} {n === 1 ? "seat" : "seats"} here</span>}
+                    {rows.length > 0 && (
+                      <span className="numeric text-sm font-normal text-muted-foreground">
+                        {formatRank(restricted.length ? open : n)} {(restricted.length ? open : n) === 1 ? "seat" : "seats"} here
+                        {restricted.map(([q, m]) => <Fragment key={q}>, +{formatRank(m)} {quotaIn(E, q)}</Fragment>)}
+                      </span>
+                    )}
                     <InfoTip label={kindName(list.kind, exam).toLowerCase()}><span className="first-letter:uppercase">{kindName(list.kind, exam)}: {kindNote(list.kind, exam)}</span></InfoTip>
                   </h3>
                   {rows.length > 0 ? (
@@ -581,7 +590,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     <li key={i} className="grid min-w-0">
                       <ResultCard
                         chips={[<span key="yr"><span className="numeric">{yn(a.year)}</span> · {roundIn(E, a.year, a.round)}</span>, a.quota, `${a.category} seat`, a.provisional && <Provisional key="p" when />]}
-                        stat={{ label: "Rank", value: <Link href={L.rankScan(a.rank, a.year)} className="numeric inline-flex min-h-11 items-center hover:text-sky hover:underline">{formatRank(a.rank)}<span className="sr-only">: scan ranks around it</span></Link> }}
+                        stat={{ label: "Rank", value: <Link href={L.rankScan(a.rank, a.year, rankListParam(exam, a.degree))} className="numeric inline-flex min-h-11 items-center hover:text-sky hover:underline">{formatRank(a.rank)}<span className="sr-only">: scan ranks around it</span></Link> }}
                         title={a.courseName}
                         href={L.lastRanks(a.courseSlug, { inst: slug })}
                         meta={[a.remark]}
@@ -603,7 +612,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       {allot.rows.map((a, i) => (
                         <tr key={i} className={tbl.row}>
                           <td className={`${tbl.num} ${stick} max-md:px-2`}>
-                            <Link href={L.rankScan(a.rank, a.year)} className="hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link>
+                            <Link href={L.rankScan(a.rank, a.year, rankListParam(exam, a.degree))} className="hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link>
                             <span className="block text-xs font-normal whitespace-nowrap md:hidden"><span className="numeric">{yn(a.year)}</span> {roundIn(E, a.year, a.round)} <Provisional when={a.provisional} /></span>
                           </td>
                           <td className={`${tbl.td} whitespace-nowrap max-md:hidden`}><span className="numeric">{yn(a.year)}</span> {roundIn(E, a.year, a.round)} <Provisional when={a.provisional} /></td>

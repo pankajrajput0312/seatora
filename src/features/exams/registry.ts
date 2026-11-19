@@ -139,5 +139,10 @@ export function rankListIn(exam: ExamKey, asked: string | null, herDegrees: stri
   if (asked === "main" || asked === own.toLowerCase()) return asked === "main" ? "" : own;
   return herDegrees.length > 0 && herDegrees.every((d) => d === own) ? own : "";
 }
+/** A seat's rank list as Rank scan / Rank journey's ?list= ("mds", "main"); undefined for an exam with one list. */
+export const rankListParam = (exam: ExamKey, degree: string) => {
+  const own = separateRankList[exam];
+  return own ? (degree === own ? own.toLowerCase() : "main") : undefined;
+};
 /** The degree an exam ranks on a list of its own (INI-CET: "MDS"), else undefined. */
 export const separateRankListOf = (exam: ExamKey) => separateRankList[exam];
