@@ -277,7 +277,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   <span className="text-muted-foreground">{yn(list.year)} {roundIn(E, list.year, list.round)} {list.kind}:</span>&nbsp;{n > 0 ? <span className={`numeric font-semibold ${list.kind === "virtual" ? "text-sun" : "text-leaf"}`}>{formatRank(n)}</span> : <span className="numeric text-muted-foreground">0 seats</span>}
                   <span className="sr-only"> seats: see Seats</span>
                 </Link>
-                <InfoTip label={listSeats(list)}>
+                <InfoTip label={listSeats(list, exam)}>
                   The {listTitle(list, exam)} list. {n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves." : "Every course, quota and category here.") : "The MCC list prints none here."} The lists overlap, so they are never added.
                 </InfoTip>
               </span>
@@ -539,7 +539,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     <InfoTip label={seatKindLabel[list.kind].toLowerCase()}><span className="first-letter:uppercase">{seatKindLabel[list.kind]}: {seatKindNote[list.kind]}</span></InfoTip>
                   </h3>
                   {rows.length > 0 ? (
-                    <CollegeSeatTable rows={rows} caption={`${listSeats(list)} at ${college.name} (MCC PDF), by course`} />
+                    <CollegeSeatTable rows={rows} caption={`${listSeats(list, exam)} at ${college.name} (MCC PDF), by course`} />
                   ) : (
                     <p className="text-sm text-muted-foreground">This list prints no seats here.</p>
                   )}
