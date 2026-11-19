@@ -516,29 +516,19 @@ export function bondPlain(t: ProgrammeTerms): string {
   return parts.join(" ");
 }
 
-/** A bond cell with no answer, as a card's flag says it (the cell's own word). */
-const BOND_WORDS: Record<string, string> = {
-  "None declared": "No bond declared",
-  "Doc not read": "Bond doc not read",
-  "Not clear": "Bond not clear",
-  "Law may apply": "No bond, state law may apply",
-  "None stated": "No bond stated",
-  "Not verified": "Bond not verified",
-  "—": "Bond not published",
-};
 const LEVELS: Level[] = ["good", "caution", "strong", "heavy"];
 
 /**
- * The bond and its penalties as one flag, for a card's summary line, from the cells' own values (never a new reading):
- * "Bond 2 yr · ₹50 L" (the years and what skipping them costs), "No bond", the bond cell's word when there is no answer
- * ("No bond declared", "No bond stated"…), then a leaving penalty that is a ₹ figure ("Leaving ≤ ₹1.06 Cr"). `level`:
- * the strongest colour of those cells. The cells (under Details) keep the words and sources.
+ * The bond and its penalties as one flag, for a card's summary line, from the cells' own values (never a new reading),
+ * in the cells' three states: "No bond", a stated bond ("Bond 2 yr · ₹50 L": the years and what skipping them costs;
+ * "Bond, years not stated"), or "Bond not known" (the cell's "Not known"; why is in its (i) under Details), then a
+ * leaving penalty that is a ₹ figure ("Leaving ≤ ₹1.06 Cr"). `level`: the strongest colour of those cells.
  */
 export function bondFlag(cells: StatCell[]): { text: string; level?: Level } {
   const at = (k: StatKey) => cells.find((c) => c.key === k)!;
   const [bond, inr, leaving] = [at("bond"), at("bondInr"), at("leaving")];
   const figure = (c: StatCell) => c.tone !== "muted" && c.short.includes("₹");
-  const head = bond.tone === "bond" ? (bond.short === "Yes" ? "Bond, years not stated" : `Bond ${bond.short.replace(/Y$/, " yr")}`) : (BOND_WORDS[bond.short] ?? bond.short);
+  const head = bond.tone === "bond" ? (bond.short === "Bond" ? bond.full : `Bond ${bond.short.replace(/Y$/, " yr")}`) : bond.short === NOT_KNOWN ? "Bond not known" : bond.short;
   const parts = [head, figure(inr) && inr.short, figure(leaving) && `Leaving ${leaving.short}`].filter(Boolean);
   const used = [bond, ...[inr, leaving].filter(figure)];
   const level = LEVELS.findLast((l) => used.some((c) => c.level === l));

@@ -17,7 +17,7 @@ import { fmtIST, nextChoiceFilling, nextDate, nextFilling, roundName, stepName, 
 import { StillCanDo } from "@/features/decide/components/still-can-do";
 import { roundStatus } from "@/features/decide/server/notices";
 import { readTermFilters, termValueLabel } from "@/features/decide/lib/term-filters";
-import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, STRAY_NOT_COUNTED } from "@/features/decide/lib/reach";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { dashboard, getMeta, listOptions, optionsPicture, type StripPoint } from "@/features/decide/service";
 import { YourPicture } from "@/features/decide/components/your-picture";
@@ -220,7 +220,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             },
             {
               label: "Within 10% in a past round",
-              info: "Options that closed just before your rank (within 10% of it) in a past round.",
+              info: `Options that closed just before your rank (within 10% of it) in a past round. ${STRAY_NOT_COUNTED}; see Last ranks for them.`,
               value: <span className="font-mono">{formatRank(r.counts["within-10"])}</span>,
               note: <Link href={L.options({ reach: "within-10" })} className={smallLink}>See them</Link>,
             },

@@ -554,12 +554,16 @@ describe("a card's summary: the bond flag and the three items (bondFlag, summary
     const raj = bond("MD", "Service bond: 1 + 3 years · ₹25 L–₹1.5 Cr by subject", 15000000, { status: "documented", years: "1 + 3", by_subject: { ANAESTHESIOLOGY: 5000000, PATHOLOGY: 2500000, GENERALSURGERY: 15000000 } });
     expect(bondFlag(list("MD/MS", [raj]))).toEqual({ text: "Bond 4 yr · ₹25 L–₹1.5 Cr", level: "heavy" });
   });
-  it("no answer: the bond cell's own word, never read as no bond; a leaving penalty figure after it", () => {
-    expect(bondFlag(list("MD/MS", [bond("MD", "Not declared by the college", null, { status: "not_declared", reason: "not_declared_no_document" })]))).toEqual({ text: "No bond declared" });
-    expect(bondFlag(list("MD/MS", [bond("MD", "Bond document on MCC not read: a scan; see the document", null, { status: "unknown", reason: "bond document not read", doc_url: "https://mcc.admissions.nic.in/x?Type=BM" })])).text).toBe("Bond doc not read");
-    expect(bondFlag(list("MD/MS", [])).text).toBe("Bond not published");
+  it("no answer: the cells' one word, \"Bond not known\" (never read as no bond, whatever the reason); a leaving penalty figure after it", () => {
+    expect(bondFlag(list("MD/MS", [bond("MD", "Not declared by the college", null, { status: "not_declared", reason: "not_declared_no_document" })]))).toEqual({ text: "Bond not known" });
+    expect(bondFlag(list("MD/MS", [bond("MD", "Bond document on MCC not read: a scan; see the document", null, { status: "unknown", reason: "bond document not read", doc_url: "https://mcc.admissions.nic.in/x?Type=BM" })])).text).toBe("Bond not known");
+    expect(bondFlag(list("MD/MS", [bond("MD", "No clear service bond: its MCC bond document is a blank form", null, { status: "unclear" })])).text).toBe("Bond not known");
+    expect(bondFlag(list("MD/MS", [])).text).toBe("Bond not known");
     const leave = penalty("MD", { items: [{ kind: "leaving_penalty", applies_to: "PG degree", inr: 3500000, when: "discontinues PG course", quote: null, source_url: MCC.url }] });
-    expect(bondFlag(list("MD/MS", [leave]))).toEqual({ text: "Bond not published · Leaving ₹35 L", level: "heavy" });
+    expect(bondFlag(list("MD/MS", [leave]))).toEqual({ text: "Bond not known · Leaving ₹35 L", level: "heavy" });
+  });
+  it("a stated bond whose years are not stated says so (the cell's own words)", () => {
+    expect(bondFlag(list("MD/MS", [bond("MD", "Service bond (years not stated) · ₹40 L", 4000000, { status: "documented", years: "service not stated" })])).text).toBe("Bond, years not stated · ₹40 L");
   });
   it("no bond: green, unless a leaving penalty is heavy", () => {
     const none = bond("DNB", "No bond (NBEMS rule for private DNB hospitals)", 0, { status: "no_bond_rule" }, NBEMS);
@@ -569,6 +573,6 @@ describe("a card's summary: the bond flag and the three items (bondFlag, summary
   });
   it("summaryText: each item as one string, a marker with its value", () => {
     const t = list("MD/MS", fees("MD", [rec("MD/MS", { fee_per_year: [fee(41000), fee(41000), fee(41000)], stipend_per_month: [{ amount: 136008, currency: "INR", kind: "stipend", src: 1 }, null, null] as never })]));
-    expect(summaryText(t)).toEqual({ fee: t[0].marker ? `${t[0].short} ${t[0].marker}` : t[0].short, bond: "Bond not published", stipend: t[1].short });
+    expect(summaryText(t)).toEqual({ fee: t[0].marker ? `${t[0].short} ${t[0].marker}` : t[0].short, bond: "Bond not known", stipend: t[1].short });
   });
 });
