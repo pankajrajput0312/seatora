@@ -39,7 +39,7 @@
      that import that file, so Decide (its own font, .app below) never downloads them. */
   --font-sans: "GeistSans", "GeistSans Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "GeistMono", ui-monospace, monospace;
-  --font-pixel: "GeistPixelSquare", "GeistMono", ui-monospace, monospace;
+  --font-pixel: "GeistPixelSquare", "GeistPixelSquare Fallback", ui-monospace, monospace;
 
   --radius-sm: 0.45rem;
   --radius-md: 0.6rem;
@@ -219,6 +219,18 @@
 @keyframes peek { 0%, 20%, 100% { transform: translateY(70%); } 35%, 85% { transform: translateY(0); } }
 @keyframes task-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes field-drift { to { background-position: 48px 24px; } }
+
+/* The pixel headline's fallback while Geist Pixel loads (src/app/site-fonts.ts): Arial or a metric twin at Geist Pixel's
+   width. Measured on the headlines: Geist Pixel is 5.6% wider than Arial at one size (1.05 to 1.07 on most lines), so
+   size-adjust 106%; ascent and descent are Geist Pixel's (1.005 and 0.295 of its size) over that. */
+@font-face {
+  font-family: "GeistPixelSquare Fallback";
+  src: local("Arial"), local("ArialMT"), local("Arimo"), local("Liberation Sans"), local("Helvetica"), local("Roboto");
+  size-adjust: 106%;
+  ascent-override: 94.8%;
+  descent-override: 27.8%;
+  line-gap-override: 0%;
+}
 
 @utility marquee { animation: marquee 60s linear infinite; }
 @utility marquee-slow { animation: marquee 90s linear infinite; }
