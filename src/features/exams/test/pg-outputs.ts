@@ -28,6 +28,7 @@ export async function pgOutputs(): Promise<Record<string, unknown>> {
     out[`${k}.options`] = await svc.listOptions(p, {}, page(1, 100));
     out[`${k}.optionsAll`] = await svc.listOptions(p, { view: "all" }, page(2, 50));
     out[`${k}.lastRanks`] = await svc.lastRanks({ courses, category: p.category }, page(1, 100));
+    out[`${k}.lastRanksBest`] = await svc.lastRanks({ courses, category: p.category, sort: { best: true, dir: "desc" } }, page(1, 100));
     out[`${k}.allotments`] = await svc.listAllotments({ year: 2025, courses: courses.map((c) => c.slug) }, page(1, 100));
     out[`${k}.dashboard`] = await svc.dashboard(p);
     out[`${k}.institutes`] = await svc.listInstitutes(p, {}, page(1, 100));

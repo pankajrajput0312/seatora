@@ -162,6 +162,15 @@ describe("service on the test fixture", () => {
     expect(cell.category).toBe("Open");
     expect(cell.n).toBe(same.reduce((s, c) => s + c.n, 0));
     expect(r.columns.map((c) => c.year)).toEqual([...r.columns.map((c) => c.year)].sort());
+    // Best: each row's deepest closing in any year and round (from year `since`), deepest first or last.
+    const deepest = (x: (typeof r.rows)[number], since = 0) => Math.max(...Object.entries(x.grid).filter(([y]) => Number(y) >= since).flatMap(([, g]) => Object.values(g).map((c) => c!.closing)), -1);
+    for (const [dir, since] of [["desc", 0], ["asc", 0], ["desc", 2025]] as const) {
+      const b = await svc.lastRanks({ specialty: "ANAESTHESIOLOGY", degree: "MD", category: "Open", sort: { best: true, dir }, closing: { since } });
+      const xs = b.rows.map((x) => deepest(x, since)).filter((x) => x >= 0);
+      expect(xs.length).toBeGreaterThan(1);
+      expect(xs).toEqual([...xs].sort((p, q) => (dir === "asc" ? p - q : q - p)));
+      if (dir === "asc") expect(b.rows.slice(xs.length).every((x) => deepest(x, since) < 0)).toBe(true); // none in those years: last
+    }
   });
 
   it("rank scan keeps the window and round order", async () => {

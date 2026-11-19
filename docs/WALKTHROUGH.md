@@ -149,7 +149,7 @@ Clinical load says "Not collected yet". Use each college's Hospital facts tab fo
 ## Research screens
 
 - **Institutes:** every institute in the MCC results, searchable by name, state and course, with 2025 allotment counts. Open one for its college page.
-- **Last ranks:** pick a course, a seat category and a quota. You get the closing rank in every round of every year, with the allotments made in brackets.
+- **Last ranks:** pick a course, a seat category and a quota. Each seat shows its Best (the deepest closing in any year and round, with its year and round); Rounds by year (or Expand all) shows the closing rank in every round of every year, with the allotments made in brackets.
 - **Allotments:** every allotment in the MCC results, filterable by year, round, course and more. Each shows rank, quota, seat and candidate category, choice number, status (allotted, upgraded…) and the seat held a round earlier. Ranks only, never names.
 - **Rank scan:** allotments to ranks near yours (± 100, 250 or 500) in one year, every course and category. It shows what ranks like yours got then.
 - **Rank journey:** one rank's seat in every round of one year: the seat, MCC's status, the choice number, and the seat held a round earlier. Useful to see how upgrades played out.

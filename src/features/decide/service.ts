@@ -635,7 +635,8 @@ const namedPrev = (cat: Catalog, p: Allotment["prev"]) => p && { ...p, ...seatNa
 export type LastRanksFilters = {
   /** `categories`: closings on any of these seat categories (another exam's default: the ones she can take); else `category`'s. */
   degree?: string; specialty?: string; courses?: { degree: string; specialty: string }[]; category?: string; categories?: string[]; quota?: string; quotas?: string[]; search?: string;
-  years?: number[]; sort?: { year: number; round: Round; dir: "asc" | "desc" }; terms?: TermFilters;
+  /** One year/round column, or `best`: each row's deepest closing (bestClosing: in the closing range, from year `since`). */
+  years?: number[]; sort?: { year: number; round: Round; dir: "asc" | "desc" } | { best: true; dir: "asc" | "desc" }; terms?: TermFilters;
   /** Only options with some round (from year `since`) closing between `min` and `max` (either may be open). */
   closing?: { min?: number; max?: number; since?: number };
 };
@@ -643,7 +644,7 @@ export type LastRanksFilters = {
 /**
  * Every institute's closing rank by year and round for one course, on one seat category (all when omitted); bracketed
  * n counts allotments in every category. `years` keeps only those years (in SQL, so totals and every field agree).
- * `rows` holds options with a closing on that category (sorted by name, or by one year/round column); `empty` counts
+ * `rows` holds options with a closing on that category (sorted by name, by one year/round column or by best); `empty` counts
  * the rest; `columns` lists the years and rounds that have data.
  */
 export async function lastRanks(f: LastRanksFilters, pg?: PageQuery, exam: ExamKey = DEFAULT_EXAM) {
@@ -675,7 +676,10 @@ export async function lastRanks(f: LastRanksFilters, pg?: PageQuery, exam: ExamK
   if (ranged) rows = rows.filter((r) => best(r) >= 0);
   const s = f.sort;
   if (s) {
-    const v = (x: OptionRow) => x.grid[s.year]?.[s.round]?.closing ?? (s.dir === "asc" ? Infinity : -1);
+    const v = (x: OptionRow) => {
+      const c = "best" in s ? best(x) : (x.grid[s.year]?.[s.round]?.closing ?? -1);
+      return c < 0 && s.dir === "asc" ? Infinity : c;
+    };
     rows = rows.sort((a, b) => (s.dir === "asc" ? v(a) - v(b) : v(b) - v(a)));
   } else if (ranged) rows = rows.sort((a, b) => best(b) - best(a));
   else rows = rows.sort((a, b) => a.college.name.localeCompare(b.college.name));
