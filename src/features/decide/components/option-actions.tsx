@@ -198,7 +198,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
               {/* A deepest closing from a later round: Round 1's own beside it. */}
               {c && c.d.round !== "R1" && <span className="block leading-normal tracking-normal"><R1Line r1={r1Of(r, c.year)} /></span>}
               <span className="mt-1 block max-w-28 text-xs leading-normal font-normal tracking-normal">
-                <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} from={r.reachFrom} />
+                <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} from={r.reachFrom} seats={r} />
               </span>
             </>
           ),
@@ -404,7 +404,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
               <td className={sessionCols ? "px-3 py-3 text-right" : notPhone}><ClosingCell d={r.latest} year={latest.year} r1={r1Of(r, latest.year)} /></td>
               {sessionCols && <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>}
               <td className="px-2 py-3">
-                <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} from={r.reachFrom} />
+                <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} from={r.reachFrom} seats={r} />
                 <SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} />
                 {r.similar && <span className="mt-1 block max-w-xs"><SimilarNote r={r} /></span>}
                 {r.capNote && <span className="mt-1 block max-w-xs"><CapNote r={r} /></span>}

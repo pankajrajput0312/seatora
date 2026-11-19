@@ -119,7 +119,7 @@ export default async function SuggestPage({ searchParams }: { searchParams: Prom
         title={TITLE}
         about={
           <>
-            Your options in one order, from the labels Options gives them ({counted}; {STRAY_NOT_COUNTED.charAt(0).toLowerCase() + STRAY_NOT_COUNTED.slice(1)}) and nothing else: no new reading of the data, no chance.{" "}
+            Your options in one order, from the reach Options gives them ({counted}; {STRAY_NOT_COUNTED.charAt(0).toLowerCase() + STRAY_NOT_COUNTED.slice(1)}) and nothing else: no new reading of the data, no chance.{" "}
             {buckets.map((b) => <Fragment key={b}><b>{bucketName[b]}</b>: {BUCKET_RULES[b]}. </Fragment>)}
             The order: your course order first (Edit, Your order: equal courses share a place), then within each course Dream, Target, Safe, because {by} goes down your list and a seat higher in it is tried first, so a Dream above a Safe seat costs nothing;
             then{f.govt ? " government colleges first, then" : ""} the seats whose capped figures are published, then the most sought seat first (the lowest Round 1 closing in its newest year with one, as a later round can close far deeper; else the closing its reason gives), a never-allotted seat after the ones with closings of their own.

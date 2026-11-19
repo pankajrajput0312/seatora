@@ -98,9 +98,9 @@ describe("another exam's Options, answer first: tightest reached first, and Your
     expect(r.rows.map((x) => [x.college.key, x.reach])).toEqual([[A, "reached-latest"], [B, "reached-latest"]]);
   });
 
-  it("Your picture: reached in Round 1 vs only in a later round, from each row's first reaching round", async () => {
+  it("Your picture: the reach chips' own buckets (they add up to her options)", async () => {
     const p = await svc.optionsPicture(medical, { view: "all" }, "neet-ss");
-    expect([p.r1, p.later, p.counts["closed-before"]]).toEqual([1, 1, 0]);
+    expect([p.counts["reached-latest"], p.counts["closed-before"]]).toEqual([2, 0]);
     expect([p.cheapest, p.safest]).toEqual([null, null]); // no fee records, no college types in this catalog
   });
 });

@@ -146,7 +146,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <HeldSeat profile={profile} exam={exam} L={L} where="home" />
       <HeldStrip />
       <ResidentsPromo L={L} />
-      {reached > 0 && <YourPicture pic={pic} profile={profile} E={E} latest={latest} L={L} scope={list ? ` with seats in ${lists}` : ""} closedHref={L.options({ reach: "closed-before", closed: true })} />}
+      {reached > 0 && <YourPicture pic={pic} profile={profile} E={E} latest={latest} L={L} scope={list ? ` with seats in ${lists}` : ""} href={(x) => L.options({ reach: x, closed: x === "closed-before" || undefined })} />}
       {/* Desktop: the box above holds the only two buttons (the Season Pass, Search residents) and the tools follow; Options
           is a tool there and its numbers are below, so this card is for phones (and always when nothing is left to show). */}
       <section aria-labelledby="next-step-h" className={`rounded-xl border border-border bg-card p-4 sm:p-5 ${total ? "md:hidden" : ""}`}>
@@ -196,8 +196,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <h2 id="numbers-h" className="text-h2 font-bold">{list ? `Your courses in ${lists}` : "Your options"}</h2>
           <InfoTip label={list ? `your courses in ${lists}` : "your options"}>
             {list
-              ? `Options with seats in ${sp ? lists : `${by}'s ${yearName(exam, list.year)} ${roundWords} lists`}, in your courses, quotas and ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`
-              : `Every option in your profile with past allotments, on ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`}
+              ? `Options with seats in ${sp ? lists : `${by}'s ${yearName(exam, list.year)} ${roundWords} lists`}, in your courses, quotas and ${seats} seats, with their reach from closing ranks in ${counted}. Each number opens them on Options.`
+              : `Every option in your profile with past allotments, on ${seats} seats, with their reach from closing ranks in ${counted}. Each number opens them on Options.`}
           </InfoTip>
         </div>
         {total > 0 && capNote}
@@ -218,7 +218,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 },
             {
               label: "Reached your rank in a past round",
-              info: `Options whose closing rank reached yours in at least one of R1 to R3 of ${counted}. Stray rounds don't count here: an option reached only there is labelled "${reachLabel("stray-only", latest, PAST_YEARS)}".`,
+              info: `Options whose closing rank reached yours in at least one of R1 to R3 of ${counted}. Stray rounds don't count here: an option reached only there shows "${reachLabel("stray-only", latest, PAST_YEARS)}".`,
               value: <span className="font-mono">{formatRank(reached)}</span>,
               note: (
                 <span className="inline-flex flex-wrap items-center gap-x-1.5">
@@ -248,11 +248,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         {total ? (
           <ChartCard
             source={labelSources}
-            title={list ? `Options in ${lists}, by label` : "Options by label"}
-            subtitle={`${list ? `The ${formatRank(total)} options with seats in ${lists}` : "Your options"}, by closing ranks in ${counted} only; older years are not counted. Select a label to see those options.`}
+            title={list ? `Options in ${lists}, by reach` : "Options by reach"}
+            subtitle={`${list ? `The ${formatRank(total)} options with seats in ${lists}` : "Your options"}, by closing ranks in ${counted} only; older years are not counted. Select a reach to see those options.`}
             table={
               <table className="w-full text-sm">
-                <caption className="sr-only">Options by label</caption>
+                <caption className="sr-only">Options by reach</caption>
                 <tbody>{labels.map((x) => <tr key={x} className="border-b border-border"><th scope="row" className="py-1.5 text-left font-normal">{reachLabel(x, latest, PAST_YEARS)}</th><td className="numeric text-right">{formatRank(r.counts[x])}</td></tr>)}</tbody>
               </table>
             }

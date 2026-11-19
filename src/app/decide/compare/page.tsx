@@ -131,10 +131,10 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     // NEET MDS: no hospital beds (dental colleges): no row.
     ...(E.has.beds ? [{ label: "Beds (as reported)", cell: (r: OptionRow) => (r.hospital?.beds ? <Beds b={r.hospital.beds} inst={r.college.name} of={`${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} /> : <Dash />) }] : []),
     {
-      label: "Your reach",
+      label: "Reach",
       cell: (r) =>
         profile ? (
-          <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} from={r.reachFrom} />
+          <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} from={r.reachFrom} seats={r} />
         ) : (
           <Link href={L.with("/decide/compare", { editProfile: "1" })} className={`${smallLink} text-sky`}>Set your rank to see</Link>
         ),

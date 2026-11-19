@@ -139,7 +139,7 @@ const matrixCols = (groups: SeatGroup[], ranked: boolean, years: ClosingYear[], 
   ...(has.fees ? statKeys.map((k) => ({ key: k, label: statLabel[k] })) : []),
   ...groups.map((g) => ({ key: g.key, label: `${g.label} seats` })),
   ...(has.beds ? [{ key: "beds", label: "Beds (as reported)" }] : []),
-  ...(ranked ? [{ key: "chances", label: "Your chances" }] : []),
+  ...(ranked ? [{ key: "chances", label: "Reach" }] : []),
   ...years.map((y) => ({ key: `closing-${y.year}`, label: `Closing ranks ${yearName(exam, y.year)}` })),
 ];
 
@@ -240,7 +240,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                       Beds<span className="block font-normal">as reported</span>
                     </th>
                   )}
-                  {ranked && <th rowSpan={2} scope="col" data-col="chances" className={cn(th, "min-w-40")} aria-sort={sorted("reach", "ascending")}>Your chances</th>}
+                  {ranked && <th rowSpan={2} scope="col" data-col="chances" className={cn(th, "min-w-40")} aria-sort={sorted("reach", "ascending")}>Reach</th>}
                   {years.map((y) => (
                     <th key={y.year} colSpan={y.rounds.length} scope="colgroup" data-col={`closing-${y.year}`} className={cn(th, "border-l border-border text-center")}>Closing rank {yearName(E.key, y.year)}</th>
                   ))}
@@ -417,7 +417,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
 
               {ranked && (
                 <section aria-labelledby="row-chances" className="grid gap-2">
-                  <h3 id="row-chances" className="font-semibold">Your chances</h3>
+                  <h3 id="row-chances" className="font-semibold">Reach</h3>
                   {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} on={r.category} /> : <p className="text-sm">{r.noLabel}.</p>}
                   <p className="text-xs text-muted-foreground">Options&apos; label on this one seat category, counting {reachWindow(latest, pastOf(latest))} (every round). {HISTORY_CAPTION}</p>
                 </section>

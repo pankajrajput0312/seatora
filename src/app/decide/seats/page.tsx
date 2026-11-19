@@ -110,7 +110,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const caption = matrix
-    ? `Seat matrix, ${round}${allRounds ? " and every other round" : ""}: seats per list, terms${profile ? ", your chances" : ""} and closing ranks by year and round, ${sortLabels[sort].toLowerCase()}, page ${r.page}`
+    ? `Seat matrix, ${round}${allRounds ? " and every other round" : ""}: seats per list, terms${profile ? ", your reach" : ""} and closing ranks by year and round, ${sortLabels[sort].toLowerCase()}, page ${r.page}`
     : `${compare ? `Seats in every ${round} list side by side` : `Seats in the ${title} list`} (${authorityOf(exam)} PDF${compare ? "s" : ""}), ${sortLabels[sort].toLowerCase()}, page ${r.page}`;
   // Only the rounds each year has results for (a round with no MCC result has no column).
   const years: ClosingYear[] = meta.years.map((y) => ({ year: y.year, rounds: y.rounds }));
@@ -141,14 +141,14 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   const about = matrix && sp ? (
     <>
       One row per institute, course, quota and seat category in the {round} seat position (or, with every round, any {by} seat position or result in the data): its seats, the course&apos;s fee, stipend, bond
-      and leaving penalty{profile && ", your chances on that seat category"} and its closing rank in every round, with the allotments {by} made there in brackets. Select a row, or its Details button,
+      and leaving penalty{profile && ", your reach on that seat category"} and its closing rank in every round, with the allotments {by} made there in brackets. Select a row, or its Details button,
       for every number and its source.
     </>
   ) : matrix ? (
     <>
       One row per institute, course, quota and seat category {allRounds ? `with seats in any ${by} seat list in the data, or allotted in any ${by} result` : `with seats in the ${round} lists`}: its {strong("clear")} and{" "}
       {strong("virtual")} vacancy seats per round, a {strong("+N new")} badge when the newly added list prints seats for it (most are also in the clear vacancy list, so they are
-      not extra seats), the course&apos;s fee, stipend, bond and leaving penalty{profile && ", your chances on that seat category"} and its closing rank in every round, with the
+      not extra seats), the course&apos;s fee, stipend, bond and leaving penalty{profile && ", your reach on that seat category"} and its closing rank in every round, with the
       allotments {by} made there in brackets. The lists overlap, so their seats are never added together. The list picked above sets the round and the list &quot;Most seats
       first&quot; sorts by. Select a row, or its Details button, for every number and its source.
     </>
@@ -166,7 +166,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
     <>
       Closing ranks are {by}&apos;s, on the row&apos;s own quota and seat category, as rank (allotments made in that round, not seats); &quot;—&quot; means no allotment there in that
       round, or no {by} result for it in the data.
-      {profile && <> Your chances is Options&apos; label on that one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round); &quot;Never allotted before&quot; when {by} never allotted the course and quota; no label on a row whose PDF prints no quota.</>}
+      {profile && <> Reach is Options&apos; reach on that one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round); &quot;Never allotted before&quot; when {by} never allotted the course and quota; no label on a row whose PDF prints no quota.</>}
       {" "}A card&apos;s deepest closing is the deepest of every round of {reachWindow(latest, PAST_YEARS)}, Stray included, with its year and round (as Options and Compare).
     </>
   ) : (
@@ -174,7 +174,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
       Closing ranks are {by}&apos;s, on the row&apos;s own quota and seat category: the deepest of every round of {reachWindow(latest, PAST_YEARS)}, Stray included, in the row,
       every round behind &quot;Every round&quot;.
       {profile && (
-        <> Reach is Options&apos; label on that one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round). Options labels an option on all your seat categories together, and notes when a list&apos;s seats there are all on a seat category with another label: the label these rows show.</>
+        <> Reach is Options&apos; reach on that one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round). Options gives an option one reach on all your seat categories together, and notes when a list&apos;s seats there are all on a seat category with another label: the label these rows show.</>
       )}
     </>
   );
@@ -260,7 +260,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
           )}
           <Field label="Sort">
             <select name="sort" defaultValue={sort} className={control}>
-              {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && several ? `Most ${kindSeats(list, exam)} first` : s === "reach" && matrix ? "Your chances: beyond your rank first" : sortLabels[s]}</option>)}
+              {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && several ? `Most ${kindSeats(list, exam)} first` : s === "reach" && matrix ? "Reach: beyond your rank first" : sortLabels[s]}</option>)}
             </select>
           </Field>
         </Fragment>

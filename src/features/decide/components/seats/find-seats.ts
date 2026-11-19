@@ -397,7 +397,7 @@ export async function seatsCsv(v: SeatsView & { r: NonNullable<SeatsView["r"]> }
       ? closingCols.flatMap((p) => [`${label(p)} closing rank`, `${label(p)} allotted`])
       : [...PAST_ROUNDS.map((p) => `${label(p)} closing rank`), "Deepest closing (every round counted, Stray included)", "Deepest round", "Other closing ranks the reach label counts"]),
     "Fee year 1 ₹", "Stipend year 1 ₹/month", "Bond years", "Bond ₹ (highest)", "Leaving penalty ₹ (highest)", "Beds", "Beds note", "Type",
-    ...(profile ? [`${matrix ? "Your chances" : "Reach"} at AIR ${profile.rank} (history, not a prediction)`] : []),
+    ...(profile ? [`Reach at AIR ${profile.rank} (history, not a prediction)`] : []),
     ...kinds.flatMap((k) => [termLabel[kindOf[k]], `${termLabel[kindOf[k]]} source`]),
   ];
   const all = (x: SeatLine, p: { year: number; round: Round }) => x.closings.find((c) => c.year === p.year && c.round === p.round);

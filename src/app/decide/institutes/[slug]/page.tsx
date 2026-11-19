@@ -353,7 +353,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       </span>
                     </span>
                     <span className="flex items-center gap-4">
-                      {profile && <ReachBadge reach={o.reach} provisional={o.reachProvisional} latest={latest} otherGroup={o.otherGroup} from={o.reachFrom} />}
+                      {profile && <ReachBadge reach={o.reach} provisional={o.reachProvisional} latest={latest} otherGroup={o.otherGroup} from={o.reachFrom} seats={o} />}
                       <span className="text-right"><span className="block text-xs text-muted-foreground">{head} deepest</span><Closing d={o.byYear[HEAD]} year={HEAD} /></span>
                     </span>
                   </li>
@@ -446,7 +446,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     return (
                       <li key={r.id} className="grid min-w-0">
                         <ResultCard
-                          chips={[quotaIn(E, r.quota), profile && <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} from={r.reachFrom} />]}
+                          chips={[quotaIn(E, r.quota), profile && <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} from={r.reachFrom} seats={r} />]}
                           actions={<>{profile && <ChoiceStar item={toChoiceItem(r, latest)} />}<CompareToggle id={r.id} label={name} /></>}
                           stat={{ label: `${head} deepest`, value: d ? <span className="numeric">{formatRank(d.closing)}</span> : <Dash /> }}
                           title={courseName(r)}
@@ -487,7 +487,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                           <th scope="row" className={`${stick} min-w-48 px-3 py-3 text-left align-top font-medium`}>
                             <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link>
                             <span className="block text-xs font-normal text-muted-foreground"><QuotaName quota={r.quota} /></span>
-                            {profile && <span className="mt-1 block font-normal"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} from={r.reachFrom} /><SeatsBelowNote r={r} latest={latest} /></span>}
+                            {profile && <span className="mt-1 block font-normal"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} from={r.reachFrom} seats={r} /><SeatsBelowNote r={r} latest={latest} /></span>}
                             {round.length > 0 && <span className="mt-1 flex flex-wrap gap-x-3 text-xs font-normal">{seatLinks(r).length ? seatLinks(r) : <span className="text-muted-foreground">No {roundIn(E, round[0].list.year, round[0].list.round)} seats</span>}</span>}
                             <div className="flex flex-wrap items-center gap-x-3 text-xs font-normal">
                               <details className="w-fit"><summary className="cursor-pointer py-3 text-sky">Rounds by year</summary></details>

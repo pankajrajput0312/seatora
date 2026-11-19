@@ -22,8 +22,8 @@ export const SUGGEST_REACH: Reach[] = ["reached-latest", "reached-both", "reache
  * (never a stray round); "within 10%" is a closing of at least 90% of her rank.
  */
 export const BUCKET_RULES: Record<Bucket, string> = {
-  safe: "a Reached label whose first round was Round 1: Round 1 reached your rank in each year the label counts (the latest year, or both past years)",
-  target: "every other Reached label: reached in only one of the two past years, or only from Round 2 or later",
+  safe: "Reached, first in Round 1: Round 1 reached your rank in each year the reach counts (the latest year, or both past years)",
+  target: "every other Reached: reached in only one of the two past years, or only from Round 2 or later",
   dream: "Within 10% (closed before your rank, at no more than 10% before it), Reached only in a stray round, or Never allotted before where the same course at similar colleges (same type, same state) closed within 10% of your rank or past it",
 };
 

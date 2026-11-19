@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Cutoff, Round, Source } from "../types";
-import { bestClosing, buildGrid, classifyReach, deepestByYear, deepestOf, deepestText, eligibleCategories, latestRound, latestText, r1Reached, reachedFrom, reachEvidence, reachLabel, reachWindow, resultsSpan, seatsBelow, seatsBelowNotes } from "./reach";
+import { bestClosing, buildGrid, classifyReach, deepestByYear, deepestOf, deepestText, eligibleCategories, latestRound, latestText, r1Reached, reachedElsewhere, reachedFrom, reachEvidence, reachLabel, reachWindow, resultsSpan, seatsBelow, seatsBelowNotes, type SeatsBelow } from "./reach";
 
 const c = (year: number, round: Round, closing: number, category: Cutoff["category"] = "Open"): Cutoff => ({
   college: "X", degree: "MD", specialty: "ANAESTHESIOLOGY", year, round, quota: "All India", category,
@@ -220,5 +220,25 @@ describe("r1Reached: Your picture's margin, Round 1 only", () => {
   it("none when only a later round reached her rank, or for a label that isn't reached", () => {
     expect(r1Reached(grid, "reached-latest", latest, 5000)).toBeNull(); // 2026: R1 4,000, only R2 reached
     expect(r1Reached(grid, "within-10", latest, 5000)).toBeNull();
+  });
+});
+
+describe("reachedElsewhere: a reach on categories the newest lists have no seats of", () => {
+  const below: SeatsBelow[] = [
+    { kind: "clear", on: [{ category: "Open", reach: "closed-before", at: { year: 2025, round: "R2", closing: 50228 } }] },
+    { kind: "virtual", on: [{ category: "Open", reach: "closed-before", at: { year: 2025, round: "R2", closing: 50228 } }] },
+  ];
+  it("KGMU MD Microbiology, EWS 60,000: reached on EWS seats, every list with seats has only Open seats", () => {
+    const r = { reachBy: { EWS: "reached-latest" as const, Open: "closed-before" as const }, seatsBelow: below, seatsBy: { clear: 2, virtual: 2, new: null } };
+    expect(reachedElsewhere("reached-latest", r)).toEqual({ on: "on EWS seats", lists: "the current lists have only Open seats" });
+    // One list with seats: "the current list".
+    expect(reachedElsewhere("reached-latest", { ...r, seatsBelow: below.slice(0, 1), seatsBy: { clear: 2 } })?.lists).toBe("the current list has only Open seats");
+    // Another list has her own seats: the list is named, never "the current list".
+    expect(reachedElsewhere("reached-latest", { ...r, seatsBelow: below.slice(0, 1) })?.lists).toBe("the clear vacancy list has only Open seats");
+  });
+  it("nothing to say: not reached, no seats elsewhere, or no per-category reach", () => {
+    expect(reachedElsewhere("closed-before", { reachBy: { Open: "closed-before" }, seatsBelow: below })).toBeNull();
+    expect(reachedElsewhere("reached-latest", { reachBy: { EWS: "reached-latest" }, seatsBelow: [] })).toBeNull();
+    expect(reachedElsewhere("reached-latest", { seatsBelow: below })).toBeNull();
   });
 });

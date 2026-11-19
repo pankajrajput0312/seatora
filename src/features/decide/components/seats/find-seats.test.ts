@@ -212,7 +212,7 @@ describe.skipIf(!process.env.DATABASE_URL)("findSeats on the real import", { tim
     expect(csv.split("\r\n")[0]).toContain("Fee year 1 ₹,Stipend year 1 ₹/month,Bond years,Bond ₹ (highest),Leaving penalty ₹ (highest),Beds");
     expect(csv.split("\r\n")[0]).toContain("2026 R1 closing rank,2026 R1 allotted,2025 R1 closing rank,2025 R1 allotted");
     expect(csv.split("\r\n")[0]).toContain("2023 Special stray closing rank");
-    expect(csv.split("\r\n")[0]).toContain("Your chances at AIR 42284");
+    expect(csv.split("\r\n")[0]).toContain("Reach at AIR 42284");
   });
 
   it("a PDF with no quota column gets no label (not \"No allotment\"), on the page and in the CSV", async () => {

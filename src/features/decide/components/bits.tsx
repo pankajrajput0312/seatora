@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { shortName } from "../lib/format";
-import { pastOf, reachLabel, reachTone, type Deepest, type Latest, type Reach } from "../lib/reach";
+import { pastOf, reachedElsewhere, reachLabel, reachTone, type Deepest, type Latest, type Reach } from "../lib/reach";
 import type { OptionRow } from "../service";
 import type { Term } from "../types";
 import { InfoTip } from "./info-tip";
@@ -56,16 +56,19 @@ export function Provisional({ when }: { when: boolean | null | undefined }) {
  * `latest`: lib/reach.ts latestRound. `on`: the label is on that one seat category (Seats rows), so its no-data wording
  * names it.
  */
-export function ReachBadge({ reach, provisional, latest, includeLatest = true, on, otherGroup, from }: { reach: Reach; provisional?: boolean; latest: Latest; includeLatest?: boolean; on?: string; otherGroup?: boolean; from?: OptionRow["reachFrom"] }) {
+/** `seats`: the option's reach per category and the newest lists' seats (OptionRow), so a reach on categories those lists have no seats of says so (lib/reach.ts reachedElsewhere). */
+export function ReachBadge({ reach, provisional, latest, includeLatest = true, on, otherGroup, from, seats }: { reach: Reach; provisional?: boolean; latest: Latest; includeLatest?: boolean; on?: string; otherGroup?: boolean; from?: OptionRow["reachFrom"]; seats?: Parameters<typeof reachedElsewhere>[1] }) {
   // NEET SS: her rank isn't compared with another question group's seats (OptionRow.otherGroup).
   if (otherGroup) return <Badge tone="neutral" className="text-muted-foreground">Another question group</Badge>;
+  const elsewhere = seats && reachedElsewhere(reach, seats, latest.exam);
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <Badge tone={reachTone[reach]} className={reach === "closed-before" ? "text-muted-foreground" : undefined}>
+      <Badge tone={elsewhere ? "warning" : reachTone[reach]} className={reach === "closed-before" ? "text-muted-foreground" : undefined}>
         {reach === "reached-both" && <History className="mr-1 size-3" aria-hidden />}
-        {reachLabel(reach, latest, pastOf(latest), includeLatest, on)}
+        {reachLabel(reach, latest, pastOf(latest), includeLatest, on)}{elsewhere && ` ${elsewhere.on}`}
       </Badge>
       <Provisional when={provisional} />
+      {elsewhere && <span className="block w-full text-xs text-sun"><span className="sr-only">; </span>{elsewhere.lists[0].toUpperCase() + elsewhere.lists.slice(1)}</span>}
       {from && <ReachedFrom from={from} reach={reach} />}
     </span>
   );

@@ -168,7 +168,7 @@ export function reachedFrom(rank: number, cutoffs: ReachInput[], reach: Reach, w
 }
 
 /**
- * Round 1's closing in the newest of a "reached" label's years where Round 1 reached her rank: "Your picture"'s margin.
+ * Round 1's closing in the newest of a "reached" label's years where Round 1 reached her rank: Suggest's Safe.
  * Round 1 only: a later round can close far deeper (INI-CET's Open Round), so it never sets a margin. Null when
  * Round 1 never reached her rank in those years, or for any other label.
  */
@@ -202,7 +202,7 @@ export function classifyReach(rank: number, cutoffs: ReachInput[], { latest, pas
 }
 
 /** Where a reach label is explained (Options' (i), the colour key): stray rounds never count toward it (classifyReach). */
-export const STRAY_NOT_COUNTED = "Stray-round closings don't count toward “Reached” or “Within 10%” (an option reached only there is labelled “Reached only in stray rounds”)";
+export const STRAY_NOT_COUNTED = "Stray-round closings don't count toward “Reached” or “Within 10%” (an option reached only there shows “Reached only in stray rounds”)";
 
 /**
  * The label of an option MCC never allotted in any result in the data ("new" internally). Not "new": that word is only
@@ -255,6 +255,25 @@ export const seatsBelow = (reach: Reach, reachBy: Partial<Record<string, Reach>>
   );
 
 const kindWords: Record<SeatKind, string> = { clear: "clear vacancy", virtual: "virtual vacancy", new: "newly added" };
+
+/**
+ * A "reached" option whose newest seat lists have, of her categories, only seats on others (seatsBelow): the label
+ * then names the categories it was reached on and the lists say what they hold, so it never reads as a seat she can
+ * take: "Reached in 2026 R1 on EWS seats" + "the current list has only Open seats". Null otherwise.
+ */
+export function reachedElsewhere(reach: Reach, r: { reachBy?: Partial<Record<string, Reach>>; seatsBelow?: SeatsBelow[]; seatsBy?: Partial<Record<SeatKind, number | null>> }, exam?: ExamKey): { on: string; lists: string } | null {
+  if (!reach.startsWith("reached") || !r.seatsBelow?.length || !r.reachBy) return null;
+  const on = Object.entries(r.reachBy).filter(([, x]) => x === reach).map(([c]) => c);
+  const only = [...new Set(r.seatsBelow.flatMap((b) => b.on.map((x) => x.category)))].filter((c) => c !== "All");
+  if (!on.length || !only.length) return null;
+  // Every list with her seats here is one of these: "the current list(s)"; else the lists by name.
+  const withSeats = (Object.keys(r.seatsBy ?? {}) as SeatKind[]).filter((k) => (r.seatsBy![k] ?? 0) > 0);
+  const kinds = r.seatsBelow.map((b) => b.kind);
+  const all = withSeats.every((k) => kinds.includes(k));
+  const named = kinds.map((k) => (kindName(k, exam) === "Seat position" ? "seat position" : kindWords[k]));
+  const lists = all ? (withSeats.length > 1 ? "the current lists have" : "the current list has") : `the ${named.length > 1 ? `${named.slice(0, -1).join(", ")} and ${named.at(-1)} lists have` : `${named[0]} list has`}`;
+  return { on: `on ${on.join(" or ")} seats`, lists: `${lists} only ${only.join(" and ")} seats` };
+}
 const atVerdict: Partial<Record<Reach, string>> = {
   "reached-latest": "reached your rank",
   "reached-both": "reached your rank",

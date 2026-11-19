@@ -65,7 +65,7 @@ const filtersSchema = z.object({
   page: pageValue.default(1),
 });
 const sortLabels = (last: string): Record<OptionSort, string> => ({
-  label: "Label (reached first)",
+  label: "Reach (reached first)",
   deep: `${last} closing: deepest first`,
   tight: `${last} closing: tightest first`,
   fee: "Fee, year 1: lowest first",
@@ -139,16 +139,18 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const labelled = reachOrder.reduce((s, x) => s + r.counts[x], 0);
   const reached = r.counts["reached-latest"] + r.counts["reached-both"] + r.counts["reached-one"];
   const headYear = headYearIn(exam, meta.sources);
-  // None reached: the option that closed deepest in the head year (any round), so the verdict has a number.
-  // An exam with sessions (INI-CET): the label counts every session of its years (Jul 2025, Jan 2026 and Jul 2026), so
-  // the deepest is across all of them, its session named; every other exam's as before (the head year's).
+  // None reached: the option that closed deepest, so the verdict has a number: in the latest year (R1 up to its newest
+  // round), never an older year's while the latest has one; none there, the head year's (any round). An exam with
+  // sessions (INI-CET): the reach counts every session of its years (Jul 2025, Jan 2026 and Jul 2026), so the deepest
+  // is across all of them, its session named.
   const sessions = sessionExams.includes(exam);
   const none = labelled > 0 && reached === 0;
-  const deepestRows = none ? (await listOptions(profile, { ...filters, reach: undefined, showClosed: true, sort: "deep" }, { page: 1, pageSize: sessions ? labelled : 1 }, exam)).rows : [];
-  const across = sessions ? deepestOf(deepestRows.flatMap((r) => examYears(exam).flatMap((y) => (r.byYear[y] ? [{ r, y, ...r.byYear[y]! }] : [])))) : null;
+  const deepestRows = none ? (await listOptions(profile, { ...filters, reach: undefined, showClosed: true, sort: "deep" }, { page: 1, pageSize: labelled }, exam)).rows : [];
+  const at = (r: (typeof deepestRows)[number], y: number) => (sessions ? r.byYear[y] : !f.prov || !latest.provisional ? r.latest : null);
+  const across = deepestOf(deepestRows.flatMap((r) => (sessions ? examYears(exam) : [latest.year]).flatMap((y) => { const d = at(r, y); return d ? [{ r, y, ...d }] : []; })));
   const deepest = across ? across.r : deepestRows[0];
   const deepestYear = across ? across.y : headYear;
-  const deepestAt = deepest?.byYear[deepestYear];
+  const deepestAt = across ?? deepest?.byYear[deepestYear];
   // Which of her courses reached her rank (r.courses), linked to each on Options; none of hers: the nearest that did.
   const courseHit = (key: string, n: number): CourseHit => ({ key, name: pairLabel(key), n, href: L.with("/decide/options", { c: key, page: null, reach: null, q: null }) });
   const hit = Object.entries(r.courses).flatMap(([key, c]) => (reachedOf(c) ? [courseHit(key, reachedOf(c))] : [])).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
@@ -279,7 +281,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         title="Options"
         about={
           <>
-            Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats,
+            Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, each with its reach: how your rank compares with the closing ranks of {counted} on {seats} seats,
             the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${E.quotas.map((q) => quotaIn(E, q)).join(", ")})`}. Within 10%: in a past round the closing rank was at
             least 90% of yours ({`${E.rankWord} `}<span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or later) but before your rank.
             {" "}{STRAY_NOT_COUNTED}; <Link href={L.to("/decide/last-ranks")} className="text-sky underline">see Last ranks for them</Link>.
@@ -287,10 +289,10 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           </>
         }
       >
-        Labelled by your rank against past closing ranks.
+        Reach: your rank against past closing ranks.
       </PageHead>
       {reached > 0 && (
-        <YourPicture pic={pic} profile={profile} E={E} latest={latest} includeLatest={!f.prov} L={L} scope={roundView && r.seats ? ` with ${round} seats` : ""} closedHref={here({ reach: "closed-before", closed: "1" })} />
+        <YourPicture pic={pic} profile={profile} E={E} latest={latest} includeLatest={!f.prov} L={L} scope={roundView && r.seats ? ` with ${round} seats` : ""} href={(x) => here({ reach: x, closed: x === "closed-before" ? "1" : null })} />
       )}
       {/* Which of her courses reach her rank (none of them: in What you can still do, below), and her list in a suggested order. */}
       {reached > 0 && (
@@ -321,8 +323,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
                 </>
               )}
               {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}. {listsTip}{" "}
-              Sorted by label (reached, then within 10%, then no allotment in your categories, then closed before your rank, never allotted before last in a group of its own), then {round} {sp ? "seats" : "clear vacancy seats"},{" "}
-              {exam === DEFAULT_EXAM ? <>then the deepest {HEAD} closing.</> : <>then, within a reached label, the tightest closing first (the most sought seat that still reached your rank); within any other label, the deepest {HEAD} closing.</>}
+              Sorted by reach (reached, then within 10%, then no allotment in your categories, then closed before your rank, never allotted before last in a group of its own), then {round} {sp ? "seats" : "clear vacancy seats"},{" "}
+              {exam === DEFAULT_EXAM ? <>then the deepest {HEAD} closing.</> : <>then, within Reached, the tightest closing first (the most sought seat that still reached your rank); within any other reach, the deepest {HEAD} closing.</>}
               <span className="mt-2 flex flex-col items-start md:hidden">{viewLinks}</span>
             </InfoTip>
           </p>
@@ -337,7 +339,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <span className="font-semibold">None of these reached {`${E.rankWord} `}{n(profile.rank)}: {n(0)} of {n(labelled)} options in a past round ({counted}).</span>
             {deepest && deepestAt && (
               <span>
-                {sessions ? "In those sessions" : `In ${HEAD}`} the deepest any closed was {n(deepestAt.closing)} ({sessions ? `${yearName(exam, deepestYear)} ` : ""}{roundShort(deepestAt.round, exam)}, {deepestAt.category} seat) at{" "}
+                {sessions ? "In those sessions" : `In ${yearName(exam, deepestYear)}`} the deepest any closed was {n(deepestAt.closing)} ({sessions ? `${yearName(exam, deepestYear)} ` : ""}{roundShort(deepestAt.round, exam)}, {deepestAt.category} seat) at{" "}
                 <Link href={L.institute(deepest.college.slug)} className={smallLink}>{deepest.college.name}</Link>, {deepest.course.degree} {deepest.course.name}
                 {deepestAt.closing < profile.rank && <>: {n(profile.rank - deepestAt.closing)} ranks before yours</>}.
               </span>
@@ -357,7 +359,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         <p className="flex flex-wrap items-center gap-x-1 text-sm">
           <Link href={otherView} className={`${smallLink} text-sky`}>Show the {round} view</Link>
           <InfoTip label={`the ${round} view`}>
-            Every option with {roundWords} seats in your courses, new ones included, closed ones shown, most clear vacancy seats first within a label. {listsTip}
+            Every option with {roundWords} seats in your courses, new ones included, closed ones shown, most clear vacancy seats first within a reach. {listsTip}
           </InfoTip>
         </p>
       )}
@@ -416,7 +418,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
                   <input type="checkbox" name="prov" value="0" defaultChecked={!!f.prov} className="size-5 accent-sky" />
                   Without {latestName} (provisional)
                 </label>
-                <InfoTip label={`${latestName} (provisional)`}>Leaves {by}&apos;s provisional {latestName} result out of the labels.</InfoTip>
+                <InfoTip label={`${latestName} (provisional)`}>Leaves {by}&apos;s provisional {latestName} result out of the reach.</InfoTip>
               </span>
             )}
           </Fragment>
@@ -510,9 +512,9 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           grouping={!f.sort || f.sort === "label" ? { counts: r.counts } : null}
           historyMore={
             <>
-              {`Closing = the highest ${E.rankName} allotted in that round on a seat of that category; here `}{seats} seats, the ones you can take. {latestText(latest)} is {latest.round === "R1" ? "that round alone" : "the deepest of those rounds"}. Labels
-              count every round of {yearName(exam, PAST_YEARS[0])} and {yearName(exam, PAST_YEARS[1])}{(!f.prov || latest.round !== "R1") && `, and ${latestText(latest, !f.prov)}`}; Rounds by year shows every round of every year (R2 and R3 included), older years
-              too, which the labels do not count; its bracketed numbers are allotments made that round in every category, not the seat matrix.
+              {`Closing = the highest ${E.rankName} allotted in that round on a seat of that category; here `}{seats} seats, the ones you can take. {latestText(latest)} is {latest.round === "R1" ? "that round alone" : "the deepest of those rounds"}. Reach
+              counts every round of {yearName(exam, PAST_YEARS[0])} and {yearName(exam, PAST_YEARS[1])}{(!f.prov || latest.round !== "R1") && `, and ${latestText(latest, !f.prov)}`}; Rounds by year shows every round of every year (R2 and R3 included), older years
+              too, which the reach does not count; its bracketed numbers are allotments made that round in every category, not the seat matrix.
             </>
           }
         />
@@ -542,7 +544,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       ) : (
         <EmptyState
           title="No options match"
-          description={iniElsewhere(f.q, exam) ? `${iniElsewhere(f.q, exam)}, not MCC's ${E.label} counselling, so it is not in MCC's data.` : `${f.q ? `Nothing here matches “${f.q}”. ` : ""}Clear the search, the label and the Filters sheet's page filters, or add courses, quotas or states in your profile (Edit beside your rank).${exam !== DEFAULT_EXAM && capped + r.unknownTerms > 0 ? ` ${formatRank(capped + r.unknownTerms)} are hidden by ${capWords} (above).` : ""}`}
+          description={iniElsewhere(f.q, exam) ? `${iniElsewhere(f.q, exam)}, not MCC's ${E.label} counselling, so it is not in MCC's data.` : `${f.q ? `Nothing here matches “${f.q}”. ` : ""}Clear the search, the reach and the Filters sheet's page filters, or add courses, quotas or states in your profile (Edit beside your rank).${exam !== DEFAULT_EXAM && capped + r.unknownTerms > 0 ? ` ${formatRank(capped + r.unknownTerms)} are hidden by ${capWords} (above).` : ""}`}
         >
           <span className="flex flex-wrap justify-center gap-x-6">
             <Link href={here({ q: null, reach: null, closed: "1", seats: roundView ? "all" : null, ...Object.fromEntries(termKeys.map((k) => [k, null])) })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Clear search and page filters</Link>

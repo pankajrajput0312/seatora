@@ -33,7 +33,7 @@ import { ViewToggle, type View } from "./view-toggle";
 import { ScrollTable } from "./scroll-table";
 
 /** `reach` null: no rank in the address (terms and hospital only; the stored label stays). */
-type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; fees: ProgrammeTerms; hospital: RowHospital; otherGroup?: boolean; latest: Deepest | null; byYear: Record<number, Deepest | null>; r1?: number | null; from?: OptionRow["reachFrom"] }>;
+type Live = Record<string, { reach: Reach | null; provisional: boolean; seats: SeatsBy; below: SeatsBelow[]; reachBy?: OptionRow["reachBy"]; fees: ProgrammeTerms; hospital: RowHospital; otherGroup?: boolean; latest: Deepest | null; byYear: Record<number, Deepest | null>; r1?: number | null; from?: OptionRow["reachFrom"] }>;
 
 // Memoised: a reorder re-renders every row, but each one's terms, type and beds (their (i) tips and source refs, the
 // bulk of a long list) only change when the live data does.
@@ -308,7 +308,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     </span>
   );
   const reachOf = (item: ChoiceItem, lr: Live[string] | undefined) =>
-    lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} latest={latest} otherGroup={lr.otherGroup} from={lr.from} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>;
+    lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} latest={latest} otherGroup={lr.otherGroup} from={lr.from} seats={{ reachBy: lr.reachBy, seatsBelow: lr.below, seatsBy: lr.seats }} /> : <span className="text-muted-foreground">{item.reachLabel || "No reach"} (when added)</span>;
   const typedBadge = <Badge tone="success"><Check className="mr-1 size-3" aria-hidden />Typed into {authorityOf(E.key)}</Badge>;
   const seatsOf = (item: ChoiceItem, lr: Live[string], l: SeatList) => (
     <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${quotaIn(E, item.quota)}`} />
@@ -377,7 +377,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
           <tr className={tbl.headRow}>
             <th scope="col" className={cn(th, "bg-card md:sticky md:left-0 md:z-[3]")}>Choice</th>
             <th scope="col" className={cn(th, "px-3! text-right")}>{latestText(latest)} closing</th>
-            <th scope="col" className={cn(th, "px-3!")}>Your reach</th>
+            <th scope="col" className={cn(th, "px-3!")}>Reach</th>
             {lists.length > 0 && <th scope="col" className={cn(th, "px-3! text-right")}>{round} seats</th>}
             {E.has.fees && statKeys.flatMap((k) => [
               <th key={k} scope="col" data-col={k} className={cn(th, "px-3! text-right")}>{statLabel[k]}</th>,
@@ -528,10 +528,10 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
         <>
           {view === "cards" ? cards : table}
           <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
-            {current && ranked ? (E.has.fees ? "Labels, seats and terms: from the current data and your rank." : "Labels and seats: from the current data and your rank.") : current && E.has.fees ? "Terms: from the current data. Labels marked (when added) are from when you added each option." : "Labels marked (when added) are from when you added each option."}
+            {current && ranked ? (E.has.fees ? "Reach, seats and terms: from the current data and your rank." : "Reach and seats: from the current data and your rank.") : current && E.has.fees ? "Terms: from the current data. Labels marked (when added) are from when you added each option." : "Labels marked (when added) are from when you added each option."}
             <InfoTip label={E.has.fees ? "labels, seats and terms" : "labels and seats"}>
               {current && ranked
-                ? `Reach labels use your current rank and category and previous years' closing ranks.${round ? ` ${round} seats: each choice's seats in the ${lists.map((l) => l.kind).join(", ")} lists, in its quota and your seat categories, "—" when a list has none; the lists overlap, so they are never added.` : ""}${E.has.fees ? " Fee, stipend, bond and leaving: each choice's course and quota, as published." : ""}`
+                ? `Reach uses your current rank and category and previous years' closing ranks.${round ? ` ${round} seats: each choice's seats in the ${lists.map((l) => l.kind).join(", ")} lists, in its quota and your seat categories, "—" when a list has none; the lists overlap, so they are never added.` : ""}${E.has.fees ? " Fee, stipend, bond and leaving: each choice's course and quota, as published." : ""}`
                 : `Set your rank to see labels and seats for your current profile.${current && E.has.fees ? " Fee, stipend, bond and leaving: each choice's course and quota, as published." : ""}`}
             </InfoTip>
           </p>
