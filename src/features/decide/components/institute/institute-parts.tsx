@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import type { SeatRow } from "../../server/seats";
 import { seatCategoryName } from "../../types";
 import { Dash, Provisional } from "../bits";
+import { NotDeclared } from "../fees";
 import { InfoTip } from "../info-tip";
 import { RegisterSources } from "../page-sources";
 import { fmtDay } from "../seats/seat-lists";
@@ -126,7 +127,7 @@ const has = (l: Line) => l.value != null && l.value !== "";
 const PER_VALUE: ValueMeta["flags"][number][] = ["self_reported", "old"];
 
 /**
- * Fact · as reported ("—" when not found) · period as printed · source, in row groups. `whole`: the record's block-level
+ * Fact · as reported ("Not published" when not found) · period as printed · source, in row groups. `whole`: the record's block-level
  * entry, the source of every value without one of its own: each such value shows its period and source; the block's
  * other flags are said once above the table, never pinned on a value they may not be about.
  */
@@ -168,7 +169,7 @@ function FactsTable({ caption, groups, whole }: { caption: string; groups: Group
                   <tr key={l.label} className={tbl.row}>
                     <th scope="row" className={cn(tbl.td, "text-left font-normal text-muted-foreground max-md:px-3")}>{l.label}</th>
                     <td className={cn(tbl.td, "text-right font-semibold [overflow-wrap:anywhere] max-md:px-3", typeof l.value === "string" && /^[\d,.]+[%+]?$/.test(l.value) && "numeric")}>
-                      {has(l) ? l.value : <Dash />}
+                      {has(l) ? l.value : <NotDeclared />}
                       {has(l) && l.note && <span className="block text-xs font-normal text-muted-foreground">{l.note}</span>}
                     </td>
                     <td className={cn(tbl.td, "text-xs text-muted-foreground max-md:hidden")}>{has(l) && m?.period}</td>
@@ -197,7 +198,7 @@ const DISCLOSURE: Record<ClinicalAt["disclosure"]["status"], string> = {
 /**
  * The Hospital facts card: hospital-wide facts grouped (capacity, workload, facilities, stipend), then each course's
  * department record (hers first), every value with its period, source, check date and flags; the NBEMS mandatory
- * disclosure check. Nothing is filled in: "—" when not found.
+ * disclosure check. Nothing is filled in: "Not published" when not found.
  */
 export function HospitalFacts({ f, name }: { f: ClinicalAt; name: string }) {
   const d = f.disclosure;
@@ -262,7 +263,7 @@ export function HospitalFacts({ f, name }: { f: ClinicalAt; name: string }) {
           {SELF_REPORTED}.
           <InfoTip label="hospital facts">
             Each figure is what the institution published (its website, NIRF data, NMC or NBEMS pages), with the period it covers, where Seatora read it and when.
-            &quot;—&quot; means Seatora did not find it, not zero.
+            &quot;Not published&quot;: Seatora found no document that gives it, never zero.
           </InfoTip>
         </p>
       </div>

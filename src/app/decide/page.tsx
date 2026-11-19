@@ -98,7 +98,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const labelSources = <DataSource used={[{ year: PAST_YEARS[0] }, { year: PAST_YEARS[1] }, { year: LATEST_YEAR }]} />;
   // Her fee / bond caps leave out options whose figure is not declared (in words only, or missing): say so, with the way back.
   const caps = [profile.maxFeeLakh != null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && termValueLabel.bondyrs(profile.maxBondYears)].flatMap((c) => (c ? [c[0].toLowerCase() + c.slice(1)] : [])).join(", ");
-  const leftOut = r.unknownTerms > 0 ? ` ${caps ? `Your caps (${caps})` : "Your fee, bond or type limits"} leave out ${formatRank(r.unknownTerms)} more without a published figure (in words only, or none published).` : "";
+  const leftOut = r.unknownTerms > 0 ? ` ${caps ? `Your caps (${caps})` : "Your fee, bond or type limits"} leave out ${formatRank(r.unknownTerms)} more without a published figure.` : "";
   // The next-step card names a round only from MCC's schedule: the choice filling open now, else the next one scheduled.
   const steps = rs && stepsNow(rs, new Date());
   const filling = steps && nextFilling(steps);

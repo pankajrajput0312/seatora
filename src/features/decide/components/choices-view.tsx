@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { CHOICE_LIST, choiceListTitle, cellWords, duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, wholeCourseRange, wholeCourseWords, type ChoiceItem } from "../lib/choices";
+import { CHOICE_LIST, choiceListTitle, duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, wholeCourseRange, wholeCourseWords, type ChoiceItem } from "../lib/choices";
 import { inrFull } from "../lib/stat-format";
 import { deepestOf, latestText, pastOf, reachWindow, seatsBelowNotes, type Deepest, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
 import { statCells, statKeys, statLabel } from "../lib/stat-format";
@@ -227,7 +227,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     const c = cardClosing(lr, latest.year, pastOf(latest), true);
     const deep = deepestOf(Object.entries(lr.byYear).flatMap(([y, d]) => (d ? [{ ...d, year: Number(y) }] : [])));
     const cells = E.has.fees ? statCells(lr.fees) : [];
-    return [c && closingWords(c.d, c.year), deep && closingWords(deep, deep.year), ...statKeys.map((k) => { const x = cells.find((x) => x.key === k); return x ? cellWords(x) : null; })];
+    return [c && closingWords(c.d, c.year), deep && closingWords(deep, deep.year), ...statKeys.map((k) => { const x = cells.find((x) => x.key === k); return x ? x.full : null; })];
   };
   const download = () => {
     const a = document.createElement("a");

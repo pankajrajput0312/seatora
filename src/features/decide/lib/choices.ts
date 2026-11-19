@@ -1,7 +1,7 @@
 // Pure choice-list logic (tested). Items are snapshots so a list renders without refetching.
 import { z } from "zod";
 import type { ProgrammeTerms } from "../server/terms";
-import { inrFull, statCells, statKeys, statLabel, type StatCell } from "./stat-format";
+import { inrFull, statCells, statKeys, statLabel } from "./stat-format";
 import { groupOf } from "@/features/exams/exam";
 
 export type ChoiceItem = {
@@ -79,9 +79,7 @@ export function duplicateList(state: ChoicesState, sourceId: string): ChoicesSta
 }
 
 /** One choice's fee, bond and penalties in words, for sharing: "Fee: ₹1.71 L/yr; Bond period: 1 year; Bond penalty: ₹10 L; Leaving penalty: None". What isn't in the data is left out. */
-/** A cell in words; a fee only "On college website ↗" gives its link instead (no arrow in a message or a file). */
-export const cellWords = (c: StatCell) => (c.href && c.full.endsWith("↗") ? `on the college website, ${c.href}` : c.full);
-export const termsWords = (t: ProgrammeTerms) => statCells(t).filter((c) => c.key !== "stipend" && !c.missing).map((c) => `${c.label}: ${cellWords(c)}`).join("; ");
+export const termsWords = (t: ProgrammeTerms) => statCells(t).filter((c) => c.key !== "stipend" && !c.missing).map((c) => `${c.label}: ${c.full}`).join("; ");
 
 /** The list for WhatsApp, in order, one line a choice (`terms`: its termsWords, null while not loaded), then `url`: the list's page. */
 /** `exam`: the exam's name ("NEET PG"). */

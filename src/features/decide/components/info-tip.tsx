@@ -82,12 +82,14 @@ function guardOutsideTaps() {
  * panel is a <span>, so a tip may sit inside a <p>, a <th> or a link's line: pass phrasing content (text, links,
  * <strong>, <br />, SourceRef), not <p> or <ul>.
  */
-export function InfoTip({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+/** `more`: the rest of a long explanation, behind a "More" button in the panel (the panel says 1-2 sentences first). */
+export function InfoTip({ label, children, more, className }: { label: string; children: React.ReactNode; more?: React.ReactNode; className?: string }) {
   const id = `tip${useId().replace(/[^\w-]/g, "")}`;
   const btn = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLSpanElement>(null);
   // Feeds aria-expanded and the scroll/resize follow; the popover itself is the source of truth.
   const [open, setOpen] = useState(false);
+  const [rest, setRest] = useState(false);
   useEffect(guardOutsideTaps, []);
 
   // While open, follow the button when the page or a table scrolls, or the window resizes.
@@ -143,6 +145,7 @@ export function InfoTip({ label, children, className }: { label: string; childre
         className="tip-p"
       >
         {children}
+        {more && (rest ? <span className="mt-2 block">{more}</span> : <button type="button" onClick={() => setRest(true)} className="mt-1 block min-h-8 font-semibold text-sky underline">More</button>)}
       </span>
     </>
   );

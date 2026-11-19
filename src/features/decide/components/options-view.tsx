@@ -144,7 +144,7 @@ export function RoundGrid({ row, caption }: { row: Pick<OptionRow, "grid" | "rea
                         {c.provisional && <Provisional when />}
                       </>
                     ) : (
-                      <span>—<span className="sr-only">not available</span></span>
+                      <span>—<span className="sr-only">not applicable</span></span>
                     )}
                   </td>
                 );

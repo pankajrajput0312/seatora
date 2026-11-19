@@ -22,7 +22,7 @@ import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle"
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { statKeys, statLabel, type StatKey } from "@/features/decide/lib/stat-format";
+import { MISSING_WORDS, NOT_PUBLISHED, statKeys, statLabel, type StatKey } from "@/features/decide/lib/stat-format";
 import { termChips, termFilterLists, termValueLabel } from "@/features/decide/lib/term-filters";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { getDecideData, getMeta, listFees, type FeeSort } from "@/features/decide/service";
@@ -143,7 +143,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                   <Link href={years(r)} title={r.college.name} className="hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
                   <span className="mt-0.5 block font-normal max-md:text-xs">{rowTitle(r)}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs font-normal text-muted-foreground max-md:hidden">
-                    {r.college.state ?? <NotDeclared what="state not available" />}
+                    {r.college.state ?? <NotDeclared />}
                     <TypeBadge type={type} of={r.college.name} />
                   </span>
                 </th>
@@ -161,41 +161,29 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       <PageHead
         title="Fees, stipend and bond"
         about={
-          exam === DEFAULT_EXAM ? (
           <>
-            <strong>Fee</strong>: a year (/yr; year 1&apos;s may be paid at admission), from the college&apos;s MCC profile (the table: years 1 to 3).
-            &quot;At admission (Year 1)&quot;: MCC&apos;s form gives the amount paid at admission, and later years differ or are not stated. &quot;Up to ₹1.25 L&quot;: a DNB
-            hospital that declared none; the most NBEMS lets it charge (no GST, paid to the hospital), not its own fee. &quot;Varies by
-            subject&quot;, &quot;On college website&quot;, &quot;Not stated&quot;: the profile gives no one figure for these seats; its
-            words are in the (i). The whole-course fee is in the Fee (i).
-            <br /><strong>Stipend</strong>: a month (/mo), before tax. &quot;From ₹…&quot;: the NBEMS floor; the pay may be higher.
-            <br /><strong>Bond period</strong>: years to serve after the course; <strong>Bond penalty</strong>: what you pay if you don&apos;t serve
-            it (a range where it varies by specialty; sorting and filters use the highest).
-            <br /><strong>Leaving penalty</strong>: the penalty for leaving the seat or course after joining. MCC&apos;s Round 2 forfeit is on
-            each institute&apos;s Fees tab.
-            <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. The bond is one of three: &quot;No bond&quot; only where the
-            college&apos;s document or the NBEMS rule says so (&quot;No bond declared&quot;: a DNB hospital that declared none to MCC, which NBEMS&apos;s rule lets impose none this session); a stated bond (its years, or &quot;Bond, years not stated&quot;); or &quot;Not known&quot;:
-            a document that says no bond while a state law&apos;s service may apply, or no record (the (i) says which; the filters count it as not published).
-            <br />Sorting: — and figures without a number go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
+            <strong>Fee</strong>: a year (/yr){exam === "ini-cet" ? ", as the institute's INI-CET prospectus prints it" : `, as the college declared it on its MCC institute profile (${exams[exam].label})`}; the whole course is in the Fee (i). <strong>Stipend</strong>: a month (/mo).
+            <br /><strong>Bond period</strong>: years to serve after the course; <strong>Bond penalty</strong>: what you pay if you don&apos;t; <strong>Leaving penalty</strong>: what you pay if you leave after joining.
+            <br />{MISSING_WORDS} Sorting puts {NOT_PUBLISHED} last either way; each figure&apos;s (i) gives its exact words and source.
           </>
+        }
+        more={
+          exam === DEFAULT_EXAM ? (
+            <>
+              &quot;At admission (Year 1)&quot;: MCC&apos;s form gives the amount paid at admission, and later years differ or are not published. &quot;Up to ₹1.25 L&quot;: a DNB
+              hospital that declared none; the most NBEMS lets it charge (no GST, paid to the hospital), not its own fee. &quot;From ₹…&quot; stipend: the NBEMS floor; the pay may be higher.
+              A bond penalty that varies by specialty shows its range; sorting and filters use the highest. MCC&apos;s Round 2 forfeit is on each institute&apos;s Fees tab.
+              <br />The bond is one of three: &quot;No bond&quot; only where the college&apos;s document or the NBEMS rule says so (&quot;No bond declared&quot;: a DNB hospital that declared none to MCC, which NBEMS&apos;s rule lets impose none this session); a stated bond (its years, or &quot;Bond, years not stated&quot;); or &quot;Not known&quot;:
+              a document that says no bond while a state law&apos;s service may apply, or no record (the (i) says which; the filters count it as not published).
+            </>
           ) : exam === "ini-cet" ? (
-            <>
-              <strong>Fee</strong>: a year (/yr), or Year 1&apos;s where later years differ, as the institute&apos;s INI-CET prospectus (Part B) prints it; its words are in the (i) where it gives no one figure.
-              <br /><strong>Stipend</strong>: a month (/mo), as printed.
-              <br /><strong>Bond</strong> and <strong>leaving penalty</strong>: as the prospectus states them (&quot;Not known&quot;: it neither states nor rules out service after the course).
-              <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. Sorting: — and figures without a number go last either way.
-            </>
+            <>Bond and leaving penalty: as the prospectus states them (&quot;Not known&quot;: it neither states nor rules out service after the course).</>
           ) : (
-            <>
-              <strong>Fee</strong>: a year (/yr; year 1&apos;s may be paid at admission), as the college declared it on its MCC institute profile ({exams[exam].label}). &quot;Varies by subject&quot;, &quot;On college website&quot;, &quot;Not stated&quot;: the profile gives no one figure for these seats; its words are in the (i).
-              <br /><strong>Stipend</strong>: a month (/mo), as declared.
-              <br /><strong>Bond</strong>: from MCC&apos;s institute list: &quot;No bond&quot;, a stated bond, &quot;No bond declared&quot; (a DrNB hospital that declared none to MCC: NBEMS&apos;s rule lets it impose none this session), or &quot;Not known&quot; (a bond document Seatora couldn&apos;t read, read it before you lock; a blank form or one with no clear bond; a D.M. / M.Ch. or MDS seat with none declared: the (i) says which). MCC&apos;s Round 2 forfeit is on each institute&apos;s Fees tab.
-              <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. Sorting: — and figures without a number go last either way.
-            </>
+            <>Bond: from MCC&apos;s institute list: &quot;No bond&quot;, a stated bond, &quot;No bond declared&quot; (a DrNB hospital that declared none to MCC: NBEMS&apos;s rule lets it impose none this session), or &quot;Not known&quot; (a bond document Seatora couldn&apos;t read, read it before you lock; a blank form or one with no clear bond; a D.M. / M.Ch. or MDS seat with none declared: the (i) says which). MCC&apos;s Round 2 forfeit is on each institute&apos;s Fees tab.</>
           )
         }
       >
-        — means none published.
+        Year 1 fee, stipend, bond and penalties by course and quota.
       </PageHead>
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}

@@ -101,7 +101,7 @@ export function CrossoverGuide({ profile }: { profile?: Profile | null }) {
       )}
       {notFound.length > 0 && (
         <details className="rounded-xl border border-border bg-card px-4">
-          <summary className="flex min-h-11 cursor-pointer items-center font-semibold">Not stated anywhere ({notFound.length})</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center font-semibold">Not published anywhere ({notFound.length})</summary>
           <ul className="grid gap-2 pb-3 text-sm">
             {notFound.map((n) => (
               <li key={n.id} id={anchor(n.id)} tabIndex={-1} className="grid scroll-mt-20 gap-0.5">

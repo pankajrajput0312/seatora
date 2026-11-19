@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { bondFlag, feeBandText, feeRange, statCells, statLabel, yearValue, type Level, type StatCell, type StatKey } from "../lib/stat-format";
+import { bondFlag, feeBandText, feeRange, MISSING_WORDS, NOT_PUBLISHED, statCells, statLabel, yearValue, type Level, type StatCell, type StatKey } from "../lib/stat-format";
 import type { ProgrammeTerms } from "../server/terms";
 import { NBEMS_BOND_RULES, termDocs } from "./fees";
 import { InfoTip } from "./info-tip";
@@ -46,17 +46,10 @@ function Value({ c, full, nb }: { c: StatCell; full?: boolean; nb?: boolean }) {
   const raw = full ? c.full : c.short;
   // "₹1.5 Cr" never splits from its unit; in a table nothing splits but a range ("₹10 L–₹20 L" wraps after its dash).
   const v = nb ? raw.replace(/ /g, "\u00a0") : raw.replace(/ (L|Cr)\b/g, "\u00a0$1");
-  if (c.href)
-    return (
-      <a href={c.href} target="_blank" rel="noopener noreferrer" className="text-sky hover:underline">
-        {raw}<span className="sr-only"> (opens in a new tab)</span>
-      </a>
-    );
   return (
     <span className={cn("numeric", c.tone === "muted" && !c.level ? "text-muted-foreground" : "font-semibold", c.level ? levelClass[c.level] : c.tone === "bond" && "text-sun")}>
       {/* A short value ("₹50 L") is read out in full ("₹50,00,000"). */}
       {full || c.short === c.full ? v : <><span aria-hidden>{v}</span><span className="sr-only">{c.full}</span></>}
-      {c.missing && <span className="sr-only"> (none published)</span>}
       {/* The fee band is colour on screen: in words for screen readers (the (i) says it too). */}
       {c.key === "fee" && c.levelWord && <span className="sr-only"> ({c.levelWord})</span>}
     </span>
@@ -87,20 +80,32 @@ export function StatCellView({ c, t, of, short, tip = true, wrap }: { c: StatCel
   );
 }
 
-/** A compact table's column notes (its header (i)): what the values and markers mean. */
-const columnNote: Record<StatKey, string> = {
-  fee: "Year 1 fee for this course and quota: /yr a fee a year (year 1’s may be paid at admission); at admission (Year 1): MCC’s form gives the amount paid at admission, and later years differ or are not stated. Up to / ≤ ₹1.25 L: a DNB hospital that declared none; the most NBEMS lets it charge. Varies by subject, On college website, Not stated: the profile gives no one figure for these seats (its words are in the institute’s Fees tab). A range (₹1–40 L): the profile gives only the range across subjects (depends on specialty). —: none published. Colour: green a low fee, red a high one, for the course type (" + feeBandText + ").",
-  stipend: "Year 1 stipend a month (/mo). From / ≥: the NBEMS minimum (the pay may be higher). below NBEMS min: declared below it. Not stated: no figure published. —: none published. Colour: amber below the NBEMS minimum.",
-  bond: "Service bond years: one of three. No bond: a document says none. A stated bond: its years (1Y: one year; Bond, years not stated). No bond declared: a DNB hospital that declared no bond to MCC, which NBEMS's rule lets impose none this session (in the No bond filter). Not known: a document that says no bond while a state law's service may apply, or no record; the (i) says which, and filters count it as not published. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey not known.",
-  bondInr: "What you pay if you do not serve the bond. ≤ at most, ≥ at least; a range where it varies (depends on specialty, when the record prices it by specialty); + more conditions. A short phrase (Refund stipend, Rest of course fee, Not stated…): no ₹ figure. None: no bond (or none declared, where NBEMS's rule lets none be imposed). Not known: the bond is not known. Colour: red ₹25 L or more, amber below that, green none.",
-  leaving: "The college's or state's penalty for leaving the seat or course after joining. ≤, ≥, + and the short phrases (Per state rule, No money penalty…): as for Bond penalty. —: none published. Colour: red ₹25 L or more.",
+/** A compact table's column notes (its header (i)): what the column is, in a sentence or two; the rest behind "More". */
+const columnNote: Record<StatKey, [string, string]> = {
+  fee: [
+    "Year 1 fee for this course and quota, a year (/yr). Green a low fee, red a high one, for the course type.",
+    "At admission (Year 1): MCC’s form gives only the amount paid at admission. Up to / ≤ ₹1.25 L: a DNB hospital that declared none; the most NBEMS lets it charge. " + feeBandText,
+  ],
+  stipend: ["Year 1 stipend a month (/mo). Amber: below the NBEMS minimum.", "From / ≥: the NBEMS minimum (the pay may be higher)."],
+  bond: [
+    "Years you must serve after the course: No bond, its years, or Not known (ask the college).",
+    "No bond declared: a DNB hospital that declared no bond to MCC, which NBEMS's rule lets impose none this session (in the No bond filter). Not known: a document that says no bond while a state law's service may apply, or no record; the (i) says which. Colour: green no bond, amber 1-2 years, orange 3 years or more.",
+  ],
+  bondInr: [
+    "What you pay if you do not serve the bond. Red: ₹25 L or more.",
+    "≤ at most, ≥ at least, + more conditions in words. A short phrase (Refund stipend, Rest of course fee…): no ₹ figure. None: no bond (or none declared, where NBEMS's rule lets none be imposed).",
+  ],
+  leaving: ["What you pay (or the rule you face) if you leave the seat or course after joining. Red: ₹25 L or more.", "≤, ≥, + and the short phrases (Per state rule, No money penalty, Barred next year…): as for Bond penalty."],
 };
 
 /** The same for another exam's MCC institute profiles (NEET MDS, NEET SS): no NBEMS, DNB or MD/MS rules, no fee colours. */
-const columnNoteOther: Record<StatKey, string> = {
-  fee: "Year 1 fee for this course and quota, as the college's MCC institute profile declares it: /yr a fee a year (year 1’s may be paid at admission); at admission (Year 1): the amount the profile gives for admission. Varies by subject, On college website, Not stated: the profile gives no one figure for these seats (its words are in the institute’s Fees tab). A range: the profile gives only the range across subjects. —: none published. No colour: there are no fee bands for these courses.",
-  stipend: "Year 1 stipend a month (/mo), as the college's MCC institute profile declares it. Not stated: no figure published. —: none published.",
-  bond: "Service bond years: one of three. No bond: a document says none. A stated bond: its years (1Y: one year; Bond, years not stated). No bond declared: a DrNB hospital that declared no bond to MCC, which NBEMS's rule lets impose none this session (in the No bond filter). Not known: a bond document Seatora couldn't read (read it before you lock your choices), a blank form or one with no clear bond, a D.M., M.Ch. or MDS seat with no bond declared (MCC's bulletin has no such rule), or no record; the (i) says which. Colour: green no bond, amber 1-2 years, orange 3 years or more, grey not known.",
+const columnNoteOther: Record<StatKey, [string, string]> = {
+  fee: ["Year 1 fee for this course and quota, a year (/yr), as the college's MCC institute profile declares it.", "At admission (Year 1): the amount the profile gives for admission. No colour: there are no fee bands for these courses."],
+  stipend: ["Year 1 stipend a month (/mo), as the college's MCC institute profile declares it.", ""],
+  bond: [
+    "Years you must serve after the course: No bond, its years, or Not known (ask the college).",
+    "No bond declared: a DrNB hospital that declared no bond to MCC, which NBEMS's rule lets impose none this session. Not known: a bond document Seatora couldn't read (read it before you lock your choices), a blank form or one with no clear bond, a D.M., M.Ch. or MDS seat with no bond declared, or no record; the (i) says which.",
+  ],
   bondInr: columnNote.bondInr,
   leaving: columnNote.leaving,
 };
@@ -111,13 +116,10 @@ function YearCell({ t, pick, year, className }: { t: ProgrammeTerms; pick: "fee"
   return (
     <td data-col={`${pick}${year}`} className={className}>
       {!v ? (
-        <span className="text-muted-foreground">—<span className="sr-only">no year {year}: a {t.durationYears}-year course</span></span>
+        <span className="text-muted-foreground">—<span className="sr-only">not applicable: a {t.durationYears}-year course has no year {year}</span></span>
       ) : (
         <>
-          <span className={cn("numeric", v.text === "—" ? "text-muted-foreground" : "font-semibold")}>
-            {v.text.replace(/ /g, "\u00a0")}
-            {v.text === "—" && <span className="sr-only"> (not stated)</span>}
-          </span>
+          <span className={cn("numeric", v.text === NOT_PUBLISHED ? "text-muted-foreground" : "font-semibold")}>{v.text.replace(/ /g, "\u00a0")}</span>
           {v.marker && <span className="block text-xs leading-snug font-normal text-muted-foreground">{v.marker}</span>}
         </>
       )}
@@ -130,8 +132,11 @@ export function StatHead({ k }: { k: StatKey }) {
   return (
     <span data-terms className="inline-flex items-center gap-0.5">
       {statLabel[k]}
-      <InfoTip label={`${statLabel[k]} column`}>
-        <PgOr pg={columnNote[k]} other={<ExamWords>{columnNoteOther[k]}</ExamWords>} /> Each figure&apos;s exact words and sources: the cards, or the institute&apos;s Fees tab.
+      <InfoTip
+        label={`${statLabel[k]} column`}
+        more={<><PgOr pg={columnNote[k][1]} other={<ExamWords>{columnNoteOther[k][1]}</ExamWords>} /> {MISSING_WORDS} Each figure&apos;s exact words and sources: the cards, or the institute&apos;s Fees tab.</>}
+      >
+        <PgOr pg={columnNote[k][0]} other={<ExamWords>{columnNoteOther[k][0]}</ExamWords>} />
       </InfoTip>
     </span>
   );
@@ -192,7 +197,7 @@ export function TermStatCells({ t, variant = "card", short, of, className, tdCla
       // `years`: Fee and Stipend's years 2 and 3 as columns of their own (YearHeads), after year 1's cell.
       ...(years && (c.key === "fee" || c.key === "stipend") ? [2, 3].map((y) => <YearCell key={`${c.key}${y}`} t={t} pick={c.key as "fee" | "stipend"} year={y} className={td} />) : []),
       // `total`: the whole course's fee after the fee's years (FeeTotalHead), "—" when a year has no figure.
-      ...(total && c.key === "fee" ? [<td key="feetotal" data-col="feetotal" className={td}>{t.wholeCourseFee != null ? <span className="numeric font-semibold">{feeRange(null, t.wholeCourseFee).replace(/ /g, "\u00a0")}</span> : <span className="text-muted-foreground">—<span className="sr-only">not stated for every year</span></span>}</td>] : []),
+      ...(total && c.key === "fee" ? [<td key="feetotal" data-col="feetotal" className={td}>{t.wholeCourseFee != null ? <span className="numeric font-semibold">{feeRange(null, t.wholeCourseFee).replace(/ /g, "\u00a0")}</span> : <span className="text-muted-foreground">{NOT_PUBLISHED}</span>}</td>] : []),
     ]);
   }
   return (

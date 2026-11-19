@@ -271,7 +271,7 @@ function Shared({ same }: { same: Same }) {
         {shown.map(([k, label]) => (
           <div key={k} className="flex items-baseline gap-1.5">
             <dt className={label ? "text-xs text-muted-foreground" : "sr-only"}>{label || "Bond and penalties"}</dt>
-            <dd className="font-semibold">{same[k] === "—" ? "none published" : same[k]}</dd>
+            <dd className="font-semibold">{same[k]}</dd>
           </div>
         ))}
       </dl>

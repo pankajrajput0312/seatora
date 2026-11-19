@@ -32,12 +32,12 @@ export function HistoryNote({ more, className }: { more?: React.ReactNode; class
  * content), so results start right under the title. `note`: a few words that must stay in view (a caveat), beside the
  * title. The h1 takes focus (id main-h1) when the content it heads is removed, e.g. the last Compare column.
  */
-export function PageHead({ title, children, about, note }: { title: string; children?: React.ReactNode; about?: React.ReactNode; note?: React.ReactNode }) {
+export function PageHead({ title, children, about, more, note }: { title: string; children?: React.ReactNode; about?: React.ReactNode; /** The rest, behind the (i)'s "More". */ more?: React.ReactNode; note?: React.ReactNode }) {
   const tip = children && about ? <>{children} {about}</> : (children ?? about);
   return (
     <div className="flex flex-wrap items-center gap-x-2">
       <h1 id="main-h1" tabIndex={-1} className="text-2xl font-bold tracking-tight md:text-3xl">{title}</h1>
-      {tip && <InfoTip label={title}>{tip}</InfoTip>}
+      {tip && <InfoTip label={title} more={more}>{tip}</InfoTip>}
       {note && <p className="text-sm text-muted-foreground">{note}</p>}
     </div>
   );
@@ -92,8 +92,9 @@ export function Closing({ d, year }: { d: Deepest | null | undefined; year?: num
   );
 }
 
+/** Not applicable ("—"); missing data is "Not published" (lib/stat-format.ts NOT_PUBLISHED). */
 export function Dash() {
-  return <span>—<span className="sr-only">not available</span></span>;
+  return <span>—<span className="sr-only">not applicable</span></span>;
 }
 
 /**

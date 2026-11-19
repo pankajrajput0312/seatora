@@ -21,7 +21,7 @@ it("card: five labelled cells, short values, each with an (i) button named after
   // Card and table show the same lakh figure (the (i) has it in full).
   expect(html).toMatch(/₹50.L/);
   expect(html).toContain("text-sun"); // a bond applies: orange
-  expect(text(html)).toContain("— (none published)"); // the fee: missing, never 0
+  expect(text(html)).toContain("Fee: Not published"); // the fee: missing, never 0 or "—"
 });
 
 it("table: five tds with full values, keyed by data-col; nothing breaks but a range's dash; the caller's padding wins", () => {

@@ -17,7 +17,7 @@ import { MAX_COMPARE } from "@/features/decide/lib/choices";
 import { decideLinks } from "@/features/decide/lib/links";
 import { parseSearchParams } from "@/features/decide/lib/params";
 import { deepestOf, eligibleCategories, LATER_ROUNDS_NOTE, latestText, pastOf, seatsOfWords } from "@/features/decide/lib/reach";
-import { inrFull } from "@/features/decide/lib/stat-format";
+import { inrFull, NOT_PUBLISHED } from "@/features/decide/lib/stat-format";
 import { lowestRisk } from "@/features/decide/lib/term-filters";
 import { kindName, rounds, type SeatList } from "@/features/decide/types";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
@@ -75,7 +75,7 @@ function IfYouLeave({ r, leaving, shared }: { r: OptionRow; leaving: string; /**
   const own = t.roundRules?.filter((p) => !shared.has(p.text));
   return (
     <span className="grid gap-1 text-xs">
-      <span><span className="text-muted-foreground">After joining:</span> <span className="font-semibold">{leaving === "—" ? "no penalty published" : leaving}</span></span>
+      <span><span className="text-muted-foreground">After joining:</span> <span className="font-semibold">{leaving}</span></span>
       {own ? (
         // INI-CET: AIIMS's round rules, each in its own words; the ones every option shares are above the table.
         own.length > 0 && (
@@ -92,7 +92,7 @@ function IfYouLeave({ r, leaving, shared }: { r: OptionRow; leaving: string; /**
         ) : t.resignForfeitText ? (
           <>{t.resignForfeitText.text}<Sup n={t.resignForfeitText.src} sources={t.sources} /></>
         ) : (
-          "not published"
+          NOT_PUBLISHED
         )}
       </span>
       )}

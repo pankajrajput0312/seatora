@@ -5,7 +5,8 @@ import { authorityOf, profileOf } from "@/features/exams/keys";
 // The stat cells (Fee | Stipend | Bond | Bond ₹ | Leaving, components/stat-cells.tsx) as plain data, from one course's
 // ProgrammeTerms (service courseTerms: that course and quota's fee-table record, its specialty's bond figure).
 // Each cell: a short value (cards), a full value (tables), a tiny marker, and the exact words behind its (i) with
-// source numbers (ProgrammeTerms.sources n). Missing is "—", never 0 and never "no bond".
+// source numbers (ProgrammeTerms.sources n). Missing data is one of three words (NOT_PUBLISHED, VARIES, "—" for not
+// applicable), never 0 and never "no bond".
 
 /** ₹ in full Indian grouping: "₹1,36,008". */
 export const inrFull = (inr: number) => formatINR(inr);
@@ -85,12 +86,10 @@ export type StatCell = {
    * (RANGE_HINT), where the data gives it. Everything else a value leaves out is said in its (i), never in the cell.
    */
   marker: string | null;
-  /** The value is a link (a fee "On college website ↗"). */
-  href?: string;
-  /** bond: a bond applies (orange); muted: "—", "Not known", a short reason ("Refund stipend", "Not stated"); warn: the marker is a warning. */
+  /** bond: a bond applies (orange); muted: "Not published", "Not known", a short reason ("Refund stipend"); warn: the marker is a warning. */
   tone: "bond" | "muted" | null;
   markerWarn?: true;
-  /** "—": not in the data (screen readers hear it). */
+  /** Not published: no document gives it (exports and share text leave it out). */
   missing?: true;
   tip: TipLine[];
   /**
@@ -120,7 +119,15 @@ const FEE_BANDS = { "MD/MS": [1e5, 5e5], Diploma: [1e5, 5e5], DNB: [125000, 1250
 export const feeBandText = "MD/MS and Diploma: low under ₹1 L a year, high from ₹5 L. DNB and NBEMS Diploma: low under the NBEMS maximum of ₹1.25 L, high above it.";
 const levelOf = (c: StatCell, level: Level | undefined, word: string | undefined): StatCell => (level ? { ...c, level, levelWord: word } : c);
 
-export const NOT_IN_DATA = "Not published.";
+/**
+ * Missing data in three words only, on every screen: NOT_PUBLISHED (no document gives it), VARIES (the document gives a
+ * range, or a figure by course: the range is shown when known), and "—" (not applicable: a 2-year course's year 3).
+ */
+export const NOT_PUBLISHED = "Not published";
+export const VARIES = "Varies (see source)";
+export const NOT_IN_DATA = `${NOT_PUBLISHED}.`;
+/** The three, said once (a page's note or a column's (i)). */
+export const MISSING_WORDS = `“${NOT_PUBLISHED}”: no document gives it. “${VARIES}”: the document gives a range or a figure by course (the range is shown when known). “—”: not applicable. Never zero.`;
 const NOT_CHECKED = "Not checked yet: Seatora has no bond record for this programme.";
 const DNB_RULE = "NBEMS rule: private DNB hospitals may not take any bond or deposit; government hospitals may apply a state service bond only if they declared it to MCC before counselling.";
 const STATE_CAUTION = "Government colleges may still have a state service bond: check the state's PG rules.";
@@ -138,7 +145,7 @@ const BASIS = { document: "the college's own document", state_rule: "state rule"
 const isDnb = (t: ProgrammeTerms) => t.programme === "DNB" || t.programme === "NBEMS Diploma";
 const yrs = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
 const sameYears = (text: string, n: number | null) => n != null && text.replace(/\s*years?\.?$/i, "").trim() === String(n);
-const dash = (c: Pick<StatCell, "key" | "label" | "about">, tip: TipLine[]): StatCell => ({ ...c, short: "—", full: "—", marker: null, tone: "muted", missing: true, tip });
+const notPublished = (c: Pick<StatCell, "key" | "label" | "about">, tip: TipLine[]): StatCell => ({ ...c, short: NOT_PUBLISHED, full: NOT_PUBLISHED, marker: null, tone: "muted", missing: true, tip });
 const words = (c: Pick<StatCell, "key" | "label" | "about">, tip: TipLine[], label: string): StatCell => ({ ...c, short: label, full: label, marker: null, tone: "muted", tip });
 const unread = (t: ProgrammeTerms, kind: ProgrammeTerms["unread"][number]["kind"]) => t.unread.find((u) => u.kind === kind);
 const asQuote = (u: { text: string; src: number }): TipLine => ({ text: u.text, src: u.src, quote: true });
@@ -149,7 +156,7 @@ const yearLines = (t: ProgrammeTerms, pick: "fee" | "stipend", unit: string): Ti
     const f: Figure | null = y[pick];
     const bound = f?.kind === "maximum" ? "up to " : f?.kind === "minimum" ? "at least " : "";
     const declared = f?.declared != null ? ` (declared ${inrFull(f.declared)}; see below)` : "";
-    return f ? { text: `Year ${y.year}: ${bound}${inrRange(f.min, f.inr, false)}${f.atAdmission ? ", paid at admission" : unit}${declared}`, src: f.src } : { text: `Year ${y.year}: not stated` };
+    return f ? { text: `Year ${y.year}: ${bound}${inrRange(f.min, f.inr, false)}${f.atAdmission ? ", paid at admission" : unit}${declared}`, src: f.src } : { text: `Year ${y.year}: not published` };
   });
 /** The record's words on how a figure was read (a GST taken off), once each. */
 const figureNotes = (t: ProgrammeTerms): TipLine[] =>
@@ -176,9 +183,9 @@ function textLines(t: ProgrammeTerms, u: ReturnType<typeof unread>): TipLine[] {
 }
 
 /**
- * A fee in words only, as a short reason: "Varies by subject" (words saying it depends on the subject), "On college
- * website ↗" (words pointing to the college's site: the link is the words' own address, else the college's MCC
- * website), a ₹ range the words give, else "Not stated". The words are in the (i).
+ * A fee in words only: a ₹ range the words give, VARIES (words saying it depends on the subject), else NOT_PUBLISHED
+ * (words pointing to the college's site among them). The words are in the (i), with the site's link (`href`: the words'
+ * own address, else the college's MCC website) under them.
  */
 function feeWords(text: string, website: string | null | undefined): { label: string; href?: string; hint?: string } {
   const url = websiteUrl(text.match(/\b(?:https?:\/\/|www\.)[^\s,;()<>"']+[^\s,;()<>"'.]/i)?.[0]);
@@ -190,9 +197,9 @@ function feeWords(text: string, website: string | null | undefined): { label: st
     const [lo, hi] = [r[1], r[2]].map((x) => Number(x.replace(/,/g, "")));
     if (lo >= 10000 && hi > lo) return { label: `${feeRange(lo, hi)}/yr`, ...(url && { href: url }), ...(varies && { hint: RANGE_HINT }) };
   }
-  if (varies) return { label: "Varies by subject", ...(url && { href: url }) };
+  if (varies) return { label: VARIES, ...(url && { href: url }) };
   const href = url ?? (/website|web ?site|\bsite\b|portal|online/i.test(text) ? websiteUrl(website) : null);
-  return href ? { label: "On college website ↗", href } : { label: "Not stated" };
+  return { label: NOT_PUBLISHED, ...(href && { href }) };
 }
 
 /**
@@ -217,7 +224,7 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 const OTHER_EXAM = new Set<string>(["MDS", "DM/MCh", "DrNB SS"]);
 const PER = { yearly: "/yr", admission: " at admission (Year 1)", year1: " (Year 1)" } as const;
 /** Why a ₹ range is a range, when the data says so (a fee or amount priced by specialty): the cell's hint. */
-export const RANGE_HINT = "depends on specialty";
+export const RANGE_HINT = VARIES;
 
 function feeCell(t: ProgrammeTerms): StatCell {
   const c = { key: "fee", label: statLabel.fee, about: "fee" } as const;
@@ -227,9 +234,9 @@ function feeCell(t: ProgrammeTerms): StatCell {
     if (u) {
       const w = feeWords(u.text, t.website);
       const link: TipLine[] = w.href ? [{ text: w.href.replace(/^https?:\/\/|\/$/g, ""), href: w.href }] : [];
-      return { ...words(c, [{ text: `${cap(profileOf(t.exam))} gives this fee in words only (no one figure for this course and seat type), so Seatora shows no figure. Its words:` }, asQuote(u), ...link, ...hostelLines(t)], w.label), ...(w.href && { href: w.href }), ...(w.hint && { marker: w.hint }) };
+      return { ...words(c, [{ text: `${cap(profileOf(t.exam))} gives this fee in words only (no one figure for this course and seat type), so Seatora shows no figure. Its words:` }, asQuote(u), ...link, ...hostelLines(t)], w.label), ...(w.hint && { marker: w.hint }) };
     }
-    return dash(c, t.notes.length ? t.notes.map((text) => ({ text, ...(t.notesSrc != null && { src: t.notesSrc }) })) : [{ text: NOT_IN_DATA }]);
+    return notPublished(c, t.notes.length ? t.notes.map((text) => ({ text, ...(t.notesSrc != null && { src: t.notesSrc }) })) : [{ text: NOT_IN_DATA }]);
   }
   const max = t.years.some((y) => y.fee?.kind === "maximum");
   const tip: TipLine[] = [
@@ -246,7 +253,7 @@ function feeCell(t: ProgrammeTerms): StatCell {
     ...(t.feeNote ? [{ text: t.feeNote }] : []),
     ...textLines(t, u),
   ];
-  if (!f) return { ...dash(c, tip), tip: [{ text: "Year 1's fee is not stated." }, ...tip] };
+  if (!f) return { ...notPublished(c, tip), tip: [{ text: "Year 1's fee is not published." }, ...tip] };
   // A year's fee says so, cards too: "₹1.71 L/yr", "₹15–25 L/yr"; an amount at admission only "₹5 L at admission (Year 1)"
   // (feeBasis); the NBEMS ceiling "Up to ₹1.25 L/yr" (cards "≤ ₹1.25 L/yr"), never the college's own. A range's marker
   // says why it is one; everything else a figure leaves out is in the (i).
@@ -257,7 +264,7 @@ function feeCell(t: ProgrammeTerms): StatCell {
     ...c,
     short: (f.kind === "maximum" ? "≤ " : "") + v + per,
     full: (f.kind === "maximum" ? "Up to " : "") + v + per,
-    marker: f.min != null ? RANGE_HINT : f.varies ? "may vary by subject" : null, tone: null, tip,
+    marker: f.min != null || f.varies ? VARIES : null, tone: null, tip,
   };
   // Fee bands are NEET PG's course types: another exam's figures have none (INI-CET's MD/MS too).
   const [low, high] = t.exam ? [] : (FEE_BANDS[t.programme as keyof typeof FEE_BANDS] ?? []);
@@ -273,8 +280,8 @@ function stipendCell(t: ProgrammeTerms): StatCell {
   const s = t.years[0]?.stipend;
   const u = unread(t, "STIPEND");
   if (!s) {
-    if (u) return words(c, [{ text: "The stipend is published in words only:" }, asQuote(u)], "Not stated");
-    return dash(c, [{ text: t.years.some((y) => y.stipend) ? "Year 1's stipend is not stated." : NOT_IN_DATA }, ...(t.years.some((y) => y.stipend) ? yearLines(t, "stipend", " a month") : [])]);
+    if (u) return words(c, [{ text: "The stipend is published in words only:" }, asQuote(u)], NOT_PUBLISHED);
+    return notPublished(c, [{ text: t.years.some((y) => y.stipend) ? "Year 1's stipend is not published." : NOT_IN_DATA }, ...(t.years.some((y) => y.stipend) ? yearLines(t, "stipend", " a month") : [])]);
   }
   const below = t.years.find((y) => y.stipend?.below)?.stipend;
   const tip: TipLine[] = [
@@ -409,10 +416,9 @@ function phrase(a: Amount, texts: (string | null | undefined)[]): string {
   if (a.formula?.label) return a.formula.label;
   const t = texts.filter(Boolean).join(" ");
   if (/^State rule/.test(t)) return /\bno money penalty\b/i.test(t) ? "No money penalty" : "Per state rule";
-  if (/by subject|by specialt/i.test(t)) return "Varies by subject";
-  if (/as per (?:the )?policy|as applicable/i.test(t)) return "As per college policy";
-  // No figure (none written, a blank left in the form): one word for it everywhere.
-  return "Not stated";
+  if (/by subject|by specialt/i.test(t)) return VARIES;
+  // No figure (none written, a blank left in the form, "as per policy"): one word for it everywhere.
+  return NOT_PUBLISHED;
 }
 
 /** What a figure leaves out: "₹10,00,000 per year × 3 years, computed", "incl. ₹10,00,000 additional". */
@@ -421,7 +427,7 @@ function amountLines(a: Amount, years: number | null, src: number | null = null)
     ...formulaLines(a, src),
     ...(a.perYear && years ? [{ text: `${inrFull(a.perYear)} per year × ${years} years, computed by Seatora.` }] : []),
     ...(a.extra ? [{ text: `Includes ${inrFull(a.extra)} owed on top (additional).` }] : []),
-    ...(a.varies ? [{ text: "The amount varies by specialty: this is the range over the subjects.", warn: true as const }] : []),
+    ...(a.varies ? [{ text: "The amount varies by specialty: this is the range over the subjects (see the source for yours).", warn: true as const }] : []),
     ...(a.more ? [{ text: a.state === "words" ? "In words only (no ₹ figure)." : "Part of it is in words only (no ₹ figure)." }] : []),
   ];
 }
@@ -464,8 +470,13 @@ function bondInrCell(t: ProgrammeTerms): StatCell {
   const quote: TipLine[] = b.quote ? [{ text: b.quote, src: b.src, quote: true }] : [];
   if (a.state === "words")
     return words(c, [head, { text: "Declared without a ₹ figure for this course.", src: b.src }, ...partLines(b.amounts, b.src), ...quote, ...formulaLines(a, b.src), ...other], phrase(a, [b.text, b.quote]));
-  return words(c, [head, { text: "Amount not stated in the bond record.", src: b.src }, ...quote, ...other], "Not stated");
+  return words(c, [head, { text: "Amount not published in the bond record.", src: b.src }, ...quote, ...other], NOT_PUBLISHED);
 }
+
+/** A penalty about leaving the seat or course (an "other" penalty of the record: a ban, a debarment). */
+const LEAVING_WORDS = /\bleav(?:e|es|ing)\b|\bresign|\bdiscontinu|\bquit/i;
+/** Such a rule's short phrase: "Barred next year" (a debarment from the next admission), else "Rule (see source)". */
+const ruleWords = (text: string) => (/\bdebar|\bbarred\b|\bban(?:ned)?\b|not (?:be )?(?:allowed|eligible)/i.test(text) ? "Barred next year" : "Rule (see source)");
 
 function leavingCell(t: ProgrammeTerms): StatCell {
   const c = { key: "leaving", label: statLabel.leaving, about: "leaving penalty" } as const;
@@ -484,25 +495,34 @@ function leavingCell(t: ProgrammeTerms): StatCell {
   if (!b.leaving.length) {
     // A PENALTY term without its record (an older import), as published; a record's forfeit in words is not this.
     const u = unread(t, "PENALTY");
-    if (u) return words(c, [head, { text: `${cap(profileOf(t.exam))}'s words:` }, asQuote(u), ...forfeit], "Not stated");
-    return dash(c, [head, { text: NOT_IN_DATA }, ...other, ...forfeit]);
+    if (u) return words(c, [head, { text: `${cap(profileOf(t.exam))}'s words:` }, asQuote(u), ...forfeit], NOT_PUBLISHED);
+    // No leaving penalty, but a rule for leaving among the other penalties (Saifai: barred from next year's admission): the rule, never "—".
+    const rule = b.otherPenalties.find((p) => p.inr == null && LEAVING_WORDS.test(p.text));
+    if (rule) return { ...words(c, [head, ...other, ...forfeit], ruleWords(rule.text)), tone: null };
+    return notPublished(c, [head, { text: NOT_IN_DATA }, ...other, ...forfeit]);
   }
   const tip = [head, ...partLines(b.leaving, b.src), ...amountLines(a, null, b.leaving[0]?.src ?? b.src), ...other, ...forfeit];
   if (a.state !== "figure" || a.max == null) return words(c, tip, phrase(a, b.leaving.map((p) => p.text)));
   // Priced from a fee that is a range across courses (no fee of this course's own): the dearest course's, not this one's.
   const range = a.formula && t.years.find((y) => y.fee?.min != null)?.fee;
-  if (range) return words(c, [head, { text: `It is priced from the course fee, and this course has no fee of its own here (${profileOf(t.exam)} gives ${feeRange(range.min!, range.inr)}/yr across courses), so it depends on your course: at most ${inrFull(a.max)} (the dearest course's).`, warn: true }, ...tip.slice(1)], "Varies by course");
+  // The range over the courses (the fee's own range, scaled), named for what it is: "Full course fee ≈ ₹18 L–₹1.65 Cr".
+  if (range) {
+    const lo = Math.round((a.max * range.min!) / range.inr);
+    const what = (/figures: ([^:]+):/.exec(a.formula!.text)?.[1] ?? "Course fee").replace(/^Whole\b/, "Full");
+    const v = `≈ ${inrCard(lo)}–${inrCard(a.max)}`;
+    return levelOf({ ...c, short: v, full: `${what} ${v}`, marker: null, tone: null, tip: [head, { text: `It is priced from the course fee, and this course has no fee of its own here (${profileOf(t.exam)} gives ${feeRange(range.min!, range.inr)}/yr across courses), so it depends on your course: from about ${inrFull(lo)} (the cheapest course's) to ${inrFull(a.max)} (the dearest course's).`, warn: true }, ...tip.slice(1)] }, a.max >= HIGH_PENALTY ? "heavy" : undefined, "₹25 L or more");
+  }
   return levelOf({ ...c, short: amountValue(a, true), full: amountValue(a, false), marker: rangeHint(a), tone: null, tip }, a.max >= HIGH_PENALTY ? "heavy" : undefined, "₹25 L or more");
 }
 
 /**
  * Year `year`'s fee or stipend for a table column ("Fee Y2"): the full figure ("₹1,58,000", "≤ ₹1,25,000" for the NBEMS
- * ceiling) with its marker, "—" when not stated; null past the course (a 2-year course has no year 3).
+ * ceiling) with its marker, NOT_PUBLISHED when not published; null past the course (a 2-year course has no year 3: "—").
  */
 export function yearValue(t: ProgrammeTerms, pick: "fee" | "stipend", year: number): { text: string; marker: string | null } | null {
   if (year > t.durationYears) return null;
   const f = t.years[year - 1]?.[pick];
-  if (!f) return { text: "—", marker: null };
+  if (!f) return { text: NOT_PUBLISHED, marker: null };
   return { text: `${f.kind === "maximum" ? "≤ " : f.kind === "minimum" ? "≥ " : ""}${pick === "fee" ? feeRange(f.min, f.inr) : inrRange(f.min, f.inr, false)}`, marker: f.below ? "below NBEMS min" : null };
 }
 
@@ -513,8 +533,9 @@ export function yearValue(t: ProgrammeTerms, pick: "fee" | "stipend", year: numb
  */
 export function bondPlain(t: ProgrammeTerms): string {
   const b = t.bond;
-  const money = (a: Amount, words: (string | null | undefined)[]) => (a.state === "figure" && a.max != null ? amountValue(a, true) : a.state === "words" ? phrase(a, words).toLowerCase() : "amount not stated");
-  const leave = b.leaving.length ? money(b.leavingAmount, b.leaving.map((p) => p.text)) : "not published";
+  const money = (a: Amount, words: (string | null | undefined)[]) => (a.state === "figure" && a.max != null ? amountValue(a, true) : a.state === "words" ? phrase(a, words).toLowerCase() : "amount not published");
+  const rule = !b.leaving.length && b.otherPenalties.find((p) => p.inr == null && LEAVING_WORDS.test(p.text));
+  const leave = b.leaving.length ? money(b.leavingAmount, b.leaving.map((p) => p.text)) : rule ? ruleWords(rule.text).toLowerCase() : "not published";
   const parts = [`Leave after joining: ${leave}.`];
   if (b.status === "declared") {
     parts.push(b.toComplete ? `Bond to complete the course: ${money(b.amount, [b.text, b.quote])}.` : `Skip ${b.years == null ? "the bond's" : `the ${yrs(b.years)}'`} service: ${money(b.amount, [b.text, b.quote])}.`);

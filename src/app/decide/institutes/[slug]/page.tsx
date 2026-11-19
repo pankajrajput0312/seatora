@@ -32,7 +32,7 @@ import { fmtDay } from "@/features/decide/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { eligibleCategories, latestText } from "@/features/decide/lib/reach";
-import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
+import { MISSING_WORDS, statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getInstitute, getMeta, listAllotments, optionsView, renamedCollege } from "@/features/decide/service";
 import { feesFor } from "@/features/decide/server/facts";
@@ -662,21 +662,21 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             </>
           )}
           <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
-            {exam === DEFAULT_EXAM ? <>&quot;—&quot; means not stated, never zero; NBEMS maximum and minimum are NBEMS&apos;s limits.</> : <>&quot;—&quot; means not stated, never zero.</>}
+            {MISSING_WORDS}{exam === DEFAULT_EXAM && " NBEMS maximum and minimum are NBEMS's limits."}
             <InfoTip label="fees and bond">
               {exam === DEFAULT_EXAM ? (
                 <>
-                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type (All India, {quotaIn(E, "Deemed/Paid")}, NRI, DNB Quota) where the MCC profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead, never a figure. NBEMS maximum and minimum are NBEMS&apos;s limits, not the college&apos;s figures. A dash means not stated (not in the MCC profile fields we import; the profile may say more), never zero.
+                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type (All India, {quotaIn(E, "Deemed/Paid")}, NRI, DNB Quota) where the MCC profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead, never a figure. NBEMS maximum and minimum are NBEMS&apos;s limits, not the college&apos;s figures. Not published: not in the MCC profile fields Seatora imports (the profile may say more), never zero.
                   Leaving the course after joining is the college&apos;s or state&apos;s penalty from its bond document; resigning from Round 2 is MCC&apos;s separate forfeit.
                 </>
               ) : exam === "ini-cet" ? (
                 <>
-                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), as the INI-CET prospectus (Part B) prints them for this institute: fee that year and stipend per month; where it gives no one figure, its own words. A dash means not stated, never zero.
+                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), as the INI-CET prospectus (Part B) prints them for this institute: fee that year and stipend per month; where it gives no one figure, its own words. Not published: not in the prospectus, never zero.
                   The bond and the leaving penalty are the prospectus&apos;s terms (&quot;Not known&quot;: it neither states nor rules out service after the course).
                 </>
               ) : (
                 <>
-                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type where the college&apos;s MCC institute profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead (a figure they state, beside them). A dash means not stated (the profile may say more), never zero.
+                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type where the college&apos;s MCC institute profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead (a figure they state, beside them). Not published: not in the profile fields Seatora imports (the profile may say more), never zero.
                   The bond is from MCC&apos;s institute list: &quot;No bond&quot;, a stated bond, &quot;No bond declared&quot; (a DrNB hospital that declared none: NBEMS&apos;s rule lets it impose none this session), or &quot;Not known&quot; (a document Seatora couldn&apos;t read, a blank form, none declared on a D.M. / M.Ch. or MDS seat: the bond box says which); resigning from Round 2 is MCC&apos;s separate forfeit.
                 </>
               )}

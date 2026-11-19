@@ -7,7 +7,7 @@ import { fmtDay, formatInrShort } from "../lib/format";
 import type { FeeQuotaGroup } from "../server/facts";
 import type { Amount, Figure, ProgrammeTerms, TermPart, TermSource } from "../server/terms";
 import { variantFor } from "../lib/specialty-search";
-import { bondUnknownWhy, NONE_DECLARED, noneDeclared, noneDeclaredWhy, NOT_KNOWN, unreadWhy } from "../lib/stat-format";
+import { bondUnknownWhy, NONE_DECLARED, noneDeclared, noneDeclaredWhy, NOT_KNOWN, NOT_PUBLISHED, unreadWhy } from "../lib/stat-format";
 import { termLabel } from "../types";
 import { SourceRef } from "./page-sources";
 import { smallLink } from "./ui";
@@ -36,11 +36,11 @@ export const NBEMS_BOND_RULES = [
 // The rules that may still bind a bond that is not known.
 const DNB_RULE = "NBEMS rule: private DNB hospitals may not take any bond or deposit; government hospitals may apply a state service bond only if they declared it to MCC before counselling.";
 const STATE_CAUTION = "Government colleges may still have a state service bond: check the state's PG rules.";
-const NOT_IN_DATA = "Not published";
+const NOT_IN_DATA = NOT_PUBLISHED;
 
-/** "—" with "not in our MCC data" for screen readers: missing is never 0 and never "no bond". */
-export function NotDeclared({ what = "not in our MCC data" }: { what?: string }) {
-  return <span>—<span className="sr-only">{what}</span></span>;
+/** Missing data: "Not published" (no document gives it), never "—" (that is "not applicable") or 0. */
+export function NotDeclared() {
+  return <span className="text-muted-foreground">{NOT_PUBLISHED}</span>;
 }
 
 
@@ -82,7 +82,7 @@ export function amountNote(a: Amount, years: number | null): string {
   return [
     a.perYear && years ? `${formatInrShort(a.perYear)} × ${years} yrs, computed` : null,
     a.extra ? `incl. ${formatInrShort(a.extra)} additional` : null,
-    a.varies ? "varies by specialty" : null,
+    a.varies ? "varies by specialty (see source)" : null,
     a.more ? "+ terms in words" : null,
   ].filter(Boolean).join("; ");
 }
@@ -154,7 +154,7 @@ const FORFEIT = [
 type At = (n: number | undefined) => React.ReactNode;
 
 function FeeCell({ f, at }: { f: FeeEntry | null; at: At }) {
-  if (!f) return <NotDeclared what="not stated" />;
+  if (!f) return <NotDeclared />;
   return (
     <span className="whitespace-nowrap">
       {f.maximum && "Up to "}{f.amount != null ? feeMoney({ amount: f.amount, amount_max: f.amount_max, currency: f.currency }) : f.text}
@@ -168,7 +168,7 @@ function FeeCell({ f, at }: { f: FeeEntry | null; at: At }) {
 type Parsed = NonNullable<Extract<FeeQuotaGroup["fee"], { display: "verbatim" }>["parsed"]>;
 /** A figure read out of the profile's own fee words (its exact words are listed under the table). */
 function ParsedCell({ x, adm, at, src }: { x: Parsed["per_year"][number] | undefined; adm?: boolean; at: At; src: number }) {
-  if (!x) return <NotDeclared what="not stated" />;
+  if (!x) return <NotDeclared />;
   return (
     <span className="whitespace-nowrap">
       {feeMoney(x)}
@@ -180,7 +180,7 @@ function ParsedCell({ x, adm, at, src }: { x: Parsed["per_year"][number] | undef
 const perOf = { per_year: "a year", per_month: "a month" } as const;
 
 function StipendCell({ s, at }: { s: StipendEntry | null; at: At }) {
-  if (!s) return <NotDeclared what="not stated" />;
+  if (!s) return <NotDeclared />;
   return (
     <span className="whitespace-nowrap">
       {s.minimum && "From "}{formatINR(s.inr)}{s.plus_da && " + DA"}
@@ -223,7 +223,7 @@ function variantTotal(v: Variant, years: number) {
  * side, so it fits a phone); every course's behind "Fee of every course here" (a row each).
  */
 function CourseFees({ rows, all, years, at, caption, nameOf }: { rows: { name: string; v: Variant }[]; all: Variant[]; years: number; at: At; caption: React.ReactNode; nameOf: (v: Variant) => string }) {
-  const money = (x: Parameters<typeof feeMoney>[0] | null | undefined) => (x ? feeMoney(x) : <NotDeclared what="not stated" />);
+  const money = (x: Parameters<typeof feeMoney>[0] | null | undefined) => (x ? feeMoney(x) : <NotDeclared />);
   const yearNos = Array.from({ length: years }, (_, i) => i);
   const th = "py-2 text-left font-normal text-muted-foreground";
   const num = "numeric px-2 py-2 text-right whitespace-nowrap";
@@ -361,7 +361,7 @@ function FeeGroup({ g, id, of, title, off, courses = [], exam }: { g: FeeQuotaGr
     p?.annual_fee && <>Annual fee: {feeMoney(p.annual_fee)} a year (from the profile&apos;s words){at(p.src)}</>,
     p?.hostel && <>Hostel: {feeMoney(p.hostel)} {perOf[p.hostel.period]} (from the profile&apos;s words){at(p.src)}</>,
     p?.includes_hostel && (p.includes_hostel === "yes" ? "The profile says the fee includes hostel." : "The profile says the fee does not include hostel."),
-    g.hostel && (g.hostel.male || g.hostel.female) && `Hostel (MCC profile): men ${g.hostel.male === "Y" ? "yes" : g.hostel.male === "N" ? "no" : "not stated"}, women ${g.hostel.female === "Y" ? "yes" : g.hostel.female === "N" ? "no" : "not stated"}.`,
+    g.hostel && (g.hostel.male || g.hostel.female) && `Hostel (MCC profile): men ${g.hostel.male === "Y" ? "yes" : g.hostel.male === "N" ? "no" : "not published"}, women ${g.hostel.female === "Y" ? "yes" : g.hostel.female === "N" ? "no" : "not published"}.`,
     ...g.notes,
   ].filter(Boolean);
   return (
@@ -539,7 +539,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
             <p className="text-base">
               <span className="numeric font-semibold">{bondYears(bond)}</span>
               {" · "}
-              <span className="numeric font-semibold">{bond.amounts.length ? partsText(bond.amounts) : (amountText(bond.amount, true) ?? "amount not stated")}</span>
+              <span className="numeric font-semibold">{bond.amounts.length ? partsText(bond.amounts) : (amountText(bond.amount, true) ?? "amount not published")}</span>
               <Sup n={bond.src} sources={sources} />
             </p>
             {bond.basis && bond.text && <span className={note}>{bond.text}</span>}
@@ -578,7 +578,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
       {(declared || bond.appliesTo) && (
         <p className="text-sm">
           <span className={cn(term, "block")}>Applies to</span>
-          {bond.appliesTo ? <>{bond.appliesTo}<Sup n={bond.src} sources={sources} /></> : <span className="text-muted-foreground">Not stated in the bond record</span>}
+          {bond.appliesTo ? <>{bond.appliesTo}<Sup n={bond.src} sources={sources} /></> : <span className="text-muted-foreground">Not published in the bond record</span>}
         </p>
       )}
       <dl className="grid gap-3 border-t border-border pt-3 text-sm">
