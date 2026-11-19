@@ -351,6 +351,28 @@ test("last ranks show the official closings: closing on one seat category, allot
   for (const v of ["21,699", "25,059", "29,892", "33,685", "20,132"]) await expect(kokila).toContainText(v);
   await expect(page.getByRole("columnheader", { name: "2026", exact: true })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: /Provisional/ })).toHaveCount(0);
+  // Its row: Best (the deepest closing, 2025 Stray's 33,685) with its year and round; every year and round behind
+  // Rounds by year (closed until opened), and all of them with Expand all.
+  const row = page.locator("tr.expand-host").filter({ has: page.locator(`a[href*="/institutes/${KOKILA_NM}?"]`) }).first();
+  await expect(row.getByRole("cell").first()).toContainText(/33,685\s*\(\d+\)\s*2025 Stray/);
+  const grid = row.locator("xpath=following-sibling::tr[1]").getByRole("table", { name: /by year and round/ });
+  await expect(grid).toBeHidden();
+  await row.getByText("Rounds by year").click();
+  await expect(grid).toBeVisible();
+  await expect(grid).toContainText("21,699");
+  await page.getByRole("link", { name: "Expand all rounds by year" }).click();
+  await expect(page).toHaveURL(/expand=1/);
+  await expect(page.locator("tr.expand-row").first()).toBeVisible();
+  // Sort by Best, deepest first.
+  await page.getByRole("link", { name: /^Best, sort/ }).click();
+  await expect(page).toHaveURL(/sort=best/);
+  // Fifty courses read as one chip; its × clears them all.
+  const many = ["md-anaesthesiology", "md-general-medicine", "md-paediatrics", "md-pathology", "md-psychiatry", "md-radio-diagnosis", "ms-general-surgery"];
+  await page.goto(`/decide/last-ranks?${PROFILE}&${many.map((c) => `course=${c}`).join("&")}`);
+  const chips = page.getByRole("group", { name: "Active filters" });
+  await expect(chips.getByRole("button", { name: "Change filter: 7 courses" })).toBeVisible();
+  await chips.getByRole("link", { name: "Remove filter: 7 courses" }).click();
+  await expect(page).not.toHaveURL(/course=/);
 
   // Seth GS MD Anaesthesiology, All India, 2026 R1: OBC 11,842 and Open 8,502, both with 20 allotments (all categories).
   await page.goto(`/decide/last-ranks?${PROFILE}&course=md-anaesthesiology&lcat=OBC&lquota=All+India&inst=${SETH_GS}`);

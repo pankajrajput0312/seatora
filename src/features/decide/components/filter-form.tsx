@@ -93,11 +93,18 @@ export function ToolbarCount({ total, noun }: { total: number; noun: string }) {
   );
 }
 
+/** Whether a page's Clear (`href`) changes anything here: its query is not the address's (the page number aside). */
+export function clears(href: string, now: URLSearchParams) {
+  const key = (p: URLSearchParams) => [...p].filter(([k]) => k !== "page").map(([k, v]) => `${k}=${v}`).sort().join("&");
+  return key(new URLSearchParams(href.split("?")[1] ?? "")) !== key(now);
+}
+
 /**
  * The filters behind a "Filters" button (its badge: `count`, the filters applied), so a list page shows only its search
  * box, this button and the active-filter chips. A modal <dialog>: a bottom sheet on phones (drag its handle down, ×,
  * Escape or a tap outside closes it), a side sheet from md up; focus stays inside while open and goes back to the button
- * after. The fields scroll between the title and a pinned footer: Reset (`clear`, this page without its filters) and
+ * after. With filters applied and a `clear` (this page without its filters, her profile kept) that changes the page,
+ * "Clear filters" sits beside the button. The fields scroll between the title and a pinned footer: "Clear all" (`clear`; without it, Reset) and
  * "Show N results": `total`, the count applied, then after each change the count for the fields as they are now
  * ("Show results" while it loads, half a second after her last change): from `counts` (the rows the page has whole,
  * lib/filter-count.ts tally), else `recount` (a server action given the query string), else this page fetched with
@@ -114,6 +121,7 @@ export function FiltersPanel({ count, clear, total, counts, recount, saveDefault
   children: React.ReactNode;
 }) {
   const id = `filters${useId().replace(/[^\w-]/g, "")}`;
+  const params = useSearchParams();
   const sheet = useRef<HTMLDialogElement>(null);
   // The count shown: `total` until she changes a field, then the new count (undefined while it loads, null: none).
   const [shown, setShown] = useState<number | null | undefined>(total);
@@ -176,6 +184,11 @@ export function FiltersPanel({ count, clear, total, counts, recount, saveDefault
           </span>
         )}
       </button>
+      {count > 0 && clear && clears(clear, params) && (
+        <Link href={clear} scroll={false} className="inline-flex h-11 shrink-0 items-center px-1 text-sm text-sky underline hover:text-foreground">
+          Clear<span className="max-md:sr-only">&nbsp;filters</span>
+        </Link>
+      )}
       <dialog
         ref={sheet}
         id={id}
@@ -231,7 +244,7 @@ export function FiltersPanel({ count, clear, total, counts, recount, saveDefault
         {saveDefaults && <SaveDefaults sheet={sheet} />}
         <div className={cn("flex items-center gap-3 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]", !saveDefaults && "border-t border-border")}>
           {clear ? (
-            <Button asChild variant="secondary"><Link href={clear} scroll={false} onClick={close}>Reset</Link></Button>
+            <Button asChild variant="secondary"><Link href={clear} scroll={false} onClick={close}>Clear all</Link></Button>
           ) : (
             <Button type="reset" variant="secondary" onClick={() => (stop(), setShown(total))}>Reset</Button>
           )}

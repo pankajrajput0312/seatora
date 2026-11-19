@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { revealInSheet } from "./filter-form";
+import { useSearchParams } from "next/navigation";
+import { clears, revealInSheet } from "./filter-form";
 
 /** The chip she removed (its place), until the page without it renders: then focus goes to its neighbour. */
 let removed: number | null = null;
@@ -24,14 +25,41 @@ function edit(param: string) {
   if (!field) sheet?.showModal();
 }
 
+type Chip = { label: string; href: string; param?: string };
+
+/** A folded group's noun ("50 courses"), by the field its chips share. */
+const nouns: Record<string, string> = { course: "courses", c: "courses", sp: "courses", deg: "degrees", degree: "degrees", st: "states", state: "states", quota: "quotas", lquota: "quotas", aq: "quotas", ctype: "college types", scat: "seat categories", acat: "seat categories", round: "rounds", year: "years" };
+
+/**
+ * More than `max` chips of one field (`param`, also its address key) fold into one, in the first one's place: "50
+ * courses", its words opening that field in the Filters sheet, its × this page without any of them (a chip's own
+ * href with that key dropped).
+ */
+export function foldChips(items: Chip[], max = 6): Chip[] {
+  const n = (param?: string) => (param ? items.filter((i) => i.param === param).length : 0);
+  return items.flatMap((i, at) => {
+    if (n(i.param) <= max) return [i];
+    if (items.findIndex((x) => x.param === i.param) !== at) return [];
+    const [path, qs = ""] = i.href.split("?");
+    const p = new URLSearchParams(qs);
+    p.delete(i.param!);
+    const q = p.toString();
+    return [{ label: `${n(i.param)} ${nouns[i.param!] ?? "filters"}`, param: i.param, href: q ? `${path}?${q}` : path }];
+  });
+}
+
 /**
  * The filters a page applies, as chips under its toolbar (one row that scrolls sideways on phones), one per value
- * ("Karnataka", "Deemed"). The chip's words open that filter in the Filters sheet (`param`: its field's name); its ×
- * removes it in one click (`href` = this page without it), and a "Removed Karnataka · Undo" note follows. "Clear all"
- * (`clear`) when there are two or more. Nothing when none is set. After a removal focus moves to the chip now in its place
- * (else the one before it), never to <body>; with none left, to the results heading (else the h1).
+ * ("Karnataka", "Deemed"), more than six of one field as one ("50 courses", foldChips). The chip's words open that
+ * filter in the Filters sheet (`param`: its field's name); its × removes it in one click (`href` = this page without
+ * it), and a "Removed Karnataka · Undo" note follows. "Clear all" (`clear`) when there are two or more and it changes
+ * the page (not only her profile's defaults, as "Your courses (7)", are set). Nothing when
+ * none is set. After a removal focus moves to the chip now in its place (else the one before it), never to <body>; with
+ * none left, to the results heading (else the h1).
  */
-export function ActiveFilters({ items, clear }: { items: { label: string; href: string; param?: string }[]; clear: string }) {
+export function ActiveFilters({ items: all, clear }: { items: Chip[]; clear: string }) {
+  const items = foldChips(all);
+  const params = useSearchParams();
   const box = useRef<HTMLDivElement>(null);
   const [undo, setUndo] = useState<{ label: string; back: string } | null>(null);
   const sig = items.map((i) => i.label).join("\n");
@@ -80,7 +108,7 @@ export function ActiveFilters({ items, clear }: { items: { label: string; href: 
             </Link>
           </span>
         ))}
-        {items.length > 1 && <Link href={clear} scroll={false} onClick={() => remember("all filters", 0)} className="inline-flex min-h-11 items-center px-1 text-sky underline hover:text-foreground max-md:min-h-[2rem]">Clear all</Link>}
+        {items.length > 1 && clears(clear, params) && <Link href={clear} scroll={false} onClick={() => remember("all filters", 0)} className="inline-flex min-h-11 items-center px-1 text-sky underline hover:text-foreground max-md:min-h-[2rem]">Clear all</Link>}
       </div>
       {undo && (
         <p role="status" className="fixed inset-x-4 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-sm items-center justify-between gap-3 rounded-lg bg-foreground px-4 py-1 text-sm text-background shadow-overlay md:bottom-6">
