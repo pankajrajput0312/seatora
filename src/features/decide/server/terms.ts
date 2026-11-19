@@ -1,7 +1,7 @@
 import "server-only";
 import { formatINR } from "@/features/cutoffs/lib/format";
 import { seatGroups, termSourceName, type BondDetails, type PenaltyDetails } from "@/features/cutoffs/lib/import-schema";
-import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
+import { DEFAULT_EXAM, inExamWords, type ExamKey } from "@/features/exams/keys";
 import { variantFor } from "../lib/specialty-search";
 import type { Catalog } from "./catalog";
 import type { SourceType } from "@/types/provenance";
@@ -845,7 +845,7 @@ export function collegeTerms(cat: Catalog, college: string): ProgrammeTerms[] {
   if (!out) {
     const terms = m.terms.get(college) ?? [];
     const website = cat.collegeByKey?.get(college)?.website ?? null;
-    out = programmesOf(m.degrees.get(college) ?? [], cat.exam).map((p) => ({ ...normalizeProgramme(p, terms, m.sharedBy), website, ...(cat.exam !== DEFAULT_EXAM && { exam: cat.exam }) }));
+    out = programmesOf(m.degrees.get(college) ?? [], cat.exam).map((p) => ofExam(cat.exam, { ...normalizeProgramme(p, terms, m.sharedBy), website }));
     m.out.set(college, out);
   }
   return out;
@@ -885,8 +885,10 @@ function withFeeVariant(cat: Catalog, t: ProgrammeTerms, college: string, degree
 
 export function courseTerms(cat: Catalog, college: string, degree: string, specialty?: string, quota?: string): ProgrammeTerms {
   const t = withFeeVariant(cat, courseTermsBase(cat, college, degree, specialty, quota), college, degree, specialty, quota);
-  return cat.exam === DEFAULT_EXAM || t.exam ? t : { ...t, exam: cat.exam };
+  return t.exam ? t : ofExam(cat.exam, t);
 }
+/** Another exam's terms carry it (its words, no NEET PG fee bands: lib/stat-format.ts), their notes in its words (INI-CET: AIIMS, its prospectus). NEET PG's as they are. */
+const ofExam = (exam: ExamKey, t: ProgrammeTerms): ProgrammeTerms => (exam === DEFAULT_EXAM ? t : { ...t, exam, notes: t.notes.map((n) => inExamWords(exam, n)) });
 
 function courseTermsBase(cat: Catalog, college: string, degree: string, specialty?: string, quota?: string): ProgrammeTerms {
   const p = programmeOfDegree(degree, cat.exam);

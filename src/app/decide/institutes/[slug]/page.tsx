@@ -359,7 +359,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               <h2 id="terms-h" className="flex items-center gap-1 text-lg font-semibold">
                 Fees, stipend and bond
                 <InfoTip label="fees, stipend and bond">
-                  {exam === "ini-cet" ? <>Year 1 figures, as the INI-CET prospectus (Part B) prints them. &quot;—&quot; means it prints none, not &quot;none&quot;.</> : <>Year 1 figures, from what the college declared to MCC and NBEMS rules. &quot;—&quot; means not in the MCC profile fields Seatora imports, not &quot;none&quot;.</>}
+                  {exam === "ini-cet" ? <>Year 1 figures, as the INI-CET prospectus (Part B) prints them. &quot;—&quot; means it prints none, not &quot;none&quot;.</> : <>Year 1 figures, from what the college declared to MCC and NBEMS rules. &quot;—&quot; means not in the MCC profile fields Seatora imports, not &quot;none&quot;.</>}{" "}
                   Bond and leaving: a range when the amount depends on course type. Each cell&apos;s (i) has the exact words and their source; the Fees &amp; bond tab has every year by seat type.
                 </InfoTip>
               </h2>
