@@ -14,6 +14,7 @@ import { useExamInfo } from "../lib/use-decide-store";
 import { control } from "./ui";
 import { matchesSpecialty } from "../lib/specialty-search";
 import { CourseOrder } from "./course-order";
+import { parseRankText } from "@/features/decide/lib/rank-text";
 
 /** "Open (General/UR)": what Open means, where she picks it and on her rank chip; the stored value stays "Open". */
 export const categoryName = (c: string) => (c === "Open" ? "Open (General/UR)" : c);
@@ -110,7 +111,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
   // Her order kept to the courses she ticks now (a course added comes last; all equal is no order).
   const current = () => courses && { ...draft, pairs: undefined, ...courses, order: orderFor(draft.order, orderUnits(courses)) };
 
-  const rank = () => Number(rankText.replace(/\D/g, ""));
+  const rank = () => parseRankText(rankText);
   const rankError = `Enter your ${E.rankName}: a number from 1 to ${formatRank(profileSchema.shape.rank.maxValue ?? 0)}.`; // the schema's limit
   // NEET SS: a rank means nothing without its question group.
   const groupError = grouped && !draft.quotas.length ? "Pick your question group: your rank compares only with that group's seats." : null;
