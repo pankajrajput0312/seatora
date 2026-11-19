@@ -2,7 +2,7 @@ import "server-only";
 import { DEFAULT_EXAM, type ExamKey } from "@/features/exams/keys";
 import { db } from "@/lib/db";
 import { seatGroups, type MccClinicalFacts, type MccFeesStructured } from "@/features/cutoffs/lib/import-schema";
-import { getCatalog } from "./catalog";
+import { getCatalog, namedSessions } from "./catalog";
 import type { Programme } from "./terms";
 
 // Bundle schema 2 tables (prisma/import-mcc.ts): ClinicalFacts and FeesStructured, JSONB validated on import
@@ -100,5 +100,5 @@ export async function feesFor(collegeKey: string, programme: Programme, exam: Ex
   const rows = await db.$queryRaw<{ g: string; data: FeeRecord }[]>`
     SELECT f."quotaGroup" AS g, f.data FROM "FeesStructured" f JOIN "College" c ON c.id = f."collegeId"
     WHERE f.exam = ${exam} AND c.key = ${collegeKey} AND f.programme = ${programme}`;
-  return rows.map((r) => feeGroup(r.g, r.data)).sort((a, b) => groupPos(a.quotaGroup) - groupPos(b.quotaGroup));
+  return rows.map((r) => feeGroup(r.g, namedSessions(exam, r.data))).sort((a, b) => groupPos(a.quotaGroup) - groupPos(b.quotaGroup));
 }

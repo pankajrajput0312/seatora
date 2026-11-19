@@ -4,7 +4,7 @@ import { cache as perRequest } from "react";
 import { requireDecideAccess } from "@/features/auth/lib/session";
 import { tidyLabel } from "@/features/exams/exam";
 import { exams } from "@/features/exams/registry";
-import { DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
+import { DEFAULT_EXAM, sessionExams, yearName, type ExamKey } from "@/features/exams/keys";
 import { db } from "@/lib/db";
 import { optionId, roundLabel, rounds, type Allotment, type College, type Course, type Cutoff, type DecideData, type Round, type Source, type Term } from "../types";
 import { termSourceName } from "@/features/cutoffs/lib/import-schema";
@@ -164,10 +164,19 @@ export function memoryCatalog(d: DecideData, exam: ExamKey = DEFAULT_EXAM): Cata
 const WORKING_NOTE = /;?\s*\b(?:I|we) (?:did not|could not|have not|didn't|couldn't|haven't) [^."\\]*\./gi;
 export const scrubNotes = <T,>(x: T): T => JSON.parse(JSON.stringify(x).replace(WORKING_NOTE, (m) => (m.startsWith(";") ? "." : "")));
 
+/**
+ * A fee record's documents with a session-code year named as the exam names it (INI-CET's prospectus "20271" → "Jan
+ * 2027"; display only: server/terms.ts and fees.tsx show a number year, the label already names the session). Every other
+ * exam's records as they are.
+ */
+export const namedSessions = <R extends { sources: { year?: number | string | null }[] }>(exam: ExamKey, r: R): R =>
+  sessionExams.includes(exam) ? { ...r, sources: r.sources.map((x) => (typeof x.year === "number" ? { ...x, year: yearName(exam, x.year) } : x)) } : r;
+
 async function loadCatalog(exam: ExamKey, version: string): Promise<Catalog> {
   // NEET PG: the build's snapshot while no import has committed since (zero DB egress), else Postgres.
   const snap = exam === DEFAULT_EXAM ? await snapshotAt(version) : null;
-  const { sources, colleges, specialties, pairs, terms, options, details, retired, feeTable } = snap?.catalog ?? (await catalogRows(db, exam));
+  const { sources, colleges, specialties, pairs, terms, options, details, retired, feeTable: rawFees } = snap?.catalog ?? (await catalogRows(db, exam));
+  const feeTable = rawFees.map((r) => namedSessions(exam, r));
   const detailsOf = new Map(details.map((d) => [d.id, scrubNotes(d.details)]));
   // FEE and STIPEND terms carry their college + program's fee-table records, as the bundle's terms do (details.records).
   const feeRecords = Map.groupBy(feeTable, (r) => `${r.collegeId}|${bucketOfDegree(r.programme)}`);
