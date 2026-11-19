@@ -16,7 +16,7 @@
 // imports: old links and saved option ids reach the college they became). Spot checks run before the commit.
 // Re-running the same bundle is a no-op in effect. Every file and summary file is hash- and count-checked against the manifest.
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
@@ -83,6 +83,11 @@ for (const [file, { count, sha256 }] of Object.entries({ ...manifest.files, ...s
   const rows = file.endsWith(".ndjson") ? raw[file].toString("utf8").split("\n").filter(Boolean).length : JSON.parse(raw[file].toString("utf8")).length;
   if (rows !== count) fail(`${file}: ${rows} rows, manifest says ${count}`);
 }
+// Another exam's builder writes round_status.json beside notices.json without a manifest entry (NEET SS, NEET MDS: 19 Nov
+// 2026), so it was never imported and its Schedule said "not published". Read it there too: no hash to check, but the
+// same strict schema as NEET PG's, and every step's notice must be in notices.json (below).
+const unlistedStatus = !pg && !summaryFiles["round_status.json"] && !!raw["notices.json"] && existsSync(join(dir, "round_status.json"));
+if (unlistedStatus) raw["round_status.json"] = readFileSync(join(dir, "round_status.json"));
 
 function parse<S extends z.ZodType>(file: string, schema: S): z.infer<S>[] {
   const text = raw[file]?.toString("utf8");
@@ -161,7 +166,8 @@ const roundStatusSchema = z
     year,
     authority: z.string().min(1),
     as_of: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+05:30$/),
-    latest_notice: isoDate,
+    // Another exam whose counselling has no notice yet (NEET SS 2026): none.
+    latest_notice: pg ? isoDate : isoDate.nullable(),
     notes: z.record(z.string(), z.string()),
     rounds: z.partialRecord(z.enum(mccRounds), z.object({ seat_matrix: stepSchema, choice_filling: stepSchema, provisional_result: stepSchema, final_result: stepSchema }).strict()),
   })
@@ -373,7 +379,9 @@ if (noticeByUrl.size !== notices.length) fail("notices.json: duplicate url");
 const steps = roundStatus
   ? Object.entries(roundStatus.rounds).flatMap(([round, st]) => roundSteps.map((step) => ({ round, step, ...st![step] })))
   : [];
-if (roundStatus && steps.length !== summaryFiles["round_status.json"]?.count) fail(`round_status.json: ${steps.length} steps, manifest says ${summaryFiles["round_status.json"]?.count}`);
+if (roundStatus && !unlistedStatus && steps.length !== summaryFiles["round_status.json"]?.count) fail(`round_status.json: ${steps.length} steps, manifest says ${summaryFiles["round_status.json"]?.count}`);
+// Unlisted (no hash): every notice it cites is one of notices.json's, which the manifest does hash.
+if (unlistedStatus) for (const st of steps) for (const u of [st.url, ...st.events.map((e) => e.url)]) if (u && !noticeByUrl.has(u)) fail(`round_status.json: ${st.round} ${st.step} cites ${u}, not in notices.json`);
 
 // NBEMS aggregates: ranks and counts consistent row by row; one result PDF per year behind both files
 type NbemsList = { year: number; key: string; url: string; noticeUrl: string; maxMarks: number; candidates: number; coverage: string; step: number | null; qualified: Record<string, number> | null };

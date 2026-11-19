@@ -2,10 +2,10 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { authorityOf, exams, yearName, type ExamKey } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, exams, yearName, type ExamKey } from "@/features/exams/registry";
 import { decideLinks } from "../lib/links";
-import { alertOf, badgeOf, currentSteps, NOTICE_CLOSED_COOKIE, dueToday, fmtIST, fmtNote, nextDate, roundName, stepName, stepsNow, type StepNow } from "../lib/round-status";
-import { roundStatus, scheduleYear } from "../server/notices";
+import { alertOf, badgeOf, currentSteps, NOTICE_CLOSED_COOKIE, dueToday, fmtIST, fmtNote, nextDate, notStarted, roundName, stepName, stepsNow, type StepNow } from "../lib/round-status";
+import { listNotices, roundStatus, scheduleYear } from "../server/notices";
 import { InfoTip } from "./info-tip";
 import { NoticeStrip } from "./notice-strip";
 import { MCC_PG } from "./pages/mcc-link";
@@ -31,6 +31,23 @@ export const siteLink = (exam: ExamKey, className = `${smallLink} text-sky`) => 
 };
 
 /**
+ * The newest notice in the data, linked, with the counselling it is about and its date: what Home and Schedule say while
+ * no step of the year is announced (NEET SS 2026: the SS 2025 counselling's last notice). Nothing without notices.
+ */
+export async function LatestNotice({ exam, by }: { exam: ExamKey; by: string }) {
+  const n = (await listNotices({}, exam))[0];
+  if (!n) return null;
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 text-sm">
+      <span className="text-muted-foreground">
+        Latest {by} notice ({exam === DEFAULT_EXAM ? "PG" : exams[exam].label} {yearName(exam, n.year)} counselling, <time dateTime={n.date} className="numeric">{fmtIST(n.date, true)}</time>):
+      </span>
+      {n.url ? <NoticeLink s={n} /> : <span>{n.title}</span>}
+    </p>
+  );
+}
+
+/**
  * Home's status strip, merged with the schedule: "Today:" what MCC has open (or what its schedule puts on today's date),
  * then "Next:" the next scheduled step, each with its MCC notice or schedule as a plain link (no numbered footnote), and
  * "Full schedule" (at that round). No round status in the data: says so and points to MCC, never a made-up date.
@@ -44,17 +61,25 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
   const rs = year == null ? null : await roundStatus(year, exam);
   const by = authorityOf(exam); // MCC; INI-CET: AIIMS
   const rn = (r: keyof typeof roundName) => exams[exam].roundWords?.[r] ?? roundName[r]; // INI-CET's R3: "Open Round"
-  if (!rs)
+  const now = new Date();
+  const all = rs ? stepsNow(rs, now) : [];
+  // No round status, or one with nothing announced yet (NEET SS 2026): say which, and the newest notice in the data.
+  if (!rs || notStarted(all)) {
+    const named = `${exam === DEFAULT_EXAM ? "PG" : exams[exam].label} ${yearName(exam, year ?? exams[exam].latestYear)}`;
     return (
-      <section aria-label={`${by} counselling ${yearName(exam, year ?? exams[exam].latestYear)} today`} className="rounded-xl border border-border bg-card px-4 py-3 text-body">
+      <section aria-label={`${by} counselling ${named} today`} className="grid gap-1 rounded-xl border border-border bg-card px-4 py-3 text-body">
         <p className="flex flex-wrap items-center gap-x-2">
-          <span>No {by} round status for {yearName(exam, year ?? exams[exam].latestYear)} is in the data, so no dates are shown. Check the</span>
+          {rs ? <><span className="font-semibold">Today:</span><strong className="font-semibold">{named} counselling hasn&apos;t started</strong><span className="text-muted-foreground">no {by} notice for it yet</span></> : <span>No {by} round status for {named} is in the data, so no dates are shown.</span>}
+        </p>
+        <LatestNotice exam={exam} by={by} />
+        <p className="flex flex-wrap items-center gap-x-3 text-caption text-muted-foreground">
+          <Link href={decideLinks(params).to("/decide/counselling")} className={`${smallLink} text-sky`}>Full schedule</Link>
           {siteLink(exam)}
         </p>
       </section>
     );
-  const now = new Date();
-  const { live, next } = currentSteps(stepsNow(rs, now));
+  }
+  const { live, next } = currentSteps(all);
   const today = next && dueToday(next, now) ? next : null;
   // "Full schedule" opens at the round of the step on today (or next), not at the finished Round 1 the page starts with.
   const at = (live[0] ?? next)?.round;

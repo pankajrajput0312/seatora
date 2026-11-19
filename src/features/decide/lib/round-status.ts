@@ -65,6 +65,26 @@ export const nextFilling = (steps: StepNow[]) =>
   steps.filter((s) => s.step === "choice_filling" && nextDate(s)).sort((a, b) => +instant(nextDate(a)!) - +instant(nextDate(b)!))[0] ??
   null;
 
+/** Nothing of the year's counselling announced yet: every step upcoming, with no notice and no date (NEET SS 2026 on 19 Nov 2026). */
+export const notStarted = (steps: StepNow[]) => steps.length > 0 && steps.every((s) => s.now === "upcoming" && !s.url && !s.scheduled);
+
+/**
+ * The longest note that two or more of a round's notes hold ("not announced: no seat-allocation schedule… (Part A: …)",
+ * or a hold's reason): said once for the round, not on each step (shortNote). Null when none is shared.
+ */
+export const sharedNote = (notes: (string | null | undefined)[]) =>
+  notes.filter((n): n is string => !!n).sort((a, b) => b.length - a.length).find((c) => notes.filter((n) => n?.includes(c)).length > 1) ?? null;
+/**
+ * A step's note with the round's shared note (said above it) cut to its head: "not announced. Mock round choice filling
+ * first: not announced."; null when nothing else is left (the step's note was just that).
+ */
+export function shortNote(note: string | null | undefined, shared: string | null) {
+  if (!note || !shared || !note.includes(shared)) return note ?? null;
+  const head = shared.includes(": ") ? `${shared.split(": ")[0]}${/[.!?]["”')]*$/.test(shared) ? "." : ""}` : "";
+  const left = note.split(shared).join(head).replace(/\s+/g, " ").trim();
+  return left === head.trim() ? null : left || null;
+}
+
 /** Banner lines: steps open or suspended now, and the upcoming step with the earliest scheduled date. */
 export function currentSteps(steps: StepNow[]) {
   const live = steps.filter((s) => s.now === "open" || s.now === "suspended");
@@ -100,3 +120,23 @@ export function alertOf(steps: StepNow[]) {
   const both = s.step.endsWith("_result") && steps.some((o) => o !== s && o.round === s.round && o.now === "suspended" && o.step.endsWith("_result") && o.url === s.url);
   return { id: s.url!.split("/").pop()!, url: s.url!, text: `${roundName[s.round]} ${both ? "result" : stepName[s.step].toLowerCase()} ${badgeOf(s).text.toLowerCase()}` };
 }
+
+/** A note's sentences ("…clarification. AIQ and State Schedule PG 2026 (16 Nov): …"), a "No. 10" never split. */
+const sentences = (note: string) => note.split(/(?<=\.)\s+(?=[A-Z])/).map((s) => s.trim()).filter(Boolean);
+const JOINING = /last date of joining\s+(\d{1,2} [A-Z][a-z]{2}(?: \d{4})?)/i;
+const isJoining = (s: string) => JOINING.test(s) || /^Tentative:/.test(s);
+
+/**
+ * A round's joining words from its steps' notes (MCC's "AIQ and State Schedule", as round_status.json gives them on the
+ * final result): the last date of joining, its window and caveat sentences ("Tentative: …"), and the step they are on.
+ * Null when no note of the round names a last date of joining.
+ */
+export function joiningOf(steps: Pick<StepNow, "note" | "step" | "url" | "title" | "scheduledBy">[]) {
+  const s = steps.find((x) => x.note && JOINING.test(x.note));
+  if (!s) return null;
+  const said = sentences(s.note!).filter(isJoining);
+  return { by: JOINING.exec(s.note!)![1], tentative: said.some((x) => /^Tentative:/.test(x)), said, step: s };
+}
+
+/** A note with its joining sentences taken out (said once under the round, joiningOf); null when nothing is left. */
+export const withoutJoining = (note: string | null) => (note ? sentences(note).filter((x) => !isJoining(x)).join(" ") || null : null);

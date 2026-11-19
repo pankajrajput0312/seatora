@@ -9,13 +9,13 @@ import { AppPage } from "@/features/decide/components/app-page";
 import { Dash, PageHead } from "@/features/decide/components/bits";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { MCC_PG, MccLink } from "@/features/decide/components/pages/mcc-link";
-import { NoticeLink, siteLink } from "@/features/decide/components/round-status";
+import { LatestNotice, NoticeLink, siteLink } from "@/features/decide/components/round-status";
 import { ScrollToHash } from "@/features/decide/components/scroll-to-hash";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { ActiveFilters, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { badgeOf, clockNote, fmtIST, fmtNote, roundName, stepName, stepsNow, type StepNow } from "@/features/decide/lib/round-status";
+import { badgeOf, clockNote, fmtIST, fmtNote, joiningOf, notStarted, roundName, sharedNote, shortNote, stepName, stepsNow, withoutJoining, type StepNow } from "@/features/decide/lib/round-status";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
 import { meritLists } from "@/features/decide/server/merit";
 import { listNotices, roundStatus, scheduleYear } from "@/features/decide/server/notices";
@@ -56,6 +56,8 @@ const wordsOf = (exam: ExamKey) => {
     /** "PG 2026" (NEET PG, as ever), else "INI-CET Jan 2027". */
     year: (y: number) => (exam === DEFAULT_EXAM ? `PG ${y}` : `${E.label} ${yearName(exam, y)}`),
     round: (r: Round) => E.roundWords?.[r] ?? roundName[r],
+    /** A counselling in a sentence: INI-CET's "the July 2026 session", else "NEET SS 2025 counselling". */
+    counselling: (y: number) => (sessionExams.includes(exam) ? `the ${yearName(exam, y, true)}` : `${exam === DEFAULT_EXAM ? "PG" : E.label} ${y} counselling`),
     site: (text: string) => (exam === DEFAULT_EXAM ? siteText(text) : siteLink(exam, smallLink)),
   };
 };
@@ -99,11 +101,23 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
   if (!rs) {
     // Another exam with no round status in its data yet (its bundle's round_status.json): the counselling it holds next
     // (this calendar year, else its latest), and where its counselling body publishes the schedule. Never made-up dates.
+    // With notices in the data, the newest of them and the way to all of them.
     const next = year ?? (sessionExams.includes(exam) ? w.E.latestYear : Math.max(w.E.latestYear, new Date().getFullYear()));
     const named = `${exam === DEFAULT_EXAM ? "PG" : w.E.label} ${yearName(exam, next)}`;
+    const any = (await listNotices({}, exam)).length > 0;
     return (
-      <EmptyState icon={CalendarDays} title={`${w.by} hasn't published the ${named} schedule here yet`} description={`Seatora shows ${w.by}'s round dates once its schedule is in the data, and never makes one up. Until then, ${w.by}'s own page has the current schedule and notices.`}>
-        {exam === DEFAULT_EXAM ? <MccLink /> : siteLink(exam)}
+      <EmptyState
+        icon={CalendarDays}
+        title={any ? `No ${w.by} round status for ${named} in the data yet` : `${w.by} hasn't published the ${named} schedule here yet`}
+        description={any ? `Seatora shows each round's steps once ${w.by}'s round status is in the data, and never makes a date up. Its newest notice is below; Announcements has every one.` : `Seatora shows ${w.by}'s round dates once its schedule is in the data, and never makes one up. Until then, ${w.by}'s own page has the current schedule and notices.`}
+      >
+        <span className="grid justify-items-center gap-1">
+          {any && <LatestNotice exam={exam} by={w.by} />}
+          <span className="flex flex-wrap justify-center gap-x-6">
+            {any && <Link href={L.to("/decide/counselling", { tab: "announcements" })} className={`${smallLink} text-sm text-sky`}>All {w.by} notices</Link>}
+            {exam === DEFAULT_EXAM ? <MccLink /> : siteLink(exam)}
+          </span>
+        </span>
       </EmptyState>
     );
   }
@@ -111,14 +125,17 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
   const before = exam === DEFAULT_EXAM ? null : examYears(exam).filter((y) => y < rs.year).at(-1) ?? null;
   const ran = before == null ? [] : await listNotices({ year: before }, exam);
   // Another exam: the session's dates its counselling body has printed (INI-CET's Prospectus Part A: course start, last date of admission).
-  const printed = exam === DEFAULT_EXAM ? [] : await listNotices({ kind: "schedule", year: rs.year }, exam);
+  // NEET MDS / SS: each step already cites its schedule notice, so not listed again above the rounds.
+  const printed = sessionExams.includes(exam) ? await listNotices({ kind: "schedule", year: rs.year }, exam) : [];
   const now = new Date();
   const steps = stepsNow(rs, now);
+  // Nothing announced yet (NEET SS 2026): said once, with the newest notice, never a list of "Not announced" steps.
+  const idle = notStarted(steps);
   return (
     <section aria-labelledby="schedule-h" className="grid gap-4">
       <div className="grid gap-1">
         <div className="flex items-center gap-1">
-          <h2 id="schedule-h" className="text-lg font-semibold">{exam === DEFAULT_EXAM ? `PG counselling ${rs.year}` : `${w.E.label} ${yearName(exam, rs.year, true)}`}, round by round</h2>
+          <h2 id="schedule-h" className="text-lg font-semibold">{exam === DEFAULT_EXAM ? `PG counselling ${rs.year}` : `${w.E.label} ${yearName(exam, rs.year, true)}`}{idle ? "" : ", round by round"}</h2>
           <InfoTip label="the round statuses">
             Each status comes from {w.by}&apos;s notices as of <span className="numeric">{fmtIST(rs.asOf)}</span> and moves on only when today (<span className="numeric">{fmtIST(now.toISOString())}</span>) passes a date printed in {w.by}&apos;s schedule. Dates are as printed; tentative ones may change. Each step links the {w.by} notice behind its status.
           </InfoTip>
@@ -132,7 +149,7 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
       <ScrollToHash />
       {printed.length > 0 && (
         <section aria-labelledby="dates-h" className="grid gap-1 rounded-xl border border-border bg-card px-4 py-3">
-          <h3 id="dates-h" className="font-semibold">Dates {w.by} has printed for the {yearName(exam, rs.year, true)}</h3>
+          <h3 id="dates-h" className="font-semibold">Dates {w.by} has printed for {w.counselling(rs.year)}</h3>
           <ul className="grid gap-1 text-sm">
             {printed.map((n) => (
               <li key={`${n.date}|${n.url}|${n.title}`} className="flex flex-wrap items-center gap-x-2">
@@ -143,7 +160,23 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
           </ul>
         </section>
       )}
-      {rs.rounds.map((r) => (
+      {idle && (
+        <section aria-labelledby="idle-h" className="grid gap-1 rounded-xl border border-border bg-card px-4 py-3">
+          <h3 id="idle-h" className="font-semibold">{exam === DEFAULT_EXAM ? `PG ${rs.year}` : `${w.E.label} ${yearName(exam, rs.year)}`} counselling hasn&apos;t started</h3>
+          <p className="text-sm text-muted-foreground">
+            No {w.by} notice, schedule or bulletin for it yet (as of <span className="numeric">{fmtIST(rs.asOf)}</span>). Its rounds ({rs.rounds.map((r) => w.round(r.round)).join(", ")}) show here once {w.by} publishes its schedule; no date is made up.
+          </p>
+          <LatestNotice exam={exam} by={w.by} />
+        </section>
+      )}
+      {!idle && rs.rounds.map((r) => {
+        const own = steps.filter((s) => s.round === r.round);
+                // Its last date of joining (the final result's note: said under the round), and a note several steps share
+        // ("Not announced: …", a hold's reason): once, under the round's name, each step keeping only its own words.
+        const joining = joiningOf(own);
+        const noteOf = (s: StepNow) => (joining && s === joining.step ? withoutJoining(s.note) : s.note);
+        const shared = sharedNote(own.map(noteOf));
+        return (
         <section key={r.round} aria-labelledby={`round-${r.round}`} className="scroll-mt-24 rounded-xl border border-border bg-card">
           <div className="flex flex-wrap items-center justify-between gap-x-3 border-b border-border px-4">
             <h3 id={`round-${r.round}`} className="scroll-mt-24 py-2.5 font-semibold">{w.round(r.round)}</h3>
@@ -151,21 +184,38 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
               {w.round(r.round)} notices
             </Link>
           </div>
-          <ol>{steps.filter((s) => s.round === r.round).map((s) => <Step key={s.step} s={s} by={w.by} />)}</ol>
-          {/* MCC's round status has no reporting or joining step: say so, never a made-up date. */}
-          <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-            Reporting and joining dates: not in Seatora&apos;s schedule data. The round&apos;s {w.by} result notice gives them:{" "}
-            <Link href={L.to("/decide/counselling", { tab: "announcements", year: rs.year, round: r.round })} className={`${smallLink} text-sky`}>{w.round(r.round)} notices</Link>.
-          </p>
+          {shared && <p className="border-b border-border px-4 py-2 text-xs text-muted-foreground">{noteText(shared)}</p>}
+          <ol>{own.map((s) => <Step key={s.step} s={s} by={w.by} note={shortNote(noteOf(s), shared)} />)}</ol>
+          {joining ? (
+            // The round's last date of joining, as its schedule notice prints it (the final result's note), with its window
+            // and caveat; the step keeps the rest of its note.
+            <div className="grid gap-0.5 border-t border-border px-4 py-2">
+              <p className="text-sm">
+                <span className="font-semibold">Last date of joining: <span className="numeric">{joining.by}</span></span>
+                {joining.tentative && <span className="text-sun"> (tentative)</span>}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {joining.said.map((x) => noteText(x)).join(" ")}{" "}
+                <Link href={L.to("/decide/counselling", { tab: "announcements", year: rs.year, round: r.round })} className={`${smallLink} text-sky`}>{w.round(r.round)} notices</Link>
+              </p>
+            </div>
+          ) : (
+            // No schedule note with the round's joining date: say so, never a made-up date.
+            <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+              Reporting and joining dates: not in Seatora&apos;s schedule data. The round&apos;s {w.by} result notice gives them:{" "}
+              <Link href={L.to("/decide/counselling", { tab: "announcements", year: rs.year, round: r.round })} className={`${smallLink} text-sky`}>{w.round(r.round)} notices</Link>.
+            </p>
+          )}
         </section>
-      ))}
+        );
+      })}
       {ran.length > 0 && before != null && (
         <section aria-labelledby="ran-h" className="grid gap-2 rounded-xl border border-dashed border-border px-4 py-3">
-          <h3 id="ran-h" className="font-semibold">How the {yearName(exam, before, true)} ran (for reference)</h3>
+          <h3 id="ran-h" className="font-semibold">How {w.counselling(before)} ran (for reference)</h3>
           <p className="text-sm text-muted-foreground">
-            The last session&apos;s {w.by} notices, newest first, as that session ran. Not a forecast: the {yearName(exam, rs.year, true)} keeps its own dates, and none is made up.
+            The last {sessionExams.includes(exam) ? "session" : "counselling"}&apos;s {w.by} notices, newest first, as it ran. Not a forecast: {w.counselling(rs.year)} keeps its own dates, and none is made up.
           </p>
-          <ol className="grid gap-1 text-sm" aria-label={`${w.by} notices of the ${yearName(exam, before, true)}`}>
+          <ol className="grid gap-1 text-sm" aria-label={`${w.by} notices of ${w.counselling(before)}`}>
             {ran.map((n) => (
               <li key={`${n.date}|${n.url}|${n.title}`} className="flex flex-wrap items-center gap-x-2">
                 <time dateTime={n.date} className="numeric text-xs text-muted-foreground">{fmtIST(n.date, true)}</time>
@@ -180,7 +230,11 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
   );
 }
 
-function Step({ s, by }: { s: StepNow; by: string }) {
+/** A round-status note as a sentence: capitalised, one full stop (a note ending in its own '…separately").' takes none). */
+const noteText = (note: string) => `${fmtNote(note[0].toUpperCase() + note.slice(1))}${/[.!?]["”')]*$/.test(note) ? "" : "."}`;
+
+/** One step; `note`: its own words (the round says its shared note and joining date once, above and below). */
+function Step({ s, by, note }: { s: StepNow; by: string; note: string | null }) {
   const sc = s.scheduled;
   const dates = sc && (sc.on ? fmtIST(sc.on) : [sc.from && fmtIST(sc.from), sc.to && fmtIST(sc.to)].filter(Boolean).join(" – "));
   const why = clockNote(s);
@@ -197,8 +251,7 @@ function Step({ s, by }: { s: StepNow; by: string }) {
           </p>
         )}
         {why && <p className="text-xs text-sun">{why}</p>}
-        {/* A note that ends a sentence itself (INI-CET's '…separately").') takes no second full stop. */}
-        {s.note && <p className="text-xs text-muted-foreground">{fmtNote(s.note[0].toUpperCase() + s.note.slice(1))}{/[.!?]["”')]*$/.test(s.note) ? "" : "."}</p>}
+        {note && <p className="text-xs text-muted-foreground">{noteText(note)}</p>}
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           {s.date && <time dateTime={s.date} className="numeric">{fmtIST(s.date, true)}</time>}
           {s.url ? <NoticeLink s={s} by={by} /> : <span>{by} notice: <Dash /></span>}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoundStepInfo } from "../types";
-import { alertOf, badgeOf, currentSteps, dueToday, fillWindow, fmtIST, fmtNote, nextChoiceFilling, nextFilling, statusNow, stepsNow } from "./round-status";
+import { alertOf, badgeOf, currentSteps, dueToday, fillWindow, fmtIST, fmtNote, nextChoiceFilling, nextFilling, joiningOf, notStarted, sharedNote, shortNote, statusNow, stepsNow, withoutJoining, type StepNow } from "./round-status";
 
 // 2026 R2 as round_status.json gives it (as of 14 Nov 2026 17:27 IST).
 const choice = { status: "open", scheduled: { from: "2026-11-10T13:00:00+05:30", to: "2026-11-15T23:55:00+05:30", on: null, tentative: false } } as const;
@@ -85,5 +85,39 @@ describe("alertOf", () => {
     expect(alertOf(r2(held("provisional_result"), held("final_result")))).toEqual({ id: "202611171047091852.pdf", url: "https://x/202611171047091852.pdf", text: "Round 2 result on hold" });
     expect(alertOf(r2(held("choice_filling", "https://x/n9.pdf")))?.text).toBe("Round 2 choice filling suspended");
     expect(alertOf(r2({ ...held("final_result"), status: "upcoming" }))).toBeNull();
+  });
+});
+
+describe("a counselling not announced yet (NEET SS 2026, INI-CET January 2027)", () => {
+  const up = (note?: string) => ({ step: "seat_matrix", round: "R1", now: "upcoming", clock: null, status: "upcoming", date: null, url: null, title: null, note: note ?? null, scheduled: null, scheduledBy: null, events: [] }) as unknown as StepNow;
+  it("not started: every step upcoming with no notice and no date", () => {
+    expect(notStarted([up(), up()])).toBe(true);
+    expect(notStarted([up(), { ...up(), url: "https://mcc.nic.in/x.pdf" }])).toBe(false);
+    expect(notStarted([up(), { ...up(), scheduled: { from: "2027-01-02", to: null, on: null, tentative: true } }])).toBe(false);
+    expect(notStarted([up(), { ...up(), now: "done" }])).toBe(false);
+    expect(notStarted([])).toBe(false);
+  });
+  it("a note two steps of a round share is said once for the round, each step keeping only its own words", () => {
+    const na = 'not announced: no seat-allocation schedule (Part A: "Will be notified separately").';
+    const notes = [`${na} Mock round choice filling first: ${na}`, `Mock round (preview of the 1st round, no seat allotted): ${na}`, na, null];
+    expect(sharedNote(notes)).toBe(na);
+    expect(notes.map((n) => shortNote(n, na))).toEqual(["not announced. Mock round choice filling first: not announced.", "Mock round (preview of the 1st round, no seat allotted): not announced.", null, null]);
+    expect(sharedNote([na, "final seat position applies from round 1", null])).toBeNull();
+    // A hold's reason, with no "head": the step that only had it says nothing more.
+    const held = "held under a Madras High Court interim order (WP No. 46350 of 2026) of 17 Nov; MCC will declare it after the court's clarification.";
+    expect([sharedNote([held, held]), shortNote(held, held)]).toEqual([held, null]);
+  });
+});
+
+describe("a round's last date of joining, from its final result's note (MCC's AIQ and State Schedule)", () => {
+  const r2 = "held under a Madras High Court interim order (WP No. 46350 of 2026) of 17 Nov; MCC will declare it after the court's clarification. AIQ and State Schedule PG 2026 (16 Nov): Round 2 from 6 Nov to 14 Nov, last date of joining 24 Nov. Tentative: MCC put the Round 2 result on hold (Notice No. 10, 17 Nov); later dates may move";
+  const steps = [{ step: "provisional_result", note: "held under …" }, { step: "final_result", note: r2 }] as unknown as StepNow[];
+  it("finds the date, its sentences and the step; the step's own note keeps the rest", () => {
+    const j = joiningOf(steps)!;
+    expect([j.by, j.tentative, j.step.step]).toEqual(["24 Nov", true, "final_result"]);
+    expect(j.said).toEqual(["AIQ and State Schedule PG 2026 (16 Nov): Round 2 from 6 Nov to 14 Nov, last date of joining 24 Nov.", "Tentative: MCC put the Round 2 result on hold (Notice No. 10, 17 Nov); later dates may move"]);
+    expect(withoutJoining(r2)).toBe("held under a Madras High Court interim order (WP No. 46350 of 2026) of 17 Nov; MCC will declare it after the court's clarification.");
+    expect(withoutJoining("AIQ and State Schedule PG 2026 (16 Nov): Round 1 from 12 Oct to 24 Oct, last date of joining 2 Nov")).toBeNull();
+    expect(joiningOf([{ step: "final_result", note: "suspended" }] as unknown as StepNow[])).toBeNull();
   });
 });
