@@ -525,7 +525,7 @@ const MAY_APPLY = /; ([^;]*\bmay apply)$/;
  * record's rows for this programme kind (never in-service), the All India figure first. `amountInr` null (no figure for
  * a non-service All India candidate): the amount is words. `src`: a document's source number (`label`: its name).
  */
-function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url: string | null, label?: string) => number, wordYears = false): Bond {
+function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url: string | null, label?: string) => number, aiims = false): Bond {
   const kind = programmes[programme].kind;
   const course = d.by_course?.find((c) => c.course === programme);
   const st = STATUS[course?.status ?? d.status];
@@ -541,7 +541,8 @@ function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url
   const appliesTo = st.basis === "state_rule" ? null : (d.applies_to ?? null);
   const rs = course?.status ?? d.status;
   // A listed document not read (NEET SS / MDS: "unknown" with the document's link); read with no clear bond, or unknown otherwise.
-  const why = rs === "unknown" && d.doc_url ? ("unread" as const) : rs === "unknown" || rs === "unclear" ? ("unclear" as const) : null;
+  // INI-CET (`aiims`): its prospectus is read, so "unknown" there means it states no service bond: unclear, never "not read".
+  const why = rs === "unknown" && d.doc_url && !aiims ? ("unread" as const) : rs === "unknown" || rs === "unclear" ? ("unclear" as const) : null;
   const base = { ...notDeclared(), ...st, stateRule: d.state_rule?.text ?? null, appliesTo, text, quote: d.quote || null, caveat, src: own, doc, ...(why && { why }) };
   // "No bond" only where nothing may still bind: one where a state law's service may apply is unknown (cells, filters, CSV).
   if (st.status === "none") return mayApply ? { ...base, status: "not_declared", basis: null } : { ...base, years: 0 };
@@ -550,8 +551,8 @@ function bondFromRecord(programme: Programme, t: Term, d: BondDetails, src: (url
   // The rule's years: its amounts too (same basis), citing the rule; else the document's rows.
   const ruleRows = rule && d.state_rule?.amounts?.length ? d.state_rule.amounts : null;
   const ruleSrc = ruleRows && d.state_rule?.source ? src(d.state_rule.source.url) : own;
-  // INI-CET (`wordYears`): a contract's years said in its words only ("for a period of three years").
-  const ys = yearsOf(rule ?? bondYearsOf(text, course ? null : d.years, kind) ?? (wordYears ? yearsInWords(d.quote ?? text) : null));
+  // INI-CET (`aiims`): a contract's years said in its words only ("for a period of three years").
+  const ys = yearsOf(rule ?? bondYearsOf(text, course ? null : d.years, kind) ?? (aiims ? yearsInWords(d.quote ?? text) : null));
   const yearsText = (rule ? d.state_rule?.years : typeof d.years === "string" ? d.years : null) ?? null;
   if (course) {
     // Its own entry: one figure; "₹10 L per unserved year" × the years (computed).

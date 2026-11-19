@@ -5,8 +5,12 @@ import { CHOICES_KEY, COMPARE_KEY } from "@/features/decide/lib/choices";
 import { PROFILE_KEY, profileQuotas } from "@/features/decide/profile";
 import { baseCategories, openQuotas, openQuotasNote, quotaScopeNote, rounds, type Source } from "@/features/decide/types";
 import { completeYear, examShows, headYearOf, neetPg, quotaIn, roundIn, roundNamesOf, tidyLabel } from "./exam";
-import { DEFAULT_EXAM, examFor, examKeys, exams, examYears, groupOf, groupsOf, headYearIn, isExam, latestOf, markerKey, pageNeeds, restrictedQuota, roundNameIn, scopedKey, rankListIn, showsPage, yearName } from "./registry";
-import { authorityOf, inExamWords, rankListOf, sessionOf } from "./keys";
+import { DEFAULT_EXAM, examFor, examKeys, exams, examYears, groupOf, groupsOf, headYearIn, isExam, latestOf, markerKey, pageNeeds, restrictedQuota, roundNameIn, scopedKey, rankListIn, rankListParam, showsPage, yearName } from "./registry";
+import { authorityOf, inExamWords, rankListOf, seatCategoriesFor, sessionOf } from "./keys";
+import { instituteGroupOf } from "./exam";
+import { kindName, roundShort, seatCategoryName } from "@/features/decide/types";
+import { normalizeProgramme, yearsInWords } from "@/features/decide/server/terms";
+import { lowestRisk } from "@/features/decide/lib/term-filters";
 import { yearsOf } from "@/features/decide/server/catalog";
 
 const src = (year: number, round: Source["round"], name = "", provisional = false): Source => ({ key: `${year}/${round}`, url: null, year, round, provisional, name });
@@ -230,5 +234,26 @@ describe("the counselling body's words (keys.ts authorityOf, inExamWords)", () =
     expect(inExamWords("ini-cet", s)).toBe("Fee in the INI-CET prospectus's own words; AIIMS's result PDFs; the INI-CET prospectus; INI-CET prospectus, read");
     for (const k of ["neet-pg", "neet-ss", "neet-mds"] as const) expect([inExamWords(k, s), authorityOf(k)]).toEqual([s, "MCC"]);
     expect(authorityOf("ini-cet")).toBe("AIIMS");
+  });
+});
+
+describe("INI-CET's words for seat lists, rounds, seats and institutes (tester fixes)", () => {
+  it("one seat position a session, R3 the Open Round, JIPMER's totals; NEET PG's words as ever", () => {
+    expect([kindName("clear", "ini-cet"), kindName("clear", "neet-pg"), kindName("virtual", "neet-mds")]).toEqual(["Seat position", "Clear vacancy", "Virtual vacancy"]);
+    expect([roundShort("R3", "ini-cet"), roundShort("R3", "neet-pg"), roundShort("stray", "ini-cet")]).toEqual(["Open Round", "R3", "Stray"]);
+    expect([seatCategoriesFor("ini-cet", ["Open", "OBC"]), seatCategoriesFor("neet-pg", ["Open", "OBC"])]).toEqual([["Open", "OBC", "All"], ["Open", "OBC"]]);
+    expect([seatCategoryName("All"), seatCategoryName("OBC PwD")]).toEqual(["Categories not split", "OBC PwD"]);
+  });
+  it("MDS's own list on links; institute groups by key", () => {
+    expect([rankListParam("ini-cet", "MDS"), rankListParam("ini-cet", "MS"), rankListParam("neet-pg", "MDS")]).toEqual(["mds", "main", undefined]);
+    const E = exams["ini-cet"];
+    expect(["AIIMSNEWDELHI#110029", "AIIMSBHOPAL#462020", "JIPMERPUDUCHERRY#605006", "PGIMERCHANDIGARH#160012", "NIMHANSBENGALURU#560029", "SCTIMSTTRIVANDRUM#695011", "X"].map((k) => instituteGroupOf(E, k))).toEqual(["AIIMS New Delhi", "New AIIMS", "JIPMER", "PGIMER", "NIMHANS", "SCTIMST", null]);
+    expect(instituteGroupOf(exams["neet-pg"], "AIIMSNEWDELHI#110029")).toBeNull();
+  });
+  it("a contract's years in words; the lowest leaving penalty where no bond penalty exists (INI-CET only)", () => {
+    expect([yearsInWords("Each Junior Resident will be on contract service for a period of three years."), yearsInWords("2 years"), yearsInWords("no figure")]).toEqual([[3], [2], null]);
+    const t = (leave: number | null) => ({ ...normalizeProgramme("MD/MS", []), bond: { ...normalizeProgramme("MD/MS", []).bond, leavingAmount: { ...normalizeProgramme("MD/MS", []).bond.leavingAmount, state: leave == null ? "none" : "figure", max: leave, min: leave } } }) as never;
+    expect(lowestRisk([{ name: "A", t: t(300000) }, { name: "B", t: t(500000) }], true)).toMatch(/^Lowest leaving penalty here: A/);
+    expect(lowestRisk([{ name: "A", t: t(300000) }, { name: "B", t: t(500000) }])).toMatch(/^Can't tell/);
   });
 });

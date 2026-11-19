@@ -12,7 +12,7 @@ import { termLabel } from "../types";
 import { SourceRef } from "./page-sources";
 import { smallLink } from "./ui";
 import { ExamWords, QuotaName } from "./round-name";
-import { authorityOf, DEFAULT_EXAM, inExamWords } from "@/features/exams/keys";
+import { authorityOf, DEFAULT_EXAM, inExamWords, type ExamKey } from "@/features/exams/keys";
 
 // Fees, stipend and bond as ProgrammeTerms (server/terms.ts) renders them. Server-safe and client-safe on purpose (no
 // "use client", type-only server imports): the institute and Fees pages render them on the server, Options rows in the browser.
@@ -290,7 +290,7 @@ function CourseFees({ rows, all, years, at, caption, nameOf }: { rows: { name: s
  * (also a record without fee_display): only the profile's fee words and their link, never a figure, then the stipends.
  * NBEMS ceilings and floors are labelled, never the college's figure.
  */
-function FeeGroup({ g, id, of, title, off, courses = [] }: { g: FeeQuotaGroup; id: string; of: string; title: string; off: number; courses?: MyCourse[] }) {
+function FeeGroup({ g, id, of, title, off, courses = [], exam }: { g: FeeQuotaGroup; id: string; of: string; title: string; off: number; courses?: MyCourse[]; exam?: ExamKey }) {
   const sources = groupSources(g, off);
   const at: At = (x) => <Sup n={x == null ? x : x + off} sources={sources} />;
   const n = g.fee.display === "numbers" ? g.fee : null;
@@ -339,7 +339,18 @@ function FeeGroup({ g, id, of, title, off, courses = [] }: { g: FeeQuotaGroup; i
     ...st.map((s, i) => s?.as_stated_per_year != null && `Stipend year ${i + 1}: stated as ${formatINR(s.as_stated_per_year)} a year, shown per month.`),
     [...new Set(st.flatMap((s) => (s?.basis ? [s.basis] : [])))].map((b) => `Stipend: ${b}.`).join(" ") || null,
     said.length ? `The MCC profile's stipend words: ${words}` : g.stipendNote,
-    cf && FORFEIT.some(([k]) => cf[k]) && (
+    // INI-CET: AIIMS's counselling rules in their own words (never MCC's Round 2 labels).
+    cf && authorityOf(exam) !== "MCC" && FORFEIT.some(([k]) => cf[k]) && (
+      <>
+        {authorityOf(exam)}&apos;s counselling rules:{" "}
+        {FORFEIT.flatMap(([k]) => {
+          const x = cf[k];
+          return x ? [[x.inr != null ? formatINR(x.inr) : "", x.text].filter(Boolean).join(": ")] : [];
+        }).join(" · ")}
+        {at(cf.src)}
+      </>
+    ),
+    cf && authorityOf(exam) === "MCC" && FORFEIT.some(([k]) => cf[k]) && (
       <>
         MCC counselling (the college&apos;s MCC form):{" "}
         {FORFEIT.flatMap(([k, label]) => {
@@ -501,7 +512,7 @@ export function FeesSection({ t: all, id, className, groups = [], courses }: { t
       <h3 id={id} className="text-lg font-semibold">{title}</h3>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="grid min-w-0 content-start gap-6">
-          {groups.length > 0 ? groups.map((g, i) => <FeeGroup key={g.quotaGroup} g={g} id={`${id}-g${i}`} of={id} title={title} off={offs[i]} courses={courses} />) : <TermsYears t={t} />}
+          {groups.length > 0 ? groups.map((g, i) => <FeeGroup key={g.quotaGroup} g={g} id={`${id}-g${i}`} of={id} title={title} off={offs[i]} courses={courses} exam={t.exam} />) : <TermsYears t={t} />}
         </div>
         <BondBox t={t} id={`${id}-bond`} of={id} />
       </div>

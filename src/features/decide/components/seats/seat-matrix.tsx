@@ -175,21 +175,6 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   const E = useExamInfo();
   const latest = latestIn ?? latestRound(results);
   const cols = useMemo(() => matrixCols(groups, ranked, years, E.has, E.key), [groups, ranked, years, E.has, E.key]);
-  // INI-CET (one seat position a session): its seats column right after the category, before the terms.
-  const seatsFirst = kindName("clear", E.key) === "Seat position";
-  const groupHeads = groups.map((g) => (
-    <th key={g.key} colSpan={g.virtual ? 2 : 1} scope="colgroup" data-col={g.key} className={cn(th, "border-l border-border text-center")}>{g.label} seats</th>
-  ));
-  const seatCells = (r: MatrixRow) =>
-    groups.map((g) => (
-      <Fragment key={g.key}>
-        <td data-col={g.key} className={cn(num, "border-l border-border")}>
-          {g.clear && r.byList[g.clear.key] != null ? <span className="font-semibold text-leaf">{formatRank(r.byList[g.clear.key])}</span> : <Dash />}
-          <AddedBadges r={r} added={g.added} />
-        </td>
-        {g.virtual && <td data-col={g.key} className={num}>{r.byList[g.virtual.key] != null ? <span className="font-semibold text-sun">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>}
-      </Fragment>
-    ));
   const [hidden] = useHiddenCols(DISPLAY_KEY, cols, DEFAULT_HIDDEN);
   const [open, setOpen] = useState<string | null>(null);
   const row = rows.find((r) => rowKey(r) === open) ?? null;
@@ -206,6 +191,21 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
   const td = "px-3 py-2 align-top";
   const num = cn(td, "text-right tabular-nums whitespace-nowrap");
   const sticky = "sticky left-0 z-[1] w-40 min-w-40 border-r border-border bg-card md:w-64 md:min-w-64";
+  // INI-CET (one seat position a session): its seats column right after the category, before the terms.
+  const seatsFirst = kindName("clear", E.key) === "Seat position";
+  const groupHeads = groups.map((g) => (
+    <th key={g.key} colSpan={g.virtual ? 2 : 1} scope="colgroup" data-col={g.key} className={cn(th, "border-l border-border text-center")}>{g.label} seats</th>
+  ));
+  const seatCells = (r: MatrixRow) =>
+    groups.map((g) => (
+      <Fragment key={g.key}>
+        <td data-col={g.key} className={cn(num, "border-l border-border")}>
+          {g.clear && r.byList[g.clear.key] != null ? <span className="font-semibold text-leaf">{formatRank(r.byList[g.clear.key])}</span> : <Dash />}
+          <AddedBadges r={r} added={g.added} />
+        </td>
+        {g.virtual && <td data-col={g.key} className={num}>{r.byList[g.virtual.key] != null ? <span className="font-semibold text-sun">{formatRank(r.byList[g.virtual.key])}</span> : <Dash />}</td>}
+      </Fragment>
+    ));
   const sorted = (s: SeatSort, dir: "ascending" | "descending") => (sort === s ? dir : undefined);
   const firstClear = groups[0]?.clear?.key;
 
