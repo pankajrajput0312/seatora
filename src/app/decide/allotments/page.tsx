@@ -30,6 +30,7 @@ import { activeExam, examGate, examInfo } from "@/features/exams/active";
 import { DEFAULT_EXAM, groupsOf, roundNameIn } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 import { quotaIn, type Exam } from "@/features/exams/exam";
+import { PgOr } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Allotments" };
 const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
@@ -56,9 +57,8 @@ const about = (
     candidate often holds an Open seat). Status: allotted (R1 and stray rounds), fresh or upgraded (R2, R3). Choice no. and the
     previous seat (the one held a round earlier, with the remark printed there) are in R2 and R3 results only, and those list
     only new or upgraded allotments.<br /><br />
-    Fee, stipend, bond and leaving penalty are that seat&apos;s course and quota as published (DNB seats follow NBEMS; MD, MS
-    and Diploma seats the college); each (i) has the exact words and source. College type is inferred, not official; beds are
-    self-reported by the hospital.
+    Fee, stipend, bond and leaving penalty are that seat&apos;s course and quota as published (<PgOr pg="DNB seats follow NBEMS; MD, MS and Diploma seats the college" other="the college's MCC institute profile" />);
+    each (i) has the exact words and source. College type is inferred, not official; beds are self-reported by the hospital.
   </>
 );
 

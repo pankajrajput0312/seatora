@@ -222,7 +222,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
           <FilterDropdown
             label="Quota"
             name="quota"
-            options={meta.quotas.map((q) => ({ value: q, label: restrictedQuota(exam, q) ? `${q} (restricted)` : q }))}
+            options={meta.quotas.map((q) => ({ value: q, label: restrictedQuota(exam, q) ? `${quotaIn(exams[exam], q)} (restricted)` : quotaIn(exams[exam], q) }))}
             selected={f.quota}
             none={profile ? "Open quotas" : undefined}
             info={profile ? E.quotasNote : undefined}

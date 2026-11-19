@@ -9,7 +9,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
 import { MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
 import type { DecideLinks } from "../lib/links";
-import { quotaIn, roundIn } from "@/features/exams/exam";
+import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { useChoices, useCompare, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
 import { latestText, type Latest } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
@@ -32,12 +32,13 @@ export function ChoiceStar({ item }: { item: ChoiceItem }) {
   const [state, setState] = useChoices();
   const active = state.lists.find((l) => l.id === state.activeId) ?? state.lists[0];
   const on = !!active?.items.some((i) => i.id === item.id);
+  const E = useExamInfo();
   return (
     <Button
       size="icon"
       variant="ghost"
       aria-pressed={on}
-      aria-label={`In ${active?.name ?? "choices"}: ${item.institute}, ${item.course}, ${item.quota}`}
+      aria-label={`In ${active?.name ?? "choices"}: ${item.institute}, ${item.course}, ${quotaIn(E, item.quota)}`}
       onClick={() => {
         setState((s) => toggleItem(s, item));
         toast(on ? `Removed from ${active?.name ?? "choices"}` : `Added to ${active?.name ?? "choices"}`);
@@ -115,8 +116,8 @@ function HospitalLine({ h, of }: { h: ListRow["hospital"]; of: string }) {
 }
 
 type Open = { open: ReadonlySet<string>; toggle: (id: string, on: boolean) => void };
-const gridCaption = (r: ListRow) => `${r.college.name}, ${courseName(r)}, ${r.quota}: closing ranks by year and round`;
-const rowLabel = (r: ListRow) => `${r.college.name}, ${courseName(r)}, ${r.quota}`;
+const gridCaption = (r: ListRow, E: Exam) => `${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}: closing ranks by year and round`;
+const rowLabel = (r: ListRow, E: Exam) => `${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`;
 
 /**
  * One option as a ResultCard: the closing's year · round, quota and seat category on top (a new option: the round's
@@ -139,7 +140,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
           c && `${c.d.category} seat`,
           c?.d.provisional && <Provisional when />,
         ]}
-        actions={<><ChoiceStar item={toChoiceItem(r, latest)} /><CompareToggle id={r.id} label={rowLabel(r)} /></>}
+        actions={<><ChoiceStar item={toChoiceItem(r, latest)} /><CompareToggle id={r.id} label={rowLabel(r, E)} /></>}
         stat={{
           // The big number's year and round, so it never reads against the label under it (which counts other rounds).
           label: c ? `${c.year} ${roundIn(E, c.year, c.d.round)} closing` : "Closing rank",
@@ -180,11 +181,11 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
             )}
             {r.seatsBelow?.length ? <div className="px-4 pb-2"><SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} /></div> : null}
             {/* Nothing above the cells: they sit on the footer's own rule (one line, not two). */}
-            <TermStatCells t={r.fees} of={rowLabel(r)} className={strip || list || r.seatsBelow?.length ? undefined : "-mt-px"} />
+            <TermStatCells t={r.fees} of={rowLabel(r, E)} className={strip || list || r.seatsBelow?.length ? undefined : "-mt-px"} />
             <div className="flex flex-wrap items-center gap-x-4 border-t border-border px-4 text-xs">
               <details open={open.has(r.id)} onToggle={(e) => toggle(r.id, e.currentTarget.open)} className="min-w-0 max-w-full open:basis-full">
                 <summary className={summary}>Rounds by year</summary>
-                {open.has(r.id) && <div className="pb-2"><RoundGrid row={r} caption={gridCaption(r)} /></div>}
+                {open.has(r.id) && <div className="pb-2"><RoundGrid row={r} caption={gridCaption(r, E)} /></div>}
               </details>
               <Related r={r} L={L} />
             </div>
@@ -201,6 +202,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
  * for data-item numbering (focus after Show more: FocusItem picks the visible pane's).
  */
 function OptionsList({ rows, caption, start, L, view, latest, pastYears, includeLatest, seatLists }: { rows: ListRow[]; caption: string; start: number; L: DecideLinks; view: View } & Years) {
+  const E = useExamInfo();
   const [older, last] = pastYears;
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string, on: boolean) =>
@@ -249,7 +251,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
               </th>
               <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>
               <td className="px-3 py-3"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} /><SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} /></td>
-              <TermStatCells t={r.fees} variant="table" of={rowLabel(r)} tdClassName="px-2!" />
+              <TermStatCells t={r.fees} variant="table" of={rowLabel(r, E)} tdClassName="px-2!" />
               {seatLists.map((l) => <td key={l.key} className="px-1.5 py-1 text-right"><SeatsCell r={r} list={l} L={L} n={r.seatsBy?.[l.kind]} /></td>)}
               <td className={notPhone}><ClosingCell d={r.latest} year={latest.year} /></td>
               <td className={notPhone}><ClosingCell d={r.byYear[last]} year={last} /></td>
@@ -263,12 +265,12 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
                   <Related r={r} L={L} />
                 </span>
               </td>
-              <td className="px-2 py-2 print:hidden"><CompareToggle id={r.id} label={rowLabel(r)} /></td>
+              <td className="px-2 py-2 print:hidden"><CompareToggle id={r.id} label={rowLabel(r, E)} /></td>
             </tr>,
             open.has(r.id) && (
               <tr key={`${r.id}-rounds`} className="bg-muted/30">
                 <td />
-                <td colSpan={8 + statKeys.length + seatLists.length} className="px-3 pb-4"><RoundGrid row={r} caption={gridCaption(r)} /></td>
+                <td colSpan={8 + statKeys.length + seatLists.length} className="px-3 pb-4"><RoundGrid row={r} caption={gridCaption(r, E)} /></td>
               </tr>
             ),
           ])}

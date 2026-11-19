@@ -4,6 +4,7 @@ import { FilterDropdown } from "./filter-dropdown";
 import { FilterSection } from "./filter-form";
 import { typeCategoryLabel } from "./institute/college-type";
 import { control, Field } from "./ui";
+import { PgOr } from "./round-name";
 
 // The term filters' controls (lib/term-filters.ts params) for the Filters sheet (FiltersPanel) of a list page: College
 // type (a checkbox section), then one "Fees & bond" section with a row per figure (native selects; each option names its
@@ -54,9 +55,11 @@ export function TermFilterControls({ f, caps }: { f: TermParams; caps?: Pick<Pro
           <>
             A college whose figure is not published, or has no number, is left out of a fee, stipend, bond or leaving filter
             unless &quot;Include not published&quot; is ticked. &quot;No bond&quot; only lists colleges whose record says no bond (ticked, also those where a
-            state law&apos;s service may still apply), and a type filter never lists a college without a type. &quot;None declared&quot; (a DNB hospital
-            that declared no bond to MCC, so NBEMS lets it impose none this session) is not &quot;No bond&quot;: no document of its own says so, so it
-            counts as not published.
+            state law&apos;s service may still apply), and a type filter never lists a college without a type.
+            <PgOr
+              pg={<> &quot;None declared&quot; (a DNB hospital that declared no bond to MCC, so NBEMS lets it impose none this session) is not &quot;No bond&quot;: no document of its own says so, so it counts as not published.</>}
+              other={<> A bond document Seatora has not read yet (&quot;not checked&quot;) counts as not published.</>}
+            />
           </>
         }
       >

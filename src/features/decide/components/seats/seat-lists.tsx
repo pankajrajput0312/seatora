@@ -20,6 +20,7 @@ import { ScrollTable } from "../scroll-table";
 import { roundNameFrom } from "@/features/exams/exam";
 import { RoundName } from "../round-name";
 import { QuotaName } from "../round-name";
+import { quotaIn } from "@/features/exams/exam";
 
 // Seats page parts (src/app/decide/seats): one MCC seat list at a time, never added to another list.
 
@@ -175,7 +176,7 @@ export function SeatTable({ rows, lists, current, sort, caption, ranked, L, late
         </thead>
         <tbody>
           {rows.map((r, i) => {
-            const name = `${r.college.name}, ${courseOf(r)}, ${r.quota ?? "quota not printed"}, ${r.category} seat`;
+            const name = `${r.college.name}, ${courseOf(r)}, ${r.quota != null ? quotaIn(exam, r.quota) : "quota not printed"}, ${r.category} seat`;
             return (
               <tr key={`${r.list}|${r.college.key}|${r.degree}|${r.specialty}|${r.quota}|${r.category}|${i}`} className={tbl.row}>
                 <th scope="row" className={cn(td, sticky, "text-left font-normal")}>

@@ -6,6 +6,7 @@ import type { Reach } from "../lib/reach";
 import { roundName } from "../lib/round-status";
 import type { SeatList } from "../types";
 import { smallLink } from "./ui";
+import { quotaIn } from "@/features/exams/exam";
 
 /**
  * What she can still do when none of her options reached her rank: Home's panel, and the top of Options (one
@@ -38,7 +39,7 @@ export function StillCanDo({ L, rank, list, fresh, counts, title, id, exam = DEF
         {pg ? (
           <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>Widen your courses, quotas or states</Link>: other states, Deemed/Paid seats (a quota), DNB and Diploma courses of your specialties, more specialties, or looser fee and bond caps.</li>
         ) : (
-          <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>{perGroup(exam) ? "Widen your courses or states" : "Widen your courses, quotas or states"}</Link>: other states, more courses{perGroup(exam) ? " of your question group" : `, other quotas you can take (${exams[exam].quotas.join(", ")})`}.</li>
+          <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>{perGroup(exam) ? "Widen your courses or states" : "Widen your courses, quotas or states"}</Link>: other states, more courses{perGroup(exam) ? " of your question group" : `, other quotas you can take (${exams[exam].quotas.map((q) => quotaIn(exams[exam], q)).join(", ")})`}.</li>
         )}
         {pg && <li>The stray vacancy round comes after Round 3: see the <Link href={L.to("/decide/counselling")} className={smallLink}>schedule and notices</Link>.</li>}
         <li><Link href={L.rankScan(rank)} className={smallLink}>Rank scan</Link> shows what ranks near yours were allotted in past rounds.</li>

@@ -218,8 +218,7 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
   const p = g.fee.display === "verbatim" ? g.fee.parsed : null;
   const pYear = (i: number) => p?.per_year[i] ?? (i === 0 ? p?.at_admission : undefined);
   const feeCol = !!n || Array.from({ length: g.years }, (_, i) => pYear(i)).some(Boolean);
-  const name = `${g.groups.join(" + ")} seats`;
-  // Shown as the exam's MCC words each seat type (NEET MDS's paid seats); the caption keeps the plain words.
+  // Each seat type as the exam's MCC words it (NEET MDS's paid seats; NEET PG's as they are).
   const shown = <>{g.groups.map((x, i) => <Fragment key={x}>{i > 0 && " + "}<QuotaName quota={x} /></Fragment>)} seats</>;
   const fees = n?.perYear ?? [];
   const st = g.stipendPerMonth;
@@ -287,7 +286,7 @@ function FeeGroup({ g, id, of, title, off }: { g: FeeQuotaGroup; id: string; of:
         </div>
       )}
       <table className="w-full max-w-xl text-sm">
-        <caption className="sr-only">{title}, {name}: {feeCol ? "fee and stipend" : "stipend"} by year of the course</caption>
+        <caption className="sr-only">{title}, {shown}: {feeCol ? "fee and stipend" : "stipend"} by year of the course</caption>
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
             <th scope="col" className="py-2 pr-3 font-semibold">Year</th>

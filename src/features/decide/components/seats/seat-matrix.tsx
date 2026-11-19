@@ -249,7 +249,7 @@ export function SeatMatrix({ rows, groups, years, results, ranked, sort, caption
                 {rows.map((r) => {
                   const k = rowKey(r);
                   // The row header names the institute already; the button adds what tells its rows apart.
-                  const name = `${courseOf(r)}, ${r.quota ?? "quota not printed"}, ${r.category} seats`;
+                  const name = `${courseOf(r)}, ${r.quota != null ? quotaIn(E, r.quota) : "quota not printed"}, ${r.category} seats`;
                   return (
                     <tr
                       key={k}

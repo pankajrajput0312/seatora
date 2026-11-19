@@ -13,6 +13,7 @@ import { TypeBadge } from "../type-badge";
 import type { SeatLine } from "./find-seats";
 import { RoundName } from "../round-name";
 import { QuotaName } from "../round-name";
+import { quotaIn } from "@/features/exams/exam";
 
 // Seat rows as compact cards (the Seats page's Cards view, every view: matrix, one list, compare): the round, quota and
 // seat category on top, the picked list's seats as the big number, the institute, course and its other lists' seats,
@@ -49,7 +50,7 @@ export function SeatCards({ rows, list, lists, ranked, L, title, onDetails, late
     <ResultCards title={title} hideTitle>
       {rows.map((r, i) => {
         const k = seatRowKey(r);
-        const name = `${r.college.name}, ${seatCourse(r)}, ${r.quota ?? "quota not printed"}, ${r.category} seats`;
+        const name = `${r.college.name}, ${seatCourse(r)}, ${r.quota != null ? quotaIn(exam, r.quota) : "quota not printed"}, ${r.category} seats`;
         const has = (l: SeatList) => (r.byList[l.key] ?? 0) > 0;
         const own = lists.some((l) => sameRound(l, list) && has(l)) ? list : (lists.find(has) ?? list);
         const others = lists.filter((l) => l.key !== own.key && sameRound(l, own));

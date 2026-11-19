@@ -55,9 +55,11 @@ export function ColourLegend({ className }: { className?: string }) {
         ) : (
           <Row head="Fee a year"><Val c="">no colour</Val></Row>
         )}
-        <Row head="Stipend a month">
-          <Val c={levelClass.caution}>below NBEMS min</Val>
-        </Row></>}
+        {key === "neet-pg" && (
+          <Row head="Stipend a month">
+            <Val c={levelClass.caution}>below NBEMS min</Val>
+          </Row>
+        )}</>}
         <Row head="Seats in the round">
           <Val c="text-leaf">clear</Val>
           <Val c="text-sun">virtual</Val>

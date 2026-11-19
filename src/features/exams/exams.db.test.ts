@@ -132,7 +132,12 @@ describe.skipIf(!local || !existsSync(join(pgBundle, "manifest.json")))("multi-e
   const unchanged = async () => {
     const n = await now();
     expect(n.rows).toEqual(golden.rows); // NEET PG's colleges included, whole rows
-    expect(n.shared).toEqual(golden.shared);
+    // Residents and hides as they were; NEET PG's retired keys each as it was (another exam's bundle may add its own:
+    // RetiredCollegeKey is one table, its old keys never NEET PG's).
+    const [cur, was] = [n.shared, golden.shared] as { r: number; h: number; k: { oldKey: string }[] | null }[][];
+    expect([cur[0].r, cur[0].h]).toEqual([was[0].r, was[0].h]);
+    const kept = new Map((cur[0].k ?? []).map((x) => [x.oldKey, x]));
+    expect((was[0].k ?? []).filter((x) => JSON.stringify(kept.get(x.oldKey)) !== JSON.stringify(x)), "NEET PG's retired keys changed").toEqual([]);
     expect(n.fp).toBe(golden.fp); // the build reuses its NEET PG snapshot
     expect(JSON.stringify(n.out) === JSON.stringify(golden.out), "NEET PG outputs byte-identical").toBe(true);
   };

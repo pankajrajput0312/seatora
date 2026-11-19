@@ -9,6 +9,8 @@ import { rounds, seatKindLabel, type Round, type SeatList, type Term } from "../
 import { Closing, Dash, Provisional, TermText } from "./bits";
 import { smallLink } from "./ui";
 import { RoundName, RoundNames } from "./round-name";
+import { quotaIn } from "@/features/exams/exam";
+import { useExamInfo } from "../lib/use-decide-store";
 
 // Server-safe on purpose (no "use client"): the institute and compare pages render these on the server, and the
 // Options list (option-actions.tsx, a client component) renders them in the browser.
@@ -62,7 +64,8 @@ export function SeatsLink({ n, list, L, at, name, end }: { n: number | null | un
 
 /** One option's seats in that one list (`n`, default its clear vacancy `seats`), linking to them on Seats; "—" when none. */
 export function SeatsCell({ r, list, L, n = r.seats, end = true }: { r: ListRow; list: SeatList; L: DecideLinks; n?: number | null; end?: boolean }) {
-  return <SeatsLink n={n} list={list} L={L} at={{ inst: r.college.slug, course: r.course.slug, quota: r.quota }} name={`${r.college.name}, ${courseName(r)}, ${r.quota}`} end={end} />;
+  const E = useExamInfo(); // client only (Options rows): the quota as the exam's MCC words it
+  return <SeatsLink n={n} list={list} L={L} at={{ inst: r.college.slug, course: r.course.slug, quota: r.quota }} name={`${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} end={end} />;
 }
 
 /** Under an option's label: the lists whose seats here are all on seat categories with another label (OptionRow.seatsBelow). */
