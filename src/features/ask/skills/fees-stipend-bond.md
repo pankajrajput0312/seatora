@@ -9,7 +9,8 @@ Always take a college's figures from the tools (`college_profile`, `compare`, `s
 ## Reading the values
 - **"—" / "Not published."**: the value is not in Seatora's data (no document). Say "not published in the documents Seatora has" and point to MCC's college information page / the college. Never treat it as zero or as "no bond".
 - **"In words" / "See text"**: the document gives it only in words; quote them.
-- **"Not known"** (a bond): no clear answer, its (i) says why (none declared to MCC, a document Seatora couldn't read, a blank form, a no-bond document where a state law may still apply, no record). Say which, and never treat it as "no bond".
+- **"No bond declared"** (a DNB / DrNB seat): the hospital declared no bond to MCC, and NBEMS's rule (accreditation bulletin para 5.10) lets it impose none this session; the No bond filter lists it.
+- **"Not known"** (a bond): no clear answer, its (i) says why (a document Seatora couldn't read, a blank form, a no-bond document where a state law may still apply, a D.M. / M.Ch., MDS or INI-CET seat with none declared, no record). Say which, and never treat it as "no bond".
 - **"No bond"** only where the college's document or the NBEMS rule says so.
 - Fees are per year unless the value says otherwise; year 2 and 3 may differ. Hostel fees are separate when listed.
 

@@ -113,7 +113,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // ways back; then the cap, not her courses, is what to change.
   const capped = "capped" in r ? (r.capped ?? 0) : 0;
   const capWords = caps && tp.maxfee == null && tp.bondyrs == null ? `your cap (${caps})` : "your fee, bond or type limits";
-  const showCapped = L.with("/decide/options", { fee: null, bond: null, maxfee: "any", bondyrs: "any", ctype: null, minstip: null, maxbond: null, maxleave: null, nd: null });
+  // Exactly the ones the caps hide, each saying which (Options' capped view); the caps stay hers.
+  const showCapped = L.with("/decide/options", { capped: "1", view: null, seats: null, closed: null, reach: null });
   const capCause = exam !== DEFAULT_EXAM && (capped > 0 || r.unknownTerms > 0);
   // While the counts above are the round's (options with seats in its lists), the charts are every option with past
   // allotments: said in view, so a median past her rank never reads against "none reached" up there.

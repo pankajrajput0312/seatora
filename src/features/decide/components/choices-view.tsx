@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { cellWords, duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, wholeCourseTotal, wholeCourseWords, type ChoiceItem } from "../lib/choices";
+import { cellWords, duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, wholeCourseRange, wholeCourseWords, type ChoiceItem } from "../lib/choices";
 import { inrFull } from "../lib/stat-format";
 import { deepestOf, latestText, pastOf, reachWindow, seatsBelowNotes, type Deepest, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
 import { statCells, statKeys, statLabel } from "../lib/stat-format";
@@ -542,17 +542,24 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
 }
 
 /**
- * NEET SS / MDS: the list's whole-course fees added up (lib/choices.ts wholeCourseTotal); a choice with no published
- * fee (or none in the current data) counted apart, never as ₹0; stipend said apart, never taken off.
+ * NEET SS / MDS / INI-CET: the list's whole-course fees as a range (lib/choices.ts wholeCourseRange), never added up:
+ * she takes one seat. A choice with no published fee (or none in the current data) counted apart, never as ₹0; stipend
+ * said apart, never taken off.
  */
 function WholeCourse({ items }: { items: (ProgrammeTerms | null)[] }) {
-  const w = wholeCourseTotal(items.filter((t): t is ProgrammeTerms => !!t));
+  const w = wholeCourseRange(items.filter((t): t is ProgrammeTerms => !!t));
   const missing = w.missing + items.filter((t) => !t).length;
+  const fee = (n: number, upTo = false) => <span className="numeric font-semibold">{upTo && "up to "}{inrFull(n)}</span>;
   return (
     <p className="text-sm">
-      <span className="text-muted-foreground">Fee, whole course, all {items.length}: </span>
-      {w.n ? <span className="numeric font-semibold">{w.upTo && "up to "}{inrFull(w.total)}</span> : <span className="text-muted-foreground">not published for any</span>}
-      {w.n > 0 && missing > 0 && <span className="text-muted-foreground"> for {w.n}</span>}
+      <span className="text-muted-foreground">Whole course: </span>
+      {w.min == null || w.max == null ? (
+        <span className="text-muted-foreground">not published for any</span>
+      ) : w.min === w.max ? (
+        <>{fee(w.max, w.upTo)}<span className="text-muted-foreground">{w.n > 1 ? ` at each of ${w.n}` : ""}</span></>
+      ) : (
+        <>{fee(w.min)} <span className="text-muted-foreground">(cheapest) to</span> {fee(w.max, w.upTo)} <span className="text-muted-foreground">(dearest) across your list</span></>
+      )}
       {missing > 0 && <span className="text-sun">; {missing} with no published fee (not counted as ₹0)</span>}
       <span className="text-muted-foreground">. Stipend apart: each choice&apos;s Stipend (a month), never taken off the fee.</span>
     </p>

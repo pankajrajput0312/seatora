@@ -6,7 +6,7 @@ import { FilterDropdown } from "./filter-dropdown";
 import { FilterSection } from "./filter-form";
 import { typeCategoryLabel } from "./institute/college-type";
 import { control, Field, smallLink } from "./ui";
-import { PgOr } from "./round-name";
+import { ExamWords, PgOr } from "./round-name";
 
 // The term filters' controls (lib/term-filters.ts params) for the Filters sheet (FiltersPanel) of a list page: College
 // type (a checkbox section; every exam), then (an exam with fee data) one "Fees & bond" section with a row per figure (native selects; each option names its
@@ -23,7 +23,8 @@ function TermSelect({ name, label, value, any, options }: {
     <Field label={label}>
       <select name={name} defaultValue={value == null ? "" : String(value)} className={control}>
         <option value="">{any}</option>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {/* In the exam's words: "No bond / none declared to MCC" (INI-CET: AIIMS). */}
+        {options.map((o) => <option key={o.value} value={o.value}><ExamWords>{o.label}</ExamWords></option>)}
       </select>
     </Field>
   );
@@ -33,7 +34,8 @@ const num = (v: unknown) => (typeof v === "number" ? v : null);
 const choices = (k: keyof typeof termChoices, v: number | null) => withCurrent(termChoices[k], v).map((n) => ({ value: String(n), label: termValueLabel[k](n) }));
 
 /**
- * College type, then fee/yr, bond years (incl. No bond), stipend, bond ₹, leaving ₹ and "Include not published".
+ * College type, then fee/yr (and "Hide options with no published fee"), bond years (incl. No bond), stipend, bond ₹,
+ * leaving ₹ and "Include not published".
  * `f`: the parsed params (readTermFilters(...).params). `caps`: her profile's fee and bond caps where the page applies
  * them (Options, Fees): "Your cap: …" is the default and "Any" clears it.
  */
@@ -55,12 +57,13 @@ export function TermFilterControls({ f, caps, fees = true }: { f: TermParams; ca
         none={fee != null || yrs != null ? "Your caps" : "Any"}
         info={
           <>
-            A college whose figure is not published, or has no number, is left out of a fee, stipend, bond or leaving filter
-            unless &quot;Include not published&quot; is ticked. &quot;No bond&quot; only lists colleges whose record says no bond (ticked, also those where a
+            A fee cap keeps a college that publishes no fee (marked &quot;Fee not published&quot;) unless &quot;Hide options with no
+            published fee&quot; is ticked. A stipend, bond or leaving figure that is not published, or has no number, is left
+            out of its filter unless &quot;Include not published or not known&quot; is ticked. &quot;No bond&quot; only lists colleges whose record says no bond (ticked, also those where a
             state law&apos;s service may still apply), and a type filter never lists a college without a type.
             <PgOr
-              pg={<> A bond that is &quot;Not known&quot; counts as not published: none declared to MCC (a DNB hospital that declared none, so NBEMS lets it impose none this session, but no document of its own says &quot;no bond&quot;), or a document saying no bond while a state law&apos;s service may apply.</>}
-              other={<> A bond that is &quot;Not known&quot; counts as not published: a bond document Seatora couldn&apos;t read, a blank form or one with no clear bond, or none declared.</>}
+              pg={<> &quot;No bond&quot; also lists a DNB hospital that declared no bond to MCC (NBEMS&apos;s rule lets it impose none this session). A bond that is &quot;Not known&quot; counts as not published: a document saying no bond while a state law&apos;s service may apply, or no record.</>}
+              other={<> &quot;No bond&quot; also lists a DrNB hospital that declared no bond to MCC (NBEMS&apos;s rule lets it impose none this session). A bond that is &quot;Not known&quot; counts as not published: a bond document Seatora couldn&apos;t read, a blank form or one with no clear bond, or a seat with none declared that no such rule covers.</>}
             />
           </>
         }
@@ -72,6 +75,10 @@ export function TermFilterControls({ f, caps, fees = true }: { f: TermParams; ca
           any={fee != null ? `Your cap: ${termValueLabel.maxfee(fee)}` : "Any fee"}
           options={[...(fee != null ? [{ value: "any", label: "Any fee" }] : []), ...choices("maxfee", num(f.maxfee))]}
         />
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+          <input type="checkbox" name="nf" value="hide" defaultChecked={f.nf === "hide"} className="size-5 accent-sky" />
+          Hide options with no published fee
+        </label>
         <TermSelect
           name="bondyrs"
           label="Bond years"
@@ -84,7 +91,7 @@ export function TermFilterControls({ f, caps, fees = true }: { f: TermParams; ca
         <TermSelect name="maxleave" label="Leaving penalty" value={f.maxleave} any="Any leaving penalty" options={choices("maxleave", f.maxleave ?? null)} />
         <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
           <input type="checkbox" name="nd" value="keep" defaultChecked={f.nd === "keep"} className="size-5 accent-sky" />
-          Include not published or not known
+          Include stipend, bond or leaving not published or not known
         </label>
       </FilterSection>}
     </>

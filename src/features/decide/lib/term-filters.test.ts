@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Amount, Bond, Figure, ProgrammeTerms } from "../server/terms";
-import { anyTermFilter, lowestRisk, readTermFilters, splitByTerms, termChips, termFilters, termMoreOpen, termParamsSchema, termsPass, termVerdict, untypedOnly } from "./term-filters";
+import { anyTermFilter, capNote, lowestRisk, readTermFilters, splitByTerms, termChips, termFailures, termFilters, termMoreOpen, termParamsSchema, termsPass, termVerdict, untypedOnly } from "./term-filters";
 
 const none: Amount = { state: "none", min: null, max: null, perYear: null, varies: false, more: false, extra: null };
 const amt = (max: number, min = max): Amount => ({ ...none, state: "figure", min, max });
@@ -25,9 +25,9 @@ describe("params", () => {
     const { params, filters } = readTermFilters(p);
     // An old link's stored type (esic) reads as its shown type (Govt); the filter compares every stored type in it.
     expect(params).toEqual({ ctype: ["govt", "deemed"], maxfee: 5, minstip: 80000, bondyrs: 0, maxbond: 10, maxleave: 2.5, nd: "keep" });
-    expect(filters).toEqual({ types: ["govt", "municipal", "central", "esic", "railway", "deemed"], maxFee: 500000, minStipend: 80000, maxBondYears: 0, maxBondInr: 1000000, maxLeavingInr: 250000, keepUnknown: true });
+    expect(filters).toEqual({ types: ["govt", "municipal", "central", "esic", "railway", "deemed"], maxFee: 500000, minStipend: 80000, maxBondYears: 0, maxBondInr: 1000000, maxLeavingInr: 250000, keepUnknown: true, hideNoFee: false });
     expect(readTermFilters(new URLSearchParams("ctype=govt&ctype=castle&maxfee=-1&bondyrs=2")).params).toEqual({ bondyrs: 2 });
-    expect(readTermFilters(new URLSearchParams("")).filters).toEqual({ types: undefined, maxFee: null, minStipend: null, maxBondYears: null, maxBondInr: null, maxLeavingInr: null, keepUnknown: false });
+    expect(readTermFilters(new URLSearchParams("")).filters).toEqual({ types: undefined, maxFee: null, minStipend: null, maxBondYears: null, maxBondInr: null, maxLeavingInr: null, keepUnknown: false, hideNoFee: false });
   });
 
   it("strictly (the API): a bad value is an error", () => {
@@ -47,7 +47,7 @@ describe("params", () => {
   });
 
   it("chips name each applied value; termMoreOpen opens the fold for a folded one", () => {
-    expect(termChips({ ctype: ["govt", "public_sector"], maxfee: 5, bondyrs: 0, nd: "keep" }).map((c) => c.label)).toEqual(["Govt", "Public Sector", "Fee up to ₹5 L/yr", "No bond", "Including not published or not known"]);
+    expect(termChips({ ctype: ["govt", "public_sector"], maxfee: 5, bondyrs: 0, nd: "keep" }).map((c) => c.label)).toEqual(["Govt", "Public Sector", "Fee up to ₹5 L/yr", "No bond / none declared to MCC", "Including not published or not known"]);
     expect(termChips({ maxfee: "any" })).toEqual([]);
     expect(termMoreOpen({ maxfee: 5 })).toBe(false);
     expect(termMoreOpen({ maxleave: 5 })).toBe(true);
@@ -136,11 +136,45 @@ describe("filters", () => {
 
 describe("unknown values", () => {
   it("never pass a cap silently: left out unless keepUnknown", () => {
-    for (const f of [{ maxFee: 500000 }, { minStipend: 50000 }, { maxBondYears: 2 }, { maxBondInr: 1000000 }, { maxLeavingInr: 1000000 }]) {
+    for (const f of [{ maxFee: 500000, hideNoFee: true }, { minStipend: 50000 }, { maxBondYears: 2 }, { maxBondInr: 1000000 }, { maxLeavingInr: 1000000 }]) {
       expect(termVerdict(blank, null, f)).toBe("unknown");
       expect(termsPass(blank, null, f)).toBe(false);
       expect(termsPass(blank, null, { ...f, keepUnknown: true })).toBe(true);
     }
+  });
+
+  it("a fee cap keeps an option with no published fee (marked), unless Hide options with no published fee", () => {
+    expect(termVerdict(blank, null, { maxFee: 500000 })).toBe("pass");
+    expect(capNote(blank, null, { maxFee: 500000 })).toBe("Fee not published for this course: kept under Fee up to ₹5 L/yr");
+    expect(termVerdict(blank, null, { maxFee: 500000, hideNoFee: true })).toBe("unknown");
+    expect(capNote(blank, null, { maxFee: 500000, hideNoFee: true })).toBeNull();
+    // A figure the cap can't judge (an NBEMS maximum over it) is still unknown.
+    expect(termVerdict(terms(fig(125000, { kind: "maximum" }), null), null, { maxFee: 100000 })).toBe("unknown");
+    expect(readTermFilters(new URLSearchParams("nf=hide")).filters.hideNoFee).toBe(true);
+    expect(termChips({ nf: "hide" })).toEqual([{ key: "nf", label: "Hiding options with no published fee" }]);
+  });
+
+  it("which caps hide an option, with its figure (Options' Show them)", () => {
+    const f = { maxFee: 100000, maxBondYears: 0 };
+    expect(termFailures(known, null, f)).toEqual(["bondyrs", "maxfee"]);
+    expect(capNote(known, null, f)).toBe("Hidden by No bond / none declared to MCC (its bond 1 year) and Fee up to ₹1 L/yr (its fee ₹2 L/yr)");
+    expect(termFailures(known, "private", { types: ["govt"] })).toEqual(["ctype"]);
+    expect(termFailures(noBond, null, f)).toEqual([]);
+    expect(capNote(known, null, {})).toBeNull();
+  });
+
+  it("No bond declared (a DNB / DrNB seat NBEMS's rule lets impose none) is no bond to the bond caps", () => {
+    const dnb = (programme: ProgrammeTerms["programme"], text: string, more: Partial<Bond> = {}) => ({ ...terms(null, null, { status: "not_declared", text, ...more }), programme });
+    const pg = dnb("DNB", "Not declared by the college (checked …); NBEMS: an undeclared bond can't be imposed this session");
+    const ss = dnb("DrNB SS", "Not declared: the college's MCC profile states no bond and MCC lists no bond document");
+    for (const t of [pg, ss]) {
+      expect(termVerdict(t, null, { maxBondYears: 0 })).toBe("pass");
+      expect(termVerdict(t, null, { maxBondInr: 100000 })).toBe("pass");
+    }
+    // A D.M. / M.Ch. seat (MCC's bulletin states no such rule), one not read, or one a state law may bind: not known.
+    expect(termVerdict(dnb("DM/MCh", ss.bond.text!), null, { maxBondYears: 0 })).toBe("unknown");
+    expect(termVerdict(dnb("DrNB SS", "Bond document on MCC not read", { why: "unread" }), null, { maxBondYears: 0 })).toBe("unknown");
+    expect(termVerdict(dnb("DNB", pg.bond.text!, { caveat: "a state law may apply" }), null, { maxBondYears: 0 })).toBe("unknown");
   });
 
   it("a fee in words only, a bond declared without years or ₹, and an unknown bond status are unknown", () => {
@@ -168,10 +202,12 @@ describe("unknown values", () => {
 
   it("splitByTerms keeps the passing rows and counts the ones left out only for an unknown value", () => {
     const rows = [known, noBond, blank, terms(fig(900000), null)];
-    const s = splitByTerms(rows, { maxFee: 300000 }, (t) => t, () => null);
+    const s = splitByTerms(rows, { maxFee: 300000, hideNoFee: true }, (t) => t, () => null);
     expect(s.kept).toEqual([known, noBond]);
     expect(s.unknown).toEqual([blank]);
-    expect(splitByTerms(rows, { maxFee: 300000, keepUnknown: true }, (t) => t, () => null)).toEqual({ kept: [known, noBond, blank], unknown: [] });
+    expect(splitByTerms(rows, { maxFee: 300000, hideNoFee: true, keepUnknown: true }, (t) => t, () => null)).toEqual({ kept: [known, noBond, blank], unknown: [] });
+    // By default the fee cap keeps the one with no fee published.
+    expect(splitByTerms(rows, { maxFee: 300000 }, (t) => t, () => null)).toEqual({ kept: [known, noBond, blank], unknown: [] });
     expect(splitByTerms(rows, {}, (t) => t, () => null).kept).toBe(rows);
   });
 });

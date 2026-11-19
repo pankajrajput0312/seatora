@@ -174,8 +174,8 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             <br /><strong>Leaving penalty</strong>: the penalty for leaving the seat or course after joining. MCC&apos;s Round 2 forfeit is on
             each institute&apos;s Fees tab.
             <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. The bond is one of three: &quot;No bond&quot; only where the
-            college&apos;s document or the NBEMS rule says so; a stated bond (its years, or &quot;Bond, years not stated&quot;); or &quot;Not known&quot;:
-            no bond declared to MCC, or a document that says no bond while a state law&apos;s service may apply (the (i) says which; the filters count it as not published).
+            college&apos;s document or the NBEMS rule says so (&quot;No bond declared&quot;: a DNB hospital that declared none to MCC, which NBEMS&apos;s rule lets impose none this session); a stated bond (its years, or &quot;Bond, years not stated&quot;); or &quot;Not known&quot;:
+            a document that says no bond while a state law&apos;s service may apply, or no record (the (i) says which; the filters count it as not published).
             <br />Sorting: — and figures without a number go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
           </>
           ) : exam === "ini-cet" ? (
@@ -189,7 +189,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             <>
               <strong>Fee</strong>: a year (/yr; year 1&apos;s may be paid at admission), as the college declared it on its MCC institute profile ({exams[exam].label}). &quot;Varies by subject&quot;, &quot;On college website&quot;, &quot;Not stated&quot;: the profile gives no one figure for these seats; its words are in the (i).
               <br /><strong>Stipend</strong>: a month (/mo), as declared.
-              <br /><strong>Bond</strong>: from MCC&apos;s institute list: &quot;No bond&quot;, a stated bond, or &quot;Not known&quot; (a bond document Seatora couldn&apos;t read, read it before you lock; a blank form or one with no clear bond; no bond declared to MCC: the (i) says which). MCC&apos;s Round 2 forfeit is on each institute&apos;s Fees tab.
+              <br /><strong>Bond</strong>: from MCC&apos;s institute list: &quot;No bond&quot;, a stated bond, &quot;No bond declared&quot; (a DrNB hospital that declared none to MCC: NBEMS&apos;s rule lets it impose none this session), or &quot;Not known&quot; (a bond document Seatora couldn&apos;t read, read it before you lock; a blank form or one with no clear bond; a D.M. / M.Ch. or MDS seat with none declared: the (i) says which). MCC&apos;s Round 2 forfeit is on each institute&apos;s Fees tab.
               <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. Sorting: — and figures without a number go last either way.
             </>
           )

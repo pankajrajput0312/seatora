@@ -337,15 +337,19 @@ describe("bond cells, by record status", () => {
     expect(cells("MD/MS", []).bond.lead).toBe("Leave after joining: not published. Bond not known. Seatora has no bond record for this programme yet.");
   });
 
-  it("a DNB hospital that declared no bond, where NBEMS lets none be imposed: 'Not known', never 'No bond'; why in the (i)", () => {
+  it("a DNB / DrNB hospital that declared no bond, where NBEMS lets none be imposed: 'No bond declared', the rule in the (i)", () => {
     const words = "Not declared by the hospital (checked MCC profile and bond page, Uttar Pradesh rules, NBEMS rules on 15 Nov 2026); NBEMS: an undeclared bond can't be imposed this session";
     const c = cells("DNB", [bond("DNB", words, null, { status: "not_declared", reason: "not_declared_no_document" })]);
-    for (const k of ["bond", "bondInr"] as const) {
-      expect(shown(c[k])).toEqual(["Not known", "Not known", null, "muted"]);
-      expect(c[k].lead).toMatch(/Bond not known\. The hospital declared no bond to MCC, and NBEMS lets a DNB hospital impose only a bond it declared before counselling/);
-      expect(c[k].tip[0]).toEqual({ text: words, src: 1 });
-    }
-    // Words that don't say so (an MD record): "Not known" too (its (i): the record's words, no NBEMS rule).
+    expect([...shown(c.bond), c.bond.level]).toEqual(["No bond declared", "No bond declared", null, null, "good"]);
+    expect([...shown(c.bondInr), c.bondInr.level]).toEqual(["None", "None", null, "muted", "good"]);
+    expect(c.bond.lead).toMatch(/No bond declared, so none can be imposed this session \(NBEMS rule\)\./);
+    expect(c.bond.tip[0]).toMatchObject({ rules: true, text: expect.stringMatching(/^The hospital declared no bond to MCC, and NBEMS lets a DNB \/ DrNB hospital impose only a bond it declared before counselling \(NBEMS accreditation bulletin, para 5\.10\)/) });
+    expect(c.bond.tip[1]).toEqual({ text: words, src: 1 });
+    // NEET SS DrNB: its record ("not declared") needs no words of the rule: NBEMS's rule binds every DrNB hospital.
+    const ssWords = "Not declared: the college's MCC profile states no bond and MCC lists no bond document";
+    expect(cells("DrNB SS", [bond("DNB", ssWords, null, { status: "not_declared", reason: "no bond document on MCC; none in the profile" })]).bond.short).toBe("No bond declared");
+    // A D.M. / M.Ch. or MD seat with none declared (MCC's bulletins state no such rule): "Not known".
+    expect(cells("DM/MCh", [bond("MD", ssWords, null, { status: "not_declared", reason: "no bond document on MCC; none in the profile" })]).bond.short).toBe("Not known");
     expect(cells("MD/MS", [bond("MD", "Not declared by the college", null, { status: "not_declared", reason: "not_declared_no_document" })]).bond.short).toBe("Not known");
   });
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { formatInrShort } from "./format";
-import { inrL } from "./stat-format";
+import { inrL, noneDeclared } from "./stat-format";
 import { parseSearchParams } from "./params";
 import { asCategory, typeCategories, typeCategoryLabel, typesIn, type CollegeType, type TypeCategory } from "../components/institute/college-type";
 import { BOND_YEAR_CHOICES, FEE_LAKH_CHOICES, type Profile } from "../profile";
@@ -12,7 +12,9 @@ import type { ProgrammeTerms } from "../server/terms";
 //
 // Unknown values (not declared, in words only, a bond whose status is unknown, years not stated) never pass a filter
 // silently: a row whose filtered value is unknown is left out (and counted: `unknownTerms` on the lists) unless the
-// "Include not declared" box is ticked (nd=keep). "No bond" (bondyrs=0) only ever lists a record that says no bond (one
+// "Include not declared" box is ticked (nd=keep). But a fee with no published figure passes a fee cap (each list marks
+// it "fee not published", capNote): hiding it hid seats she could take (a reachable seat whose college publishes no fee)
+// unless "Hide options with no published fee" is ticked (nf=hide), when it is unknown as before. "No bond" (bondyrs=0) only ever lists a record that says no bond (one
 // adding that a state law's service may apply is unknown, as its cells say: listed with nd=keep), and a type filter
 // never lists a college with no type in the data, ticked or not: each page says how many it left out (untypedOnly). An NBEMS maximum fee or minimum stipend is not the
 // college's figure: inside the cap it passes, outside it the figure is unknown (as a "+ DA" basic stipend under a floor).
@@ -47,6 +49,8 @@ export const termFilterShape = {
   maxleave: z.coerce.number().positive().max(100000).optional(),
   /** keep: rows whose filtered value is not declared pass the caps too ("Include not declared"); absent or hide: left out. */
   nd: z.enum(["keep", "hide"]).optional(),
+  /** hide: a fee cap leaves out a row with no published fee ("Hide options with no published fee"); absent: it passes, marked. */
+  nf: z.literal("hide").optional(),
 };
 /** List params of the shape (readParams `lists`); optional, `ctype` also reads a single comma-joined value. */
 export const termFilterLists = ["ctype"] as const;
@@ -67,6 +71,8 @@ export type TermFilters = {
   maxBondInr?: number | null;
   maxLeavingInr?: number | null;
   keepUnknown?: boolean;
+  /** A fee cap leaves out a row with no published fee (it is unknown); default: it passes the cap. */
+  hideNoFee?: boolean;
 };
 
 const lakh = (v: number | null | undefined) => (v == null ? null : Math.round(v * 100000));
@@ -81,6 +87,7 @@ export function termFilters(f: TermParams, profile?: Pick<Profile, "maxFeeLakh" 
     maxBondInr: lakh(f.maxbond),
     maxLeavingInr: lakh(f.maxleave),
     keepUnknown: f.nd === "keep",
+    hideNoFee: f.nf === "hide",
   };
 }
 
@@ -131,11 +138,12 @@ function bounded(v: number | null, a: ProgrammeTerms["bond"]["amount"] | null, c
 /** pass; fail (a known value is outside a cap, "No bond" not on record, no or another type); unknown: passes but for a value not declared. */
 export type TermVerdict = "pass" | "fail" | "unknown";
 
-export function termVerdict(t: ProgrammeTerms, type: TypeValue | null | undefined, f: TermFilters): TermVerdict {
-  if (typeFails(type, f)) return "fail";
-  // "No bond": a record saying so passes, a declared bond fails; one not declared, not read or not clear (or a no-bond
-  // record a state law's service may override) is unknown, so "Include not published" lists it, as every other cap.
-  if (f.maxBondYears === 0 && t.bond.status === "declared") return "fail";
+/** The caps a filter sets, by their URL param: what a row failed (capNote, Options' "hidden by your caps"). */
+export type CapKey = "ctype" | "maxfee" | "minstip" | "bondyrs" | "maxbond" | "maxleave";
+type Check = [CapKey, number | null | undefined, number | null, (v: number, cap: number) => boolean];
+
+/** Each cap set, with the row's value under it (null: not known) and its test. */
+function checksOf(t: ProgrammeTerms, f: TermFilters): Check[] {
   const fee = t.years[0]?.fee;
   const s = t.years[0]?.stipend;
   // A stipend range (by subject): its lowest figure meets a floor; a fee range's highest a cap (feeValue). An NBEMS
@@ -143,21 +151,56 @@ export function termVerdict(t: ProgrammeTerms, type: TypeValue | null | undefine
   // stipend "+ DA" under the floor, and a fee whose GST Seatora took off (`declared`) when the cap lies between the two.
   const feeUnsure = f.maxFee != null && !!fee && ((fee.kind === "maximum" && fee.inr > f.maxFee) || (fee.declared != null && fee.inr <= f.maxFee && f.maxFee < fee.declared));
   const stipUnsure = f.minStipend != null && !!s && (s.kind === "minimum" || !!s.plusDa) && s.inr < f.minStipend;
-  const checks: [number | null | undefined, number | null, (v: number, cap: number) => boolean][] = [
-    [f.maxFee, feeUnsure ? null : feeValue.fee1(t), (v, cap) => v <= cap],
-    [f.minStipend, !s || stipUnsure ? null : (s.min ?? s.inr), (v, cap) => v >= cap],
-    [f.maxBondYears, feeValue.bondyrs(t), (v, cap) => v <= cap],
-    [f.maxBondInr, bounded(feeValue.bond(t), t.bond.status === "declared" ? t.bond.amount : null, f.maxBondInr), (v, cap) => v <= cap],
-    [f.maxLeavingInr, bounded(feeValue.leave(t), t.bond.leavingAmount, f.maxLeavingInr), (v, cap) => v <= cap],
+  // A DNB / DrNB seat with no bond declared, which NBEMS's rule lets impose none this session (stat-format noneDeclared): 0 years, ₹0.
+  const none = noneDeclared(t);
+  return [
+    // No fee published at all: passes the cap (marked "fee not published"), unless she hides those.
+    ["maxfee", !fee && !f.hideNoFee ? null : f.maxFee, feeUnsure ? null : feeValue.fee1(t), (v, cap) => v <= cap],
+    ["minstip", f.minStipend, !s || stipUnsure ? null : (s.min ?? s.inr), (v, cap) => v >= cap],
+    ["bondyrs", f.maxBondYears, none ? 0 : feeValue.bondyrs(t), (v, cap) => v <= cap],
+    ["maxbond", f.maxBondInr, none ? 0 : bounded(feeValue.bond(t), t.bond.status === "declared" ? t.bond.amount : null, f.maxBondInr), (v, cap) => v <= cap],
+    ["maxleave", f.maxLeavingInr, bounded(feeValue.leave(t), t.bond.leavingAmount, f.maxLeavingInr), (v, cap) => v <= cap],
   ];
-  let unknown = false;
-  for (const [cap, v, ok] of checks) {
-    if (cap == null) continue;
-    if (v == null) unknown = true;
-    else if (!ok(v, cap)) return "fail";
-  }
-  return unknown ? "unknown" : "pass";
 }
+
+/** The caps a row fails on a known value (or its type), in the filters' order; empty when it fails none. */
+export function termFailures(t: ProgrammeTerms, type: TypeValue | null | undefined, f: TermFilters): CapKey[] {
+  const out: CapKey[] = typeFails(type, f) ? ["ctype"] : [];
+  // "No bond": a record saying so passes, a declared bond fails; one not declared, not read or not clear (or a no-bond
+  // record a state law's service may override) is unknown, so "Include not published" lists it, as every other cap.
+  if (f.maxBondYears === 0 && t.bond.status === "declared") out.push("bondyrs");
+  for (const [k, cap, v, ok] of checksOf(t, f)) if (cap != null && v != null && !ok(v, cap) && !out.includes(k)) out.push(k);
+  return out;
+}
+
+export function termVerdict(t: ProgrammeTerms, type: TypeValue | null | undefined, f: TermFilters): TermVerdict {
+  if (termFailures(t, type, f).length) return "fail";
+  return checksOf(t, f).some(([, cap, v]) => cap != null && v == null) ? "unknown" : "pass";
+}
+
+/**
+ * The row's line under the caps, or null: the caps that hide it with its own figure ("Hidden by Fee up to ₹5 L/yr (its
+ * fee ₹8.4 L/yr)"), or that a fee cap kept it though no fee is published ("Fee not published: kept under Fee up to ₹5 L/yr").
+ */
+export function capNote(t: ProgrammeTerms, type: TypeValue | null | undefined, f: TermFilters | null | undefined): string | null {
+  if (!f) return null;
+  const fails = termFailures(t, type, f);
+  const fee1 = feeValue.fee1(t);
+  const years = noneDeclared(t) ? 0 : feeValue.bondyrs(t);
+  const why: Record<CapKey, () => string> = {
+    ctype: () => "the College type filter",
+    maxfee: () => `${termValueLabel.maxfee(f.maxFee! / 100000)} (its fee ${formatInrShort(fee1!)}/yr)`,
+    minstip: () => `${termValueLabel.minstip(f.minStipend!)} (its stipend ${formatInrShort(feeValue.stip1(t)!)}/mo)`,
+    bondyrs: () => `${termValueLabel.bondyrs(f.maxBondYears!)} (${years != null ? `its bond ${years} ${years === 1 ? "year" : "years"}` : "it has a bond"})`,
+    maxbond: () => `${termValueLabel.maxbond(f.maxBondInr! / 100000)} (its bond penalty ${formatInrShort(feeValue.bond(t)!)})`,
+    maxleave: () => `${termValueLabel.maxleave(f.maxLeavingInr! / 100000)} (its leaving penalty ${formatInrShort(feeValue.leave(t)!)})`,
+  };
+  if (fails.length) return `Hidden by ${fails.map((k) => why[k]()).join(" and ")}`;
+  return f.maxFee != null && !f.hideNoFee && noFeeFigure(t) ? `Fee not published for this course: kept under ${termValueLabel.maxfee(f.maxFee / 100000)}` : null;
+}
+
+/** No fee figure published for year 1 (none, or words only): a fee cap keeps it unless hideNoFee. */
+export const noFeeFigure = (t: ProgrammeTerms) => !t.years[0]?.fee;
 
 /** Whether one course's terms (and its college's type) pass the filters: an unknown value only with `keepUnknown`. */
 export function termsPass(t: ProgrammeTerms, type: TypeValue | null | undefined, f: TermFilters): boolean {
@@ -196,7 +239,8 @@ const lakhText = (v: number) => formatInrShort(v * 100000);
 export const termValueLabel = {
   maxfee: (v: number) => `Fee up to ${lakhText(v)}/yr`,
   minstip: (v: number) => `Stipend at least ${formatInrShort(v)}/mo`,
-  bondyrs: (v: number) => (v === 0 ? "No bond" : `Bond up to ${v} ${v === 1 ? "year" : "years"}`),
+  // 0: no bond on record, or none declared to MCC where NBEMS's rule lets none be imposed (stat-format noneDeclared).
+  bondyrs: (v: number) => (v === 0 ? "No bond / none declared to MCC" : `Bond up to ${v} ${v === 1 ? "year" : "years"}`),
   maxbond: (v: number) => `Bond penalty up to ${lakhText(v)}`,
   maxleave: (v: number) => `Leaving penalty up to ${lakhText(v)}`,
 };
@@ -212,6 +256,7 @@ export function termChips(f: TermParams): { key: keyof TermParams; label: string
     const v = f[k];
     if (typeof v === "number") out.push({ key: k, label: termValueLabel[k](v) });
   }
+  if (f.nf === "hide") out.push({ key: "nf", label: "Hiding options with no published fee" });
   if (f.nd === "keep") out.push({ key: "nd", label: "Including not published or not known" });
   return out;
 }

@@ -36,6 +36,11 @@ export function YourPicture({ pic, profile, E, latest, includeLatest = true, L, 
   // The rounds after Round 1 that make a "reached" label (never a stray round), as this exam names them.
   const later = E.rounds.filter((r) => r !== "R1" && r !== "stray" && r !== "special_stray").map((r) => roundShort(r, E.key));
   const fee = pic.cheapest && statCells(pic.cheapest.fees)[0];
+  // Options in none of the three tiles (within 10%, reached only in a stray round, no allotment in her categories, never
+  // allotted), each kind named: "With no allotment in your categories", or "Not reached: 12 within 10%, 43 with no …".
+  const rest = labelled - pic.r1 - pic.later - pic.counts["closed-before"];
+  const kinds = ([["within-10", "within 10% in a past round"], ["stray-only", "reached only in a stray round"], ["no-data", "with no allotment in your categories"], ["new", "never allotted before"]] as const).filter(([k]) => pic.counts[k] > 0);
+  const restLabel = kinds.length === 1 ? `${kinds[0][1][0].toUpperCase()}${kinds[0][1].slice(1)}` : `Not reached: ${kinds.map(([k, w]) => `${formatRank(pic.counts[k])} ${w}`).join(", ")}`;
   const s = pic.safest;
   const count = (n: number, label: React.ReactNode, tone: string, href?: string) => (
     <div className="flex min-w-0 flex-col-reverse justify-end gap-0.5">
@@ -53,10 +58,12 @@ export function YourPicture({ pic, profile, E, latest, includeLatest = true, L, 
         {group ? ` in the ${group}` : E.categories.length > 1 ? `, ${profile.category}${profile.pwd ? " PwD" : ""}` : ""}: your{" "}
         <span className="numeric">{formatRank(labelled)}</span> {labelled === 1 ? "option" : "options"}{scope}. Based on last years&apos; closing ranks ({reachWindow(latest, pastOf(latest), includeLatest)}), not a prediction.
       </p>
-      <dl className="mt-3 grid grid-cols-3 gap-3">
+      <dl className={`mt-3 grid gap-3 ${rest > 0 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
         {count(pic.r1, "Reached your rank in Round 1", "text-leaf")}
         {count(pic.later, <>Only in a later round{later.length ? ` (${later.join(" or ")})` : ""}</>, "text-sun")}
         {count(pic.counts["closed-before"], "Closed before your rank", "text-muted-foreground", closedHref)}
+        {/* The rest, so the tiles add up to her options: never reached and never closed before her rank. */}
+        {rest > 0 && count(rest, restLabel, "text-muted-foreground")}
       </dl>
       {(pic.cheapest || s || pic.govtLater > 0) && (
         <dl className="mt-3 grid gap-3 border-t border-border pt-3 text-sm md:grid-cols-2">
@@ -71,7 +78,7 @@ export function YourPicture({ pic, profile, E, latest, includeLatest = true, L, 
             </div>
           )}
           <div className="min-w-0">
-            <dt className="text-xs text-muted-foreground">Government with the most margin in Round 1</dt>
+            <dt className="text-xs text-muted-foreground">{pic.allGovt ? "Most margin in Round 1" : "Government with the most margin in Round 1"}</dt>
             {s ? (
               <dd>
                 Closed <span className="numeric font-semibold">{formatRank(s.at.closing)}</span> in {yearName(E.key, s.at.year)} R1 at{" "}
@@ -83,7 +90,7 @@ export function YourPicture({ pic, profile, E, latest, includeLatest = true, L, 
             ) : (
               <dd>
                 None reached your rank in Round 1
-                {pic.govtLater > 0 && <span className="block text-xs text-muted-foreground"><span className="numeric">{formatRank(pic.govtLater)}</span> {pic.govtLater === 1 ? "government option reached it" : "government options reached it"} only in a later round</span>}
+                {pic.govtLater > 0 && <span className="block text-xs text-muted-foreground"><span className="numeric">{formatRank(pic.govtLater)}</span> {pic.allGovt ? (pic.govtLater === 1 ? "option" : "options") : pic.govtLater === 1 ? "government option" : "government options"} reached it only in a later round</span>}
               </dd>
             )}
           </div>

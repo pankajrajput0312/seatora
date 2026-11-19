@@ -27,13 +27,13 @@ import { iniElsewhere } from "@/features/decide/lib/college-aliases";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, resultsSpan, STRAY_NOT_COUNTED } from "@/features/decide/lib/reach";
+import { deepestOf, eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, resultsSpan, STRAY_NOT_COUNTED } from "@/features/decide/lib/reach";
 import { readTermFilters, termChips, termValueLabel, untypedOnly } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, orderUnits, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { examGroupCourses, getMeta, listOptions, nearestCourses, optionsPicture, optionsView, reachedOf, unlistedSeats } from "@/features/decide/service";
 import { kindName, optionSorts, optionsViews, roundShort, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { authorityOf, DEFAULT_EXAM, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, examYears, headYearIn, latestOf, perGroup, sessionExams, yearName } from "@/features/exams/registry";
 import { groupsIn, quotaIn } from "@/features/exams/exam";
 
 export const metadata: Metadata = { title: "Options" };
@@ -57,6 +57,8 @@ const filtersSchema = z.object({
   sort: z.enum(optionSorts).optional(),
   /** "1": every card's Details open. */
   details: z.literal("1").optional(),
+  /** "1": only the options her caps and term filters hide on a known figure (another exam's "Show them"), each saying which. */
+  capped: z.literal("1").optional(),
   page: pageValue.default(1),
 });
 const sortLabels = (last: string): Record<OptionSort, string> => ({
@@ -81,7 +83,11 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // Term filters (college type, fee, stipend, bond, leaving): an absent maxfee / bondyrs is her profile's cap.
   const { params: tp, filters: terms } = readTermFilters(params, profile);
   const hasSeats = f.seats === "1" ? "clear" : f.seats === "all" ? false : f.seats;
-  const filters = { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms, sort: f.sort };
+  // The ones her caps hide ("Show them"): every one of them, whatever its seats or closing (the count said so).
+  const capMode = f.capped === "1" && exam !== DEFAULT_EXAM;
+  const filters = capMode
+    ? { search: f.q, includeProvisional: !f.prov, showClosed: true, hasSeats: false, view: "all" as const, terms, sort: f.sort, capped: true }
+    : { search: f.q, reach: f.reach ? [f.reach] : undefined, includeProvisional: !f.prov, showClosed: f.closed ? f.closed === "1" : undefined, hasSeats, view: f.view, terms, sort: f.sort };
   // A college type picked: the options it left out only because their type is not known (counted, never silently).
   const typeless = untypedOnly(terms);
   const [meta, r, view, untyped, pic] = await Promise.all([
@@ -125,8 +131,15 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const reached = r.counts["reached-latest"] + r.counts["reached-both"] + r.counts["reached-one"];
   const headYear = headYearIn(exam, meta.sources);
   // None reached: the option that closed deepest in the head year (any round), so the verdict has a number.
-  const deepest = labelled > 0 && reached === 0 ? (await listOptions(profile, { ...filters, reach: undefined, showClosed: true, sort: "deep" }, { page: 1, pageSize: 1 }, exam)).rows[0] : undefined;
-  const deepestAt = deepest?.byYear[headYear];
+  // An exam with sessions (INI-CET): the label counts every session of its years (Jul 2025, Jan 2026 and Jul 2026), so
+  // the deepest is across all of them, its session named; every other exam's as before (the head year's).
+  const sessions = sessionExams.includes(exam);
+  const none = labelled > 0 && reached === 0;
+  const deepestRows = none ? (await listOptions(profile, { ...filters, reach: undefined, showClosed: true, sort: "deep" }, { page: 1, pageSize: sessions ? labelled : 1 }, exam)).rows : [];
+  const across = sessions ? deepestOf(deepestRows.flatMap((r) => examYears(exam).flatMap((y) => (r.byYear[y] ? [{ r, y, ...r.byYear[y]! }] : [])))) : null;
+  const deepest = across ? across.r : deepestRows[0];
+  const deepestYear = across ? across.y : headYear;
+  const deepestAt = deepest?.byYear[deepestYear];
   // Which of her courses reached her rank (r.courses), linked to each on Options; none of hers: the nearest that did.
   const courseHit = (key: string, n: number): CourseHit => ({ key, name: pairLabel(key), n, href: L.with("/decide/options", { c: key, page: null, reach: null, q: null }) });
   const hit = Object.entries(r.courses).flatMap(([key, c]) => (reachedOf(c) ? [courseHit(key, reachedOf(c))] : [])).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
@@ -164,6 +177,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const closedDefault = roundView ? "1" : "0";
   const termKeys = ["ctype", "maxfee", "minstip", "bondyrs", "maxbond", "maxleave", "nd"] as const;
   const active = [
+    capMode && { label: "Only the ones your caps hide", param: "capped", href: here({ capped: null }) },
     f.q && { label: `Search: “${f.q}”`, param: "q", href: here({ q: null }) },
     f.reach && { label: reachLabel(f.reach, latest, PAST_YEARS, !f.prov), href: here({ reach: null, closed: null }) },
     // The seats filter, the round view's default too ("Has seats in any 2026 R2 list", as the sheet names it): × shows the
@@ -188,20 +202,26 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: here({ bond: null }) },
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/options", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
-  const clearAll = here({ q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, sort: null, ...(perGroup(exam) ? {} : { quota: null }), st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
+  const clearAll = here({ capped: null, q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, sort: null, ...(perGroup(exam) ? {} : { quota: null }), st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
   // Another exam (most of its MCC profiles give no fee figure): a cap never empties the list unsaid.
   const capped = "capped" in r ? (r.capped ?? 0) : 0;
   const caps = [profile.maxFeeLakh != null && tp.maxfee == null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && tp.bondyrs == null && termValueLabel.bondyrs(profile.maxBondYears)].filter(Boolean).join(", ");
   const capWords = caps ? `your cap (${caps})` : "the fee, stipend, bond or type filters";
-  const showCapped = here({ fee: null, bond: null, maxfee: "any", bondyrs: "any", ctype: null, minstip: null, maxbond: null, maxleave: null });
+  // Exactly the ones the caps hide, each saying which cap (OptionRow.capNote): the caps stay as they are.
+  const showCapped = here({ capped: "1", view: null, seats: null, closed: null, reach: null });
   const capNote = exam !== DEFAULT_EXAM && (capped > 0 || r.unknownTerms > 0) && (
     <p role="status" className="flex flex-wrap items-center gap-x-3 rounded-md border border-sun/40 bg-sun/10 px-3 py-2 text-sm">
-      {capped > 0 && (
+      {capped > 0 && (capMode ? (
+        <span>
+          Showing the <span className="numeric font-semibold">{formatRank(capped)}</span> {capped === 1 ? "option" : "options"} in your profile hidden by {capWords}, with or without seats this round; each says which cap hides it.{" "}
+          <Link href={here({ capped: null })} className={`${smallLink} text-sky`}>Back to your options</Link>
+        </span>
+      ) : (
         <span>
           <span className="numeric font-semibold">{formatRank(capped)}</span> {capped === 1 ? "option" : "options"} in your profile hidden by {capWords}.{" "}
           <Link href={showCapped} className={`${smallLink} text-sky`}>Show them</Link>
         </span>
-      )}
+      ))}
       {r.unknownTerms > 0 && (
         <span>
           <span className="numeric font-semibold">{formatRank(r.unknownTerms)}</span> more with no published figure for {capWords}.{" "}
@@ -305,7 +325,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <span className="font-semibold">None of these reached {`${E.rankWord} `}{n(profile.rank)}: {n(0)} of {n(labelled)} options in a past round ({counted}).</span>
             {deepest && deepestAt && (
               <span>
-                In {HEAD} the deepest any closed was {n(deepestAt.closing)} ({roundShort(deepestAt.round, exam)}, {deepestAt.category} seat) at{" "}
+                {sessions ? "In those sessions" : `In ${HEAD}`} the deepest any closed was {n(deepestAt.closing)} ({sessions ? `${yearName(exam, deepestYear)} ` : ""}{roundShort(deepestAt.round, exam)}, {deepestAt.category} seat) at{" "}
                 <Link href={L.institute(deepest.college.slug)} className={smallLink}>{deepest.college.name}</Link>, {deepest.course.degree} {deepest.course.name}
                 {deepestAt.closing < profile.rank && <>: {n(profile.rank - deepestAt.closing)} ranks before yours</>}.
               </span>

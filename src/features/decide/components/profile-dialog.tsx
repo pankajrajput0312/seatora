@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { groupOf, groupsIn, quotaIn, tidyLabel, type Exam } from "@/features/exams/exam";
-import { DEFAULT_EXAM } from "@/features/exams/keys";
+import { groupOf, groupsIn, quotaIn, specialtyGroupOf, tidyLabel, type Exam } from "@/features/exams/exam";
+import { DEFAULT_EXAM, inExamWords } from "@/features/exams/keys";
 import { BOND_YEAR_CHOICES, coursesFromPicks, feeChoices, orderFor, orderUnits, pairKey, picksOf, profileSchema, type Profile } from "../profile";
 import { useExamInfo } from "../lib/use-decide-store";
 import { control } from "./ui";
@@ -85,6 +85,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
   const [step, setStep] = useState(0);
   const stepHead = useRef<HTMLHeadingElement>(null);
   const rankInput = useRef<HTMLInputElement>(null);
+  const freshFocus = useRef(false); // the rank field was just focused: its first mouseup keeps the select-all
   /** Setup: to another step; its (visually hidden) heading takes focus, so a screen reader hears where she is. */
   const go = (n: number) => {
     setStep(n);
@@ -152,10 +153,20 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
     if (step < steps.length - 1) go(step + 1);
     else save();
   };
-  // NEET SS: each specialty with its degrees ("DM Medical Gastroenterology" beside "DrNB Gastroenterology"), her group's only.
-  const specialtyOptions = meta.specialties
-    .filter((sp) => (!grouped || offered(sp.code).length > 0) && (picked[sp.code] || matchesSpecialty(find, sp.name)))
-    .map((sp) => ({ value: sp.code, label: grouped ? `${offered(sp.code).join(" / ")} ${sp.name}` : sp.name }));
+  // NEET SS: each specialty with its degrees ("DrNB / MCh Surgical Gastroenterology"), her group's only; one specialty
+  // under two boards' names (Exam.sameSpecialties: "MCh Urology / DrNB Genito Urinary Surgery (Urology)") is one entry,
+  // ticking both codes.
+  const groupOfCode = (code: string) => specialtyGroupOf(E, code);
+  const shownSpecialties = meta.specialties.filter((sp) => !grouped || offered(sp.code).length > 0);
+  const members = (key: string) => shownSpecialties.filter((sp) => groupOfCode(sp.code) === key);
+  const courseWords = (sps: typeof shownSpecialties) =>
+    new Set(sps.map((sp) => sp.name)).size === 1 ? `${[...new Set(sps.flatMap((sp) => offered(sp.code)))].join(" / ")} ${sps[0].name}` : sps.map((sp) => `${offered(sp.code).join(" / ")} ${sp.name}`).join(" / ");
+  const specialtyOptions = [...new Set(shownSpecialties.map((sp) => groupOfCode(sp.code)))]
+    .map((key) => members(key))
+    .filter((sps) => sps.some((sp) => picked[sp.code] || matchesSpecialty(find, sp.name)))
+    .map((sps) => ({ value: groupOfCode(sps[0].code), label: grouped ? courseWords(sps) : sps[0].name }));
+  const pickedKeys = [...new Set(Object.keys(picked).map(groupOfCode))];
+  const pickSpecialtyKeys = (keys: string[]) => pickSpecialties(keys.flatMap((k) => { const ms = members(k).map((sp) => sp.code); return ms.length ? ms : [k]; }));
 
   const exportJson = () => {
     const c = current();
@@ -192,8 +203,12 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
             inputMode="numeric"
             value={rankText}
             onChange={(e) => { setRankText(e.target.value); setError(null); }}
-            // Select it all on focus, so typing replaces her old rank instead of adding digits to it.
-            onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.setSelectionRange(0, t.value.length)); }}
+            // Select it all on focus, so typing replaces her old rank instead of adding digits to it: at once (a frame later
+            // lost the digits typed before it: "1500" became "500"), and the click's own mouseup, which would put the caret
+            // back, is cancelled. Later clicks place the caret as usual.
+            onFocus={(e) => { e.currentTarget.select(); freshFocus.current = true; }}
+            onMouseUp={(e) => { if (freshFocus.current) e.preventDefault(); freshFocus.current = false; }}
+            onBlur={() => { freshFocus.current = false; }}
             placeholder={`e.g. ${E.exampleRank}`}
             aria-invalid={!!rankMsg}
             aria-describedby={rankMsg ? "profile-error" : undefined}
@@ -251,8 +266,8 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
         legend="Specialties"
         note={grouped && !group ? "Pick your question group first: only its courses are listed." : grouped ? `Your question group's courses (${tidyLabel(E, group!)}). None ticked = every one of them.` : setup ? "Tick each specialty you would take; then, below, untick any degree you would not. None ticked = every course." : undefined}
         options={specialtyOptions}
-        value={Object.keys(picked)}
-        onChange={pickSpecialties}
+        value={pickedKeys}
+        onChange={pickSpecialtyKeys}
       />
       {find.trim() && !meta.specialties.some((sp) => matchesSpecialty(find, sp.name)) && <p role="status" className="text-sm text-muted-foreground">No specialty matches “{find.trim()}”.</p>}
       {/* NEET SS: a course typed that only another question group has says which group (her rank is her group's). */}
@@ -325,7 +340,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
           Max bond
           <select value={draft.maxBondYears ?? ""} onChange={(e) => set("maxBondYears", e.target.value ? Number(e.target.value) : null)} className={control}>
             <option value="">Any</option>
-            {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? "No bond" : `Up to ${y} ${y === 1 ? "year" : "years"}`}</option>)}
+            {BOND_YEAR_CHOICES.map((y) => <option key={y} value={y}>{y === 0 ? inExamWords(exam, "No bond / none declared to MCC") : `Up to ${y} ${y === 1 ? "year" : "years"}`}</option>)}
           </select>
         </label>
         {setup && <p className="text-xs text-muted-foreground sm:col-span-2">Optional: Any shows every seat, whatever its fee or bond.</p>}
@@ -355,8 +370,8 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
         className="fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-xl border border-border bg-popover p-6 pb-0 shadow-overlay outline-none md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Dialog.Title className="text-xl font-semibold">{trial ? `Try ${exam === DEFAULT_EXAM ? "a" : `a ${E.label}`} rank` : `Your ${exam === DEFAULT_EXAM ? "" : `${E.label} `}${setup ? "rank and courses" : "rank and preferences"}`}</Dialog.Title>
-            <Dialog.Description className="mt-1 text-sm text-muted-foreground">{trial ? "Try a rank: nothing is saved unless you choose Save." : "Saved to your account, on every device you sign in on."}{onTry && !trial && " Or try one without saving."}</Dialog.Description>
+            <Dialog.Title className="text-xl font-semibold">{trial ? `Try ${exam === DEFAULT_EXAM ? "a" : `${/^[AEIOU]/.test(E.label) ? "an" : "a"} ${E.label}`} rank` : `Your ${exam === DEFAULT_EXAM ? "" : `${E.label} `}${setup ? "rank and courses" : "rank and preferences"}`}</Dialog.Title>
+            <Dialog.Description className="mt-1 text-sm text-muted-foreground">{trial ? "Try a rank: nothing is saved unless you choose Save as mine." : "Saved to your account, on every device you sign in on."}{onTry && !trial && " Or try one without saving."}</Dialog.Description>
           </div>
           <Dialog.Close asChild>
             <Button variant="ghost" size="icon" className="shrink-0" aria-label="Close"><X className="size-5" /></Button>
@@ -373,7 +388,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
           </ol>
         )}
 
-        <form className="mt-6 grid gap-6" onSubmit={(e) => { e.preventDefault(); if (setup) next(); else save(); }}>
+        <form className="mt-6 grid gap-6" onSubmit={(e) => { e.preventDefault(); if (setup) next(); else save(trial && onTry ? onTry : onSave); }}>
           {setup && <h3 ref={stepHead} tabIndex={-1} className="sr-only">Step <span className="numeric">{step + 1}</span> of <span className="numeric">{steps.length}</span>: {steps[step]}</h3>}
           {setup ? (
             <>
@@ -417,8 +432,13 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
             </div>
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
               {/* Only the page's address changes (rank, category, courses…): every page shows it, a banner offers Save. */}
-              {onTry && (!setup || rankText.trim() !== "") && <Button type="button" variant="secondary" size="lg" className="max-md:h-12 max-md:px-4" onClick={() => save(onTry)}>Try without saving</Button>}
-              <Button type="submit" size="lg">{!setup ? "Save" : step < steps.length - 1 ? "Next" : "Save and see your options"}</Button>
+              {/* Trying a rank: Try is the main action (Enter too), Save the other; nothing is saved by accident. */}
+              {trial ? (
+                <Button type="button" variant="secondary" size="lg" className="max-md:h-12 max-md:px-4" onClick={() => save()}>Save as mine</Button>
+              ) : (
+                onTry && (!setup || rankText.trim() !== "") && <Button type="button" variant="secondary" size="lg" className="max-md:h-12 max-md:px-4" onClick={() => save(onTry)}>Try without saving</Button>
+              )}
+              <Button type="submit" size="lg">{trial && onTry ? "Try without saving" : !setup ? "Save" : step < steps.length - 1 ? "Next" : "Save and see your options"}</Button>
             </div>
           </div>
         </form>

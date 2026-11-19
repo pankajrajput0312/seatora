@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { LayoutGrid, Table2 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { parseView, VIEW_PARAM, viewCookie, viewHref, type View } from "./view-toggle";
+import { parseView, PHONE_QUERY, VIEW_PARAM, viewCookie, viewHref, type View } from "./view-toggle";
 
 // The client half of view-toggle.tsx (import from there).
 
@@ -12,9 +12,9 @@ const VIEWS = [
   { v: "table", label: "Table", Icon: Table2 },
 ] as const;
 
-/** The choice as a cookie, for the server (one year, the Decide pages only). */
+/** The choice as a cookie for this window's class (phone or wide), for the server (one year, the Decide pages only). */
 const writeCookie = (page: string, v: View) => {
-  document.cookie = `${viewCookie(page)}=${v}; path=/decide; max-age=31536000; samesite=lax`;
+  document.cookie = `${viewCookie(page, matchMedia(PHONE_QUERY).matches)}=${v}; path=/decide; max-age=31536000; samesite=lax`;
 };
 
 const item = "inline-flex min-h-11 max-md:min-h-[2.375rem] items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground first:rounded-l-md last:rounded-r-md";

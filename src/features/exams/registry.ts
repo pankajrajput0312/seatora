@@ -42,6 +42,23 @@ export const exams: Record<ExamKey, Exam> = {
     site: { url: "https://mcc.nic.in/current-events-super-speciality-3/", name: "MCC Super Speciality counselling page" },
     // Hospital facts (beds) are about the institution: an SS hospital's are NEET PG's record of it (institute-data.ts).
     has: { ...resultsOnly, seats: true, beds: true },
+    // One specialty under NBEMS's DrNB name and NMC's D.M. / M.Ch. name (each pair in one question group in the bundle,
+    // 19 Nov 2026), one picker entry; MCC's seat lists print them apart, and so do Seatora's labels. The codes with both
+    // degrees already (Surgical Gastroenterology, Neuro Surgery…) are one code. No DrNB pair: Paediatric Intensive Care,
+    // Thoracic Surgery (no D.M. / M.Ch. of that name).
+    sameSpecialties: [
+      ["UROLOGY", "GENITOURINARYSURGERYUROLOGY"],
+      ["CARDIOVASCULARTHORACICSURGERY", "CARDIOTHORACICSURGERY"],
+      ["MEDICALGASTROENTEROLOGY", "GASTROENTEROLOGY"],
+      ["GYNAECOLOGICALONCOLOGY", "GYNAECOLOGICONCOLOGY"],
+      ["CLINICALHAEMATOLOGY", "HAEMATOLOGY"],
+      ["PLASTICRECONSTRUCTIVESURGERY", "PLASTICSURGERY"],
+      ["CLINICALIMMUNOLOGYRHEUMATOLOGY", "RHEUMATOLOGY"],
+      ["VASCULARSURGERY", "PERIPHERALVASCULARSURGERY"],
+      ["INTERVENTIONALRADIOLOGY", "ENDOVASCULARINTERVENTIONALRADIOLOGY"],
+      ["INFECTIOUSDISEASE", "SPECIALTYINFECTIOUSDISEASES"],
+      ["NEUROANAESTHESIA", "NEUROANAESTHESIACRITICALCARE"],
+    ],
   },
   // MCC: the NEET PG result layout (50% AIQ, deemed, central universities, AFMS).
   "neet-mds": {
@@ -90,6 +107,10 @@ export const exams: Record<ExamKey, Exam> = {
     quotaScoped: true,
     crossover: true,
     apartQuotas: { quotas: ["Sponsored/Foreign National", "Sponsored", "Foreign National", "Bhutani National"], name: "Sponsored/Foreign National" },
+    // Its Sponsored / Foreign National seat position heads the column "Bhutani National"; its seat positions' notes
+    // (January 2023 to January 2025: "No change in seat position of Foreign National / Sponsored/ Bhutanese National
+    // candidates") say "Bhutanese National", the right word: shown so, the data keeps AIIMS's column name.
+    quotaNames: { "Bhutani National": "Bhutanese National" },
     // Its institutes by family (college keys: neetpg-planner tools/exams/ini_cet identity.json).
     instituteGroups: [
       { label: "AIIMS New Delhi", prefixes: ["AIIMSNEWDELHI"] },

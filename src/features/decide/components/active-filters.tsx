@@ -5,6 +5,8 @@ import Link from "next/link";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useSearchParams } from "next/navigation";
+import { inExamWords } from "@/features/exams/keys";
+import { useExamInfo } from "../lib/use-decide-store";
 import { clears, revealInSheet } from "./filter-form";
 
 /** The chip she removed (its place), until the page without it renders: then focus goes to its neighbour. */
@@ -58,7 +60,9 @@ export function foldChips(items: Chip[], max = 6): Chip[] {
  * none left, to the results heading (else the h1).
  */
 export function ActiveFilters({ items: all, clear }: { items: Chip[]; clear: string }) {
-  const items = foldChips(all);
+  // Each label in the exam's words (INI-CET: AIIMS, its prospectus; the rest as written).
+  const exam = useExamInfo().key;
+  const items = foldChips(all).map((i) => ({ ...i, label: inExamWords(exam, i.label) }));
   const params = useSearchParams();
   const box = useRef<HTMLDivElement>(null);
   const [undo, setUndo] = useState<{ label: string; back: string } | null>(null);

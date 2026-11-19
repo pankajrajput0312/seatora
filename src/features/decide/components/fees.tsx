@@ -7,7 +7,7 @@ import { fmtDay, formatInrShort } from "../lib/format";
 import type { FeeQuotaGroup } from "../server/facts";
 import type { Amount, Figure, ProgrammeTerms, TermPart, TermSource } from "../server/terms";
 import { variantFor } from "../lib/specialty-search";
-import { bondUnknownWhy, NOT_KNOWN, unreadWhy } from "../lib/stat-format";
+import { bondUnknownWhy, NONE_DECLARED, noneDeclared, noneDeclaredWhy, NOT_KNOWN, unreadWhy } from "../lib/stat-format";
 import { termLabel } from "../types";
 import { SourceRef } from "./page-sources";
 import { smallLink } from "./ui";
@@ -555,6 +555,13 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
             {bond.text && <span className={note}>{bond.text}</span>}
             {bond.caveat && <span className="block text-xs text-sun">{bond.basis === "nbems_rule" ? `Seatora's check: ${bond.caveat}.` : `${bond.caveat}.`}</span>}
             {bond.basis === "nbems_rule" && <NbemsRules />}
+          </>
+        ) : noneDeclared(t) ? (
+          // No bond declared: NBEMS's rule lets none be imposed this session (stat-format noneDeclared).
+          <>
+            <p className="text-base"><span className="font-semibold">{NONE_DECLARED}</span><Sup n={bond.src} sources={sources} /></p>
+            <span className={note}>{noneDeclaredWhy(authorityOf(t.exam))}<NbemsRules /></span>
+            {bond.text && <span className={note}>{bond.text}</span>}
           </>
         ) : (
           // Not known (the cells' word): why, in one plain line (a scan Seatora couldn't read, a blank form, nothing

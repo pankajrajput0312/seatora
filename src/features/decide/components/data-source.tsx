@@ -76,9 +76,10 @@ export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLin
         </InfoTip>
       </span>
       {later.length > 0 && (
-        <span className="inline-flex items-center gap-x-1 rounded-full border border-sun/40 bg-sun/10 py-0.5 pl-2.5 pr-1 font-medium text-sun">
+        // The whole pill opens the notices: its (i) button's hit area (::before) spans the pill, not only the icon.
+        <span className="relative inline-flex cursor-pointer items-center gap-x-1 rounded-full border border-sun/40 bg-sun/10 py-0.5 pl-2.5 pr-1 font-medium text-sun hover:bg-sun/20">
           {later.length === 1 ? `Later ${by} notice: check it` : `${later.length} later ${by} notices: check them`}
-          <InfoTip label={later.length === 1 ? `the later ${by} seat notice` : `the later ${by} seat notices`}>
+          <InfoTip label={later.length === 1 ? `the later ${by} seat notice` : `the later ${by} seat notices`} className="static before:inset-x-0 before:-inset-y-3">
             Check {later.length === 1 ? `this later ${by} notice` : `these ${later.length} later ${by} notices`} before you lock your choices (their seats are not applied here): {noticeLinks(later)}
           </InfoTip>
         </span>

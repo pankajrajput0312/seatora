@@ -677,7 +677,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               ) : (
                 <>
                   One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type where the college&apos;s MCC institute profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead (a figure they state, beside them). A dash means not stated (the profile may say more), never zero.
-                  The bond is from MCC&apos;s institute list: &quot;No bond&quot;, a stated bond, or &quot;Not known&quot; (a document Seatora couldn&apos;t read, a blank form, none declared: the bond box says which); resigning from Round 2 is MCC&apos;s separate forfeit.
+                  The bond is from MCC&apos;s institute list: &quot;No bond&quot;, a stated bond, &quot;No bond declared&quot; (a DrNB hospital that declared none: NBEMS&apos;s rule lets it impose none this session), or &quot;Not known&quot; (a document Seatora couldn&apos;t read, a blank form, none declared on a D.M. / M.Ch. or MDS seat: the bond box says which); resigning from Round 2 is MCC&apos;s separate forfeit.
                 </>
               )}
             </InfoTip>

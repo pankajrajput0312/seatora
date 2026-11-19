@@ -26,6 +26,7 @@ import { BackToTop } from "./back-to-top";
 import { NAV_EVENT, navigating, TOAST_EVENT } from "./nav-pending";
 import { categoryName, ProfileDialog, profileSub, type ProfileMeta } from "./profile-dialog";
 import { RenamedSaved } from "./renamed-saved";
+import { PHONE_QUERY, WIDTH_COOKIE } from "./view-toggle";
 
 const sections = [
   {
@@ -64,6 +65,9 @@ const bottom = [
   { href: "/decide/institutes", label: "Institutes", icon: Building2 },
   { href: "/decide/last-ranks", label: "Last ranks", icon: TrendingUp },
 ];
+/** The pages the nav brings her back to with their filters (this tab, each exam its own: sessionStorage). */
+const navPaths = [...sections.flatMap((x) => x.items), ...bottom].map(({ href }) => href);
+const filtersKey = (path: string, exam: ExamKey) => scopedKey(`decide:filters:${path}`, exam);
 
 /** `phone`: the server's guess from the user agent (layout.tsx), so the first paint has the right layout. */
 /** `ask`: the server says she is the owner with Ask Seatora on (layout.tsx); only then is its nav entry rendered. */
@@ -113,6 +117,15 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
   // rank=abc or cat=XYZ; cat=UR or GEN is Open) counts as none, so the page and this sidebar both show the saved one, and
   // an unknown category says so (badCat).
   useEffect(() => setBadCat(null), [pathname]);
+  // The window's class for the server (server/view.ts isPhone): the next page's layout and Cards | Table follow the width
+  // she has now, not the user agent's guess, and a narrowed desktop window counts as a phone.
+  useEffect(() => {
+    const mq = matchMedia(PHONE_QUERY);
+    const put = () => (document.cookie = `${WIDTH_COOKIE}=${mq.matches ? "phone" : "wide"}; path=/decide; max-age=31536000; samesite=lax`);
+    put();
+    mq.addEventListener("change", put);
+    return () => mq.removeEventListener("change", put);
+  }, []);
   useEffect(() => {
     if (!hydrated) return;
     if (landing.current) {
@@ -127,7 +140,9 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
     const asked = next.get("editProfile");
     const wantsEdit = asked === "1" || asked === "try";
     next.delete("editProfile");
-    if (wantsEdit) setEditing(asked === "try" ? "try" : "edit");
+    // While she is trying a rank, every way into the editor (Options' "Widen your courses", Edit) is the try-only one:
+    // its Save would otherwise make the trial her saved profile.
+    if (wantsEdit) setEditing(asked === "try" || trying ? "try" : "edit");
     const saved = profile && profileToParams(profile, next);
     if (saved && !profileSchema.safeParse(profileInput(next)).success && `${saved}` !== `${next}`) {
       navigating();
@@ -136,7 +151,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
       navigating();
       router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
     }
-  }, [hydrated, profile, sp, pathname, router]);
+  }, [hydrated, profile, sp, pathname, router, trying]);
 
   // "Saved your rank" after each save, or another page's toast() (nav-pending.tsx): a few seconds, above the phone's bottom bar.
   const [toast, setToast] = useState<{ text: string; at: number } | null>(null);
@@ -151,8 +166,33 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
     return () => window.removeEventListener(TOAST_EVENT, on);
   }, []);
 
+  // Each nav page's remembered filters (this tab, this exam), and the ones she had when a trial began: "Back to my rank"
+  // puts those back, so a filter she added while trying (Options' "0 of 9") goes with the trial.
+  const pretrialKey = scopedKey("decide:pretrial", ex);
+  const backToMine = (p: Profile) => {
+    let before: Record<string, string> = {};
+    try {
+      before = JSON.parse(sessionStorage.getItem(pretrialKey) ?? "{}");
+      sessionStorage.removeItem(pretrialKey);
+      for (const path of navPaths) sessionStorage.setItem(filtersKey(path, ex), before[path] ?? "");
+    } catch {
+      // storage blocked: this page without its filters
+    }
+    const next = profileToParams(p, new URLSearchParams(before[pathname] ?? ""));
+    if (ex !== DEFAULT_EXAM) next.set("exam", ex);
+    navigating();
+    router.replace(`${pathname}?${next}`, { scroll: false });
+  };
+
   // Into the page's address, saved (Save) or not ("Try without saving": only the address changes, the saved one stays).
   const apply = (p: Profile, keep: boolean) => {
+    try {
+      if (keep) sessionStorage.removeItem(pretrialKey);
+      // A trial begins: the filters she has now, for "Back to my rank".
+      else if (!trying) sessionStorage.setItem(pretrialKey, JSON.stringify({ ...Object.fromEntries(navPaths.map((path) => [path, sessionStorage.getItem(filtersKey(path, ex)) ?? ""])), [pathname]: pageFilters(sp) }));
+    } catch {
+      // storage blocked: Back to my rank drops every filter
+    }
     if (keep) {
       setStored(p);
       setToast({ text: "Saved your rank", at: Date.now() });
@@ -219,9 +259,8 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
   useEffect(() => {
     try {
       // Each exam's own (a NEET PG course filter means nothing on NEET MDS).
-      const key = (path: string) => scopedKey(`decide:filters:${path}`, ex);
-      sessionStorage.setItem(key(pathname), pageFilters(sp));
-      setLast(Object.fromEntries([...sections.flatMap((x) => x.items), ...bottom].map(({ href }) => [href, sessionStorage.getItem(key(href)) ?? ""])));
+      sessionStorage.setItem(filtersKey(pathname, ex), pageFilters(sp));
+      setLast(Object.fromEntries(navPaths.map((href) => [href, sessionStorage.getItem(filtersKey(href, ex)) ?? ""])));
     } catch {
       // storage blocked: nav links without them
     }
@@ -304,7 +343,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
                   </span>
                 )}
                 {/* Phones: the rank and its edit button as one chip here (the sidebar, with its rank card, is in the drawer). */}
-                <button type="button" data-profile-edit aria-label={shown ? `${E.rankWord} ${formatRank(shown.rank)} ${profileSub(E, shown)}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing("edit")}
+                <button type="button" data-profile-edit aria-label={shown ? `${E.rankWord} ${formatRank(shown.rank)} ${profileSub(E, shown)}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(trying ? "try" : "edit")}
                   className="hit inline-flex h-8 min-w-0 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
                   {shown ? <><span className="numeric shrink-0 font-semibold"><span className="@max-[23.75rem]/topbar:hidden">{`${E.rankWord} `}</span><span className="@max-[21.25rem]/topbar:hidden">{formatRank(shown.rank)}</span><span className="hidden @max-[21.25rem]/topbar:inline">{compactRank(shown.rank)}</span></span><span className="truncate text-muted-foreground @max-[25rem]/topbar:hidden">{E.perGroup ? `· ${profileSub(E, shown)}` : <>· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</>}</span></> : <span className="truncate">{hydrated ? <>Set <span className="@max-[23.75rem]/topbar:hidden">your </span>rank</> : "Loading…"}</span>}
                   <Pencil className="size-3 shrink-0 text-muted-foreground" aria-hidden />
@@ -331,7 +370,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
                 ) : (
                   <p className="mt-0.5 text-sm">{hydrated ? "Not set yet" : "Loading…"}</p>
                 )}
-                <Button data-profile-edit variant="secondary" className="mt-2 w-full" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing("edit")}>{shown ? "Edit" : "Set your rank"}</Button>
+                <Button data-profile-edit variant="secondary" className="mt-2 w-full" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(trying ? "try" : "edit")}>{shown ? "Edit" : "Set your rank"}</Button>
                 <Link href="/" className="mt-1 inline-flex min-h-10 items-center text-sm text-muted-foreground hover:text-foreground md:hidden">Back to site</Link>
               </div>
             }
@@ -367,7 +406,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
                   </span>
                   <span className="flex flex-wrap gap-x-2">
                     <Button variant="ghost" size="sm" className="text-sky max-md:h-11" onClick={() => save(inUrl)}>Save as mine</Button>
-                    {profile && <Button variant="ghost" size="sm" className="text-sky max-md:h-11" onClick={() => apply(profile, false)}>Back to my rank</Button>}
+                    {profile && <Button variant="ghost" size="sm" className="text-sky max-md:h-11" onClick={() => backToMine(profile)}>Back to my rank</Button>}
                   </span>
                 </p>
               )}

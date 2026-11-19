@@ -95,8 +95,10 @@ describe("NEET PG (2024, 2025 past; 2026 R1 latest)", () => {
     const pvt = row({ id: "pvt", course: "DNB~ORTHOPAEDICS", reach: "reached-latest", from: [2026, "R1"], cells: { 2026: { R1: 27000 } }, type: "private" });
     const caps = termFilters({ ctype: ["govt"] }, { maxFeeLakh: 10, maxBondYears: null });
     const govt = { ...safe, hospital: { type: { value: "govt" as const, basis: "t" }, beds: null, mccProfileUrl: null } };
-    expect(suggestList([govt, dear, blank, pvt], { rank, latest, caps }).left).toEqual({ fee: 1, unknown: 1, type: 1 });
-    const keep = termFilters({ nd: "keep" }, { maxFeeLakh: 10, maxBondYears: null });
+    // A fee cap keeps an option with no published fee (term-filters: marked, not hidden), unless she hides those (nf=hide).
+    expect(suggestList([govt, dear, blank, pvt], { rank, latest, caps }).left).toEqual({ fee: 1, type: 1 });
+    expect(suggestList([govt, dear, blank, pvt], { rank, latest, caps: termFilters({ ctype: ["govt"], nf: "hide" }, { maxFeeLakh: 10, maxBondYears: null }) }).left).toEqual({ fee: 1, unknown: 1, type: 1 });
+    const keep = termFilters({ nd: "keep", nf: "hide" }, { maxFeeLakh: 10, maxBondYears: null });
     const kept = suggestList([safe, blank, dear], { rank, latest, caps: keep }).items;
     expect(kept.map((x) => [x.row.id, !!x.unsure])).toEqual([["safe", false], ["blank", true]]);
     // Bond cap "No bond": a declared bond fails it (the "terms" count: bond, stipend, penalty caps).

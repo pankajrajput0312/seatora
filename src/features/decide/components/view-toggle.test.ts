@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { FilterBar } from "./ui";
-import { deviceView, parseView, VIEW_PARAM, viewHref, ViewField, ViewPanes, ViewToggle } from "./view-toggle";
+import { deviceView, parseView, parseWidth, VIEW_PARAM, viewCookie, viewHref, ViewField, ViewPanes, ViewToggle } from "./view-toggle";
 
 let query = "";
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(query) }));
@@ -14,6 +14,11 @@ describe("view toggle", () => {
     expect(parseView("cards")).toBe("cards");
     expect(parseView("table")).toBe("table");
     for (const v of [null, undefined, "", "list", 1, ["cards"]]) expect(parseView(v)).toBeNull();
+  });
+
+  it("a choice is kept per device class: a Table picked on a wide screen never opens a phone in Table", () => {
+    expect([viewCookie("options"), viewCookie("options", true)]).toEqual(["medpath.view.options", "medpath.view.options.phone"]);
+    expect([parseWidth("phone"), parseWidth("wide"), parseWidth("tablet"), parseWidth(undefined)]).toEqual(["phone", "wide", null, null]);
   });
 
   it("sets view and keeps every other param, repeated ones too", () => {

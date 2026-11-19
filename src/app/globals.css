@@ -557,6 +557,13 @@ html:has(.app dialog[data-filters][open]) { overflow: hidden; }
   .app .chip-row a, .app [aria-label="Active filters"] > a { min-height: 2rem; }
 }
 
+/* Below the desktop breakpoint the side menu is the drawer (closed until ☰ or More), never a column squeezing the page:
+   the server lays out from the user agent (a phone asking for the desktop site, a narrow desktop window, can get the
+   desktop layout) and Astryx moves the menu into the drawer only once the shell hydrates, seconds later on a phone. */
+@media (width < 48rem) {
+  .app .astryx-app-shell-sidenav { display: none; }
+}
+
 /* The phone menu: the account footer (decide-shell.tsx AccountFooter) stays at the drawer's bottom while the list scrolls
    (the sidebar's own footer is pinned by Astryx). -0.5rem: over the drawer's own 8px bottom padding, which sticky keeps. */
 @media (width < 48rem) {

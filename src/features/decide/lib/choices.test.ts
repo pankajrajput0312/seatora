@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addToList, defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, otherGroupItems, parseChoices, putFirst, shareText, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, wholeCourseTotal, wholeCourseWords, type ChoiceItem, type RenamedCollege } from "./choices";
+import { addToList, defaultChoices, duplicateList, markTypedUpTo, move, nameFirstList, otherGroupItems, parseChoices, putFirst, shareText, renameOptionId, renameSaved, toCsv, toMccText, toggleItem, typedPrefix, wholeCourseRange, wholeCourseWords, type ChoiceItem, type RenamedCollege } from "./choices";
 import type { ProgrammeTerms } from "../server/terms";
 
 const item = (id: string): ChoiceItem => ({ id, institute: `Inst ${id}`, slug: id, state: "S", course: "DNB Anaesthesiology", quota: "DNB Quota", reachLabel: "", closedEveryRound: false });
@@ -148,13 +148,15 @@ describe("otherGroupItems (NEET SS)", () => {
   });
 });
 
-describe("wholeCourseTotal (NEET SS / MDS choice lists)", () => {
+describe("wholeCourseRange (NEET SS / MDS / INI-CET choice lists)", () => {
   const t = (fee: number | null, years = 3, range = false) =>
     ({ durationYears: years, wholeCourseFee: fee, years: [{ year: 1, fee: fee == null ? null : { inr: fee / years, ...(range && { min: 1 }) }, stipend: null }] }) as unknown as ProgrammeTerms;
-  it("adds the published whole-course fees; a choice with none is counted apart, never as ₹0", () => {
-    expect(wholeCourseTotal([t(300000), t(null), t(450000)])).toEqual({ total: 750000, n: 2, missing: 1, upTo: false });
-    expect(wholeCourseTotal([t(300000, 3, true)]).upTo).toBe(true);
-    expect(wholeCourseTotal([])).toEqual({ total: 0, n: 0, missing: 0, upTo: false });
+  it("the cheapest to the dearest published whole-course fee, never a sum; a choice with none is counted apart, never as ₹0", () => {
+    expect(wholeCourseRange([t(450000), t(null), t(300000)])).toEqual({ min: 300000, max: 450000, n: 2, missing: 1, upTo: false });
+    expect(wholeCourseRange([t(300000, 3, true)]).upTo).toBe(true);
+    expect(wholeCourseRange([t(900000, 3, true), t(300000)]).upTo).toBe(true); // the dearest is a maximum
+    expect(wholeCourseRange([t(900000), t(300000, 3, true)]).upTo).toBe(false);
+    expect(wholeCourseRange([])).toEqual({ min: null, max: null, n: 0, missing: 0, upTo: false });
     expect(wholeCourseWords(t(null))).toBe("not published");
     expect(wholeCourseWords(t(450000))).toBe("₹4,50,000 (3 years)");
   });

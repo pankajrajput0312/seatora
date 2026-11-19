@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Atkinson_Hyperlegible_Mono, Atkinson_Hyperlegible_Next } from "next/font/google";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import { DatabaseZap } from "lucide-react";
 import "@astryxdesign/core/reset.css";
@@ -15,9 +15,9 @@ import { DecideShell } from "@/features/decide/components/decide-shell";
 import { NavPending } from "@/features/decide/components/nav-pending";
 import type { ProfileMeta } from "@/features/decide/components/profile-dialog";
 import { EmptyState } from "@/features/decide/components/ui";
-import { deviceView } from "@/features/decide/components/view-toggle";
 import { nextChoiceFilling, roundName, stepsNow } from "@/features/decide/lib/round-status";
 import { roundStatus } from "@/features/decide/server/notices";
+import { isPhone } from "@/features/decide/server/view";
 import { examGroupCourses, examGroups, getMeta } from "@/features/decide/service";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { examShows } from "@/features/exams/exam";
@@ -66,9 +66,9 @@ export default async function DecideLayout({ children }: { children: React.React
     unstable_rethrow(e); // the sign-in redirect when access is gone
     console.error("[decide] data unavailable", e);
   }
-  // A phone's first paint already has the drawer layout (no sidebar column), so nothing shifts when the shell hydrates.
-  const h = await headers();
-  const phone = deviceView(h.get("user-agent"), h.get("sec-ch-ua-mobile")) === "cards";
+  // A phone's first paint already has the drawer layout (no sidebar column), so nothing shifts when the shell hydrates:
+  // the width the shell measured last time, else the user agent's guess (globals.css keeps the column off a narrow window anyway).
+  const phone = await isPhone();
   // Ask Seatora's nav entry: only for the owner while ASK_ENABLED=1 (no database read otherwise).
   const ask = !!meta && (await askUser().catch(() => null)) != null;
   // Her first choice list's name: the round she fills next (MCC's schedule, as Choices names it).

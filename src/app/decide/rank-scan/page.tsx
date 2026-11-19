@@ -45,10 +45,12 @@ const PAGE_SIZE = 50; // a phone: 25 (pageSizeFor)
 const windows = ["100", "250", "500", "1000", "2500", "5000", "1%", "2%", "5%", "10%"] as const;
 const MAX_WINDOW = 5000;
 const halfWindow = (w: (typeof windows)[number], rank: number) => Math.min(MAX_WINDOW, w.endsWith("%") ? Math.max(1, Math.round((rank * parseFloat(w)) / 100)) : Number(w));
+/** None picked: ± 10% of the rank, at least ± 100 (rank 900: 800 to 1,000, never 400 to 1,400). */
+const defaultWindow = (rank: number) => Math.min(MAX_WINDOW, Math.max(100, Math.round(rank / 10)));
 const schema = z.object({
   scan: rankShorthand.optional(), // "25k", "2.5 lakh" as on Last ranks
   year: z.coerce.number().int().optional(),
-  w: z.enum(windows).default("500"),
+  w: z.enum(windows).optional(),
   round: z.enum(rounds).optional(),
   page: pageValue.optional(),
 });
@@ -75,7 +77,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const rank = invalid ? null : (f.scan ?? profile?.rank ?? null);
   // Default: the newest year whose results are final.
   const year = meta.years.find((y) => y.year === f.year) ?? meta.years.find((y) => !y.provisional) ?? meta.years[0];
-  const window = halfWindow(f.w, rank ?? 0);
+  const window = f.w ? halfWindow(f.w, rank ?? 0) : defaultWindow(rank ?? 0);
   const round = f.round && year?.rounds.includes(f.round) ? f.round : undefined;
   // Her courses, and the seat categories she can take, unless she picks others ("all" lifts one): what is near her rank for her.
   const cf = courseFilter(params, profile, meta.courses);
@@ -98,6 +100,14 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const terms = splitByTerms(scanned, tp.filters, (a) => a.fees, (a) => a.hospital?.type?.value);
   const inRound = <T extends { round: string }>(xs: T[]) => (round ? xs.filter((a) => a.round === round) : xs);
   const [kept, unknown] = [inRound(terms.kept), inRound(terms.unknown)];
+  // Her courses have none in the range: the nearest ranks they had that year, below and above it (any filter but the terms).
+  type Near = Awaited<ReturnType<typeof rankScan>>[number]["rows"][number];
+  let nearest: { below: Near | null; above: Near | null } | null = null;
+  if (rank && year && cf.slugs && !inRound(scanned).length) {
+    const all = inRound((await rankScan(rank, year.year, 300000, exam, group ?? mineQ)).flatMap((g) => g.rows).filter(wanted));
+    const pick = (xs: Near[], better: (a: Near, b: Near) => boolean) => xs.reduce<Near | null>((m, a) => (!m || better(a, m) ? a : m), null);
+    nearest = { below: pick(all.filter((a) => a.rank < rank - window), (a, b) => a.rank > b.rank), above: pick(all.filter((a) => a.rank > rank + window), (a, b) => a.rank < b.rank) };
+  }
   type Row = (typeof kept)[number];
   const you = rank ? youMarks(kept, rank) : new Set<Row>();
   const page = Math.min(Math.max(1, Math.ceil(kept.length / pageSize)), f.page ?? 1);
@@ -171,7 +181,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         }
       >
         <Field label="Year"><Select name="year" value={year ? String(year.year) : undefined} options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
-        <Field label="Range"><Select name="w" value={f.w} options={windows.map((w) => ({ value: w, label: w.endsWith("%") ? `± ${w} of your rank${rank ? ` (± ${formatRank(halfWindow(w, rank))})` : ""}` : `± ${formatRank(Number(w))}` }))} /></Field>
+        <Field label="Range"><Select name="w" value={f.w} all={`± 10% of your rank, at least ± 100${rank ? ` (± ${formatRank(defaultWindow(rank))})` : ""}`} options={windows.map((w) => ({ value: w, label: w.endsWith("%") ? `± ${w} of your rank${rank ? ` (± ${formatRank(halfWindow(w, rank))})` : ""}` : `± ${formatRank(Number(w))}` }))} /></Field>
         <Field label="Round"><Select name="round" value={round} all="All rounds" options={(year?.rounds ?? []).map((r) => ({ value: r, label: roundOf(r) }))} /></Field>
         {/* Her courses and seat categories by default (none ticked), as Residents; the shared searchable chips. */}
         <FilterDropdown label="Course" name="course" search options={cf.choices} selected={cf.selected} none={cf.none} info={cf.mine.length ? "None ticked means your courses. Tick All courses for every one." : undefined} />
@@ -221,11 +231,28 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
           {roundsLine}
           {groups.length === 0 && (
             // The real controls: a wider range, every course, every seat category (her profile's are the default).
-            <EmptyState title="No allotments in this range" description={`No seat ${cf.slugs ? "in your courses " : ""}was allotted to ranks ${formatRank(Math.max(1, rank - window))}–${formatRank(rank + window)} in ${yearWords}, or none passed the filters.`}>
-              <span className="flex flex-wrap justify-center gap-x-6">
-                {window < MAX_WINDOW && <Link href={L.with(R, { w: String(MAX_WINDOW), page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Widen to ± {formatRank(MAX_WINDOW)}</Link>}
-                {cf.slugs && <Link href={L.with(R, { course: "all", page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Every course</Link>}
-                {cats && <Link href={L.with(R, { scat: "all", page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Every seat category</Link>}
+            <EmptyState
+              title={nearest ? "None in your courses in this range" : "No allotments in this range"}
+              description={nearest ? `No seat in your courses was allotted to ranks ${formatRank(Math.max(1, rank - window))}–${formatRank(rank + window)} in ${yearWords}${round ? ` ${roundOf(round)}` : ""}.` : `No seat ${cf.slugs ? "in your courses " : ""}was allotted to ranks ${formatRank(Math.max(1, rank - window))}–${formatRank(rank + window)} in ${yearWords}, or none passed the filters.`}
+            >
+              {/* One child: the empty state's actions are a row; the nearest ranks go above its links. */}
+              <span className="grid justify-items-center gap-2">
+                {nearest && (nearest.below || nearest.above) && (
+                  <span className="grid justify-items-center gap-1 text-sm">
+                    <span className="text-muted-foreground">Nearest in your courses that year:</span>
+                    {[nearest.below, nearest.above].map((a) => a && (
+                      <Link key={a.rank} href={L.with(R, { scan: a.rank, page: null })} className={`${smallLink} text-sky`}>
+                        <span>Rank <span className="numeric">{formatRank(a.rank)}</span> ({roundOf(a.round)}, {a.collegeName}, {a.degree} {courseOf.get(`${a.degree}|${a.specialty}`)?.name ?? a.specialty}): scan around it</span>
+                      </Link>
+                    ))}
+                  </span>
+                )}
+                {nearest && !nearest.below && !nearest.above && <span className="block text-sm text-muted-foreground">Your courses had no allotment at all in {yearWords}{round ? ` ${roundOf(round)}` : ""}.</span>}
+                <span className="flex flex-wrap justify-center gap-x-6">
+                  {window < MAX_WINDOW && <Link href={L.with(R, { w: String(MAX_WINDOW), page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Widen to ± {formatRank(MAX_WINDOW)}</Link>}
+                  {cf.slugs && <Link href={L.with(R, { course: "all", page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Every course</Link>}
+                  {cats && <Link href={L.with(R, { scat: "all", page: null })} className="inline-flex min-h-11 items-center text-sm text-sky underline">Every seat category</Link>}
+                </span>
               </span>
             </EmptyState>
           )}

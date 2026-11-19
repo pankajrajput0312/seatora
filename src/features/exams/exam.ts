@@ -60,6 +60,12 @@ export type Exam = {
   apartQuotas?: { quotas: string[]; name: string };
   /** Its Counselling area has the "Also in NEET PG counselling?" guide (./crossover.ts; INI-CET). */
   crossover?: boolean;
+  /**
+   * Specialty codes that are one specialty under two boards' names (NEET SS: NBEMS's DrNB and NMC's D.M. / M.Ch., e.g.
+   * DrNB Genito Urinary Surgery (Urology) and M.Ch. Urology): one entry in the profile's specialty picker, ticking both.
+   * The data, filters and labels keep each course as MCC prints it.
+   */
+  sameSpecialties?: string[][];
 };
 
 export const neetPg: Exam = {
@@ -144,6 +150,9 @@ export function completeYear(sources: Pick<Source, "year" | "round">[]): number 
 }
 /** The year headlines name: the latest complete one (another exam: from its data), NEET PG's later past year as before. */
 export const headYearOf = (E: Pick<Exam, "headYear" | "pastYears">) => E.headYear ?? E.pastYears[1];
+
+/** A specialty code's picker group (Exam.sameSpecialties): its first code, or the code itself. */
+export const specialtyGroupOf = (E: Pick<Exam, "sameSpecialties">, code: string) => E.sameSpecialties?.find((g) => g.includes(code))?.[0] ?? code;
 
 /** A label with the exam's bundle typos tidied (Exam.typos; display only, the data as it is). */
 export const tidyLabel = (E: Pick<Exam, "typos">, s: string) => (E.typos ?? []).reduce((x, [from, to]) => x.split(from).join(to), s);

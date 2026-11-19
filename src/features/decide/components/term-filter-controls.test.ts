@@ -19,13 +19,15 @@ describe("TermFilterControls", () => {
     expect(checked(html, "ctype", "govt")).toBe(true);
     expect(checked(html, "ctype", "esic")).toBe(false);
     expect(checked(html, "nd", "keep")).toBe(true);
-    expect(html).toContain(">No bond<");
+    expect(html).toContain(">No bond / none declared to MCC<");
+    expect(checked(html, "nf", "hide")).toBe(false); // a fee cap keeps the options with no published fee by default
     expect(html).toContain('aria-label="About Fees &amp; bond"'); // "Include not published" explained behind the section's (i)
   });
 
   it("nothing applied: any, include-not-declared unticked", () => {
     const html = render("");
     expect(selected(html, "maxfee")).toBe("");
+    expect(html).toContain("Hide options with no published fee");
     expect(checked(html, "nd", "keep")).toBe(false);
     expect(html).toMatch(/>Stipend<\/span><select name="minstip"/); // a short visible label, its row in the sheet
   });

@@ -1,7 +1,8 @@
 // Cards | Table for a results page. The server renders only the view on show (half the HTML or less): the choice is
 // `layout=cards|table` in the address (`layout`, not `view`: Options' and Seats' `view` is their own list view), else
-// the one she picked last on this device (a cookie the toggle sets, server/view.ts chosenView), else cards on a phone
-// and the table elsewhere (deviceView). Switching is a navigation to `?layout=…` (links: works without JS).
+// the one she picked last at this screen size (a cookie per device class the toggle sets, server/view.ts chosenView: a
+// Table picked on a wide screen never opens a phone-width window in Table), else cards on a phone and the table elsewhere
+// (deviceView). Switching is a navigation to `?layout=…` (links: works without JS).
 // No "use client" here: the server reads VIEW_PARAM, parseView and ViewPanes; the toggle is in view-toggle-client.tsx.
 
 export type View = "cards" | "table";
@@ -12,8 +13,12 @@ export const VIEW_PARAM = "layout";
 /** A `layout` value from the address or the cookie (untrusted): only the two views, else null. */
 export const parseView = (v: unknown): View | null => (v === "cards" || v === "table" ? v : null);
 
-/** The cookie that tells the server the choice she made on this device, per page. */
-export const viewCookie = (page: string) => `medpath.view.${page}`;
+/** The cookie that tells the server the choice she made, per page and device class (a phone's ends ".phone"). */
+export const viewCookie = (page: string, phone = false) => `medpath.view.${page}${phone ? ".phone" : ""}`;
+/** The window's class as the shell last measured it (below 48rem: "phone", else "wide"): the server's layout and views follow it. */
+export const WIDTH_COOKIE = "medpath.vw";
+export const PHONE_QUERY = "(width < 48rem)";
+export const parseWidth = (v: unknown): "phone" | "wide" | null => (v === "phone" || v === "wide" ? v : null);
 
 /**
  * Nothing chosen: cards on a phone, the table elsewhere. `mobileHint`: the Sec-CH-UA-Mobile header (Chromium sends it

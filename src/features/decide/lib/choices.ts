@@ -93,12 +93,14 @@ const upTo = (t: ProgrammeTerms) => t.years.some((y) => y.fee?.kind === "maximum
 export const wholeCourseWords = (t: ProgrammeTerms) =>
   t.wholeCourseFee == null ? "not published" : `${upTo(t) ? "up to " : ""}${inrFull(t.wholeCourseFee)} (${t.durationYears} ${t.durationYears === 1 ? "year" : "years"})`;
 /**
- * The shortlist's whole-course fees added up: `total` over the `n` choices that publish one (`upTo`: one of them is a
- * maximum or a range's top), `missing` the ones that publish none, never counted as ₹0. Stipend is never taken off.
+ * The list's whole-course fees as a range, never a sum (she takes one seat, not all of them): the cheapest and the
+ * dearest of the `n` choices that publish one (`upTo`: the dearest is a maximum or a range's top), `missing` the ones
+ * that publish none, never counted as ₹0. Stipend is never taken off.
  */
-export function wholeCourseTotal(ts: ProgrammeTerms[]) {
-  const known = ts.filter((t) => t.wholeCourseFee != null);
-  return { total: known.reduce((n, t) => n + t.wholeCourseFee!, 0), n: known.length, missing: ts.length - known.length, upTo: known.some(upTo) };
+export function wholeCourseRange(ts: ProgrammeTerms[]) {
+  const known = ts.filter((t) => t.wholeCourseFee != null).sort((a, b) => a.wholeCourseFee! - b.wholeCourseFee!);
+  const dearest = known.at(-1);
+  return { min: known[0]?.wholeCourseFee ?? null, max: dearest?.wholeCourseFee ?? null, n: known.length, missing: ts.length - known.length, upTo: !!dearest && upTo(dearest) };
 }
 
 export const otherGroupItems = (items: ChoiceItem[], groups: string[]) => (groups.length ? items.filter((i) => !groups.includes(groupOf(i.quota) ?? "")) : []);

@@ -8,7 +8,7 @@ import { hospitalInfo, type HospitalInfo } from "./components/institute/institut
 import { renameOptionId, type RenamedCollege } from "./lib/choices";
 import { searchMatcher } from "./lib/college-aliases";
 import { SUGGEST_REACH, suggestList } from "./lib/suggest";
-import { anyTermFilter, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
+import { anyTermFilter, capNote, feeValue, profileTermFilters, splitByTerms, termsPass, termVerdict, type TermFilters } from "./lib/term-filters";
 import { bestClosing, buildGrid, classifyReach, deepestByYear, eligibleCategories, isStrayRound, LATEST_YEAR, PAST_YEARS, pastOf, r1Reached, reachedFrom, reachEvidence, reachOrder, roundReachOrder, seatsBelow, YEARS, type Deepest, type GridCell, type Latest, type Reach, type ReachAt, type ReachInput, type SeatsBelow } from "./lib/reach";
 import { pairKey, profileCourseFilter, profileHasCourse, profileQuotas, type Profile } from "./profile";
 import { getCatalog, type Catalog, type Opt } from "./server/catalog";
@@ -130,6 +130,8 @@ export type OptionRow = {
   otherGroup?: true;
   /** Options' never-allotted rows (reach "new"): other colleges' closings for comparison, never this option's (withSimilar). */
   similar?: Similar;
+  /** Under a cap (Options): the caps that hide it with its figure, or "Fee not published: kept under …" (lib/term-filters capNote). */
+  capNote?: string;
 };
 
 /**
@@ -168,7 +170,8 @@ export function optionsView(asked: OptionsView | undefined, lists: SeatList[], s
  * without; undefined: the view's (round: "any", all: with or without).
  */
 /** `terms`: fee, stipend, bond, leaving and college-type filters (lib/term-filters.ts); given, they replace her profile's fee and bond caps. */
-export type OptionFilters = { search?: string; reach?: Reach[]; includeProvisional?: boolean; showClosed?: boolean; hasSeats?: boolean | SeatKind | "any"; view?: OptionsView; terms?: TermFilters; sort?: OptionSort };
+/** `capped`: only the options in her profile her caps and term filters hide (a known figure outside them: capNote says which). */
+export type OptionFilters = { search?: string; reach?: Reach[]; includeProvisional?: boolean; showClosed?: boolean; hasSeats?: boolean | SeatKind | "any"; view?: OptionsView; terms?: TermFilters; sort?: OptionSort; capped?: boolean };
 
 /** Seats per kind in one option's own cells (OptionSeats.cells, `lists` order), in `categories` (all when omitted); null = that list prints none. */
 export function seatsByKind(lists: SeatList[], s: Pick<OptionSeats, "cells"> | undefined, categories?: string[]) {
@@ -542,7 +545,11 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
   const tf = f.terms ?? (profile && profileTermFilters(profile));
   const types = await typesFor(tf, cat.exam);
   const matches = (o: Parameters<typeof optMatches>[1]) => optMatches(cat, o, profile, tf, types);
-  const split = splitByTerms(cat.options.filter((o) => inProfile(cat, o, profile)), tf, (o) => optTerms(cat, o), (o) => types?.get(o.college)?.type?.value);
+  const typeOf = (o: Pick<Opt, "college">) => types?.get(o.college)?.type?.value;
+  const split = splitByTerms(cat.options.filter((o) => inProfile(cat, o, profile)), tf, (o) => optTerms(cat, o), typeOf);
+  // "Show them": the ones the caps hide on a known figure, exactly (Options counts them as `capped`), and none else.
+  const hiddenByCaps = !!f.capped && !!tf && anyTermFilter(tf);
+  if (hiddenByCaps) Object.assign(split, { kept: cat.options.filter((o) => inProfile(cat, o, profile) && termVerdict(optTerms(cat, o), typeOf(o), tf) === "fail"), unknown: [] });
   const mine = split.kept;
   const opts = mine.filter(text);
   // Options left out only because a filtered term is not declared: labelled and filtered as the shown ones, for the count.
@@ -554,8 +561,8 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     rankOptions(cat, opts, profile, includeProvisional),
     unknownOpts.length ? rankOptions(cat, unknownOpts, profile, includeProvisional) : [],
   ]);
-  const fresh = profileSeats && round ? newOptions(cat, profileSeats, profile, matches) : [];
-  const freshUnknown = profileSeats && round && tf && !tf.keepUnknown && anyTermFilter(tf)
+  const fresh = profileSeats && round && !hiddenByCaps ? newOptions(cat, profileSeats, profile, matches) : [];
+  const freshUnknown = profileSeats && round && !hiddenByCaps && tf && !tf.keepUnknown && anyTermFilter(tf)
     ? newOptions(cat, profileSeats, profile, (o) => inProfile(cat, o, profile) && termVerdict(optTerms(cat, o), types?.get(o.college)?.type?.value, tf) === "unknown")
     : [];
   const by = new Map(profileSeats ? [...mine, ...fresh, ...split.unknown, ...freshUnknown].map((o) => [o.id, seatsByKind(lists, profileSeats.get(o.id)).by]) : []);
@@ -600,9 +607,14 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
         return c && c.state == null && cat.courseOf.has(`${s.degree}|${s.specialty}`) && optMatches(cat, s, anyState, tf, types) && hasSeatsIn(seatsByKind(lists, s).by, "any");
       }).length
     : 0;
+  // Under a cap: which caps hide a row ("Show them"), or that a fee cap kept it with no fee published (lib/term-filters capNote).
+  const capped = (r: OptionRow) => {
+    const note = tf && anyTermFilter(tf) ? capNote(r.fees, r.hospital?.type?.value, tf) : null;
+    return note ? { ...r, capNote: note } : r;
+  };
   return {
     ...page,
-    rows: await withSimilar(cat, withSeats(built, lists, seats, profile, cat.exam), profile),
+    rows: (await withSimilar(cat, withSeats(built, lists, seats, profile, cat.exam), profile)).map(capped),
     view,
     showClosed,
     seats: kind,
@@ -612,7 +624,7 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     unknownTerms: open(inView([...labelledUnknown, ...freshUnknown.filter(text).map(asNew)]).filter(inReach)).length,
     // Another exam: options in her profile (and search) whose declared figure fails her caps or the term filters, so
     // a cap never empties the list unsaid (NEET PG's answer is as before).
-    ...(cat.exam !== DEFAULT_EXAM && { capped: tf && anyTermFilter(tf) ? cat.options.filter((o) => inProfile(cat, o, profile) && text(o)).length - opts.length - unknownOpts.length : 0 }),
+    ...(cat.exam !== DEFAULT_EXAM && { capped: tf && anyTermFilter(tf) ? (hiddenByCaps ? opts.length : cat.options.filter((o) => inProfile(cat, o, profile) && text(o)).length - opts.length - unknownOpts.length) : 0 }),
     hiddenClosed: hidden.length,
     /** Of the hidden ones, those whose label rests on the provisional latest round alone. */
     hiddenProvisional: hidden.filter((r) => r.provisional).length,
@@ -667,7 +679,7 @@ export async function suggestOptions(profile: Profile, f: { terms?: TermFilters;
  * later round's closing, which can be an outlier), else how many government ones reached it only later. History only.
  */
 export async function optionsPicture(profile: Profile, f: OptionFilters = {}, exam: ExamKey = DEFAULT_EXAM) {
-  const [r, cat] = await Promise.all([listOptions(profile, { ...f, reach: REACHED, sort: undefined }, undefined, exam), getCatalog(exam)]);
+  const [r, cat, info] = await Promise.all([listOptions(profile, { ...f, reach: REACHED, sort: undefined }, undefined, exam), getCatalog(exam), hospitalInfo(exam)]);
   const latest = latestOf(cat.sources, exam);
   // A fee a year only: never the NBEMS ceiling, never an amount at admission whose later years differ or aren't stated.
   const fee = (x: OptionRow) => (x.fees.years[0]?.fee?.kind === "maximum" || feeBasis(x.fees) !== "yearly" ? null : feeValue.fee1(x.fees));
@@ -685,6 +697,8 @@ export async function optionsPicture(profile: Profile, f: OptionFilters = {}, ex
     // Round 1's margin only (a later round's closing can be an outlier); none: `govtLater` says how many reached later.
     safest: inR1.reduce<(typeof inR1)[number] | null>((a, x) => (!a || x.at.closing > a.at.closing ? x : a), null),
     govtLater: govt.filter((x) => x.reachFrom && x.reachFrom.round !== "R1").length,
+    /** Every institute of the exam is a government one (INI-CET's): "the most margin", not "government with…". */
+    allGovt: cat.options.length > 0 && cat.options.every((o) => { const t = info.get(o.college)?.type?.value; return !!t && typeCategory[t] === "govt"; }),
   };
 }
 export type OptionsPicture = Awaited<ReturnType<typeof optionsPicture>>;

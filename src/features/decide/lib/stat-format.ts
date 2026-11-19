@@ -290,12 +290,21 @@ function stipendCell(t: ProgrammeTerms): StatCell {
 }
 
 /**
- * A DNB hospital's bond its checked record finds not declared to MCC, where the record says NBEMS lets none be imposed
- * this session (an undeclared bond can't be: NBEMS bulletin para 5.10). "Not known", never "No bond": no document of the
- * hospital's says no bond, so the No bond filter still leaves it out (its (i) says why).
+ * A DNB / DrNB seat whose hospital declared no bond to MCC, where NBEMS's own rule binds it: its accreditation bulletin
+ * (2025, para 5.10: only a government hospital may run a service bond, and only one it declared to the counselling
+ * authority before counselling) means none can be imposed this session. "No bond declared", with the rule in its (i), and
+ * in the No bond filter. NEET PG: the checked record cites that rule ("can't be imposed"); NEET SS: every DrNB SS seat
+ * whose record is "not declared" (MCC lists no bond document and the profile states none; not unread, not unclear, no
+ * caveat). MCC's own bulletins (PG 2026, SS 2025, MDS 2026) and AIIMS's prospectus state no such rule, so an MD/MS, D.M.
+ * / M.Ch., MDS or INI-CET seat with nothing declared stays "Not known".
  */
 export const noneDeclared = (t: Pick<ProgrammeTerms, "programme" | "bond">) =>
-  isDnb(t as ProgrammeTerms) && t.bond.status === "not_declared" && !t.bond.caveat && /\bcan(?:'|’|no)t be imposed\b/i.test(t.bond.text ?? "");
+  t.bond.status === "not_declared" && !t.bond.caveat && !t.bond.why &&
+  ((isDnb(t as ProgrammeTerms) && /\bcan(?:'|’|no)t be imposed\b/i.test(t.bond.text ?? "")) || (t.programme === "DrNB SS" && !!t.bond.text));
+/** The words for a noneDeclared bond, in every cell, card, filter and Fees tab. */
+export const NONE_DECLARED = "No bond declared";
+/** Why a noneDeclared bond is no bond: NBEMS's rule, as its (i) and the Fees tab say it. */
+export const noneDeclaredWhy = (by: string) => `The hospital declared no bond to ${by}, and NBEMS lets a DNB / DrNB hospital impose only a bond it declared before counselling (NBEMS accreditation bulletin, para 5.10), so none can be imposed this session.`;
 /** An unread bond document's record words as one line: why it isn't read ("a scanned image"), none when they only say "not read". */
 export function unreadWhy(text: string | null): string | null {
   const m = /not read: (.+?); see the document/i.exec(text ?? "");
@@ -313,7 +322,7 @@ export function bondUnknownWhy(t: Pick<ProgrammeTerms, "programme" | "bond" | "e
   const b = t.bond;
   if (b.status === "none" || b.status === "declared") return null;
   const by = authorityOf(t.exam);
-  if (noneDeclared(t)) return `The hospital declared no bond to ${by}, and NBEMS lets a DNB hospital impose only a bond it declared before counselling, so none can be imposed this session; but no document of the hospital's says “no bond”.`;
+  if (noneDeclared(t)) return null; // "No bond declared": known, by NBEMS's rule
   if (b.why === "unread") return `Its bond document on ${by} is a scan or a filled-in form Seatora couldn't read: read it there before you lock your choices.`;
   if (b.status === "other_course") return `The bond ${t.exam === "ini-cet" ? `in ${profileOf(t.exam)}` : "on the college's MCC profile"} is for other courses, not ${t.programme}.`;
   if (b.text) {
@@ -360,6 +369,8 @@ function bondCell(t: ProgrammeTerms): StatCell {
     const caveat = !!(b.caveat || b.stateRule);
     return levelOf({ ...c, short: "No bond", full: "No bond", marker: null, tone: null, tip: noBondTip(t) }, caveat ? undefined : "good", undefined);
   }
+  // No bond declared, where NBEMS's rule lets none be imposed this session: as good as no bond, said as it is.
+  if (noneDeclared(t)) return levelOf({ ...c, short: NONE_DECLARED, full: NONE_DECLARED, marker: null, tone: null, tip: [{ text: noneDeclaredWhy(authorityOf(t.exam)), rules: true }, { text: b.text!, src: b.src }, ...(b.doc != null ? [{ text: `The college's own bond document${onBy(t)}`, src: b.doc }] : [])] }, "good", undefined);
   if (b.status !== "declared") return bondMissing(t, c);
   // A stated bond: its years, or "Bond, years not stated" (never read as no answer).
   const full = b.years == null ? "Bond, years not stated" : b.yearsSum ? `${b.yearsSum} = ${yrs(b.years)}` : yrs(b.years);
@@ -433,6 +444,7 @@ function bondInrCell(t: ProgrammeTerms): StatCell {
   const b = t.bond;
   // Ink with a caveat (as the Bond cell's "No bond" beside it), green without: one colour per row.
   if (b.status === "none") return levelOf({ ...c, short: "None", full: "None", marker: null, tone: b.caveat || b.stateRule ? null : "muted", tip: [{ text: "No bond, so no bond amount." }, ...noBondTip(t)] }, b.caveat || b.stateRule ? undefined : "good", undefined);
+  if (noneDeclared(t)) return levelOf({ ...c, short: "None", full: "None", marker: null, tone: "muted", tip: [{ text: "No bond declared, so no bond amount." }, { text: noneDeclaredWhy(authorityOf(t.exam)), rules: true }, { text: b.text!, src: b.src }] }, "good", undefined);
   if (b.status !== "declared") return bondMissing(t, c);
   const a = b.amount;
   const head: TipLine = { text: b.toComplete ? "What you pay if you leave before completing the course (bond penalty)." : "What you pay if you do not serve the bond (bond penalty)." };
@@ -509,6 +521,7 @@ export function bondPlain(t: ProgrammeTerms): string {
     if (b.yearsText && !sameYears(b.yearsText, b.years)) parts.push(`The years are written more than one way (${b.yearsText}): confirm with the college.`);
     if (b.basis === "state_rule" || b.yearsFrom) parts.push("Years from the state's rule, not the college's own bond document: confirm with the college.");
   } else if (b.status === "none") parts.push(b.caveat || b.stateRule ? "No bond on record, with a caveat (below): confirm with the college." : "No bond: no service to serve, nothing to pay for one.");
+  else if (noneDeclared(t)) parts.push("No bond declared, so none can be imposed this session (NBEMS rule).");
   else {
     const why = bondUnknownWhy(t)!;
     parts.push(`Bond not known. ${why}`);

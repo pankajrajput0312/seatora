@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import { MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
 import type { DecideLinks } from "../lib/links";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
-import { authorityOf, yearName } from "@/features/exams/keys";
+import { authorityOf, sessionExams, yearName } from "@/features/exams/keys";
 import { useChoices, useCompare, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
 import { latestText, NEVER_ALLOTTED, reachWindow, type Latest, type Reach } from "../lib/reach";
 import { statCells, statLabel, type StatKey } from "../lib/stat-format";
@@ -155,6 +155,12 @@ function SimilarNote({ r }: { r: ListRow }) {
   );
 }
 
+/** Under a cap: the caps that hide this option with its figure ("Show them"), or "Fee not published: kept under …". */
+function CapNote({ r }: { r: ListRow }) {
+  if (!r.capNote) return null;
+  return <p className={cn("text-xs", r.capNote.startsWith("Hidden") ? "text-sun" : "text-muted-foreground")}>{r.capNote}.</p>;
+}
+
 const chevron = <ChevronDown className="size-4 transition-transform group-open/d:rotate-180 motion-reduce:transition-none" strokeWidth={2} aria-hidden />;
 
 /**
@@ -207,6 +213,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
               {E.has.fees && <TermSummary cells={statCells(r.fees)} hide={same} />}
               <R1Trend r={r} latest={latest} pastYears={pastYears} />
               <SimilarNote r={r} />
+              <CapNote r={r} />
             </div>
             {list && (
               <p className="flex flex-wrap items-center gap-x-3 border-t border-border px-4 text-xs">
@@ -329,6 +336,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
       return next;
     });
   const years = { latest, pastYears, includeLatest, seatLists };
+  const sessionCols = sessionExams.includes(E.key);
   // Rounds by year (it opens the grid in the full-width row below, so the row stays narrow) and the cross-links.
   const rowTools = (r: ListRow) => (
     <>
@@ -347,9 +355,12 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
               px-2 cells), so all are in view from 1280px wide; the seat lists and the past years' closings follow. */}
           <tr className="text-left text-xs font-semibold text-muted-foreground">
             <th scope="col" className={cn(stick, "w-12 px-2 py-3 print:hidden")}><span className="sr-only">Add to choices or compare</span></th>
-            <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course<span className="md:hidden">, {latestText(latest)} closing</span></th>
-            <th scope="col" className={phoneOnly}>{yearName(E.key, last)} deepest</th>
-            <th scope="col" className={notPhone}>{latestText(latest)} closing</th>
+            <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course{!sessionCols && <span className="md:hidden">, {latestText(latest)} closing</span>}</th>
+            {/* An exam with sessions (INI-CET): on a phone too the newest session's closing is the first column, the one
+                before it next (newest first), not the older one beside a closing in the row header. */}
+            {!sessionCols && <th scope="col" className={phoneOnly}>{yearName(E.key, last)} deepest</th>}
+            <th scope="col" className={sessionCols ? "px-3 py-3 text-right" : notPhone}>{latestText(latest)} closing</th>
+            {sessionCols && <th scope="col" className={phoneOnly}>{yearName(E.key, last)} deepest</th>}
             <th scope="col" className="px-2 py-3">Reach</th>
             {tableKeys.map((k) => <th key={k} scope="col" data-col={k} className="px-2 py-3 text-right">{statLabel[k]}</th>)}
             {seatLists.map((l) => <th key={l.key} scope="col" className="px-1.5 py-3 text-right"><SeatsHead list={l} short /></th>)}
@@ -381,19 +392,21 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
                 <span className={cn("block max-md:text-xs", tbl.clamp)}>{courseName(r)}<span className="text-muted-foreground">, <QuotaName quota={r.quota} /><span className="max-md:hidden">, {r.college.state ?? "state not listed"}</span></span></span>
                 <span className="block max-md:hidden"><HospitalLine h={r.hospital} of={r.college.name} /></span>
                 <span className="mt-1 flex flex-wrap items-center gap-x-3 text-xs max-md:hidden print:hidden">{rowTools(r)}</span>
-                <span className="mt-1 block text-xs text-muted-foreground md:hidden">
+                <span className={cn("mt-1 block text-xs text-muted-foreground md:hidden", sessionCols && "hidden")}>
                   {/* The closing's own round (the deepest of the year's rounds), and R1's when it is a later round's. */}
                   {r.latest ? `${yearName(E.key, latest.year)} ${roundIn(E, latest.year, r.latest.round)}` : latestText(latest)} <span className="numeric text-sm font-semibold text-foreground">{r.latest ? formatRank(r.latest.closing) : "—"}</span>
                   {r.latest && r.latest.round !== "R1" && <R1Line r1={r1Of(r, latest.year)} />}
                   {r.latest?.provisional && <span className="mt-0.5 block"><Provisional when /></span>}
                 </span>
               </th>
-              <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>
-              <td className={notPhone}><ClosingCell d={r.latest} year={latest.year} r1={r1Of(r, latest.year)} /></td>
+              {!sessionCols && <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>}
+              <td className={sessionCols ? "px-3 py-3 text-right" : notPhone}><ClosingCell d={r.latest} year={latest.year} r1={r1Of(r, latest.year)} /></td>
+              {sessionCols && <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>}
               <td className="px-2 py-3">
                 <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} from={r.reachFrom} />
                 <SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} />
                 {r.similar && <span className="mt-1 block max-w-xs"><SimilarNote r={r} /></span>}
+                {r.capNote && <span className="mt-1 block max-w-xs"><CapNote r={r} /></span>}
               </td>
               {/* The cards' short values (read out in full), so the summary columns fit beside the seats at 1440px. */}
               <TermStatCells t={r.fees} variant="table" short wrap of={rowLabel(r, E)} tdClassName="px-2! max-w-28" keys={tableKeys} />
