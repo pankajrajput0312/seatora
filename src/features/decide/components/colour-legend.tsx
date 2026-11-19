@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
+import { STRAY_NOT_COUNTED } from "../lib/reach";
 import { feeBandText } from "../lib/stat-format";
 import { useExamInfo } from "../lib/use-decide-store";
 import { InfoTip } from "./info-tip";
@@ -70,6 +71,7 @@ export function ColourLegend({ className }: { className?: string }) {
           <span className={cn(badge, "bg-sun/10 text-sun")}>Within 10%</span>
           <span className={cn(badge, "bg-muted text-muted-foreground")}>Closed before / no data / never allotted before</span>
         </Row>
+        <span className="mt-1 block text-muted-foreground">{STRAY_NOT_COUNTED}; see Last ranks for them.</span>
       </InfoTip>
     </span>
   );

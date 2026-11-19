@@ -198,6 +198,9 @@ export function classifyReach(rank: number, cutoffs: ReachInput[], { latest, pas
   return "closed-before";
 }
 
+/** Where a reach label is explained (Options' (i), the colour key): stray rounds never count toward it (classifyReach). */
+export const STRAY_NOT_COUNTED = "Stray-round closings don't count toward “Reached” or “Within 10%” (an option reached only there is labelled “Reached only in stray rounds”)";
+
 /**
  * The label of an option MCC never allotted in any result in the data ("new" internally). Not "new": that word is only
  * MCC's newly added seat list (seatKindShort "newly added").

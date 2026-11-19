@@ -25,7 +25,7 @@ import { iniElsewhere } from "@/features/decide/lib/college-aliases";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, resultsSpan } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestText, reachLabel, reachOrder, reachWindow, resultsSpan, STRAY_NOT_COUNTED } from "@/features/decide/lib/reach";
 import { readTermFilters, termChips, termValueLabel, untypedOnly } from "@/features/decide/lib/term-filters";
 import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toURLSearchParams } from "@/features/decide/profile";
 import { examGroupCourses, getMeta, listOptions, optionsPicture, optionsView, unlistedSeats } from "@/features/decide/service";
@@ -143,14 +143,16 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const caption = `Options for ${E.rankWord} ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? (sp ? `; ${round} seat position` : `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added`) : ""}`;
   // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
   const pairLabel = (c: string) => pairChoices(meta.courses).find((x) => x.value === c)?.label ?? c.replace("~", " ");
-  const seatsWords = (s: SeatKind | "any") => (s === "any" || sp ? `Has seats in ${sp ? `the ${round} seat position` : `a ${round} list`}` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
+  // One name per value, the chip's and the Filters sheet's alike ("any" is any of the round's lists, never with or without).
+  const seatsWords = (s: SeatKind | "any") => (s === "any" || sp ? `Has seats in ${sp ? `the ${round} seat position` : `any ${round} list`}` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
   const closedDefault = roundView ? "1" : "0";
   const termKeys = ["ctype", "maxfee", "minstip", "bondyrs", "maxbond", "maxleave", "nd"] as const;
   const active = [
     f.q && { label: `Search: “${f.q}”`, param: "q", href: here({ q: null }) },
     f.reach && { label: reachLabel(f.reach, latest, PAST_YEARS, !f.prov), href: here({ reach: null, closed: null }) },
-    // The seats filter, the round view's default too ("Only with R2 seats"): × shows the options with or without seats.
-    lists.length > 0 && r.seats && { label: r.seats === "any" ? `Only with ${roundShort(lists[0].round, exam)} seats` : seatsWords(r.seats), param: "seats", href: here({ seats: roundView ? "all" : null }) },
+    // The seats filter, the round view's default too ("Has seats in any 2026 R2 list", as the sheet names it): × shows the
+    // options with or without seats.
+    lists.length > 0 && r.seats && { label: seatsWords(r.seats), param: "seats", href: here({ seats: roundView ? "all" : null }) },
     lists.length > 0 && !r.seats && f.seats && { label: `With or without ${round} seats`, param: "seats", href: here({ seats: null }) },
     f.closed && f.closed !== closedDefault && !f.reach && { label: f.closed === "1" ? "Closed before your rank: shown" : "Closed before your rank: hidden", href: here({ closed: null }) },
     f.prov && { label: `Without ${latestName} (provisional)`, param: "prov", href: here({ prov: null }) },
@@ -232,6 +234,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats,
             the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${E.quotas.map((q) => quotaIn(E, q)).join(", ")})`}. Within 10%: in a past round the closing rank was at
             least 90% of yours ({`${E.rankWord} `}<span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or later) but before your rank.
+            {" "}{STRAY_NOT_COUNTED}; <Link href={L.to("/decide/last-ranks")} className="text-sky underline">see Last ranks for them</Link>.
             {roundView && <> Never allotted before = {by} allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years, exam)}), in any round or seat category, so there is no closing rank to compare.</>}
           </>
         }
