@@ -19,6 +19,16 @@ export type ChoiceItem = {
 export type ChoiceList = { id: string; name: string; items: ChoiceItem[]; typedIds: string[] };
 export type ChoicesState = { lists: ChoiceList[]; activeId: string };
 
+/**
+ * Her ordered list's one name, on every screen (nav, page title, Home card, list tabs, star, table headers, landing
+ * copy); a list's own name ("Round 3 · 2026") only ever follows it. Ask Seatora's saved list is ASK_DRAFT, never "plan".
+ */
+export const CHOICE_LIST = "Choice list";
+/** "Choice list (Round 3 · 2026)": the list's name after the one name. */
+export const choiceListTitle = (name: string) => `${CHOICE_LIST} (${name})`;
+/** The list Ask Seatora saves into her Choice list (tools.ts save_choice_list's default name). */
+export const ASK_DRAFT = "Draft from Ask Seatora";
+
 export const CHOICES_KEY = "medpath.choices";
 export const COMPARE_KEY = "medpath.compare";
 export const MAX_COMPARE = 4;
@@ -80,7 +90,7 @@ export function shareText(list: ChoiceList, terms: (id: string) => string | null
     const t = terms(i.id);
     return `${n + 1}. ${i.institute} — ${i.course}, ${i.quota}${t ? `. ${t}` : ""}`;
   });
-  return [`My ${exam} choice list (${list.name}), in order:`, ...lines, "", `The list on Seatora: ${url}`].join("\n");
+  return [`My ${exam} ${CHOICE_LIST} (${list.name}), in order:`, ...lines, "", `The list on Seatora: ${url}`].join("\n");
 }
 
 /**

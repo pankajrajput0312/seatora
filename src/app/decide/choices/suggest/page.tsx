@@ -25,9 +25,9 @@ import { getMeta, nearestCourses, suggestOptions } from "@/features/decide/servi
 import { activeExam, examInfo } from "@/features/exams/active";
 import { authorityOf, exams, perGroup } from "@/features/exams/registry";
 
-export const metadata: Metadata = { title: "Suggest my list" };
+export const metadata: Metadata = { title: "Suggest my Choice list" };
 
-const TITLE = "Suggest my list";
+const TITLE = "Suggest my Choice list";
 /** `govt=1`: government colleges first within each bucket. The term filters (college type, fee, bond…): lib/term-filters.ts. */
 const filtersSchema = z.object({ govt: z.literal("1").optional(), /** "1": with her seat set, only courses she ranks above it (Options' Upgrades only). */ up: z.literal("1").optional() });
 const th = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;

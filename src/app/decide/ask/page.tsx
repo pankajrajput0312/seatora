@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function AskPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   if (!(await askUser())) notFound();
-  const head = <PageHead title="Ask Seatora" about="An assistant over Seatora's MCC data: options for your rank, colleges, fees and bonds, this round's seats, residents and your choice list. It reads the same data as the pages; closing ranks are history, not a prediction." />;
+  const head = <PageHead title="Ask Seatora" about="An assistant over Seatora's MCC data: options for your rank, colleges, fees and bonds, this round's seats, residents and your Choice list. It reads the same data as the pages; closing ranks are history, not a prediction." />;
   // Ask reads NEET PG's data only. Another exam active (staff): only the note and the switch, never NEET PG's example
   // prompts or profile as if they were that exam's.
   const exam = await activeExam();
@@ -41,7 +41,7 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
   const air = profile ? `AIR ${formatRank(profile.rank)}` : null;
   const youLine = profile ? `${air} · ${profile.category}${profile.pwd ? " PwD" : ""} · ${course}` : null;
   const starters: Starter[] = [
-    { kind: "list", title: "Build my choice list", prompt: air ? `Build my full choice list for ${air} this round` : "Build my full choice list for this round" },
+    { kind: "list", title: "Build my Choice list", prompt: air ? `Build my full Choice list for ${air} this round` : "Build my full Choice list for this round" },
     { kind: "rank", title: "What can I get?", prompt: air ? `What can I get with ${air}, and what should I fill?` : "What can I get with my rank?" },
     { kind: "fee", title: "Is it worth the fee?", prompt: "Is Chettinad worth ₹33 L/yr for MD Anaesthesiology?" },
     { kind: "chances", title: "My chances", prompt: `What are my chances for ${course} at Seth GS Medical College?` },

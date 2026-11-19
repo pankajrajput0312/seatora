@@ -195,7 +195,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   return (
     <AppPage>
       <CompareFromDevice validIds={known.map((o) => o.id)} requested={ids} />
-      <PageHead title="Compare" about={`Up to ${MAX_COMPARE} options side by side. Add them with the compare button on Options, Choices or an institute page.`} />
+      <PageHead title="Compare" about={`Up to ${MAX_COMPARE} options side by side. Add them with the compare button on Options, your Choice list or an institute page.`} />
 
       {options.length === 0 ? (
         <EmptyState

@@ -167,7 +167,7 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
             {[
               { title: "Set your rank", body: w.enter },
               { title: "See your options", body: `Every seat with its closing rank in each round, its fee, stipend and bond, and how many seats the newest list has. Each is marked reached, within 10% or closed before your rank, from past rounds.` },
-              { title: "Build your choice list", body: `Put the seats in the order you'll fill them in ${who}'s choice filling, with the reasons beside each.` },
+              { title: "Build your Choice list", body: `Put the seats in the order you'll fill them in ${who}'s choice filling, with the reasons beside each.` },
             ].map((s, i) => (
               <li key={s.title} className="grid grid-cols-[2.5rem_1fr] border-t border-border pt-5">
                 <span className="numeric text-2xl font-medium text-muted-foreground" aria-hidden>{i + 1}</span>

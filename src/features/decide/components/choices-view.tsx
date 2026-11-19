@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { cellWords, duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, wholeCourseRange, wholeCourseWords, type ChoiceItem } from "../lib/choices";
+import { CHOICE_LIST, choiceListTitle, cellWords, duplicateList, markTypedUpTo, move, otherGroupItems, shareText, termsWords, toCsv, toMccText, typedPrefix, updateActive, wholeCourseRange, wholeCourseWords, type ChoiceItem } from "../lib/choices";
 import { inrFull } from "../lib/stat-format";
 import { deepestOf, latestText, pastOf, reachWindow, seatsBelowNotes, type Deepest, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
 import { statCells, statKeys, statLabel } from "../lib/stat-format";
@@ -321,7 +321,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       </span>
     );
   const flagLines = (flags: string[]) => flags.map((f) => <span key={f} className="block text-xs text-sun">{f}</span>);
-  const listName = `${list.name} choice list, ${n} ${n === 1 ? "item" : "items"}`;
+  const listName = `${choiceListTitle(list.name)}, ${n} ${n === 1 ? "item" : "items"}`;
 
   const cards = (
     <ol id="choices-list" tabIndex={-1} aria-label={listName} className="grid max-w-4xl gap-3">
@@ -448,7 +448,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       <div className="flex flex-wrap items-center gap-2" data-print-hide>
         {state.lists.map((l) => (
           <Button key={l.id} variant={l.id === list.id ? "primary" : "secondary"} aria-pressed={l.id === list.id} onClick={() => setState((s) => ({ ...s, activeId: l.id }))}>
-            {l.name} <span className="opacity-70">({l.items.length})</span>
+            <span className="sr-only">{CHOICE_LIST}: </span>{l.name} <span className="opacity-70">({l.items.length})</span>
           </Button>
         ))}
         {state.lists.length < maxLists ? (
@@ -470,7 +470,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       {/* As on every results page: Cards | Table, then the CSV. An empty list: none of them (nothing to show or send). */}
       {n > 0 && <div className="flex flex-wrap items-center gap-2" data-print-hide>
         <ViewToggle page="choices" view={view} />
-        <Button variant="secondary" onClick={download} aria-label={`Download CSV of ${list.name}`}><Download className="size-4" aria-hidden />CSV</Button>
+        <Button variant="secondary" onClick={download} aria-label={`Download CSV of your ${choiceListTitle(list.name)}`}><Download className="size-4" aria-hidden />CSV</Button>
         <Button variant="secondary" onClick={copy}>Copy in {authorityOf(E.key)} order</Button>
         <Button variant="secondary" onClick={share}>Share on WhatsApp</Button>
         <Button variant="secondary" onClick={() => window.print()}>Print</Button>
@@ -516,12 +516,12 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
         </p>
       )}
 
-      <h2 id="choices-h" tabIndex={-1} className="sr-only">{list.name}</h2>
+      <h2 id="choices-h" tabIndex={-1} className="sr-only">{choiceListTitle(list.name)}</h2>
       {n === 0 ? (
-        <EmptyState title={`${list.name} is empty`} description="Add options with the star on the Options screen or an institute page, or start from a suggested list.">
+        <EmptyState title={`Your ${choiceListTitle(list.name)} is empty`} description="Add options with the star on the Options screen or an institute page, or start from a suggested list.">
           <span className="flex flex-wrap justify-center gap-x-6">
             <Link href={L.options()} className={cn(smallLink, "text-sm text-sky")}>Go to Options</Link>
-            <Link href={L.to("/decide/choices/suggest")} className={cn(smallLink, "text-sm text-sky")}>Suggest my list</Link>
+            <Link href={L.to("/decide/choices/suggest")} className={cn(smallLink, "text-sm text-sky")}>Suggest my {CHOICE_LIST}</Link>
           </span>
         </EmptyState>
       ) : (

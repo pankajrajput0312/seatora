@@ -131,7 +131,7 @@ describe("shareText", () => {
   it("the list in order with each choice's terms when loaded, then the link", () => {
     const list = { id: "a", name: "Round 3 · 2026", items: [item("x"), item("y")], typedIds: [] };
     expect(shareText(list, (id) => (id === "x" ? "Fee ₹1.71 L/yr; Bond period 1 year" : null), "https://seatora.test/decide/choices")).toBe(
-      "My NEET PG choice list (Round 3 · 2026), in order:\n1. Inst x — DNB Anaesthesiology, DNB Quota. Fee ₹1.71 L/yr; Bond period 1 year\n2. Inst y — DNB Anaesthesiology, DNB Quota\n\nThe list on Seatora: https://seatora.test/decide/choices",
+      "My NEET PG Choice list (Round 3 · 2026), in order:\n1. Inst x — DNB Anaesthesiology, DNB Quota. Fee ₹1.71 L/yr; Bond period 1 year\n2. Inst y — DNB Anaesthesiology, DNB Quota\n\nThe list on Seatora: https://seatora.test/decide/choices",
     );
   });
 });
@@ -144,7 +144,7 @@ describe("otherGroupItems (NEET SS)", () => {
     expect(otherGroupItems(xs, [])).toEqual([]);
   });
   it("the share text names the exam", () => {
-    expect(shareText({ ...defaultChoices.lists[0], items: [item("a")] }, () => null, "https://x", "NEET SS")).toMatch(/^My NEET SS choice list/);
+    expect(shareText({ ...defaultChoices.lists[0], items: [item("a")] }, () => null, "https://x", "NEET SS")).toMatch(/^My NEET SS Choice list/);
   });
 });
 

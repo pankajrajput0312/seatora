@@ -6,6 +6,7 @@ import { AppPage } from "@/features/decide/components/app-page";
 import { HistoryNote, PageHead } from "@/features/decide/components/bits";
 import { ChoicesView } from "@/features/decide/components/choices-view";
 import { DataSource, SeatSource } from "@/features/decide/components/data-source";
+import { CHOICE_LIST } from "@/features/decide/lib/choices";
 import { decideLinks } from "@/features/decide/lib/links";
 import { fillWindow, nextChoiceFilling, roundName, stepsNow } from "@/features/decide/lib/round-status";
 import { HeldSeat } from "@/features/decide/components/held-seat";
@@ -18,7 +19,7 @@ import { authorityOf, DEFAULT_EXAM, exams, latestOf, yearName } from "@/features
 import { currentPlan } from "@/features/plans/usage";
 import { liveReach } from "./actions";
 
-export const metadata: Metadata = { title: "Choices" };
+export const metadata: Metadata = { title: CHOICE_LIST };
 
 export default async function ChoicesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
@@ -32,12 +33,12 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
   const nextRound = fill && { name: `${roundName[fill.round]} · ${yearName(exam, rs.year)}`, when: `${roundName[fill.round]} choice filling, ${fillWindow(fill)}` };
   return (
     <AppPage>
-      <PageHead title="Choices" about={`Your list in the order you'll enter it on the ${authorityOf(exam)} portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons; in the table, pick a choice's number to move it straight there.`} />
+      <PageHead title={CHOICE_LIST} about={`Your list in the order you'll enter it on the ${authorityOf(exam)} portal, saved to your account (every device you sign in on). Reorder by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), or with the move buttons; in the table, pick a choice's number to move it straight there.`} />
       {/* The seat she holds and what she risks if this list upgrades her (with a rank in the address). */}
       {profile && <div className="mt-3"><HeldSeat profile={profile} exam={exam} L={L} where="choices" /></div>}
       {/* Her options in a suggested order (Dream, Target, Safe within her course order), each with its reason; added only when she says so. */}
       <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground" data-print-hide>
-        <Button asChild variant="secondary" className="max-sm:w-full"><Link href={L.to("/decide/choices/suggest")}><ListOrdered className="size-4" aria-hidden />Suggest my list</Link></Button>
+        <Button asChild variant="secondary" className="max-sm:w-full"><Link href={L.to("/decide/choices/suggest")}><ListOrdered className="size-4" aria-hidden />Suggest my Choice list</Link></Button>
         Your options in a suggested order, each with its reason. Nothing is added until you choose.
       </p>
       {/* Another exam: "no seats in the lists" only while their round is current (no result yet: its choice filling). */}

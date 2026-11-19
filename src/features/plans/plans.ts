@@ -28,7 +28,7 @@ export const FEATURE_LABEL: Record<Feature, string> = {
   csv: "CSV exports",
   compare: "options in Compare",
   reports: "plan reports",
-  choiceLists: "saved choice lists",
+  choiceLists: "saved Choice lists",
 };
 
 const envKey = (plan: Plan, f: Feature) => `PLAN_${plan}_${f.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}`;

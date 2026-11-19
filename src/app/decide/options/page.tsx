@@ -159,7 +159,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const nearest = labelled > 0 && reached === 0 ? (await nearestCourses(profile, filters, exam)).map((x) => courseHit(x.key, x.reached)) : undefined;
   const suggestButton = (
     <Button asChild variant="secondary" className="max-sm:w-full">
-      <Link href={L.to("/decide/choices/suggest")}><ListOrdered className="size-4" aria-hidden />Suggest my list</Link>
+      <Link href={L.to("/decide/choices/suggest")}><ListOrdered className="size-4" aria-hidden />Suggest my Choice list</Link>
     </Button>
   );
   const courseReach = <CourseReach hit={hit} missed={missed} nearest={nearest} rank={`${E.rankWord} ${formatRank(profile.rank)}`} when={reachWindow(latest, PAST_YEARS, !f.prov, true)} />;

@@ -10,7 +10,7 @@ const PROFILE = "rank=42284&cat=OBC&sp=ANAESTHESIOLOGY,FAMILYMEDICINE";
 test("plan routes render real data, never demo data", async ({ page }) => {
   test.setTimeout(120_000);
   for (const [path, h1] of [
-    ["/decide", "Home"], ["/decide/options", "Options"], ["/decide/choices", "Choices"], ["/decide/choices/suggest", "Suggest my list"], ["/decide/compare", "Compare"],
+    ["/decide", "Home"], ["/decide/options", "Options"], ["/decide/choices", "Choice list"], ["/decide/choices/suggest", "Suggest my Choice list"], ["/decide/compare", "Compare"],
     // Rank scan, last ranks, seats, counselling, institutes, allotments and fees: see "research and counselling routes" below.
   ]) {
     await page.goto(`${path}${path.includes("?") ? "&" : "?"}${PROFILE}`);
@@ -62,7 +62,7 @@ test("set profile, label options, and reorder choices with the keyboard only", a
 
   await page.goto(`/decide/choices?${PROFILE}&layout=cards`); // the list (desktop opens on the table)
   // The first list is named after the round MCC's schedule has her fill next.
-  const list = page.getByRole("list", { name: /Round \d · 2026 choice list, 3 items/ });
+  const list = page.getByRole("list", { name: /Choice list \(Round \d · 2026\), 3 items/ });
   const names = async () => list.locator(":scope > li").evaluateAll((lis) => lis.map((li) => li.querySelector("a")?.textContent));
   await expect(list).toBeVisible();
   const before = await names();
@@ -116,7 +116,7 @@ test("options, the round view by default: her options with 2026 R2 seats, new on
   await expect(row).toContainText("New: no past allotment");
   await row.getByRole("button", { name: /^In Round 2/ }).click();
   await page.goto(`/decide/choices?${PROFILE}&layout=cards`); // the list (desktop opens on the table)
-  await expect(page.getByRole("list", { name: /choice list, 1 item/ })).toContainText("New: no past allotment");
+  await expect(page.getByRole("list", { name: /Choice list .*, 1 item/ })).toContainText("New: no past allotment");
 
   // Also options without R2 seats; then the view of every option with past allotments, closed hidden.
   await page.goto(`/decide/options?${PROFILE}`);

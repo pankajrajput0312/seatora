@@ -28,7 +28,7 @@ export const landingWords: Record<ExamKey, Words> = {
     title: "NEET PG counselling planner: closing ranks by round, fees and bonds",
     description: "Plan MCC's NEET PG counselling: All India Quota, deemed and central institute seats, with closing ranks by round, fees, stipends and bonds from MCC's official documents.",
     headline: "Where can your AIR get a seat, round by round?",
-    scope: "MCC runs NEET PG counselling for the All India Quota seats of government medical colleges, deemed universities, central institutions and DNB hospitals. Seatora shows where ranks like yours were allotted, so you can decide which seats go on your choice list and in what order.",
+    scope: "MCC runs NEET PG counselling for the All India Quota seats of government medical colleges, deemed universities, central institutions and DNB hospitals. Seatora shows where ranks like yours were allotted, so you can decide which seats go on your Choice list and in what order.",
     notCovered: "State quota counselling (such as Maharashtra's CET Cell) isn't covered.",
     enter: "Your All India Rank, category and the quotas you can take.",
     faqs: (d: LandingData) => [

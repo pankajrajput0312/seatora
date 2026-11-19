@@ -15,7 +15,7 @@ import { fmtDay } from "@/features/decide/lib/format";
 // Checked here too, so a non-owner's page carries no "Plan report" title (metadata renders before the page).
 export async function generateMetadata(): Promise<Metadata> {
   if (!(await askUser())) notFound();
-  return { title: "Plan report", robots: { index: false, follow: false } };
+  return { title: "Ask Seatora report", robots: { index: false, follow: false } };
 }
 
 const th = "px-2 py-1.5 text-left font-semibold";
@@ -33,7 +33,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       <header className="grid gap-2 border-b border-border pb-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="text-xs tracking-wide text-muted-foreground uppercase">Seatora plan report</p>
+            <p className="text-xs tracking-wide text-muted-foreground uppercase">Ask Seatora report</p>
             <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{report.title}</h1>
           </div>
           <PrintButton />

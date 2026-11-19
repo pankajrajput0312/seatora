@@ -7,7 +7,7 @@ import { ChevronDown, ChevronsDownUp, ChevronsUpDown, GitCompareArrows, Star } f
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
-import { MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
+import { choiceListTitle, MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
 import type { DecideLinks } from "../lib/links";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { authorityOf, sessionExams, yearName } from "@/features/exams/keys";
@@ -35,15 +35,16 @@ export function ChoiceStar({ item }: { item: ChoiceItem }) {
   const active = state.lists.find((l) => l.id === state.activeId) ?? state.lists[0];
   const on = !!active?.items.some((i) => i.id === item.id);
   const E = useExamInfo();
+  const list = choiceListTitle(active?.name ?? "");
   return (
     <Button
       size="icon"
       variant="ghost"
       aria-pressed={on}
-      aria-label={`In ${active?.name ?? "choices"}: ${item.institute}, ${item.course}, ${quotaIn(E, item.quota)}`}
+      aria-label={`In your ${list}: ${item.institute}, ${item.course}, ${quotaIn(E, item.quota)}`}
       onClick={() => {
         setState((s) => toggleItem(s, item));
-        toast(on ? `Removed from ${active?.name ?? "choices"}` : `Added to ${active?.name ?? "choices"}`);
+        toast(on ? `Removed from your ${list}` : `Added to your ${list}`);
       }}
     >
       <Star className={cn("size-5", on && "fill-sky text-sky")} strokeWidth={1.75} aria-hidden />
@@ -354,7 +355,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
           {/* The latest closing beside the option (from md; a phone has it in the row header), then Reach and Fee…Leaving (tight
               px-2 cells), so all are in view from 1280px wide; the seat lists and the past years' closings follow. */}
           <tr className="text-left text-xs font-semibold text-muted-foreground">
-            <th scope="col" className={cn(stick, "w-12 px-2 py-3 print:hidden")}><span className="sr-only">Add to choices or compare</span></th>
+            <th scope="col" className={cn(stick, "w-12 px-2 py-3 print:hidden")}><span className="sr-only">Add to your Choice list or compare</span></th>
             <th scope="col" className={cn(stickName, "px-3 py-3")}>Institute and course{!sessionCols && <span className="md:hidden">, {latestText(latest)} closing</span>}</th>
             {/* An exam with sessions (INI-CET): on a phone too the newest session's closing is the first column, the one
                 before it next (newest first), not the older one beside a closing in the row header. */}

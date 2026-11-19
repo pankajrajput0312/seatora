@@ -169,7 +169,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </p>}
             <span className="mt-3 flex flex-wrap gap-2">
               <Button asChild size="lg" className="min-h-11 max-sm:w-full"><Link href={L.options()}>Open Options</Link></Button>
-              <Button asChild size="lg" variant="secondary" className="min-h-11 max-sm:w-full"><Link href={L.to("/decide/choices/suggest")}>Suggest my list</Link></Button>
+              <Button asChild size="lg" variant="secondary" className="min-h-11 max-sm:w-full"><Link href={L.to("/decide/choices/suggest")}>Suggest my Choice list</Link></Button>
             </span>
           </>
         ) : capCause ? (

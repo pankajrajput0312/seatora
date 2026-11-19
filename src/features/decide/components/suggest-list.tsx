@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { groupsIn, quotaIn } from "@/features/exams/exam";
 import { authorityOf } from "@/features/exams/keys";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { addToList, putFirst, toCsv, toMccText, updateActive, type ChoiceItem } from "../lib/choices";
+import { addToList, choiceListTitle, putFirst, toCsv, toMccText, updateActive, type ChoiceItem } from "../lib/choices";
 import { bucketName, type Bucket } from "../lib/suggest";
 import { useChoices, useDecideLinks, useExamInfo, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams } from "../profile";
@@ -57,9 +57,9 @@ export function SuggestList({ items, groups, safeNote }: { items: SuggestItem[];
   const reorder = () => {
     const xs = items.map((x) => x.item);
     const rest = list.items.filter((i) => !xs.some((x) => x.id === i.id)).length;
-    if (!confirm(`Put these ${xs.length} choices first in ${list.name}, in this order${rest ? `, and keep your ${rest} other ${rest === 1 ? "choice" : "choices"} after them` : ""}? Nothing is removed.`)) return;
+    if (!confirm(`Put these ${xs.length} choices first in your ${choiceListTitle(list.name)}, in this order${rest ? `, and keep your ${rest} other ${rest === 1 ? "choice" : "choices"} after them` : ""}? Nothing is removed.`)) return;
     setState((s) => updateActive(s, (l) => putFirst(l, xs)));
-    say(`${list.name} now starts with these ${formatRank(xs.length)}${rest ? `, then your ${formatRank(rest)} other ${rest === 1 ? "choice" : "choices"}` : ""}.`);
+    say(`Your ${choiceListTitle(list.name)} now starts with these ${formatRank(xs.length)}${rest ? `, then your ${formatRank(rest)} other ${rest === 1 ? "choice" : "choices"}` : ""}.`);
   };
   // Copy and CSV: every suggested choice, each quota as MCC words it.
   const out = { id: "suggested", name: "Suggested list", typedIds: [], items: items.map((x) => ({ ...x.item, quota: quotaIn(E, x.item.quota) })) };
@@ -118,7 +118,7 @@ export function SuggestList({ items, groups, safeNote }: { items: SuggestItem[];
             <Button variant="ghost" onClick={reorder}>Use this order in {list.name}</Button>
             <Button variant="ghost" onClick={csv} aria-label="Download CSV of the suggested list"><Download className="size-4" aria-hidden />CSV</Button>
             <span className="basis-full text-xs text-muted-foreground">
-              Adds go after your {formatRank(list.items.length)} {list.items.length === 1 ? "choice" : "choices"} in {list.name}; nothing in it is removed. <Link href={L.choices()} className={smallLink}>Open {list.name}</Link>
+              Adds go after your {formatRank(list.items.length)} {list.items.length === 1 ? "choice" : "choices"} in your {choiceListTitle(list.name)}; nothing in it is removed. <Link href={L.choices()} className={smallLink}>Open {list.name}</Link>
             </span>
           </>
         )}

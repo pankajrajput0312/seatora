@@ -22,7 +22,7 @@ A plain-language tour of every screen in Seatora Decide, set up for one profile:
 Good to know:
 - The profile goes into page addresses, so a link you share carries your rank and category.
 - To use the same profile on your phone, choose **Edit → Export JSON** here, then **Import JSON** there. The choice list can't be moved that way: it stays in the browser where you built it. Build it on one device and keep its CSV as a backup (see Choices).
-- On a phone, the bar at the bottom has Options, Seats and Choices, and Compare once you've added something to compare. Every other screen is in the menu.
+- On a phone, the bar at the bottom has Options, Seats and Choice list, and Compare once you've added something to compare. Every other screen is in the menu.
 
 ## A plan for today
 
@@ -31,7 +31,7 @@ Good to know:
 3. **Seats:** check seat counts and every past closing rank for the rows you starred.
 4. **College pages:** read the fees, bond, hospital facts and residents before deciding.
 5. **Compare:** line up two to four close calls side by side.
-6. **Choices:** put the list in the order you want the seats, then type it into the MCC portal, save and lock it before 23:55 IST.
+6. **Choice list:** put the list in the order you want the seats, then type it into the MCC portal, save and lock it before 23:55 IST.
 
 ## Home
 
@@ -117,22 +117,22 @@ Open any institute name. The header gives the address as printed by MCC, the typ
 
 The same fee, stipend and bond data as the college pages, for every institute at once. Filter by programme (your profile's by default), state, institute, max fee per year, min stipend in year 1, max bond years, max bond amount, and bond declared or not, then sort by fee. A dash means not in Seatora's MCC data. It never means zero or "no bond". "Not checked yet" means Seatora has no bond record for that programme, and a government college may still have a state service bond.
 
-## Choices
+## Choice list
 
-Choices is your list, in the order you will type it into the MCC portal. It is named **Round 2 · 2026**, and every starred option lands here.
+Your Choice list is your list, in the order you will type it into the MCC portal (every screen calls it Choice list; Ask Seatora's saved list is "Draft from Ask Seatora"). It is named **Choice list (Round 2 · 2026)**, and every starred option lands here.
 
 - **Reorder** by dragging, with the keyboard (Space to pick up, arrows to move, Space to drop), with the up and down buttons, or by typing a position number and pressing **Move**. **Undo** brings back a removed row.
 - Each row shows its current label and its Round 2 seats. Rows that no longer have seats, or are closed before your rank, are flagged. "Same institute and course listed more than once" warns about duplicates.
 - **Copy in MCC order** copies "1. Institute — Course — Quota" lines. **Download CSV** (each choice's latest and deepest closing, fee, stipend, bond and leaving penalty too) and **Print** save it. **Share on WhatsApp** sends the list with a link to it. Keep a copy, because the list lives in this browser only.
 - **Typed into the MCC portal up to #**: as you enter choices on the MCC portal, set this number. Seatora then warns if you move a row that is already typed in ("Check the order in the MCC portal").
 - **Duplicate for next round** copies the list as the start of the next round's list.
-- **Suggest my list** puts your options in one suggested order, each with its reason ("Dream: closed at 23,502 in 2025 R3, 6% before you"): your course order first (Edit, **Your order**: move courses up or down, tick **Equal** for ones you'd take as gladly), then Dream, Target and Safe within each course, within your fee, bond and college-type limits (what they leave out is counted). It comes from past closing ranks, not a prediction. **Add all** or **Add selected** puts them after your choices; **Use this order** puts them first and keeps yours after. Nothing is removed. Trying a rank without saving: Copy or CSV.
+- **Suggest my Choice list** puts your options in one suggested order, each with its reason ("Dream: closed at 23,502 in 2025 R3, 6% before you"): your course order first (Edit, **Your order**: move courses up or down, tick **Equal** for ones you'd take as gladly), then Dream, Target and Safe within each course, within your fee, bond and college-type limits (what they leave out is counted). It comes from past closing ranks, not a prediction. **Add all** or **Add selected** puts them after your choices; **Use this order** puts them first and keeps yours after. Nothing is removed. Trying a rank without saving: Copy or CSV.
 
 Order the list by what you want most, not by your chances. Then type it into the MCC portal, **save and lock it there** before 23:55 IST.
 
 ## Compare
 
-Up to four options side by side. Add them with the compare button on Options, Choices or a college page. The rows are:
+Up to four options side by side. Add them with the compare button on Options, your Choice list or a college page. The rows are:
 - course, quota and state;
 - your label;
 - closing ranks by year and round, on Open or OBC seats, each saying which;

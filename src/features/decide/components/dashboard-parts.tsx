@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
-import { typedPrefix } from "../lib/choices";
-import { authorityOf, DEFAULT_EXAM } from "@/features/exams/keys";
+import { CHOICE_LIST, choiceListTitle, typedPrefix } from "../lib/choices";
+import { authorityOf } from "@/features/exams/keys";
 import { useChoicesFor, useDecideLinks, useExam, useExamInfo, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams } from "../profile";
 import { navigating } from "./nav-pending";
@@ -121,9 +121,9 @@ export function ChoicesStat({ nextRound }: { nextRound?: string | null }) {
   return (
     <StatCell
       // Another exam's first list is named "NEET SS list" (layout.tsx): no "list list". NEET PG's labels as they were.
-      label={hydrated ? `In your ${list.name}${exam === DEFAULT_EXAM || !/ list$/i.test(list.name) ? " list" : ""}` : "In your choice list"}
+      label={hydrated ? `In your ${choiceListTitle(list.name)}` : `In your ${CHOICE_LIST}`}
       value={<span className="font-mono">{hydrated ? formatRank(list.items.length) : "—"}</span>}
-      note={<Link href={L.choices()} className={smallLink}>{!hydrated ? "Open your list" : typed ? `${formatRank(typed)} typed into ${authorityOf(exam)}` : `None typed into ${authorityOf(exam)} yet`}</Link>}
+      note={<Link href={L.choices()} className={smallLink}>{!hydrated ? `Open your ${CHOICE_LIST}` : typed ? `${formatRank(typed)} typed into ${authorityOf(exam)}` : `None typed into ${authorityOf(exam)} yet`}</Link>}
     />
   );
 }
@@ -140,17 +140,17 @@ export function TopChoices({ nextRound }: { nextRound?: string | null }) {
   return (
     <section aria-labelledby="top-choices" className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id="top-choices" className="text-title font-semibold">{hydrated ? `Top of ${list.name}` : "Top of your list"}</h2>
+        <h2 id="top-choices" className="text-title font-semibold">Top of your {CHOICE_LIST}{hydrated && <span className="font-normal text-muted-foreground"> ({list.name})</span>}</h2>
         <span className="flex flex-wrap gap-x-4">
-          <Link href={L.to("/decide/choices/suggest")} className={`${smallLink} text-sm text-sky`}>Suggest my list</Link>
-          <Link href={L.choices()} className={`${smallLink} text-sm text-sky`}>Open list</Link>
+          <Link href={L.to("/decide/choices/suggest")} className={`${smallLink} text-sm text-sky`}>Suggest my {CHOICE_LIST}</Link>
+          <Link href={L.choices()} className={`${smallLink} text-sm text-sky`}>Open {CHOICE_LIST}</Link>
         </span>
       </div>
       {!hydrated ? (
-        <p className="mt-4 text-sm text-muted-foreground">Loading your list…</p>
+        <p className="mt-4 text-sm text-muted-foreground">Loading your {CHOICE_LIST}…</p>
       ) : top.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">
-          Nothing in this list yet. Star options on <Link href={L.options()} className={`${smallLink} text-sky`}>Options</Link> to add them.
+          Nothing in your {CHOICE_LIST} yet. Star options on <Link href={L.options()} className={`${smallLink} text-sky`}>Options</Link> to add them.
         </p>
       ) : (
         <ol className="mt-3 divide-y divide-border">

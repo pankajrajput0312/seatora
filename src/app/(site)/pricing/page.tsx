@@ -82,7 +82,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
               <li>Seat matrix and allotment tables for every college, course and quota.</li>
               <li>Fee, stipend, service bond and seat-leaving penalty for each college, with the official source of each figure.</li>
               <li>Names of residents at each college from MCC&apos;s official admitted-candidates lists.</li>
-              <li>MCC notices and the round schedule, NEET PG score-to-rank and merit position from NBEMS results, choice lists and side-by-side compare.</li>
+              <li>MCC notices and the round schedule, NEET PG score-to-rank and merit position from NBEMS results, Choice lists and side-by-side compare.</li>
             </ul>
             <p className="mt-2">
               The data is historical, can contain errors and is not a prediction or a promise of admission. Check the official documents before

@@ -27,8 +27,8 @@ describe("PlanCardsView", () => {
 
   it("lines come from the plans config; after the free period ₹199 and no ribbon; signed out gets the Free card's CTA", () => {
     const html = render(null, null);
-    expect(text(card(html, "FREE"))).toContain("10 institute pages a day10 residents searches a day2 options in Compare1 saved choice listNo CSV exportsNo plan reports");
-    expect(text(card(html, "PREMIUM"))).toContain("Unlimited institute pages200 residents searches a day4 options in Compare10 saved choice listsUnlimited CSV exportsUnlimited plan reports");
+    expect(text(card(html, "FREE"))).toContain("10 institute pages a day10 residents searches a day2 options in Compare1 saved Choice listNo CSV exportsNo plan reports");
+    expect(text(card(html, "PREMIUM"))).toContain("Unlimited institute pages200 residents searches a day4 options in Compare10 saved Choice listsUnlimited CSV exportsUnlimited plan reports");
     expect(text(html)).not.toMatch(/Your plan|Free till|Current plan/);
     expect(text(card(html, "PREMIUM"))).toContain("₹199once, no auto-renew");
     expect(text(html)).not.toContain("₹499");

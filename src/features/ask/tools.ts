@@ -8,7 +8,7 @@ import { DEFAULT_EXAM } from "@/features/exams/keys";
 import { hospitalInfo } from "@/features/decide/components/institute/institute-data";
 import { collegeTypeLabel, typesIn } from "@/features/decide/components/institute/college-type";
 import { courseName, toChoiceItem } from "@/features/decide/components/options-view";
-import { CHOICES_KEY, defaultChoices, parseChoices, pinOf, toMccText, type ChoiceItem, type ChoicesState } from "@/features/decide/lib/choices";
+import { ASK_DRAFT, CHOICES_KEY, defaultChoices, parseChoices, pinOf, toMccText, type ChoiceItem, type ChoicesState } from "@/features/decide/lib/choices";
 import { LATEST_YEAR, latestRound, PAST_YEARS, reachLabel, reachOrder, type Latest } from "@/features/decide/lib/reach";
 import { clockNote, currentSteps, fmtIST, roundName, stepName, stepsNow } from "@/features/decide/lib/round-status";
 import { statCells } from "@/features/decide/lib/stat-format";
@@ -148,7 +148,7 @@ export const toolSchemas = {
   save_choice_list: z.strictObject({
     items: z.array(choiceRef).min(1).max(150).describe("Her list in order: each an option id from a tool result, or college + course + quota exactly as in your table"),
     mode: z.enum(["replace", "append"]),
-    listName: z.string().min(1).max(60).optional().describe("Default 'Ask Seatora plan'"),
+    listName: z.string().min(1).max(60).optional().describe("Default 'Draft from Ask Seatora'"),
     confirmed: z.boolean().describe("true only after she said yes in her own message"),
   }),
   create_report: z.strictObject({
@@ -178,7 +178,7 @@ const descriptions: Record<ToolName, string> = {
   score_to_rank: "What rank a NEET PG score was in each year's NBEMS result (history).",
   find_colleges: "Find colleges by name words, state or type; returns slugs and links.",
   draft_choice_list: "Candidates for her choice list from the current round's options, grouped dream / realistic / safe / unknown with facts and option ids. You order and explain them.",
-  save_choice_list: "Save an ordered list into her Seatora Choices (account-synced, /decide/choices) as its own list. Only after she explicitly confirms in chat.",
+  save_choice_list: "Save an ordered list into her Seatora Choice list page (account-synced, /decide/choices) as its own list. Only after she explicitly confirms in chat.",
   create_report: "Save a printable plan report (summary, ordered choices with facts, residents counts, risks, sources). Returns its link.",
 };
 
@@ -220,7 +220,7 @@ export const toolLabel: Record<ToolName, string> = {
   score_to_rank: "Looking up score and rank…",
   find_colleges: "Finding colleges…",
   draft_choice_list: "Drafting candidates for your list…",
-  save_choice_list: "Saving to your Choices…",
+  save_choice_list: "Saving to your Choice list…",
   create_report: "Writing your report…",
 };
 
@@ -689,14 +689,14 @@ const handlers: Handlers = {
       ...uniq.map(({ r }, n) => `${n + 1}. ${[r.college.name, [r.college.state, pinOf(r)].filter(Boolean).join(" ")].filter(Boolean).join(", ")} — ${courseName(r)} — ${r.quota}`),
       "```",
       "",
-      "[Open your Choices](/decide/choices)",
+      "[Open your Choice list](/decide/choices)",
     ].join("\n");
     if (show) show(md);
     return {
       shown: uniq.length,
       notFound: [...refs.missing, ...i.items.filter((_, n) => refs.ids[n] && !byId.has(refs.ids[n]!)).map((it) => it.ref ?? it.id ?? "?")],
       note: show
-        ? "She now sees this table and the copy block. Do not repeat the lines. Add only: why this order (brief), the best-practice checklist, next steps with dates, and offer to save it to her Choices and make a report."
+        ? "She now sees this table and the copy block. Do not repeat the lines. Add only: why this order (brief), the best-practice checklist, next steps with dates, and offer to save it to her Choice list and make a report."
         : md,
     };
   },
@@ -769,8 +769,9 @@ const handlers: Handlers = {
     const latest = latestRound((await meta()).sources);
     const items: ChoiceItem[] = wanted.flatMap((id) => (byId.has(id) ? [toChoiceItem(byId.get(id)!, latest)] : []));
     if (!items.length) fail(`None of these name an option in the data: ${missing.slice(0, 5).join("; ")}. Use ids from draft_choice_list or exact college, course and quota.`);
-    const name = i.listName?.trim() || "Ask Seatora plan";
-    const listId = `ask-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "plan"}`;
+    const name = i.listName?.trim() || ASK_DRAFT;
+    // The default list keeps the id it was first saved under (as "Ask Seatora plan"): saving again renames it, never adds a second.
+    const listId = i.listName?.trim() ? `ask-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "draft"}` : "ask-ask-seatora-plan";
     const row = await db.userChoices.findUnique({ where: { userId } });
     const state: ChoicesState = row ? parseChoices(row.json) : defaultChoices;
     const old = state.lists.find((l) => l.id === listId);

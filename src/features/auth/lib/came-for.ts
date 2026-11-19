@@ -13,7 +13,7 @@ const PAGES: [string, string][] = [
   ["/decide/institutes", "every institute"],
   ["/decide/counselling", "the counselling schedule"],
   ["/decide/compare", "Compare"],
-  ["/decide/choices", "your choice list"],
+  ["/decide/choices", "your Choice list"],
   ["/decide/plan", "the Season Pass"],
   ["/pricing", "the Season Pass"],
   ["/decide", "your planner"],
