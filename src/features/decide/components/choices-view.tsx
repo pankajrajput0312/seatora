@@ -26,7 +26,7 @@ import { cardClosing, ClosingCell, SeatsLink } from "./options-view";
 import { Beds } from "./pages/beds";
 import { ResultCard } from "./result-card";
 import { TermStatCells } from "./stat-cells";
-import { QuotaTerm, Term } from "./term";
+import { CourseKindTag, QuotaTerm, Term } from "./term";
 import { TypeBadge } from "./type-badge";
 import { Skeleton } from "./skeleton";
 import { control, EmptyState, smallLink, tbl } from "./ui";
@@ -337,7 +337,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
               title={item.institute}
               href={L.institute(item.slug)}
               external={lr?.hospital?.mccProfileUrl ? { href: lr.hospital.mccProfileUrl, label: `MCC profile: ${item.institute}` } : undefined}
-              subtitle={item.course}
+              subtitle={<>{item.course} <CourseKindTag specialty={item.id.split("~")[2] ?? ""} /></>}
               meta={[item.state ?? "State not listed", lr && <TypeBadgeM key="type" type={lr.hospital?.type} of={item.institute} />, lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />]}
               footer={
                 <>
@@ -402,7 +402,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                     </select>
                     <span className="min-w-0 py-1">
                       <Link href={L.institute(item.slug)} className="font-medium hover:text-sky hover:underline"><InstName name={item.institute} state={item.state} /></Link>
-                      <span className="block text-xs text-muted-foreground">{item.course}, {quotaIn(E, item.quota)}</span>
+                      <span className="block text-xs text-muted-foreground">{item.course}, {quotaIn(E, item.quota)} <CourseKindTag specialty={item.id.split("~")[2] ?? ""} /></span>
                       <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                         {item.state ?? "State not listed"}
                         {lr && <TypeBadgeM type={lr.hospital?.type} of={item.institute} />}

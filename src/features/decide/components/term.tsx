@@ -1,5 +1,6 @@
 "use client";
 
+import { courseKind } from "../lib/course-kind";
 import { glossary, quotaTerm, roundTerm, type TermKey } from "../lib/glossary";
 import { useExamInfo } from "../lib/use-decide-store";
 import { InfoTip } from "./info-tip";
@@ -23,4 +24,10 @@ export function QuotaTerm({ quota, shown }: { quota: string; shown: string }) {
 /** A round's name as shown ("R1", "Stray", "Open Round"), tappable. */
 export function RoundTerm({ shown }: { shown: string }) {
   return <Term k={roundTerm(shown)}>{shown}</Term>;
+}
+
+/** A course's kind ("Para-clinical"), tappable for what the grouping is (lib/course-kind.ts); none when Seatora doesn't group it. */
+export function CourseKindTag({ specialty, className }: { specialty: string; className?: string }) {
+  const k = courseKind(specialty);
+  return k && <span className={className ?? "text-xs text-muted-foreground"}><Term k="clinical">{k}</Term></span>;
 }

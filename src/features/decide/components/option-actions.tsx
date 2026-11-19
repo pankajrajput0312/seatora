@@ -29,7 +29,7 @@ import { smallLink, tbl } from "./ui";
 import { ViewPanes, ViewToggle, type View } from "./view-toggle";
 import { ScrollTable } from "./scroll-table";
 import { QuotaName } from "./round-name";
-import { QuotaTerm, RoundTerm, Term } from "./term";
+import { CourseKindTag, QuotaTerm, RoundTerm, Term } from "./term";
 
 export function ChoiceStar({ item }: { item: ChoiceItem }) {
   const [state, setState] = useChoices();
@@ -207,7 +207,7 @@ function OptionCard({ r, L, n, latest, pastYears, includeLatest, seatLists, open
         title={r.college.name}
         href={L.institute(r.college.slug)}
         external={mcc ? { href: mcc, label: `MCC profile: ${r.college.name}` } : undefined}
-        subtitle={courseName(r)}
+        subtitle={<>{courseName(r)} <CourseKindTag specialty={r.course.specialty} /></>}
         meta={[r.college.state ?? "State not listed", <TypeBadge key="type" type={r.hospital?.type} of={r.college.name} />, r.hospital?.beds && <Beds b={r.hospital.beds} inst={r.college.name} unit />]}
         footer={
           <>
@@ -391,7 +391,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
               {/* Row header: only what names the option, so it reads short for every cell. */}
               <th scope="row" className={cn(stickName, "px-3 py-3 text-left font-normal")}>
                 <Link href={L.institute(r.college.slug)} title={r.college.name} className="font-semibold hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
-                <span className={cn("block max-md:text-xs", tbl.clamp)}>{courseName(r)}<span className="text-muted-foreground">, <QuotaName quota={r.quota} /><span className="max-md:hidden">, {r.college.state ?? "state not listed"}</span></span></span>
+                <span className={cn("block max-md:text-xs", tbl.clamp)}>{courseName(r)} <CourseKindTag specialty={r.course.specialty} /><span className="text-muted-foreground">, <QuotaName quota={r.quota} /><span className="max-md:hidden">, {r.college.state ?? "state not listed"}</span></span></span>
                 <span className="block max-md:hidden"><HospitalLine h={r.hospital} of={r.college.name} /></span>
                 <span className="mt-1 flex flex-wrap items-center gap-x-3 text-xs max-md:hidden print:hidden">{rowTools(r)}</span>
                 <span className={cn("mt-1 block text-xs text-muted-foreground md:hidden", sessionCols && "hidden")}>
