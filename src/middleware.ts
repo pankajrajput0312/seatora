@@ -25,9 +25,13 @@ export async function middleware(req: NextRequest) {
   const known = req.cookies.get(EXAM_COOKIE)?.value;
   // ?exam= without the staff cookie (or an exam that isn't one): through /decide/exam first.
   if (exam != null && !(isExam(exam) && isExam(known))) return withAid(redirect(req, `/decide/exam?${new URLSearchParams({ k: exam, next: req.nextUrl.pathname + req.nextUrl.search })}`), aid);
-  // Bare /decide (Home, nothing asked) in a staff browser last on another exam: that exam's Home. Members never have
-  // the cookie (only the route sets it, for staff); one made up only names an exam the page then ignores (active.tsx).
-  if (req.nextUrl.pathname === "/decide" && !req.nextUrl.search && isExam(known) && known !== DEFAULT_EXAM) return withAid(redirect(req, `/decide?exam=${known}`), aid);
+  // A Decide page with no ?exam= and no profile in its URL (Home, a bookmark, a typed address) in a staff browser last on
+  // another exam: that exam's page. A link with a rank is a NEET PG profile's own link: as it is (never another exam's
+  // params under this one). Members never have the cookie (only the route sets it, for staff); one made up only names
+  // an exam the page then ignores (active.tsx).
+  // Through /decide/exam, which checks staff: a member's made-up cookie is cleared there, so it never sticks in the URL.
+  if (decide && exam == null && !req.nextUrl.searchParams.has("rank") && isExam(known) && known !== DEFAULT_EXAM)
+    return withAid(redirect(req, `/decide/exam?${new URLSearchParams({ k: known, next: req.nextUrl.pathname + req.nextUrl.search })}`), aid);
   if (exam != null) req.headers.set(EXAM_HEADER, exam);
   const res = await gate(req, api);
   // Staff's cookie follows the exam their URL names (a link, Back): the last one used.

@@ -48,3 +48,11 @@ it("an account read that fails is everyone else", async () => {
   });
   expect((await pick("neet-ss", "/decide")).headers.get("set-cookie")).toBeNull();
 });
+
+it("everyone else's made-up seatora_exam cookie is cleared (only staff are ever given one)", async () => {
+  staffUser.mockResolvedValue(null);
+  const req = new NextRequest(`http://test/decide/exam?${new URLSearchParams({ k: "neet-ss", next: "/decide/options" })}`, { headers: { host: "test", cookie: "seatora_exam=neet-ss" } });
+  const res = await GET(req);
+  expect(res.headers.get("location")).toBe("http://test/decide/options");
+  expect(res.headers.get("set-cookie")).toMatch(/seatora_exam=;.*Max-Age=0/i);
+});

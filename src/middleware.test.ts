@@ -55,11 +55,15 @@ describe("middleware: the URL's ?exam=", () => {
     expect(header(res)).toBeNull();
     expect(res.headers.get("set-cookie") ?? "").not.toMatch(/seatora_exam/);
   });
-  it("bare /decide: the staff browser's last exam (its cookie); NEET PG's or none, or anything asked: as it is", async () => {
+  it("a Decide page without ?exam= or a rank: the staff browser's last exam (its cookie); NEET PG's or none, or a rank: as it is", async () => {
     const aid = "seatora_aid=AAAAAAAAAAAAAAAAAAAAAA";
-    const ss = await visit({ ...ua, cookie: `${aid}; seatora_exam=neet-ss` }, "/decide");
-    expect(new URL(ss.headers.get("location")!).pathname + new URL(ss.headers.get("location")!).search).toBe("/decide?exam=neet-ss");
-    for (const [cookie, path] of [[`${aid}; seatora_exam=neet-pg`, "/decide"], [aid, "/decide"], [`${aid}; seatora_exam=neet-ss`, "/decide?rank=500"], [`${aid}; seatora_exam=neet-ss`, "/decide/options"]])
+    const at = async (path: string) => { const l = (await visit({ ...ua, cookie: `${aid}; seatora_exam=neet-ss` }, path)).headers.get("location"); return l && new URL(l).pathname + new URL(l).search; };
+    // via /decide/exam (the staff check), with the page as asked
+    const via = (next: string) => `/decide/exam?${new URLSearchParams({ k: "neet-ss", next })}`;
+    expect(await at("/decide")).toBe(via("/decide"));
+    expect(await at("/decide/options")).toBe(via("/decide/options"));
+    expect(await at("/decide/seats?view=table")).toBe(via("/decide/seats?view=table"));
+    for (const [cookie, path] of [[`${aid}; seatora_exam=neet-pg`, "/decide/options"], [aid, "/decide"], [`${aid}; seatora_exam=neet-ss`, "/decide?rank=500"], [`${aid}; seatora_exam=neet-ss`, "/decide/options?rank=500&cat=OBC"]])
       expect((await visit({ ...ua, cookie }, path)).headers.get("location")).toBeNull();
   });
 });

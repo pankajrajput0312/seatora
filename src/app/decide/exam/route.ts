@@ -29,5 +29,7 @@ export async function GET(req: NextRequest) {
   const res = NextResponse.redirect(new URL(to.pathname + to.search, host ? `${proto}://${host}` : req.url), 303);
   res.headers.set("Cache-Control", "private, no-store");
   if (staff) res.cookies.set(EXAM_COOKIE, k!, examCookie());
+  // Anyone else's seatora_exam (made up: only staff are ever given one) goes, so it can't keep sending them here.
+  else if (req.cookies.get(EXAM_COOKIE)) res.cookies.set(EXAM_COOKIE, "", { ...examCookie(), maxAge: 0 });
   return res;
 }
