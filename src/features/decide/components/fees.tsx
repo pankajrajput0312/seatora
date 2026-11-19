@@ -11,7 +11,8 @@ import { UNREAD, unreadWhy } from "../lib/stat-format";
 import { termLabel } from "../types";
 import { SourceRef } from "./page-sources";
 import { smallLink } from "./ui";
-import { QuotaName } from "./round-name";
+import { ExamWords, QuotaName } from "./round-name";
+import { authorityOf, DEFAULT_EXAM, inExamWords } from "@/features/exams/keys";
 
 // Fees, stipend and bond as ProgrammeTerms (server/terms.ts) renders them. Server-safe and client-safe on purpose (no
 // "use client", type-only server imports): the institute and Fees pages render them on the server, Options rows in the browser.
@@ -105,7 +106,7 @@ const years = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
 const bondYears = (b: ProgrammeTerms["bond"]) => (b.years == null ? "Years not stated" : b.yearsSum ? `${b.yearsSum} = ${years(b.years)}` : years(b.years));
 const BASIS: Record<NonNullable<ProgrammeTerms["bond"]["basis"]>, string> = { document: "the college's own document", state_rule: "state rule", nbems_rule: "NBEMS rule" };
 
-const otherCourse = (t: ProgrammeTerms) => `Not published for ${t.programme}: the bond on the college's MCC profile is for other courses (its exact words are below).`;
+const otherCourse = (t: ProgrammeTerms) => inExamWords(t.exam ?? DEFAULT_EXAM, `Not published for ${t.programme}: the bond on the college's MCC profile is for other courses (its exact words are below).`);
 
 /** The NBEMS bond rules as source numbers (the page's footer). */
 function NbemsRules() {
@@ -197,10 +198,10 @@ function StipendCell({ s, at }: { s: StipendEntry | null; at: At }) {
 function FeeWords({ fee }: { fee: FeeQuotaGroup["fee"] }) {
   return (
     <>
-      {fee.text ? <blockquote className="border-l-2 border-border pl-3 text-muted-foreground">{fee.text}</blockquote> : <p className="text-muted-foreground">The MCC profile gives no fee in words for these seats.</p>}
+      {fee.text ? <blockquote className="border-l-2 border-border pl-3 text-muted-foreground">{fee.text}</blockquote> : <p className="text-muted-foreground"><ExamWords>The MCC profile gives no fee in words for these seats.</ExamWords></p>}
       {fee.src && (
         <a href={fee.src.url} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-xs text-sky`}>
-          MCC institute profile, read <span className="numeric ml-1">{fmtDay(fee.src.date)}</span><span className="sr-only"> (opens in a new tab)</span>
+          <ExamWords>MCC institute profile</ExamWords>, read <span className="numeric ml-1">{fmtDay(fee.src.date)}</span><span className="sr-only"> (opens in a new tab)</span>
         </a>
       )}
     </>
@@ -365,9 +366,9 @@ function FeeGroup({ g, id, of, title, off, courses = [] }: { g: FeeQuotaGroup; i
       {!n && (
         <div className="grid gap-1 text-sm">
           <p className="text-xs text-muted-foreground">
-            {feeCol
+            <ExamWords>{feeCol
               ? "Fee in the MCC profile's own words. The figures in the table are the ones these words state for these seats (each year, or at admission); a year they give no clear figure for is —."
-              : "Fee in the MCC profile's own words: it is not one clearly labelled amount per year, so Seatora shows no fee figure here."}
+              : "Fee in the MCC profile's own words: it is not one clearly labelled amount per year, so Seatora shows no fee figure here."}</ExamWords>
           </p>
           <FeeWords fee={g.fee} />
         </div>
@@ -404,12 +405,12 @@ function FeeGroup({ g, id, of, title, off, courses = [] }: { g: FeeQuotaGroup; i
       </table>
       {notes.length > 0 && (
         <ul className="grid gap-1 text-xs text-muted-foreground">
-          {notes.map((x, i) => <li key={i}>{x}</li>)}
+          {notes.map((x, i) => <li key={i}>{typeof x === "string" ? <ExamWords>{x}</ExamWords> : x}</li>)}
         </ul>
       )}
       {n?.text && (
         <details className="text-sm">
-          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky">The MCC profile&apos;s own fee words</summary>
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sky"><ExamWords>{"The MCC profile's own fee words"}</ExamWords></summary>
           <div className="grid gap-1"><FeeWords fee={n} /></div>
         </details>
       )}
@@ -560,7 +561,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
         ) : (
           <p>{MD_NO_BOND}</p>
         )}
-        {bond.doc != null && <span className={note}>The college&apos;s own bond document on MCC<Sup n={bond.doc} sources={sources} /></span>}
+        {bond.doc != null && <span className={note}>The college&apos;s own bond document{authorityOf(t.exam) === "MCC" && " on MCC"}<Sup n={bond.doc} sources={sources} /></span>}
       </div>
       {(declared || bond.appliesTo) && (
         <p className="text-sm">
@@ -585,7 +586,7 @@ function BondBox({ t, id, of }: { t: ProgrammeTerms; id: string; of: string }) {
             {t.resignForfeit ? <span className="numeric font-semibold">{formatINR(t.resignForfeit.inr)}<Sup n={t.resignForfeit.src} sources={sources} /></span>
               : t.resignForfeitText ? <>{t.resignForfeitText.text}<Sup n={t.resignForfeitText.src} sources={sources} /></>
               : NOT_IN_DATA}
-            <span className={note}>What MCC lets the college keep if you resign or don&apos;t join from Round 2. Separate from the leaving penalty.</span>
+            <span className={note}>What {authorityOf(t.exam)} lets the college keep if you resign or don&apos;t join from Round 2. Separate from the leaving penalty.</span>
           </dd>
         </div>
       </dl>

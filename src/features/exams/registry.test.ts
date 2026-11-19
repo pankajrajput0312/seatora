@@ -6,7 +6,7 @@ import { PROFILE_KEY, profileQuotas } from "@/features/decide/profile";
 import { baseCategories, openQuotas, openQuotasNote, quotaScopeNote, rounds, type Source } from "@/features/decide/types";
 import { completeYear, examShows, headYearOf, neetPg, quotaIn, roundIn, roundNamesOf, tidyLabel } from "./exam";
 import { DEFAULT_EXAM, examFor, examKeys, exams, examYears, groupOf, groupsOf, headYearIn, isExam, latestOf, markerKey, pageNeeds, restrictedQuota, roundNameIn, scopedKey, rankListIn, showsPage, yearName } from "./registry";
-import { rankListOf, sessionOf } from "./keys";
+import { authorityOf, inExamWords, rankListOf, sessionOf } from "./keys";
 import { yearsOf } from "@/features/decide/server/catalog";
 
 const src = (year: number, round: Source["round"], name = "", provisional = false): Source => ({ key: `${year}/${round}`, url: null, year, round, provisional, name });
@@ -219,5 +219,14 @@ describe("INI-CET's MDS rank list (keys.ts separateRankList)", () => {
   it("her list: asked, else her courses' when all are MDS, else the main one; none for other exams", () => {
     expect([rankListIn("ini-cet", "mds", []), rankListIn("ini-cet", "main", ["MDS"]), rankListIn("ini-cet", null, ["MDS"]), rankListIn("ini-cet", null, ["MDS", "MD"]), rankListIn("ini-cet", null, [])]).toEqual(["MDS", "", "MDS", "", ""]);
     expect([rankListIn("neet-pg", "mds", ["MDS"]), rankListIn("neet-mds", null, ["MDS"])]).toEqual([null, null]);
+  });
+});
+
+describe("the counselling body's words (keys.ts authorityOf, inExamWords)", () => {
+  it("INI-CET: AIIMS and its prospectus; NEET PG, SS and MDS text exactly as written", () => {
+    const s = "Fee in the MCC profile's own words; MCC's result PDFs; the college's MCC institute profile; MCC institute profile, read";
+    expect(inExamWords("ini-cet", s)).toBe("Fee in the INI-CET prospectus's own words; AIIMS's result PDFs; the INI-CET prospectus; INI-CET prospectus, read");
+    for (const k of ["neet-pg", "neet-ss", "neet-mds"] as const) expect([inExamWords(k, s), authorityOf(k)]).toEqual([s, "MCC"]);
+    expect(authorityOf("ini-cet")).toBe("AIIMS");
   });
 });

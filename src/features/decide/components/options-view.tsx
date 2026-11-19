@@ -8,7 +8,7 @@ import type { OptionRow } from "../service";
 import { rounds, seatKindLabel, type Round, type SeatList, type Term } from "../types";
 import { Closing, Dash, Provisional, TermText } from "./bits";
 import { smallLink } from "./ui";
-import { RoundName, RoundNames, YearName } from "./round-name";
+import { Authority, RoundName, RoundNames, YearName } from "./round-name";
 import { quotaIn } from "@/features/exams/exam";
 import { useExamInfo } from "../lib/use-decide-store";
 
@@ -111,7 +111,7 @@ export function RoundGrid({ row, caption }: { row: Pick<OptionRow, "grid" | "rea
   if (!years.length)
     return (
       <p className="text-xs text-muted-foreground">
-        {row.reach === "new" ? "Never allotted before: MCC allotted nobody to this course and quota here in any result Seatora has, in any round or seat category." : "No closing rank on these seat categories in any round."}
+        {row.reach === "new" ? <>Never allotted before: <Authority /> allotted nobody to this course and quota here in any result Seatora has, in any round or seat category.</> : "No closing rank on these seat categories in any round."}
       </p>
     );
   return (

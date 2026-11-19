@@ -26,7 +26,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { getMeta, listInstitutes } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { headYearIn, latestOf, yearName } from "@/features/exams/registry";
+import { authorityOf, headYearIn, latestOf, yearName } from "@/features/exams/registry";
 import { quotaIn } from "@/features/exams/exam";
 import { iniElsewhere } from "@/features/decide/lib/college-aliases";
 
@@ -188,7 +188,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Institutes"
-        about={<>Every institute in the MCC results: where it is, its type{E.has.beds && " and beds"}, the courses it offers and how many allotments were made there in {head} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments{E.has.fees ? ", fees and bond" : ""}.</>}
+        about={<>Every institute in the {authorityOf(exam)} results: where it is, its type{E.has.beds && " and beds"}, the courses it offers and how many allotments were made there in {head} (all rounds and seat categories; not the number of seats). Open one for its courses, allotments{E.has.fees ? ", fees and bond" : ""}.</>}
       />
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}

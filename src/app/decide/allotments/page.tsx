@@ -27,7 +27,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { roundLabel, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examGate, examInfo } from "@/features/exams/active";
-import { DEFAULT_EXAM, groupsOf, roundNameIn, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, groupsOf, roundNameIn, termsDocOf, yearName, type ExamKey } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 import { quotaIn, type Exam } from "@/features/exams/exam";
 import { PgOr } from "@/features/decide/components/round-name";
@@ -46,10 +46,10 @@ const colsOf = (E: Exam) => [
   { key: "prev", label: "Previous seat" },
 ];
 
-/** The page's (i) beside its title: what a row is and what each part means. */
-const about = (
+/** The page's (i) beside its title: what a row is and what each part means (in the exam's words: MCC's, INI-CET's AIIMS). */
+const aboutOf = (exam: ExamKey) => (
   <>
-    Every allotment in MCC&apos;s result PDFs, newest year first, then round and rank. Ranks only, never names. With no filter
+    Every allotment in {authorityOf(exam)}&apos;s result PDFs, newest year first, then round and rank. Ranks only, never names. With no filter
     the page opens on the latest round: pick All years under Year for every round. Select a rank to
     scan the allotments around it that year, Journey for that rank&apos;s seat in every round of the year, a course for its last
     ranks at that institute.<br /><br />
@@ -57,7 +57,7 @@ const about = (
     candidate often holds an Open seat). Status: allotted (R1 and stray rounds), fresh or upgraded (R2, R3). Choice no. and the
     previous seat (the one held a round earlier, with the remark printed there) are in R2 and R3 results only, and those list
     only new or upgraded allotments.<br /><br />
-    Fee, stipend, bond and leaving penalty are that seat&apos;s course and quota as published (<PgOr pg="DNB seats follow NBEMS; MD, MS and Diploma seats the college" other="the college's MCC institute profile" />);
+    Fee, stipend, bond and leaving penalty are that seat&apos;s course and quota as published (<PgOr pg="DNB seats follow NBEMS; MD, MS and Diploma seats the college" other={termsDocOf(exam)} />);
     each (i) has the exact words and source. College type is inferred, not official; beds are self-reported by the hospital.
   </>
 );
@@ -256,7 +256,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
 
   return (
     <AppPage className="grid grid-cols-1 gap-3">
-      <PageHead title="Allotments" about={about}>MCC allotment results by rank, never names.</PageHead>
+      <PageHead title="Allotments" about={aboutOf(exam)}>{authorityOf(exam)} allotment results by rank, never names.</PageHead>
 
       {inst && (
         // A slim line, not a card: the institute once (the table's rows then show the course alone), with its state, type and beds.

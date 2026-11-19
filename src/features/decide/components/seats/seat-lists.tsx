@@ -19,7 +19,7 @@ import { seatCourse as courseOf } from "./seat-cards";
 import { ScrollTable } from "../scroll-table";
 import { roundNameFrom } from "@/features/exams/exam";
 import { RoundName, YearName } from "../round-name";
-import { DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
+import { authorityOf, DEFAULT_EXAM, yearName, type ExamKey } from "@/features/exams/keys";
 import { QuotaName } from "../round-name";
 import { quotaIn } from "@/features/exams/exam";
 
@@ -97,7 +97,7 @@ export function UnlistedSeats({ u, profile, here, href, options, exam = DEFAULT_
       <span><span className="numeric">{formatRank(u.seats)}</span> {u.list.kind === "new" ? `${roundOf(u.list, exam)} newly added` : listTitle(u.list, exam)} {u.seats === 1 ? "seat" : "seats"}{here && " here"} never allotted before</span>
       <InfoTip label={`${listSeats(u.list, exam)} never allotted before`}>
         {u.seats === 1 ? "It is" : "They are"} in <span className="numeric">{formatRank(u.options)}</span> {one ? "course and quota" : "courses and quotas"}
-        {profile ? " that match your courses, quotas, states and seat categories" : ""} with no past MCC allotments, so there is no closing rank to
+        {profile ? " that match your courses, quotas, states and seat categories" : ""} with no past {authorityOf(exam)} allotments, so there is no closing rank to
         compare{options ? `: Options lists ${one ? "it" : "them"} as “Never allotted before”.` : `, and ${one ? "it is not an option" : "they are not options"} here.`}
       </InfoTip>
       {options && <Link href={options} className={`${smallLink} text-sky sm:ml-2`}>See {one ? "it" : "them"} on Options</Link>}

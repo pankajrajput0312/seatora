@@ -4,7 +4,7 @@ import type { ProgrammeTerms } from "../server/terms";
 import { NBEMS_BOND_RULES, termDocs } from "./fees";
 import { InfoTip } from "./info-tip";
 import { SourceRef } from "./page-sources";
-import { PgOr } from "./round-name";
+import { ExamWords, PgOr } from "./round-name";
 
 // One course's terms as number cells: Fee | Stipend | Bond | Bond ₹ | Leaving (lib/stat-format.ts says what each shows).
 // Server- and client-safe (no "use client"; InfoTip and SourceRef are the client parts). Sources go to the page's one
@@ -131,7 +131,7 @@ export function StatHead({ k }: { k: StatKey }) {
     <span data-terms className="inline-flex items-center gap-0.5">
       {statLabel[k]}
       <InfoTip label={`${statLabel[k]} column`}>
-        <PgOr pg={columnNote[k]} other={columnNoteOther[k]} /> Each figure&apos;s exact words and sources: the cards, or the institute&apos;s Fees tab.
+        <PgOr pg={columnNote[k]} other={<ExamWords>{columnNoteOther[k]}</ExamWords>} /> Each figure&apos;s exact words and sources: the cards, or the institute&apos;s Fees tab.
       </InfoTip>
     </span>
   );

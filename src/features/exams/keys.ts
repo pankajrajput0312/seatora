@@ -11,6 +11,23 @@ export const isExam = (s: unknown): s is ExamKey => examKeys.includes(s as ExamK
 export const ranksPerGroup: readonly ExamKey[] = ["neet-ss"];
 /** Exams that rank one degree on a merit list of its own (INI-CET: MDS): a candidate is a rank within its degree's list. */
 export const separateRankList: Partial<Record<ExamKey, string>> = { "ini-cet": "MDS" };
+/** Who runs an exam's counselling, as its pages name it: AIIMS (New Delhi) for INI-CET; MCC for NEET PG, SS and MDS. */
+export const authorityOf = (exam: ExamKey = DEFAULT_EXAM) => (exam === "ini-cet" ? "AIIMS" : "MCC");
+/** Where a college's fee and bond terms come from, in a sentence: INI-CET's prospectus; else the college's MCC institute profile. */
+export const termsDocOf = (exam: ExamKey = DEFAULT_EXAM) => (exam === "ini-cet" ? "the INI-CET prospectus (Part B)" : "the college's MCC institute profile");
+/** The document a college's own fee and bond words are in: INI-CET's prospectus; else its MCC profile. */
+export const profileOf = (exam: ExamKey = DEFAULT_EXAM) => (exam === "ini-cet" ? "the INI-CET prospectus" : "the MCC profile");
+/**
+ * A sentence in MCC's words as an exam's pages say it: INI-CET's counselling is AIIMS's and its terms are in its
+ * prospectus; every other exam's text exactly as written. For whole strings (notes, tips); a page builds its own words.
+ */
+export function inExamWords(exam: ExamKey, s: string) {
+  if (authorityOf(exam) === "MCC") return s;
+  return s
+    .replace(/the college's MCC (?:institute )?profile|the MCC (?:institute )?profile/g, "the INI-CET prospectus")
+    .replace(/MCC (?:institute )?profile/g, "INI-CET prospectus")
+    .replace(/\bMCC\b/g, authorityOf(exam));
+}
 /** A seat's rank list: its degree when that degree has a list of its own (INI-CET's MDS), else "" (the exam's one list). */
 export const rankListOf = (exam: ExamKey, degree: string) => (separateRankList[exam] === degree ? degree : "");
 

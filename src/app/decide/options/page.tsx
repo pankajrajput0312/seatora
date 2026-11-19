@@ -30,7 +30,7 @@ import { keepProfileParams, pairChoices, profileFromParams, profileToParams, toU
 import { getMeta, listOptions, optionsView, unlistedSeats } from "@/features/decide/service";
 import { optionSorts, optionsViews, roundLabel, seatKindLabel, seatKinds, type OptionSort, type SeatKind } from "@/features/decide/types";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { DEFAULT_EXAM, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
 import { quotaIn } from "@/features/exams/exam";
 
 export const metadata: Metadata = { title: "Options" };
@@ -102,6 +102,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // result); the toggle exists only then.
   const latest = latestOf(meta.sources, exam);
   const latestName = `${yearName(exam, latest.year)} ${roundLabel[latest.round]}`;
+  const by = authorityOf(exam); // MCC; INI-CET: AIIMS
   const counted = reachWindow(latest, PAST_YEARS, !f.prov);
   const round = lists[0] && `${yearName(exam, lists[0].year)} ${roundLabel[lists[0].round]}`;
   const roundWords = lists[0] && roundName[lists[0].round];
@@ -177,7 +178,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   // What the round's seat lists are, behind the (i) of the summary (round view) or of the link to that view.
   const listsTip = lists.length > 0 && (
     <>
-      From MCC&apos;s {round} lists:{" "}
+      From {by}&apos;s {round} lists:{" "}
       {lists.map((l, i) => (
         <Fragment key={l.key}>
           {i > 0 && ", "}
@@ -211,7 +212,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             Every institute and course in your profile{roundView && r.seats ? ` with ${round} seats` : ""}, labelled by how your rank compares with the closing ranks of {counted} on {seats} seats,
             the seat categories you can take{profile.quotas.length ? "" : `, in the quotas open to everyone (${E.quotas.map((q) => quotaIn(E, q)).join(", ")})`}. Within 10%: in a past round the closing rank was at
             least 90% of yours ({`${E.rankWord} `}<span className="numeric">{formatRank(Math.ceil(profile.rank * 0.9))}</span> or later) but before your rank.
-            {roundView && <> Never allotted before = MCC allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years, exam)}), in any round or seat category, so there is no closing rank to compare.</>}
+            {roundView && <> Never allotted before = {by} allotted nobody to that course and quota there in any result Seatora has ({resultsSpan(meta.years, exam)}), in any round or seat category, so there is no closing rank to compare.</>}
           </>
         }
       >
@@ -231,7 +232,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             <InfoTip label={`${round} seats`}>
               {formatRank(sum.options)} {sum.options === 1 ? "option has" : "options have"} {roundWords} seats in your courses: {formatRank(sum.clear)} in the clear vacancy list,{" "}
               {formatRank(sum.virtualOnly)} virtual only (seats there fall vacant only if their holder upgrades or leaves){sum.newOnly > 0 && `, ${formatRank(sum.newOnly)} only newly added`};{" "}
-              {formatRank(sum.withNew)} with seats in MCC&apos;s newly added list; {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}. {listsTip}{" "}
+              {formatRank(sum.withNew)} with seats in {by}&apos;s newly added list; {sum.fresh > 0 ? `${formatRank(sum.fresh)} never allotted before (no past allotment)` : "none never allotted before (every one has a past allotment)"}. {listsTip}{" "}
               Sorted by label (reached, then within 10%, then never allotted before and no allotment in your categories, closed before your rank last), then {round} clear vacancy seats, then the deepest{" "}
               {HEAD} closing.
               <span className="mt-2 flex flex-col items-start md:hidden">{viewLinks}</span>
@@ -317,7 +318,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
                   <input type="checkbox" name="prov" value="0" defaultChecked={!!f.prov} className="size-5 accent-sky" />
                   Without {latestName} (provisional)
                 </label>
-                <InfoTip label={`${latestName} (provisional)`}>Leaves MCC&apos;s provisional {latestName} result out of the labels.</InfoTip>
+                <InfoTip label={`${latestName} (provisional)`}>Leaves {by}&apos;s provisional {latestName} result out of the labels.</InfoTip>
               </span>
             )}
           </Fragment>

@@ -192,6 +192,8 @@ export type ProgrammeTerms = {
   sources: TermSource[];
   /** The college's website as declared on its MCC profile (a fee in words pointing to it links it). */
   website?: string | null;
+  /** Another exam's (none: NEET PG's): its words (MCC's or AIIMS's documents) and no NEET PG fee bands (lib/stat-format.ts). */
+  exam?: ExamKey;
 };
 
 export type Quality = "full" | "partial" | "none";
@@ -843,7 +845,7 @@ export function collegeTerms(cat: Catalog, college: string): ProgrammeTerms[] {
   if (!out) {
     const terms = m.terms.get(college) ?? [];
     const website = cat.collegeByKey?.get(college)?.website ?? null;
-    out = programmesOf(m.degrees.get(college) ?? [], cat.exam).map((p) => ({ ...normalizeProgramme(p, terms, m.sharedBy), website }));
+    out = programmesOf(m.degrees.get(college) ?? [], cat.exam).map((p) => ({ ...normalizeProgramme(p, terms, m.sharedBy), website, ...(cat.exam !== DEFAULT_EXAM && { exam: cat.exam }) }));
     m.out.set(college, out);
   }
   return out;
@@ -882,7 +884,8 @@ function withFeeVariant(cat: Catalog, t: ProgrammeTerms, college: string, degree
 }
 
 export function courseTerms(cat: Catalog, college: string, degree: string, specialty?: string, quota?: string): ProgrammeTerms {
-  return withFeeVariant(cat, courseTermsBase(cat, college, degree, specialty, quota), college, degree, specialty, quota);
+  const t = withFeeVariant(cat, courseTermsBase(cat, college, degree, specialty, quota), college, degree, specialty, quota);
+  return cat.exam === DEFAULT_EXAM || t.exam ? t : { ...t, exam: cat.exam };
 }
 
 function courseTermsBase(cat: Catalog, college: string, degree: string, specialty?: string, quota?: string): ProgrammeTerms {

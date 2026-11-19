@@ -8,7 +8,7 @@ import type { OptionRow } from "../service";
 import { roundLabel, type Term } from "../types";
 import { InfoTip } from "./info-tip";
 import { SourceRef } from "./page-sources";
-import { RoundName } from "./round-name";
+import { RoundName, YearName } from "./round-name";
 
 export const HISTORY_CAPTION =
   "Based on previous years' closing ranks. History, not a prediction — seat matrix, category and competition change every round.";
@@ -76,7 +76,7 @@ export function ReachBadge({ reach, provisional, latest, includeLatest = true, o
  * label rests on two, so an option first reached in R2 or R3 never reads like a Round 1 seat.
  */
 function ReachedFrom({ from, reach }: { from: NonNullable<OptionRow["reachFrom"]>; reach: Reach }) {
-  const year = reach !== "reached-latest" && <span className="numeric">{from.year}: </span>;
+  const year = reach !== "reached-latest" && <span className="numeric"><YearName year={from.year} />: </span>;
   if (from.round === "R1") return <span className="block w-full text-xs text-muted-foreground">{reach === "reached-one" && year}In Round 1</span>;
   return <span className="block w-full text-xs text-sun">{year}Only in a later round (<RoundName year={from.year} round={from.round} />)</span>;
 }

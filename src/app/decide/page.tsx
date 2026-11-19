@@ -23,7 +23,7 @@ import { dashboard, getMeta, listOptions, type StripPoint } from "@/features/dec
 import { roundLabel } from "@/features/decide/types";
 import { QuotaName } from "@/features/decide/components/round-name";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { DEFAULT_EXAM, exams, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, exams, headYearIn, latestOf, perGroup, yearName } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -105,7 +105,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const fill = steps && nextChoiceFilling(steps);
   const fillName = fill ? `${roundName[fill.round]} · ${yearName(exam, rs.year)}` : null;
   // MCC's seat lists of the round Options lists, said as such (never "Round 2 seats in your courses").
-  const lists = list && `MCC's ${roundWords} seat lists`;
+  const by = authorityOf(exam); // MCC; INI-CET: AIIMS
+  const lists = list && `${by}'s ${roundWords} seat lists`;
   const undeclared = r.unknownTerms > 0 && <> · <Link href={L.to("/decide/options", { nd: "keep" })} className={smallLink}>+{formatRank(r.unknownTerms)} without a published figure</Link></>;
   // Another exam (most of its MCC profiles give no fee figure): what her cap hides, said as Options says it, with the
   // ways back; then the cap, not her courses, is what to change.
@@ -151,7 +152,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               </p>
             )}
             <p className="mt-1 text-body text-muted-foreground">
-              <span className="numeric">{formatRank(total)}</span> {total === 1 ? "option" : "options"} {list ? "with seats in MCC's latest seat lists, in your courses" : "in your profile"};{" "}
+              <span className="numeric">{formatRank(total)}</span> {total === 1 ? "option" : "options"} {list ? `with seats in ${by}'s latest seat lists, in your courses` : "in your profile"};{" "}
               {/* The parts are Options' own label tabs, so each number is one she can open there. */}
               <span className="numeric">{formatRank(reached)}</span> reached your rank in a past round
               {reached > 0 && <>{" "}(<ReachedParts L={L} counts={r.counts} latest={latest} />)</>}.
@@ -181,7 +182,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <h2 id="numbers-h" className="text-h2 font-bold">{list ? `Your courses in ${lists}` : "Your options"}</h2>
           <InfoTip label={list ? `your courses in ${lists}` : "your options"}>
             {list
-              ? `Options with seats in MCC's ${yearName(exam, list.year)} ${roundWords} lists, in your courses, quotas and ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`
+              ? `Options with seats in ${by}'s ${yearName(exam, list.year)} ${roundWords} lists, in your courses, quotas and ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`
               : `Every option in your profile with past allotments, on ${seats} seats, labelled from closing ranks in ${counted}. Each number opens them on Options.`}
           </InfoTip>
         </div>

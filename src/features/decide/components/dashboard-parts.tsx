@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { typedPrefix } from "../lib/choices";
-import { DEFAULT_EXAM } from "@/features/exams/keys";
+import { authorityOf, DEFAULT_EXAM } from "@/features/exams/keys";
 import { useChoicesFor, useDecideLinks, useExam, useExamInfo, useSavedProfile } from "../lib/use-decide-store";
 import { profileFromParams } from "../profile";
 import { navigating } from "./nav-pending";
@@ -116,7 +116,7 @@ export function ChoicesStat({ nextRound }: { nextRound?: string | null }) {
       // Another exam's first list is named "NEET SS list" (layout.tsx): no "list list". NEET PG's labels as they were.
       label={hydrated ? `In your ${list.name}${exam === DEFAULT_EXAM || !/ list$/i.test(list.name) ? " list" : ""}` : "In your choice list"}
       value={<span className="font-mono">{hydrated ? formatRank(list.items.length) : "—"}</span>}
-      note={<Link href={L.choices()} className={smallLink}>{!hydrated ? "Open your list" : typed ? `${formatRank(typed)} typed into MCC` : "None typed into MCC yet"}</Link>}
+      note={<Link href={L.choices()} className={smallLink}>{!hydrated ? "Open your list" : typed ? `${formatRank(typed)} typed into ${authorityOf(exam)}` : `None typed into ${authorityOf(exam)} yet`}</Link>}
     />
   );
 }

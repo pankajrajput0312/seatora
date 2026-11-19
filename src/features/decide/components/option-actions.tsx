@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import { MAX_COMPARE, toggleItem, type ChoiceItem } from "../lib/choices";
 import type { DecideLinks } from "../lib/links";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
-import { yearName } from "@/features/exams/keys";
+import { authorityOf, yearName } from "@/features/exams/keys";
 import { useChoices, useCompare, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
 import { latestText, reachWindow, type Latest, type Reach } from "../lib/reach";
 import { statKeys, statLabel } from "../lib/stat-format";
@@ -213,7 +213,7 @@ const grouped = ["no-data", "closed-before"] as const satisfies Reach[];
 const groupOf = (r: ListRow) => (grouped as readonly Reach[]).includes(r.reach) ? (r.reach as (typeof grouped)[number]) : null;
 function groupWords(g: (typeof grouped)[number], { latest, pastYears, includeLatest }: Years) {
   return g === "no-data"
-    ? { title: "No allotment in your seat categories", note: `MCC allotted none of your seat categories on these in ${reachWindow(latest, pastYears, includeLatest, true)}, so there is no closing rank to compare with yours. Not a sign of a seat you can take.` }
+    ? { title: "No allotment in your seat categories", note: `${authorityOf(latest.exam)} allotted none of your seat categories on these in ${reachWindow(latest, pastYears, includeLatest, true)}, so there is no closing rank to compare with yours. Not a sign of a seat you can take.` }
     : { title: "Closed before your rank", note: `The closing rank came before yours in every round of ${reachWindow(latest, pastYears, includeLatest)}.` };
 }
 /** Each row's group heading where a group's run starts (the page's first row too), else null. */
@@ -281,7 +281,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
                 <span className="block max-md:hidden"><HospitalLine h={r.hospital} of={r.college.name} /></span>
                 <span className="mt-1 block text-xs text-muted-foreground md:hidden">
                   {/* The closing's own round (the deepest of the year's rounds), and R1's when it is a later round's. */}
-                  {r.latest ? `${latest.year} ${roundIn(E, latest.year, r.latest.round)}` : latestText(latest)} <span className="numeric text-sm font-semibold text-foreground">{r.latest ? formatRank(r.latest.closing) : "—"}</span>
+                  {r.latest ? `${yearName(E.key, latest.year)} ${roundIn(E, latest.year, r.latest.round)}` : latestText(latest)} <span className="numeric text-sm font-semibold text-foreground">{r.latest ? formatRank(r.latest.closing) : "—"}</span>
                   {r.latest && r.latest.round !== "R1" && <R1Line r1={r1Of(r, latest.year)} />}
                   {r.latest?.provisional && <span className="mt-0.5 block"><Provisional when /></span>}
                 </span>

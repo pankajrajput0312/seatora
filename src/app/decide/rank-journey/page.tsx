@@ -25,7 +25,7 @@ import { roundLabel, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
 import { activeExam, examInfo, RankListNote } from "@/features/exams/active";
-import { groupsOf, perGroup, rankListIn, rankListOf, roundNameIn, yearName } from "@/features/exams/registry";
+import { authorityOf, groupsOf, perGroup, rankListIn, rankListOf, roundNameIn, yearName } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Rank journey" };
@@ -66,13 +66,14 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
   const courseLink = (a: Row) => L.allotments({ course: courseOf.get(`${a.degree}|${a.specialty}`)?.slug, inst: a.collegeSlug || undefined, year: year!.year, round: a.round });
   const roundOf = (r: Round) => (year ? roundNameIn(exam, meta.sources, year.year, r) : roundLabel[r]);
   const yearWords = year && yearName(exam, year.year); // INI-CET: "Jan 2026"
+  const by = authorityOf(exam); // MCC; INI-CET: AIIMS
   const of = (a: Row) => `${a.collegeName}, ${a.courseName}, ${roundOf(a.round)}`;
 
   return (
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Rank journey"
-        about={`One ${E.rankName}'s seat in every round of one year's MCC results: the seat, MCC's status, the choice number and the seat held a round earlier.${group ? ` In your question group (${groupsOf(exam, group).join(", ")}) only: the same rank in another group is another candidate.` : ""} Ranks only, never names.`}
+        about={`One ${E.rankName}'s seat in every round of one year's ${by} results: the seat, ${by}'s status, the choice number and the seat held a round earlier.${group ? ` In your question group (${groupsOf(exam, group).join(", ")}) only: the same rank in another group is another candidate.` : ""} Ranks only, never names.`}
         note="History, not a prediction."
       />
 
@@ -88,12 +89,12 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
       {invalid ? (
         <p id="air-error" role="alert" className="text-sm text-ember">“{typed}” isn&apos;t a rank. Enter a whole number between 1 and 3,00,000, for example {E.exampleRank}.</p>
       ) : !rank || !year ? (
-        <EmptyState title="Enter a rank" description={`Type ${E.rankName === "All India Rank" ? "an" : "a"} ${E.rankName} above, or set your rank, to see that rank's seat in every round of one year's MCC results.`} />
+        <EmptyState title="Enter a rank" description={`Type ${E.rankName === "All India Rank" ? "an" : "a"} ${E.rankName} above, or set your rank, to see that rank's seat in every round of one year's ${by} results.`} />
       ) : rows.length === 0 ? (
         <>
           <EmptyState
             title={`No allotment to rank ${formatRank(rank)} in ${yearWords}`}
-            description={`MCC's ${yearWords} results (${year.rounds.map(roundOf).join(", ")}) list no seat for this rank in any round.`}
+            description={`${by}'s ${yearWords} results (${year.rounds.map(roundOf).join(", ")}) list no seat for this rank in any round.`}
             href={L.rankScan(rank, year.year)}
             action={`Scan ranks around ${formatRank(rank)}`}
           />

@@ -31,7 +31,7 @@ import { allotmentTrends, getMeta } from "@/features/decide/service";
 import { fmtDay, listDay } from "@/features/decide/lib/format";
 import { seatKindLabel, seatKinds, type SeatList } from "@/features/decide/types";
 import { activeExam, examGate, examInfo } from "@/features/exams/active";
-import { DEFAULT_EXAM, examYears, exams, latestOf, restrictedQuota, yearName, type ExamKey } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, examYears, exams, latestOf, restrictedQuota, yearName, type ExamKey } from "@/features/exams/registry";
 import { roundNameFrom } from "@/features/exams/exam";
 import { quotaIn } from "@/features/exams/exam";
 
@@ -75,7 +75,7 @@ export default async function SeatsPage({ searchParams }: { searchParams: Promis
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Seats"
-        about={<>MCC&apos;s seat lists for a round, as each PDF printed them: the seat matrix (every list of the round with every closing rank, fee and bond per row), one list, or the round&apos;s lists side by side.{profile && " Filtered to the courses, quotas, states, seat categories and fee and bond caps in your profile."}</>}
+        about={<>{authorityOf(exam)}&apos;s seat lists for a round, as each PDF printed them: the seat matrix (every list of the round with every closing rank, fee and bond per row), one list, or the round&apos;s lists side by side.{profile && " Filtered to the courses, quotas, states, seat categories and fee and bond caps in your profile."}</>}
       />
       <SubTabs label="Seats" current={f.tab} items={[{ key: "matrix", label: "Seat lists", href: L.to("/decide/seats", { tab: "matrix" }) }, { key: "trends", label: "Allotment trends", href: L.to("/decide/seats", { tab: "trends" }) }]} />
       {f.tab === "trends" ? <Trends profile={profile} page={f.page} L={L} exam={exam} /> : <SeatLists f={f} profile={profile} params={params} L={L} exam={exam} />}
@@ -110,7 +110,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
     `inline-flex min-h-11 items-center rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const caption = matrix
     ? `Seat matrix, ${round}${allRounds ? " and every other round" : ""}: seats per list, terms${profile ? ", your chances" : ""} and closing ranks by year and round, ${sortLabels[sort].toLowerCase()}, page ${r.page}`
-    : `${compare ? `Seats in every ${round} list side by side` : `Seats in the ${title} list`} (MCC PDF${compare ? "s" : ""}), ${sortLabels[sort].toLowerCase()}, page ${r.page}`;
+    : `${compare ? `Seats in every ${round} list side by side` : `Seats in the ${title} list`} (${authorityOf(exam)} PDF${compare ? "s" : ""}), ${sortLabels[sort].toLowerCase()}, page ${r.page}`;
   // Only the rounds each year has results for (a round with no MCC result has no column).
   const years: ClosingYear[] = meta.years.map((y) => ({ year: y.year, rounds: y.rounds }));
   const latest = latestOf(meta.sources, exam);
@@ -135,12 +135,13 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   ].filter((x) => !!x);
   const clearAll = here({ list: list.key, q: null, quota: null, st: null, has: null, scat: null, ...noTerms });
   const strong = (t: string) => <span className="font-semibold">{t}</span>;
+  const by = authorityOf(exam); // MCC; INI-CET: AIIMS
   const about = matrix ? (
     <>
-      One row per institute, course, quota and seat category {allRounds ? "with seats in any MCC seat list in the data, or allotted in any MCC result" : `with seats in the ${round} lists`}: its {strong("clear")} and{" "}
+      One row per institute, course, quota and seat category {allRounds ? `with seats in any ${by} seat list in the data, or allotted in any ${by} result` : `with seats in the ${round} lists`}: its {strong("clear")} and{" "}
       {strong("virtual")} vacancy seats per round, a {strong("+N new")} badge when the newly added list prints seats for it (most are also in the clear vacancy list, so they are
       not extra seats), the course&apos;s fee, stipend, bond and leaving penalty{profile && ", your chances on that seat category"} and its closing rank in every round, with the
-      allotments MCC made there in brackets. The lists overlap, so their seats are never added together. The list picked above sets the round and the list &quot;Most seats
+      allotments {by} made there in brackets. The lists overlap, so their seats are never added together. The list picked above sets the round and the list &quot;Most seats
       first&quot; sorts by. Select a row, or its Details button, for every number and its source.
     </>
   ) : compare ? (
@@ -155,14 +156,14 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   );
   const closingNote = matrix ? (
     <>
-      Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category, as rank (allotments made in that round, not seats); &quot;—&quot; means no allotment there in that
-      round, or no MCC result for it in the data.
-      {profile && <> Your chances is Options&apos; label on that one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round); &quot;Never allotted before&quot; when MCC never allotted the course and quota; no label on a row whose PDF prints no quota.</>}
+      Closing ranks are {by}&apos;s, on the row&apos;s own quota and seat category, as rank (allotments made in that round, not seats); &quot;—&quot; means no allotment there in that
+      round, or no {by} result for it in the data.
+      {profile && <> Your chances is Options&apos; label on that one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round); &quot;Never allotted before&quot; when {by} never allotted the course and quota; no label on a row whose PDF prints no quota.</>}
       {" "}A card&apos;s deepest closing is the deepest of every round of {reachWindow(latest, PAST_YEARS)}, Stray included, with its year and round (as Options and Compare).
     </>
   ) : (
     <>
-      Closing ranks are MCC&apos;s, on the row&apos;s own quota and seat category: the deepest of every round of {reachWindow(latest, PAST_YEARS)}, Stray included, in the row,
+      Closing ranks are {by}&apos;s, on the row&apos;s own quota and seat category: the deepest of every round of {reachWindow(latest, PAST_YEARS)}, Stray included, in the row,
       every round behind &quot;Every round&quot;.
       {profile && (
         <> Reach is Options&apos; label on that one seat category, counting {reachWindow(latest, PAST_YEARS)} (every round). Options labels an option on all your seat categories together, and notes when a list&apos;s seats there are all on a seat category with another label: the label these rows show.</>
@@ -268,8 +269,8 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
       )}
       {f.nohist && (
         <p className="flex flex-wrap items-center gap-x-1 rounded-lg border border-border bg-card px-4 py-1 text-sm">
-          Only seats with no past MCC allotments
-          <InfoTip label="seats never allotted before">Seats at courses and quotas MCC never allotted before (no past allotment in any result Seatora has), so they are not on Options (no closing rank to compare). Not the same as MCC&apos;s newly added seat list.</InfoTip>
+          Only seats with no past {by} allotments
+          <InfoTip label="seats never allotted before">Seats at courses and quotas {by} never allotted before (no past allotment in any result Seatora has), so they are not on Options (no closing rank to compare). Not the same as {by}&apos;s newly added seat list.</InfoTip>
           <Link href={here({ list: list.key, nohist: null })} className={`${smallLink} ml-2 text-muted-foreground`}>Show every seat</Link>
         </p>
       )}

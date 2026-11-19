@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { activeExam } from "@/features/exams/active";
 import { roundNameFrom } from "@/features/exams/exam";
-import { DEFAULT_EXAM, exams, roundNameIn, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, exams, roundNameIn, yearName } from "@/features/exams/registry";
 import { fmtDay } from "../lib/format";
 import { roundName } from "../lib/round-status";
 import { listNotices } from "../server/notices";
@@ -52,6 +52,7 @@ export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLin
   const named = lists.length === 1 ? `the ${listTitle(lists[0], exam)} list` : `the ${yearName(exam, year)} ${roundNameFrom(lists[0].name, round)} seat lists`;
   // Another exam has no MCC notices in the data (no Schedule page): no link to them.
   const notices = exams[exam].has.notices;
+  const by = authorityOf(exam); // MCC; INI-CET: AIIMS
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
       {/* The later and same-day notices are in the page's Sources too. The page's own MCC documents are numbered first
@@ -61,7 +62,7 @@ export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLin
         Seats as printed
         <InfoTip label={named}>
           {each.map(({ list }) => {
-            const dated = list.publishedAt && `MCC notice dated ${fmtDay(list.publishedAt)}`;
+            const dated = list.publishedAt && `${by} notice dated ${fmtDay(list.publishedAt)}`;
             const doc: SourceDoc = { key: `seat-list|${list.key}`, name: `${list.name}, PDF${dated ? ` (${dated})` : ""}`, url: list.url, type: "OFFICIAL" };
             return (
               <span key={list.key} className="block">
@@ -69,16 +70,16 @@ export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLin
               </span>
             );
           })}
-          Seats MCC added or removed after {lists.length === 1 ? "it" : "them"} are not applied here.
+          Seats {by} added or removed after {lists.length === 1 ? "it" : "them"} are not applied here.
           {sameDay.length > 0 && <> Published the same day as the list, so it may already include {sameDay.length === 1 ? "this notice" : "these notices"}: {noticeLinks(sameDay)}.</>}{" "}
-          {notices && <Link href={noticesHref} className={`${smallLink} text-sky`}>All MCC seat notices, {exam === DEFAULT_EXAM ? "PG" : exams[exam].label} {yearName(exam, year)} {roundName[round]}</Link>}
+          {notices && <Link href={noticesHref} className={`${smallLink} text-sky`}>All {by} seat notices, {exam === DEFAULT_EXAM ? "PG" : exams[exam].label} {yearName(exam, year)} {roundName[round]}</Link>}
         </InfoTip>
       </span>
       {later.length > 0 && (
         <span className="inline-flex items-center gap-x-1 rounded-full border border-sun/40 bg-sun/10 py-0.5 pl-2.5 pr-1 font-medium text-sun">
-          {later.length === 1 ? "Later MCC notice: check it" : `${later.length} later MCC notices: check them`}
-          <InfoTip label={later.length === 1 ? "the later MCC seat notice" : "the later MCC seat notices"}>
-            Check {later.length === 1 ? "this later MCC notice" : `these ${later.length} later MCC notices`} before you lock your choices (their seats are not applied here): {noticeLinks(later)}
+          {later.length === 1 ? `Later ${by} notice: check it` : `${later.length} later ${by} notices: check them`}
+          <InfoTip label={later.length === 1 ? `the later ${by} seat notice` : `the later ${by} seat notices`}>
+            Check {later.length === 1 ? `this later ${by} notice` : `these ${later.length} later ${by} notices`} before you lock your choices (their seats are not applied here): {noticeLinks(later)}
           </InfoTip>
         </span>
       )}

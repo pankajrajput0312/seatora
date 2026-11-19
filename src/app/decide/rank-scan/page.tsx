@@ -31,7 +31,7 @@ import { roundLabel, rounds } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { examGate } from "@/features/exams/active";
 import { activeExam, examInfo, RankListNote } from "@/features/exams/active";
-import { groupsOf, perGroup, rankListIn, rankListOf, roundNameIn, yearName } from "@/features/exams/registry";
+import { authorityOf, groupsOf, perGroup, rankListIn, rankListOf, roundNameIn, yearName } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 
 export const metadata: Metadata = { title: "Rank scan" };
@@ -122,7 +122,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
     <AppPage className="grid grid-cols-1 gap-3">
       <PageHead
         title="Rank scan"
-        about="Allotments to ranks near yours, round by round, in one year's MCC results: every course and seat category. In R2 and later only new or upgraded allotments are listed."
+        about={`Allotments to ranks near yours, round by round, in one year's ${authorityOf(exam)} results: every course and seat category. In R2 and later only new or upgraded allotments are listed.`}
       />
 
       <FilterBar

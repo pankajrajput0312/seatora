@@ -21,7 +21,7 @@ import { roundStatus } from "@/features/decide/server/notices";
 import { examGroupCourses, examGroups, getMeta } from "@/features/decide/service";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { examShows } from "@/features/exams/exam";
-import { DEFAULT_EXAM, examKeys, exams, pageNeeds, perGroup, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, examKeys, exams, pageNeeds, perGroup, yearName } from "@/features/exams/registry";
 import { PlanCards } from "@/features/plans/components/plan-cards";
 import { PlanPrompt } from "@/features/plans/components/plan-prompt";
 import { freeNow, passState, planLine, shortDate } from "@/features/plans/plans";
@@ -93,7 +93,7 @@ export default async function DecideLayout({ children }: { children: React.React
                 headingLevel={1}
                 icon={DatabaseZap}
                 title="Data unavailable"
-                description="The MCC allotment data could not be loaded, so nothing is shown rather than numbers that might be wrong. Reload the page in a few minutes."
+                description={`The ${authorityOf(exam)} allotment data could not be loaded, so nothing is shown rather than numbers that might be wrong. Reload the page in a few minutes.`}
                 className="mt-6"
               />
             </AppPage>

@@ -7,7 +7,7 @@ import { baseCategories, roundLabel, rounds, type Round, type Source } from "@/f
 import { completeYear, examShows, groupsIn, isRestricted, neetPg, roundNameFrom, type Exam, type ExamHas } from "./exam";
 import { DEFAULT_EXAM, isExam, ranksPerGroup, separateRankList, type ExamKey } from "./keys";
 
-export { DEFAULT_EXAM, EXAM_COOKIE, examKeys, isExam, markerKey, rankListOf, ranksPerGroup, scopedKey, sessionExams, yearName, type ExamKey } from "./keys";
+export { authorityOf, DEFAULT_EXAM, EXAM_COOKIE, examKeys, inExamWords, isExam, markerKey, rankListOf, termsDocOf, ranksPerGroup, scopedKey, sessionExams, yearName, type ExamKey } from "./keys";
 export { groupOf, pageNeeds, type Exam, type ExamHas } from "./exam";
 
 // The bundle contract's required files: cutoffs and allotments. An adapter turns a flag on once its bundle has the data.

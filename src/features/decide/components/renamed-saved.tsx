@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { collegeKeyOf, nameFirstList, renameOptionId, renameSaved, type RenamedCollege } from "../lib/choices";
 import { examRetiredKeys } from "@/app/decide/retired-actions";
-import { DEFAULT_EXAM } from "@/features/exams/keys";
+import { authorityOf, DEFAULT_EXAM } from "@/features/exams/keys";
 import { useChoices, useCompare, useExam } from "../lib/use-decide-store";
 import { navigating } from "./nav-pending";
 
@@ -77,7 +77,7 @@ export function RenamedSaved({ listName }: { listName?: string | null }) {
     <div role="status" className={renamed.length ? "px-4 pt-4 md:px-6 xl:px-10" : undefined} data-print-hide>
       {renamed.length > 0 && (
         <p className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm">
-          {renamed.length} saved {renamed.length === 1 ? "option was" : "options were"} renamed after MCC&apos;s college names were cleaned up:{" "}
+          {renamed.length} saved {renamed.length === 1 ? "option was" : "options were"} renamed after {authorityOf(exam)}&apos;s college names were cleaned up:{" "}
           {renamed.slice(0, 3).join("; ")}{renamed.length > 3 ? `; and ${renamed.length - 3} more` : ""}.
           <Button variant="ghost" onClick={() => setRenamed([])}>Dismiss</Button>
         </p>

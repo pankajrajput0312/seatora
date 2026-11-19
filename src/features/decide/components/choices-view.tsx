@@ -13,7 +13,7 @@ import { inrFull } from "../lib/stat-format";
 import { deepestOf, latestText, pastOf, reachWindow, seatsBelowNotes, type Deepest, type Latest, type Reach, type SeatsBelow } from "../lib/reach";
 import { statCells, statKeys, statLabel } from "../lib/stat-format";
 import { groupsIn, quotaIn, roundIn } from "@/features/exams/exam";
-import { yearName } from "@/features/exams/keys";
+import { authorityOf, yearName } from "@/features/exams/keys";
 import { useChoices, useDecideLinks, useExamInfo } from "../lib/use-decide-store";
 import { keepProfileParams, profileFromParams } from "../profile";
 import type { ProgrammeTerms } from "../server/terms";
@@ -196,7 +196,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       await navigator.clipboard.writeText(text);
       // What went to the clipboard, at a glance: the first three lines and how many more.
       const lines = text.split("\n");
-      setCopyMsg({ text: `Copied ${n} ${n === 1 ? "choice" : "choices"} in MCC order:`, lines: [...lines.slice(0, 3), ...(lines.length > 3 ? [`and ${lines.length - 3} more`] : [])] });
+      setCopyMsg({ text: `Copied ${n} ${n === 1 ? "choice" : "choices"} in ${authorityOf(E.key)} order:`, lines: [...lines.slice(0, 3), ...(lines.length > 3 ? [`and ${lines.length - 3} more`] : [])] });
     } catch {
       setCopyMsg({ text: "Couldn't copy. Use CSV or Print instead." });
     }
@@ -252,8 +252,8 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       // Seats are matched to the option by institute and course; say what was found, not what MCC printed.
       listsCurrent && lr && lists.length > 0 && lists.every((l) => lr.seats[l.kind] == null) && `No seats found for this option in the ${round} seat lists (this quota, your seat categories). Search Seats for the institute before you drop it.`,
       ...seatsBelowNotes(lr?.below ?? [], latest, pastOf(latest)),
-      fresh && !lr && "Not found in the current MCC data; it may have been renamed. Check it on Options.",
-      typed && i >= prefix && "Marked typed, but its position changed since. Check the order in the MCC portal.",
+      fresh && !lr && `Not found in the current ${authorityOf(E.key)} data; it may have been renamed. Check it on Options.`,
+      typed && i >= prefix && `Marked typed, but its position changed since. Check the order in the ${authorityOf(E.key)} portal.`,
     ].filter(Boolean) as string[];
     return { typed, lr, flags, picking: picked?.index === i };
   };
@@ -309,7 +309,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
   );
   const reachOf = (item: ChoiceItem, lr: Live[string] | undefined) =>
     lr?.reach ? <ReachBadge reach={lr.reach} provisional={lr.provisional} latest={latest} otherGroup={lr.otherGroup} from={lr.from} /> : <span className="text-muted-foreground">{item.reachLabel || "No label"} (when added)</span>;
-  const typedBadge = <Badge tone="success"><Check className="mr-1 size-3" aria-hidden />Typed into MCC</Badge>;
+  const typedBadge = <Badge tone="success"><Check className="mr-1 size-3" aria-hidden />Typed into {authorityOf(E.key)}</Badge>;
   const seatsOf = (item: ChoiceItem, lr: Live[string], l: SeatList) => (
     <SeatsLink n={lr.seats[l.kind]} list={l} L={L} at={{ inst: item.slug, course: item.courseSlug, quota: item.quota }} name={`${name(item)}, ${quotaIn(E, item.quota)}`} />
   );
@@ -471,11 +471,11 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       {n > 0 && <div className="flex flex-wrap items-center gap-2" data-print-hide>
         <ViewToggle page="choices" view={view} />
         <Button variant="secondary" onClick={download} aria-label={`Download CSV of ${list.name}`}><Download className="size-4" aria-hidden />CSV</Button>
-        <Button variant="secondary" onClick={copy}>Copy in MCC order</Button>
+        <Button variant="secondary" onClick={copy}>Copy in {authorityOf(E.key)} order</Button>
         <Button variant="secondary" onClick={share}>Share on WhatsApp</Button>
         <Button variant="secondary" onClick={() => window.print()}>Print</Button>
         <label className="inline-flex min-h-11 items-center gap-2 text-sm">
-          Mark how far you&apos;ve typed into MCC: up to choice
+          Mark how far you&apos;ve typed into {authorityOf(E.key)}: up to choice
           <span className="w-20">
             <input
               type="number" min={0} max={n} value={prefix}
@@ -502,7 +502,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       )}
       {missingTyped > 0 && (
         <p className="text-sm text-sun" data-print-hide>
-          {missingTyped === 1 ? "1 option you marked as typed into MCC is" : `${missingTyped} options you marked as typed into MCC are`} no longer in this list, but still in the
+          {missingTyped === 1 ? `1 option you marked as typed into ${authorityOf(E.key)} is` : `${missingTyped} options you marked as typed into ${authorityOf(E.key)} are`} no longer in this list, but still in the
           portal. Remove {missingTyped === 1 ? "it" : "them"} there too, then set the typed count again.
         </p>
       )}

@@ -29,7 +29,7 @@ import type { PastClosing, SeatLine, SeatSort } from "./find-seats";
 import { SeatCards, seatCourse as courseOf, seatRowKey as rowKey } from "./seat-cards";
 import { ScrollTable } from "../scroll-table";
 import { quotaIn, roundIn, roundNameFrom, type Exam } from "@/features/exams/exam";
-import { yearName, type ExamKey } from "@/features/exams/keys";
+import { authorityOf, yearName, type ExamKey } from "@/features/exams/keys";
 
 // The Seats page's matrix view (src/app/decide/seats): one row per institute, course, quota and seat category, its
 // seats in each round's lists (never added together), its course's terms (TermStatCells: the course's own programme
@@ -360,14 +360,14 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
               </div>
 
               <section aria-labelledby="row-seats" className="grid gap-2">
-                <h3 id="row-seats" className="font-semibold">Seats in MCC&apos;s lists</h3>
+                <h3 id="row-seats" className="font-semibold">Seats in {authorityOf(E.key)}&apos;s lists</h3>
                 <p className="text-xs text-muted-foreground">Each list as its PDF printed it. The lists overlap (newly added seats are mostly also clear vacancies; a virtual vacancy opens only if its holder moves), so never add them.</p>
                 <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
                   {lists.map((l) => (
                     <div key={l.key} className="contents">
                       <dt>
                         {l.url ? <a href={l.url} target="_blank" rel="noopener noreferrer" className={link}>{listName(l, E.key)}<span className="sr-only"> PDF (opens in a new tab)</span></a> : listName(l, E.key)}
-                        <span className="block text-xs text-muted-foreground">MCC notice dated {l.publishedAt ? fmtDay(l.publishedAt) : "—"}</span>
+                        <span className="block text-xs text-muted-foreground">{authorityOf(E.key)} notice dated {l.publishedAt ? fmtDay(l.publishedAt) : "—"}</span>
                       </dt>
                       <dd className="numeric text-right font-semibold">{r.byList[l.key] != null ? formatRank(r.byList[l.key]) : <Dash />}</dd>
                     </div>
@@ -377,7 +377,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
 
               <section aria-labelledby="row-closing" className="grid gap-2">
                 <h3 id="row-closing" className="font-semibold">Closing ranks on {r.quota != null ? quotaIn(E, r.quota) : "this quota"}, {r.category} seats</h3>
-                <p className="text-xs text-muted-foreground">The highest {E.rankName} MCC allotted in that round; allotments made in brackets (not seats). Each round links its MCC result PDF. {LATER_ROUNDS_NOTE}</p>
+                <p className="text-xs text-muted-foreground">The highest {E.rankName} {authorityOf(E.key)} allotted in that round; allotments made in brackets (not seats). Each round links its {authorityOf(E.key)} result PDF. {LATER_ROUNDS_NOTE}</p>
                 <div className="overflow-x-auto overflow-y-hidden">
                   <table className="text-sm">
                     <caption className="sr-only">Closing rank and allotments by year and round: {r.college.name}, {courseOf(r)}</caption>

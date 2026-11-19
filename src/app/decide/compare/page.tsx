@@ -28,7 +28,7 @@ import { currentOptionIds, currentSeatLists, getMeta, getOptionsByIds, type Opti
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
-import { DEFAULT_EXAM, examYears, latestOf, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, examYears, latestOf, yearName } from "@/features/exams/registry";
 
 export const metadata: Metadata = { title: "Compare" };
 
@@ -78,7 +78,7 @@ function IfYouLeave({ r, leaving }: { r: OptionRow; leaving: string }) {
       <span>
         <span className="text-muted-foreground">Resign or don&apos;t join from Round 2:</span>{" "}
         {t.resignForfeit ? (
-          <>MCC lets the college keep <span className="font-semibold">{inrFull(t.resignForfeit.inr)}</span><Sup n={t.resignForfeit.src} sources={t.sources} /></>
+          <>{authorityOf(t.exam)} lets the college keep <span className="font-semibold">{inrFull(t.resignForfeit.inr)}</span><Sup n={t.resignForfeit.src} sources={t.sources} /></>
         ) : t.resignForfeitText ? (
           <>{t.resignForfeitText.text}<Sup n={t.resignForfeitText.src} sources={t.sources} /></>
         ) : (
@@ -126,7 +126,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     },
     ...(lists.length
       ? [{
-          label: `Seats in MCC's ${round} lists`,
+          label: `Seats in ${authorityOf(exam)}'s ${round} lists`,
           // Each list on its own, never added (a seat can be in two). No intake figure: Seatora has no sanctioned-seat data.
           cell: (r: OptionRow) => (
             <span className="grid text-xs">

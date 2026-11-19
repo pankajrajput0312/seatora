@@ -44,7 +44,7 @@ import { checkAndCount, currentPlan } from "@/features/plans/usage";
 import { seatKindLabel } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { DEFAULT_EXAM, headYearIn, latestOf, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, headYearIn, inExamWords, latestOf, yearName } from "@/features/exams/registry";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { QuotaName } from "@/features/decide/components/round-name";
@@ -138,6 +138,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   // (that one is complete: another exam) the year before it.
   const HEAD = headYearIn(exam, meta.sources);
   const yn = (y: number) => yearName(exam, y); // as the exam names it (INI-CET: "Jan 2026")
+  const by = authorityOf(exam); // MCC; INI-CET: AIIMS
+  const w = (s: string) => inExamWords(exam, s); // a sentence in the exam's words (NEET PG, SS, MDS: as written)
   const head = yn(HEAD);
   const n2025 = allotmentsByYear.find((a) => a.year === HEAD)?.n ?? null;
   const LATER = HEAD === LATEST_YEAR ? PAST_YEARS[1] : LATEST_YEAR;
@@ -267,7 +269,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     <span className="mt-1 block"><ValueSource m={beds.meta} /></span>
                   </>
                 ) : (
-                  "No bed count found in this institute's own disclosures, its NBEMS mandatory disclosure or its MCC profile. Seatora does not use paid aggregators' figures."
+                  w("No bed count found in this institute's own disclosures, its NBEMS mandatory disclosure or its MCC profile. Seatora does not use paid aggregators' figures.")
                 )}
               </InfoTip>
             </span>}
@@ -278,13 +280,13 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   <span className="sr-only"> seats: see Seats</span>
                 </Link>
                 <InfoTip label={listSeats(list, exam)}>
-                  The {listTitle(list, exam)} list. {n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves." : "Every course, quota and category here.") : "The MCC list prints none here."} The lists overlap, so they are never added.
+                  The {listTitle(list, exam)} list. {n > 0 ? (list.kind === "virtual" ? "Free only if the holder upgrades or leaves." : "Every course, quota and category here.") : `The ${by} list prints none here.`} The lists overlap, so they are never added.
                 </InfoTip>
               </span>
             ))}
             {college.address && (
               <span className="inline-flex items-center gap-0.5 text-muted-foreground">
-                Address<InfoTip label="address">{college.address} (as printed by MCC)</InfoTip>
+                Address<InfoTip label="address">{college.address} (as printed by {by})</InfoTip>
               </span>
             )}
             {info?.mccProfileUrl && (
@@ -294,12 +296,12 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             )}
             {website && (
               <a href={website} target="_blank" rel="noopener noreferrer" title={info!.website ?? undefined} className="inline-flex min-h-11 items-center gap-1 text-sky hover:text-foreground">
-                <Globe className="size-4" strokeWidth={2} aria-hidden />Website<span className="sr-only">: {info!.website}, as declared on its MCC profile (opens in a new tab)</span>
+                <Globe className="size-4" strokeWidth={2} aria-hidden />Website<span className="sr-only">: {info!.website}, {exam === "ini-cet" ? "its own site" : "as declared on its MCC profile"} (opens in a new tab)</span>
               </a>
             )}
           </p>
           {/* On paper the tip doesn't open: the address prints in full. */}
-          {college.address && <p className="hidden text-sm print:block">Address as printed by MCC: {college.address}</p>}
+          {college.address && <p className="hidden text-sm print:block">Address as printed by {by}: {college.address}</p>}
         </div>
       </div>
 
@@ -309,7 +311,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         <>
           <StatStrip
             items={[
-              { label: "Courses", value: formatRank(pastCourses), info: courses.length > pastCourses ? `Courses with past MCC allotments here.${newNote(courses.length - pastCourses, "course")}` : undefined },
+              { label: "Courses", value: formatRank(pastCourses), info: courses.length > pastCourses ? `Courses with past ${by} allotments here.${newNote(courses.length - pastCourses, "course")}` : undefined },
               { label: "Options", value: formatRank(past.length), info: `Course and quota options here (with past allotments).${newNote(options.length - past.length, "option")}` },
               { label: `Allotments ${head}`, value: n2025 != null ? formatRank(n2025) : <Dash />, info: "All rounds and seat categories. This counts allotments, not seats." },
               // Four cells fill the strip: hers when she has a profile, else the latest year's allotments.
@@ -357,14 +359,14 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               <h2 id="terms-h" className="flex items-center gap-1 text-lg font-semibold">
                 Fees, stipend and bond
                 <InfoTip label="fees, stipend and bond">
-                  Year 1 figures, from what the college declared to MCC and NBEMS rules. &quot;—&quot; means not in the MCC profile fields Seatora imports, not &quot;none&quot;.
+                  {exam === "ini-cet" ? <>Year 1 figures, as the INI-CET prospectus (Part B) prints them. &quot;—&quot; means it prints none, not &quot;none&quot;.</> : <>Year 1 figures, from what the college declared to MCC and NBEMS rules. &quot;—&quot; means not in the MCC profile fields Seatora imports, not &quot;none&quot;.</>}
                   Bond and leaving: a range when the amount depends on course type. Each cell&apos;s (i) has the exact words and their source; the Fees &amp; bond tab has every year by seat type.
                 </InfoTip>
               </h2>
               <Link href={L.institute(slug, "fees")} className={`${smallLink} text-sm text-sky`}>Year by year</Link>
             </div>
             {fees.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No courses here in the MCC data.</p>
+              <p className="text-sm text-muted-foreground">No courses here in the {by} data.</p>
             ) : (
               <ul className="grid gap-3 lg:grid-cols-2">
                 {fees.map((p) => (
@@ -401,11 +403,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <h2 id="mix-h" className="flex items-center gap-1 text-lg font-semibold">
               Allotments by quota and seat category
               <InfoTip label="allotments by quota and seat category">
-                All courses here, from MCC&apos;s allotment results: the latest round, then each year with all its rounds. These count allotments (in R2 and later rounds, only fresh
+                All courses here, from {by}&apos;s allotment results: the latest round, then each year with all its rounds. These count allotments (in R2 and later rounds, only fresh
                 and upgraded ones), not seats. The seat category is the seat&apos;s, not the candidate&apos;s.
               </InfoTip>
             </h2>
-            {mix ? <AllotmentMixTable mix={mix} name={college.name} /> : <p className="text-sm text-muted-foreground">No MCC allotments here in the imported results.</p>}
+            {mix ? <AllotmentMixTable mix={mix} name={college.name} /> : <p className="text-sm text-muted-foreground">No {by} allotments here in the imported results.</p>}
           </section>
           <DataSource used={[...PAST_YEARS.map((year) => ({ year })), { year: LATEST_YEAR }, ...(mix?.columns.map((c) => ({ year: c.year, round: c.round })) ?? [])]} />
         </>
@@ -422,7 +424,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             {options.length > 0 && <ViewToggle page="institute-courses" />}
           </div>
           {options.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No courses with past MCC allotments here, so there are no closing ranks to show.</p>
+            <p className="text-sm text-muted-foreground">No courses with past {by} allotments here, so there are no closing ranks to show.</p>
           ) : (
             <ViewPanes
               page="institute-courses"
@@ -507,7 +509,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               <>
                 {profile ? "Closing ranks are on the seat categories you can take." : "Closing ranks shown across all seat categories."}
                 {roundName &&
-                  ` ${roundName} seats: in each of MCC's ${roundName} lists (${[...new Set(roundLists.map((l) => seatKindLabel[l.kind].toLowerCase()))].join(", ")}), that quota and ${seatCats ? "your seat categories" : "every seat category"}; a list with none here is left out. The lists overlap, so their seats are never added together. Each number opens those seats on Seats.`}
+                  ` ${roundName} seats: in each of ${by}'s ${roundName} lists (${[...new Set(roundLists.map((l) => seatKindLabel[l.kind].toLowerCase()))].join(", ")}), that quota and ${seatCats ? "your seat categories" : "every seat category"}; a list with none here is left out. The lists overlap, so their seats are never added together. Each number opens those seats on Seats.`}
               </>
             }
           />
@@ -518,14 +520,14 @@ export default async function InstitutePage({ params, searchParams }: Props) {
 
       {tab === "seats" &&
         (round.length === 0 ? (
-          <EmptyState title="Seat lists not imported yet" description="No MCC seat list is in the data yet, so there are no seats to show here." href={L.institute(slug, "courses")} action="See the courses here" />
+          <EmptyState title="Seat lists not imported yet" description={`No ${by} seat list is in the data yet, so there are no seats to show here.`} href={L.institute(slug, "courses")} action="See the courses here" />
         ) : (
           <section aria-labelledby="seats-h" className="grid grid-cols-1 gap-8">
             <div className="grid gap-2">
               <h2 id="seats-h" className="flex items-center gap-1 text-lg font-semibold">
                 {roundName} seat lists here
                 <InfoTip label="seat lists">
-                  Every course here, each list as its MCC PDF printed it. The kinds of list overlap (most newly added seats are also clear vacancies), so their seats are never added together.
+                  Every course here, each list as its {by} PDF printed it. The kinds of list overlap (most newly added seats are also clear vacancies), so their seats are never added together.
                 </InfoTip>
               </h2>
             </div>
@@ -539,7 +541,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     <InfoTip label={seatKindLabel[list.kind].toLowerCase()}><span className="first-letter:uppercase">{seatKindLabel[list.kind]}: {seatKindNote[list.kind]}</span></InfoTip>
                   </h3>
                   {rows.length > 0 ? (
-                    <CollegeSeatTable rows={rows} caption={`${listSeats(list, exam)} at ${college.name} (MCC PDF), by course`} />
+                    <CollegeSeatTable rows={rows} caption={`${listSeats(list, exam)} at ${college.name} (${by} PDF), by course`} />
                   ) : (
                     <p className="text-sm text-muted-foreground">This list prints no seats here.</p>
                   )}
@@ -625,7 +627,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         <section aria-labelledby="fees-h" className="grid grid-cols-1 gap-4">
           <h2 id="fees-h" className="sr-only">Fees, stipend and bond</h2>
           {fees.length === 0 ? (
-            <EmptyState title="No courses here in the MCC data" description="There is no programme here to show fees, stipend or bond for." href={L.institute(slug, "courses")} action="See the courses here" />
+            <EmptyState title={`No courses here in the ${by} data`} description="There is no programme here to show fees, stipend or bond for." href={L.institute(slug, "courses")} action="See the courses here" />
           ) : (
             <>
               {fees.length > 1 && (
@@ -647,6 +649,11 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                 <>
                   One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), by seat type (All India, {quotaIn(E, "Deemed/Paid")}, NRI, DNB Quota) where the MCC profile gives them. Fee that year and stipend per month as declared to MCC; where the profile&apos;s fee is not one clearly labelled amount per year, its own words with their link instead, never a figure. NBEMS maximum and minimum are NBEMS&apos;s limits, not the college&apos;s figures. A dash means not stated (not in the MCC profile fields we import; the profile may say more), never zero.
                   Leaving the course after joining is the college&apos;s or state&apos;s penalty from its bond document; resigning from Round 2 is MCC&apos;s separate forfeit.
+                </>
+              ) : exam === "ini-cet" ? (
+                <>
+                  One section per programme offered here ({fees.map(programmeTitle).join(", ") || "none"}), as the INI-CET prospectus (Part B) prints them for this institute: fee that year and stipend per month; where it gives no one figure, its own words. A dash means not stated, never zero.
+                  The bond and the leaving penalty are the prospectus&apos;s terms (&quot;Not clear&quot;: it neither states nor rules out service after the course).
                 </>
               ) : (
                 <>

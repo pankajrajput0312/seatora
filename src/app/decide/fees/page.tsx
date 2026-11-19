@@ -178,6 +178,13 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             the college&apos;s document says no bond, but a state law&apos;s service may apply (the filters count both as not published).
             <br />Sorting: — and figures without a number go last either way. Each figure&apos;s (i) gives its exact words, other years and source.
           </>
+          ) : exam === "ini-cet" ? (
+            <>
+              <strong>Fee</strong>: a year (/yr), or Year 1&apos;s where later years differ, as the institute&apos;s INI-CET prospectus (Part B) prints it; its words are in the (i) where it gives no one figure.
+              <br /><strong>Stipend</strong>: a month (/mo), as printed.
+              <br /><strong>Bond</strong> and <strong>leaving penalty</strong>: as the prospectus states them (&quot;Not clear&quot;: it neither states nor rules out service after the course).
+              <br />&quot;—&quot;: none published, never zero or &quot;no bond&quot;. Sorting: — and figures without a number go last either way.
+            </>
           ) : (
             <>
               <strong>Fee</strong>: a year (/yr; year 1&apos;s may be paid at admission), as the college declared it on its MCC institute profile ({exams[exam].label}). &quot;Varies by subject&quot;, &quot;On college website&quot;, &quot;Not stated&quot;: the profile gives no one figure for these seats; its words are in the (i).
