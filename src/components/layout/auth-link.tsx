@@ -32,22 +32,26 @@ export function useSignedIn() {
   return me;
 }
 
-/** "Sign in", or "My planner" (the planner's home) when signed in. */
+/** "Sign in" for a signed-out visitor; nothing when signed in (PlannerCta beside it is "Open my planner"). */
 export function AuthLink({ className, onClick }: { className?: string; onClick?: () => void }) {
-  const me = useSignedIn();
-  return (
-    <Link href={me ? "/decide" : "/login"} className={className} onClick={onClick}>
-      {me ? "My planner" : "Sign in"}
+  return useSignedIn() ? null : (
+    <Link href="/login" className={className} onClick={onClick}>
+      Sign in
     </Link>
   );
 }
 
-/** The main call to action: "Get Seatora — Free" (sign-up), or "Open my planner · AIR 42,284" when signed in. */
-export function PlannerCta({ className, onClick }: { className?: string; onClick?: () => void }) {
+/**
+ * The main call to action: signed out, `label` to `href` (default "Get Seatora — Free", sign-up); signed in, "Open my
+ * planner · AIR 42,284" (or `memberLabel`) to `member` (default the planner's home), never "Create free account".
+ */
+export function PlannerCta({ className, onClick, href = "/signup", label = "Get Seatora — Free", member = "/decide", memberLabel }: {
+  className?: string; onClick?: () => void; href?: string; label?: React.ReactNode; member?: string; memberLabel?: string;
+}) {
   const me = useSignedIn();
   return (
-    <Link href={me ? "/decide" : "/signup"} className={className} onClick={onClick}>
-      {me ? <>Open my planner{me.air && <span className="numeric font-normal">· AIR {formatRank(me.air)}</span>}</> : "Get Seatora — Free"}
+    <Link href={me ? member : href} className={className} onClick={onClick}>
+      {!me ? label : memberLabel ?? <>Open my planner{me.air && <span className="numeric font-normal">· AIR {formatRank(me.air)}</span>}</>}
     </Link>
   );
 }

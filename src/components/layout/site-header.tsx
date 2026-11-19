@@ -15,6 +15,11 @@ export function SiteHeader() {
           {siteConfig.name}
         </Link>
         <div className="flex items-center gap-2">
+          <nav aria-label="Main" className="mr-2 hidden items-center gap-5 text-sm text-muted-foreground lg:flex">
+            {siteConfig.nav.filter((l) => l.href !== "/#faq").map((l) => (
+              <Link key={l.href} href={l.href} className="inline-flex min-h-11 items-center hover:text-foreground">{l.label}</Link>
+            ))}
+          </nav>
           <div className="hidden items-center gap-2 md:flex">
             <Button asChild size="sm" variant="ghost">
               <AuthLink />

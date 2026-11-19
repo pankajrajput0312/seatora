@@ -8,12 +8,6 @@ import { Button } from "@/components/ui/button";
 import { AUTH_EVENT } from "@/features/auth/components/log-out-button";
 import { AuthLink, MenuLogOut, PlannerCta } from "./auth-link";
 
-const links = [
-  { label: "Residents", href: "/#preview" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "FAQ", href: "/#faq" },
-];
-
 // Native <dialog>: showModal() gives the focus trap, Escape and top layer, so phones don't download a dialog library.
 export function MobileNav() {
   const ref = useRef<HTMLDialogElement>(null);
@@ -48,15 +42,16 @@ export function MobileNav() {
             </button>
           </div>
           <nav aria-label="Mobile" className="mt-4 grid">
-            {links.map((l) => (
+            {siteConfig.nav.map((l) => (
               <Link key={l.href} href={l.href} onClick={close} className="flex min-h-11 items-center border-b border-border text-base">{l.label}</Link>
             ))}
             <AuthLink onClick={close} className="flex min-h-11 items-center border-b border-border text-base" />
-            <MenuLogOut className="flex min-h-11 w-full items-center border-b border-border text-left text-base text-muted-foreground aria-disabled:opacity-60" />
           </nav>
           <Button asChild size="lg" className="mt-5 w-full">
             <PlannerCta onClick={close} />
           </Button>
+          {/* Apart from the links and the main button, so a tap meant for them never logs her out. */}
+          <MenuLogOut className="mt-6 flex min-h-11 w-full items-center justify-center rounded-md border border-border text-base text-muted-foreground hover:bg-muted aria-disabled:opacity-60" />
         </div>
       </dialog>
     </>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { business } from "@/config/business";
 import { siteConfig } from "@/config/site";
+import { PlannerCta } from "./auth-link";
 import { Container } from "./container";
 
 /** About, pricing and policy pages, also linked from /v2's footer. */
@@ -14,6 +15,8 @@ export const legalLinks = [
   { label: "Contact", href: "/contact" },
 ];
 
+const link = "inline-flex min-h-11 items-center hover:text-foreground";
+
 export function SiteFooter() {
   return (
     <footer className="overflow-hidden border-t border-border">
@@ -23,9 +26,10 @@ export function SiteFooter() {
           Previous-year data is not a promise of admission.
         </p>
         <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-6">
-          {[...siteConfig.nav, ...legalLinks].map((item) => (
-            <Link key={item.href} href={item.href} className="inline-flex min-h-11 items-center hover:text-foreground">{item.label}</Link>
-          ))}
+          {siteConfig.nav.map((item) => <Link key={item.href} href={item.href} className={link}>{item.label}</Link>)}
+          {/* The planner: signed out, sign-up first with what she gets (her options), never the sign-in page. */}
+          <PlannerCta href={`/signup?${new URLSearchParams({ next: "/decide/options" })}`} label="Your options" memberLabel="My planner" className={link} />
+          {legalLinks.filter((l) => l.href !== "/pricing").map((item) => <Link key={item.href} href={item.href} className={link}>{item.label}</Link>)}
           <span className="font-mono text-xs">© {new Date().getFullYear()}{business.sellerName && ` ${business.sellerName}`}</span>
         </nav>
       </Container>

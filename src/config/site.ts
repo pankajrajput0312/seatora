@@ -7,9 +7,11 @@ export const siteConfig = {
   contactEmail: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "",
   description:
     "The NEET PG planner: institutes, specialties, previous-year ranks, seat matrices, fees, stipends, bonds, residents by college and counselling updates in one place.",
+  /** The public pages every menu links (header, phone menu, footer); the planner link is PlannerCta's, signed-in aware. */
   nav: [
+    { label: "NEET PG counselling", href: "/neet-pg" },
     { label: "Residents", href: "/#preview" },
-    { label: "Decide", href: "/decide" },
+    { label: "Pricing", href: "/pricing" },
     { label: "FAQ", href: "/#faq" },
   ],
 } as const;

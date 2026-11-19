@@ -85,10 +85,17 @@ export function WhatsAppLogin({ next }: { next: string }) {
           </p>
         </div>
       ) : (
-        <Button type="button" variant="secondary" size="lg" onClick={start} aria-disabled={busy || undefined} className="aria-disabled:opacity-50">
-          {busy && <Loader2 className="size-4 animate-spin" />}
-          Continue with WhatsApp
-        </Button>
+        <>
+          <Button type="button" variant="secondary" size="lg" onClick={start} aria-disabled={busy || undefined} aria-describedby="wa-what" className="aria-disabled:opacity-50">
+            {busy && <Loader2 className="size-4 animate-spin" />}
+            Continue with WhatsApp
+          </Button>
+          {/* What the button does, before she taps it (docs/WHATSAPP.md): the bot only answers, it never messages first. */}
+          <p id="wa-what" className="text-xs leading-relaxed text-muted-foreground">
+            Opens WhatsApp with a one-time code ready to send to Seatora. Send it and you&apos;re signed in here; Seatora replies with a
+            link too. Your number is your account, no password needed. No spam: Seatora only replies to messages you send.
+          </p>
+        </>
       )}
       {error && <p role="alert" className="rounded-md border border-ember/30 bg-ember/10 px-3 py-2 text-sm text-ember">{error}</p>}
     </div>
