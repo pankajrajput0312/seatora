@@ -27,7 +27,7 @@ export function SkHead({ w = "w-56", sub, text }: { w?: string; sub?: string; te
   return (
     <div className="max-w-3xl">
       {/* PageHead's own markup (an h1, hidden: LoadingPage announces the wait), so the page's title paints the same. */}
-      {text ? <h1 aria-hidden className="text-2xl font-bold tracking-tight md:text-3xl">{text}</h1> : <Skeleton className={cn("h-11 max-w-full", w)} />}
+      {text ? <h1 aria-hidden className="text-h1 font-semibold">{text}</h1> : <Skeleton className={cn("h-11 max-w-full", w)} />}
       {sub && <Skeleton className={cn("mt-3 h-5 max-w-full", sub)} />}
     </div>
   );
