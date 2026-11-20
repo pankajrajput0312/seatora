@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Atkinson_Hyperlegible_Mono, Atkinson_Hyperlegible_Next } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { cookies } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import { DatabaseZap } from "lucide-react";
@@ -29,10 +29,11 @@ import { freeNow, passState, planLine, shortDate } from "@/features/plans/plans"
 import { PLAN_PROMPT_COOKIE, PLAN_PROMPT_EVERY_MS } from "@/features/plans/prompt";
 import { db } from "@/lib/db";
 
-// Inside app uses its own "case sheet" system (docs/APP_DESIGN_SYSTEM.md): light, hyperlegible numerals.
-const app = Atkinson_Hyperlegible_Next({ subsets: ["latin"], variable: "--font-app", display: "swap" });
-// Stats and numbers only (font-mono, globals.css). Not preloaded: only a page that shows a stat fetches it.
-const mono = Atkinson_Hyperlegible_Mono({ subsets: ["latin"], variable: "--font-app-mono", display: "swap", preload: false });
+// Inside app: "Clean & clinical" (docs/APP_DESIGN_SYSTEM.md). IBM Plex Sans: tabular figures by default (every rank and fee
+// column lines up), a tailed l and an open 1 that never read as each other, ₹ in its latin-ext range.
+const app = IBM_Plex_Sans({ subsets: ["latin"], variable: "--font-app", display: "swap" });
+// Codes only (font-mono, globals.css). Not preloaded: only a page that shows one fetches it.
+const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-app-mono", display: "swap", preload: false });
 
 // Every Decide page reads profile params, so render on request. The shell is not suspended (its meta comes from the
 // cached catalog); each route's loading.tsx streams a skeleton of its page inside it until the page's data is in. So a
@@ -49,7 +50,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const description = `${label} counselling by ${authorityOf(exam)}: options for your ${label} rank, the seats on offer, closing ranks by ${sessionExams.includes(exam) ? "session" : "year"} and round, fees and bonds.`;
   return { title, description, openGraph: { title: `Seatora · ${label} planner`, description } };
 }
-export const viewport: Viewport = { themeColor: "#f3f6f9", viewportFit: "cover" }; // chart paper (--color-background inside .app)
+export const viewport: Viewport = { themeColor: "#f5f7f8", viewportFit: "cover" }; // the page (--color-background inside .app)
 
 /** Staff's exam switcher: every exam, with the pages it has no data for (the switcher opens Home instead). */
 const examChoices = () =>

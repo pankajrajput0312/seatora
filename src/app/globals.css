@@ -53,19 +53,40 @@
   --container-prose: 42rem;
 }
 
-/* Decide's type scale (docs/APP_DESIGN_SYSTEM.md "Type"): text-h1 32/40, text-h2 24/32, text-title 16/24 (card titles,
-   semibold), text-body 14/20, text-caption 12/16, the same at every width; nothing in Decide is set below 12px. */
+/* Decide's type scale (docs/APP_DESIGN_SYSTEM.md "Type"), IBM Plex Sans, about a 1.2 step from the 14px body:
+   text-caption 12/16, text-body 14/20, text-title 16/24 (card titles), text-h2 20/28 (sections), text-h1 28/36 (page
+   titles), text-figure 28/32 (stat tiles, the rank). Phones step h1 down (below). Nothing in Decide is below 12px. */
 @theme {
-  --text-h1: 2rem;
-  --text-h1--line-height: 2.5rem;
-  --text-h2: 1.5rem;
-  --text-h2--line-height: 2rem;
+  --text-figure: 1.75rem;
+  --text-figure--line-height: 2rem;
+  --text-h1: 1.75rem;
+  --text-h1--line-height: 2.25rem;
+  --text-h2: 1.25rem;
+  --text-h2--line-height: 1.75rem;
   --text-title: 1rem;
   --text-title--line-height: 1.5rem;
   --text-body: 0.875rem;
   --text-body--line-height: 1.25rem;
   --text-caption: 0.75rem;
   --text-caption--line-height: 1rem;
+  /* A secondary control's edge, the accent's hover, a raised control's shadow: the site's values here, the app's in .app. */
+  --color-edge: oklch(100% 0 0 / 0.11);
+  --color-sky-strong: oklch(86% 0.1 222);
+  --shadow-xs: 0 1px 2px oklch(0% 0 0 / 0.3);
+  /* Reach (lib/reach.ts reachTone, Badge): reached, later round only, within 10%, closed before, no allotment. */
+  --color-reach-later: #665f00;
+  --color-reach-none: #5f6d78;
+}
+/* Roles over the base signals, resolved where they are used (inline), so the .app scope's values apply. */
+@theme inline {
+  --color-reach-reached: var(--color-leaf);
+  --color-reach-within: var(--color-sun);
+  --color-reach-closed: var(--color-muted-foreground);
+  --color-fee-low: var(--color-leaf);
+  --color-fee-high: var(--color-ember);
+  --color-risk: var(--color-ember);       /* "Be careful": a bond or leaving penalty of ₹25 L or more */
+  --color-provisional: var(--color-sun);
+  --color-final: var(--color-leaf);
 }
 /* The one section-label style, on the page and in the sidebar (Astryx's SideNavSection title is the same: 12px semibold,
    sentence case, no tracking, secondary ink). Colour is the caller's (text-muted-foreground on the sheet). */
@@ -77,38 +98,57 @@
   text-transform: none;
 }
 
-/* ---------- Inside app: "case sheet" system (docs/APP_DESIGN_SYSTEM.md) ----------
-   Scoped token overrides: shared components use the same token classes and restyle automatically. */
+/* ---------- Inside app: "Clean & clinical" (docs/APP_DESIGN_SYSTEM.md) ----------
+   Scoped token overrides: shared components use the same token classes and restyle automatically. Every text colour
+   here is at least 4.5:1 on white, on the page and on its own 10% tint; control borders (input) 3:1. */
 @layer base {
   .app {
     color-scheme: light;
-    --color-background: #f3f6f9;     /* chart paper */
-    --color-card: #ffffff;           /* sheet */
+    /* Surfaces: crisp white sheets on a pale, cool page. */
+    --color-background: #f5f7f8;     /* page */
+    --color-card: #ffffff;           /* sheet: cards, nav, tables */
     --color-popover: #ffffff;
-    --color-secondary: #ffffff;
-    --color-muted: #ecf1f5;
-    --color-raised: #e3eaf1;
-    --color-foreground: #102231;     /* ink */
-    --color-muted-foreground: #53657a;
-    --color-primary: #102231;
+    --color-secondary: #ffffff;      /* secondary button fill */
+    --color-muted: #eff3f5;          /* sunken: hover rows, group rows, chips */
+    --color-raised: #e4eaee;         /* pressed, skeleton base */
+    /* Slate ink */
+    --color-foreground: #15232d;     /* 16:1 on white */
+    --color-muted-foreground: #52616c; /* 6.4:1 on white, 5.6:1 on its own tint */
+    --color-primary: #0b6e75;        /* primary buttons: the accent */
     --color-primary-foreground: #ffffff;
-    --color-border: #d9e1e9;         /* ruled hairline */
-    --color-input: #7d8fa3;          /* control borders: 3.3:1 on the sheet (WCAG 1.4.11) */
-    --color-ring: #2a78d6;
-    --color-sky: #1c5cab;            /* chart-ink blue (text-safe step) */
-    --color-mark: #2a78d6;           /* chart-ink blue for marks */
-    --color-wash: #e8f1fb;           /* soft blue card wash */
-    --color-wash-line: #cfe0f2;      /* hairline on the wash */
-    --color-leaf: #0a7a0a;           /* good */
-    --color-sun: #8a5a00;            /* warning */
-    --color-ember: #c03030;          /* critical */
-    --color-mist: #e3eaf1;
-    --shadow-overlay: 0 12px 32px rgb(16 34 49 / 0.14);
+    /* Lines */
+    --color-border: #e1e7eb;         /* hairline: dividers, sheet edges */
+    --color-edge: #cbd4da;           /* a button's or chip's edge (its words identify it) */
+    --color-input: #7f8e99;          /* form field borders: 3.3:1 on white (WCAG 1.4.11) */
+    /* The one accent, teal: what she can act on, and where she is. */
+    --color-sky: #0b6e75;            /* links, current item, info: 6.0:1 on white */
+    --color-sky-strong: #085960;     /* its hover / pressed */
+    --color-ring: #0b6e75;
+    --color-mark: #14868e;           /* chart marks: 4.3:1 on white */
+    --color-wash: #eaf5f5;           /* accent tint: unread news, the current nav item */
+    --color-wash-line: #c4e2e2;
+    --color-residents: #0b6e75;
+    /* Signals: meaning only (success, warning, danger; info is the accent) */
+    --color-leaf: #16753a;           /* reached, low fee, no bond, final */
+    --color-sun: #8a5300;            /* within 10%, provisional, caution */
+    --color-ember: #b42318;          /* high fee or penalty, "Be careful", errors */
+    --color-flame: #a3460a;          /* a bond of 3 years or more */
+    --color-mist: #e4eaee;
+    /* Radii by hierarchy: badge 4, control 8, popover 10, sheet 12, dialog 16. */
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.625rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    /* Flat sheets; elevation only for what floats (menus, tips, sheets, toasts). */
+    --shadow-xs: 0 1px 2px rgb(21 35 45 / 0.06);
+    --shadow-overlay: 0 12px 32px -6px rgb(21 35 45 / 0.18), 0 2px 6px rgb(21 35 45 / 0.06);
+    /* Two weights carry emphasis: 500 (labels, buttons) and 600 (titles, figures); font-bold is 600 here. */
+    --font-weight-bold: 600;
     --font-sans: var(--font-app), ui-sans-serif, system-ui, sans-serif;
     --font-pixel: var(--font-app), ui-sans-serif, system-ui, sans-serif;
-    /* Stats and numbers only (font-mono): Atkinson Hyperlegible Mono, the UI face's own mono. A glyph it lacks (₹ is
-       checked) falls back to the UI face, glyph by glyph. */
-    --font-mono: var(--font-app-mono), var(--font-app), ui-monospace, monospace;
+    /* Codes only (font-mono): IBM Plex Mono. Figures are the UI face's own, tabular by default. */
+    --font-mono: var(--font-app-mono), ui-monospace, monospace;
     font-family: var(--font-sans);
     background: var(--color-background);
     color: var(--color-foreground);
@@ -130,6 +170,9 @@
     --color-mark: #000000;
     --color-wash: #efefef;
     --color-wash-line: #e2e2e2;
+    --color-edge: #d4d4d4;
+    --color-sky-strong: #000000;
+    --color-residents: #0e7490;
     --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.1);
   }
   /* Its dark version: white on black. The /v2 default; the header toggle switches to the light one above. */
@@ -156,6 +199,10 @@
     --color-leaf: #5cc85c;
     --color-sun: #e0a83a;
     --color-ember: #ff6b6b;
+    --color-edge: #3a3a3a;
+    --color-sky-strong: #ffffff;
+    --color-reach-later: #d6cf62;
+    --color-reach-none: #a3a3a3;
     --shadow-overlay: 0 0 0 1px #2a2a2a;
   }
   /* Faint ECG-style grid paper behind the hero chart */
@@ -348,30 +395,33 @@ html:has(.app [data-compare-pill]) { scroll-padding-bottom: 8rem; }
   /* Astryx's CSS declares :root tokens (border, color-scheme) and stays loaded after a client navigation back to the
      site, so restate the site's own here (this layer sorts after Astryx's). Inside the app, html is chart paper. */
   :root { color-scheme: dark; --color-border: oklch(100% 0 0 / 0.08); }
-  html:has(.app) { color-scheme: light; background: #f3f6f9; }
+  html:has(.app) { color-scheme: light; background: #f5f7f8; }
 
   .app [data-astryx-theme] {
     color-scheme: light;
     --font-family-body: var(--font-app), ui-sans-serif, system-ui, sans-serif;
     --font-family-heading: var(--font-app), ui-sans-serif, system-ui, sans-serif;
-    --color-background-body: #f3f6f9;
-    --color-background-muted: #ecf1f5;
+    --color-background-body: #f5f7f8;
+    --color-background-muted: #eff3f5;
     --color-background-surface: #ffffff;
     --color-background-card: #ffffff;
     --color-background-popover: #ffffff;
-    --color-text-primary: #102231;
-    --color-text-secondary: #53657a;
-    --color-border: #d9e1e9;
-    --color-border-emphasized: #c3cfdb;
-    --color-accent: #1c5cab;
-    --color-text-accent: #1c5cab;
+    --color-text-primary: #15232d;
+    --color-text-secondary: #52616c;
+    --color-icon-primary: #15232d;
+    --color-icon-secondary: #52616c;
+    --color-border: #e1e7eb;
+    --color-border-emphasized: #cbd4da;
+    --color-accent: #0b6e75;
+    --color-text-accent: #0b6e75;
+    --color-icon-accent: #0b6e75;
     --color-on-accent: #ffffff;
-    --color-accent-muted: #dce8f6;
-    --color-info: #2a78d6;
-    --color-text-info: #1c5cab;
-    --color-text-success: #0a7a0a;
-    --color-text-warning: #8a5a00;
-    --color-text-error: #c03030;
+    --color-accent-muted: #eaf5f5;
+    --color-info: #14868e;
+    --color-text-info: #0b6e75;
+    --color-text-success: #16753a;
+    --color-text-warning: #8a5300;
+    --color-text-error: #b42318;
   }
 }
 
@@ -384,6 +434,16 @@ html:has(.app [data-compare-pill]) { scroll-padding-bottom: 8rem; }
 /* Same for its nav rows, the brand link and the drawer's close button (all 32px); unlayered, so these beat Astryx's layer. */
 .app .astryx-side-nav-item, .app .astryx-top-nav-heading { min-height: 2.75rem; }
 .app .astryx-mobile-nav .astryx-button { min-width: 2.75rem; min-height: 2.75rem; }
+/* The current page in the sidebar and the menu: the accent's tint, ink words, a teal icon (teal text is for links and
+   Residents). Hover: the sunken grey. */
+.app .astryx-side-nav-item[data-selected="selected"] { background: var(--color-wash); color: var(--color-foreground); font-weight: 600; }
+.app .astryx-side-nav-item[data-selected="selected"] > svg { color: var(--color-sky); }
+.app .astryx-side-nav-item:not([data-selected="selected"]):hover { background: var(--color-muted); }
+/* Underlined links read calmer at 40% of their colour, full on hover; the underline stays (never colour alone). */
+@layer base {
+  .app a.underline, .app summary.underline { text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); text-underline-offset: 0.2em; }
+  .app a.underline:hover, .app summary.underline:hover { text-decoration-color: currentColor; }
+}
 
 /* Loading placeholders (features/decide/components/skeleton.tsx): a soft light sweep over the raised token, the
    owner-asked loading affordance (not decoration). Static blocks under reduced motion (also the base rule above). */
@@ -401,13 +461,13 @@ html:has(.app [data-compare-pill]) { scroll-padding-bottom: 8rem; }
    Every one is ≥4.5:1 as text on its own 10% tint, on the sheet and on chart paper, in both. Never colour alone: each
    value or badge says it in words too. */
 @theme {
-  --color-flame: #a84300;          /* a bond of 3 years or more */
+  --color-flame: #a3460a;          /* a bond of 3 years or more */
   --color-type-govt: #0a6b2e;      /* state government, municipal */
-  --color-type-central: #00646c;   /* central government: AIIMS-type, armed forces, railway, PSU */
+  --color-type-central: #3e4c94;   /* central government: AIIMS-type, armed forces, railway, PSU (indigo: teal is the accent) */
   --color-type-esic: #5b3db5;      /* ESIC */
   --color-type-deemed: #1c5cab;    /* deemed university */
   --color-type-trust: #8e2a68;     /* trust hospital */
-  --color-residents: #0e7490;      /* Residents, the main feature: the Upgrade button's cyan (#5ccfe6), deep enough for text */
+  --color-residents: #0e7490;      /* Residents, the main feature (.app: the accent) */
 }
 @layer base {
   .app.dark {
