@@ -95,7 +95,7 @@ export function SetupCard() {
       <ol className="mt-3 grid gap-2 sm:grid-cols-3">
         {steps.map((s, i) => (
           <li key={s} className="flex items-center gap-2 text-body">
-            <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full border border-input font-mono text-caption font-semibold">{i + 1}</span>
+            <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full border border-input text-caption font-semibold">{i + 1}</span>
             {s}
           </li>
         ))}
@@ -122,7 +122,7 @@ export function ChoicesStat({ nextRound }: { nextRound?: string | null }) {
     <StatCell
       // Another exam's first list is named "NEET SS list" (layout.tsx): no "list list". NEET PG's labels as they were.
       label={hydrated ? `In your ${choiceListTitle(list.name)}` : `In your ${CHOICE_LIST}`}
-      value={<span className="font-mono">{hydrated ? formatRank(list.items.length) : "—"}</span>}
+      value={hydrated ? formatRank(list.items.length) : "—"}
       note={<Link href={L.choices()} className={smallLink}>{!hydrated ? `Open your ${CHOICE_LIST}` : typed ? `${formatRank(typed)} typed into ${authorityOf(exam)}` : `None typed into ${authorityOf(exam)} yet`}</Link>}
     />
   );

@@ -216,20 +216,20 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             sum && list
               ? {
                   label: `Options in ${lists}`,
-                  value: <span className="font-mono">{formatRank(total)}</span>,
+                  value: formatRank(total),
                   info: sp ? `In your courses, quotas and ${seats} seats.${leftOut}` : `${formatRank(sum.clear)} in the clear vacancy list, ${formatRank(sum.virtualOnly)} virtual only${sum.newOnly > 0 ? `, ${formatRank(sum.newOnly)} only newly added` : ""}.${leftOut}`,
                   note: sp ? <><Link href={L.options()} className={smallLink}>See them on Options</Link>{undeclared}</> : <><Link href={L.options()} className={smallLink}>{formatRank(sum.clear)} clear, {formatRank(sum.virtualOnly)} virtual only</Link>{undeclared}</>,
                 }
               : {
                   label: "Options in your profile",
-                  value: <span className="font-mono">{formatRank(total)}</span>,
+                  value: formatRank(total),
                   info: `Every option in your profile's ${formatRank(d.summary.length)} ${d.summary.length === 1 ? "course" : "courses"} with past allotments; ${formatRank(r.counts["closed-before"])} of them closed before your rank.${leftOut}`,
                   note: <><Link href={L.options({ closed: true })} className={smallLink}>{formatRank(r.counts["closed-before"])} closed before your rank</Link>{undeclared}</>,
                 },
             {
               label: "Reached your rank in a past round",
               info: `Options whose closing rank reached yours in at least one of R1 to R3 of ${counted}. Stray rounds don't count here: an option reached only there shows "${reachLabel("stray-only", latest, PAST_YEARS)}".`,
-              value: <span className="font-mono">{formatRank(reached)}</span>,
+              value: formatRank(reached),
               note: (
                 <span className="inline-flex flex-wrap items-center gap-x-1.5">
                   <Link href={L.options({ reach: "reached-latest" })} className={smallLink}>{formatRank(r.counts["reached-latest"])} in {latestText(latest)}</Link>
@@ -240,7 +240,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             {
               label: "Within 10% in a past round",
               info: `Options that closed just before your rank (within 10% of it) in a past round. ${STRAY_NOT_COUNTED}; see Last ranks for them.`,
-              value: <span className="font-mono">{formatRank(r.counts["within-10"])}</span>,
+              value: formatRank(r.counts["within-10"]),
               note: <Link href={L.options({ reach: "within-10" })} className={smallLink}>See them</Link>,
             },
           ]}

@@ -82,7 +82,7 @@ export function WhatChangedCard({ items, courses }: { items: VisitItem[]; course
   const rest = fresh.filter((i) => i !== top);
 
   return (
-    <section aria-labelledby="changed-h" className="rounded-xl border border-sky/40 bg-sky/10 p-4" data-print-hide>
+    <section aria-labelledby="changed-h" className="rounded-xl border border-wash-line bg-wash p-4 sm:p-5" data-print-hide>
       <div className="flex items-start justify-between gap-3">
         <h2 id="changed-h" className="text-title font-semibold">{headline ?? "What changed since your last visit"}</h2>
         <Button variant="ghost" size="icon" className="-mt-2 -mr-2 shrink-0" aria-label="Dismiss what changed" onClick={dismiss}><X className="size-4" aria-hidden /></Button>
@@ -130,7 +130,7 @@ export function ResultNewsCard({ items, courses, round, news, title, badge, foun
     h.current?.focus(); // the ✕ is gone: focus stays in the card
   };
   return (
-    <section aria-labelledby="your-result-h" className={cn("grid gap-2 rounded-xl border p-4 sm:p-5", unread ? "bg-sky/10" : "bg-card", found ? "border-leaf/50" : unread ? "border-sky/40" : "border-border")}>
+    <section aria-labelledby="your-result-h" className={cn("grid gap-2 rounded-xl border p-4 sm:p-5", unread ? "bg-wash" : "bg-card", found ? "border-leaf/50" : unread ? "border-wash-line" : "border-border")}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <h2 ref={h} id="your-result-h" tabIndex={-1} className="text-title font-semibold">{title}</h2>

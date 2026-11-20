@@ -3,7 +3,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { groupsIn, quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { yearName } from "@/features/exams/keys";
 import type { DecideLinks } from "../lib/links";
-import { pastOf, reachLabel, reachOrder, reachWindow, type Latest, type Reach } from "../lib/reach";
+import { pastOf, reachLabel, reachOrder, reachTone, reachWindow, type Latest, type Reach } from "../lib/reach";
 import { inrCard, statCells } from "../lib/stat-format";
 import type { Profile } from "../profile";
 import type { OptionRow, OptionsPicture } from "../service";
@@ -14,8 +14,8 @@ import { smallLink } from "./ui";
 
 /** "MD Anaesthesiology, All India" under a picked option's name. */
 const what = (r: OptionRow, E: Exam) => `${courseName(r)}, ${quotaIn(E, r.quota)}`;
-/** A tile's colour: reached green, within 10% or stray only amber, the rest grey (the chips' own order and words). */
-const tone = (x: Reach) => (x.startsWith("reached") ? "text-leaf" : x === "within-10" || x === "stray-only" ? "text-sun" : "text-muted-foreground");
+/** A tile's colour: the reach badges' own (lib/reach.ts reachTone), in the chips' own order and words. */
+const tone = (x: Reach) => ({ reached: "text-reach-reached", later: "text-reach-later", within: "text-reach-within", closed: "text-reach-closed", none: "text-reach-none" })[reachTone[x]];
 
 /**
  * "Your picture", at the top of Options and Home: of her options (`scope`: what Options lists, e.g. " with 2026 R2
@@ -52,7 +52,7 @@ export function YourPicture({ pic, profile, E, latest, includeLatest = true, L, 
         {shown.map((x) => (
           <div key={x} className="flex min-w-0 flex-col-reverse justify-end gap-0.5">
             <dt className="text-xs leading-snug text-muted-foreground">{x === "within-10" || x === "stray-only" ? <Term k={x === "stray-only" ? "stray" : "within-10"}>{reachLabel(x, latest, pastOf(latest), includeLatest)}</Term> : reachLabel(x, latest, pastOf(latest), includeLatest)}</dt>
-            <dd className={`numeric text-2xl leading-tight font-bold ${tone(x)}`}>
+            <dd className={`numeric text-figure font-semibold ${tone(x)}`}>
               <Link href={href(x)} className="hover:underline">{formatRank(pic.counts[x])}</Link>
             </dd>
           </div>

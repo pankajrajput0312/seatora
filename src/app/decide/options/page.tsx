@@ -22,7 +22,7 @@ import { YourPicture } from "@/features/decide/components/your-picture";
 import { HeldSeat, heldRow } from "@/features/decide/components/held-seat";
 import { GroupPrompt } from "@/features/decide/components/dashboard-parts";
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
-import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
+import { ActiveFilters, chip, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
 import { Button } from "@/components/ui/button";
 import { ChevronsDownUp, ChevronsUpDown, ListOrdered } from "lucide-react";
 import { iniElsewhere } from "@/features/decide/lib/college-aliases";
@@ -250,8 +250,6 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       )}
     </p>
   );
-  const chip = (active: boolean) =>
-    `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const n = (x: number) => <span className="numeric font-semibold">{formatRank(x)}</span>;
   const detailsHref = here({ details: f.details ? null : "1", page: f.page > 1 ? String(f.page) : null });
   // What the round's seat lists are, behind the (i) of the summary (round view) or of the link to that view.

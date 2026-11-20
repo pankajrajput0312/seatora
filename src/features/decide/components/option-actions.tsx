@@ -102,7 +102,7 @@ const summary = "inline-flex min-h-11 cursor-pointer items-center text-sky";
 // both scale with the spacing). Phones: the row header is narrow (tbl.pin: the short name, the course) and carries the
 // latest closing rank, so swiping to the fee or stipend keeps the star, the option and its closing rank in view.
 const stick = "sticky left-0 z-[1] bg-card max-md:w-11 max-md:min-w-11 max-md:max-w-11 max-md:px-0!";
-const stickName = cn("sticky left-12 z-[1] min-w-48 max-w-72 border-r border-border bg-card max-md:left-11", tbl.pin);
+const stickName = cn("sticky left-12 z-[1] min-w-48 max-w-72 border-r border-border bg-card max-md:left-11 md:min-w-60", tbl.pin);
 // Phones: the deepest closing comes right after the row header (from md, after the terms and seats, where it was).
 const phoneOnly = "px-3 py-3 text-right md:hidden";
 const notPhone = "px-2 py-3 text-right max-md:hidden";
@@ -406,7 +406,8 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
               {!sessionCols && <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>}
               <td className={sessionCols ? "px-3 py-3 text-right" : notPhone}><ClosingCell d={r.latest} year={latest.year} r1={r1Of(r, latest.year)} /></td>
               {sessionCols && <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>}
-              <td className="px-2 py-3">
+              {/* Wide enough for a reach label on one or two lines, so a row is as tall as its name, not its notes. */}
+              <td className="px-2 py-3 md:min-w-[10.5rem]">
                 <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} from={r.reachFrom} seats={r} />
                 <SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} />
                 {E.has.fees && <BeCareful cells={statCells(r.fees)} className="mt-1 max-w-xs" />}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, ChevronRight, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
+import { Building2, ChevronRight, Calculator, GitCompareArrows, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp } from "lucide-react";
 import { activeExam } from "@/features/exams/active";
 import { examShows, neetPg, type Exam } from "@/features/exams/exam";
 import { authorityOf, exams, inExamWords } from "@/features/exams/registry";
@@ -9,9 +9,9 @@ import { passView } from "@/features/plans/components/plan-cards";
 import { cn } from "@/lib/cn";
 import type { DecideLinks } from "../lib/links";
 
-// The planner's home, in Seatora's own look (the logo's ink, cyan and green): the tools as cards under the sidebar's own
-// names, and the Residents card just above them, with the Season Pass button ("Get free Season Pass" while
-// FREE_FOR_ALL_UNTIL is ahead, then "Upgrade for ₹199"). The schedule is the status strip (round-status.tsx), not a card.
+// The planner's home: the tools as tiles under the sidebar's own names, and the Residents card on top, with the Season
+// Pass button ("Get free Season Pass" while FREE_FOR_ALL_UNTIL is ahead, then "Upgrade for ₹199"). The schedule is the
+// status strip (round-status.tsx), not a card.
 
 const groups = [
   {
@@ -57,15 +57,15 @@ export function ToolGroups({ L, E = neetPg }: { L: DecideLinks; E?: Exam }) {
           <ul className={cn("grid grid-cols-2 gap-2", g.cols)}>
             {g.tools.map(({ href, label, note, icon: Icon }) => (
               <li key={href}>
-                <Link href={L.to(href)} className="group relative flex h-full min-h-14 items-center gap-2 rounded-lg border border-border bg-card py-2 pr-7 pl-2.5 hover:border-[#5ccfe6] focus-visible:border-[#5ccfe6] sm:gap-3 sm:pl-3">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-md bg-[#0b0e12] text-[#5ccfe6] sm:size-9">
+                <Link href={L.to(href)} className="group relative flex h-full min-h-14 items-center gap-2 rounded-xl border border-border bg-card py-2 pr-7 pl-2.5 hover:border-wash-line hover:bg-wash/40 sm:gap-3 sm:pl-3">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-md bg-wash text-sky sm:size-9">
                     <Icon className="size-4 sm:size-[1.125rem]" strokeWidth={1.75} aria-hidden />
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm leading-5 font-semibold text-foreground sm:text-title">{label}</span>
                     <span className="line-clamp-2 text-caption text-muted-foreground sm:text-body">{note}</span>
                   </span>
-                  <ChevronRight className="absolute top-1/2 right-2 size-4 -translate-y-1/2 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden />
+                  <ChevronRight className="absolute top-1/2 right-2 size-4 -translate-y-1/2 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-sky" aria-hidden />
                 </Link>
               </li>
             ))}
@@ -84,30 +84,30 @@ export function ToolGroups({ L, E = neetPg }: { L: DecideLinks; E?: Exam }) {
 export async function ResidentsPromo({ L }: { L: DecideLinks }) {
   if (!exams[await activeExam()].has.residents) return null;
   const { got } = await passView(); // what the plan cards say: her pass, or nothing to say
-  const green = "font-mono font-semibold text-[#5fd36f]";
-  // Light-on-dark theme tokens inside this black card, so shared parts (the coupon field and its Apply) stay readable.
+  // The feature the owner leads with: a plain sheet, its figures in the accent. The Season Pass is the primary
+  // action; with a pass (or staff) Search residents takes that place.
   return (
-    <section aria-labelledby="residents-h" data-placement="home_card" className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-[#1f2a33] bg-[#0b0e12] p-4 text-[#f1f4f7] [--color-foreground:#f1f4f7] [--color-input:#5b6b78] [--color-muted-foreground:#a3abb3]">
+    <section aria-labelledby="residents-h" data-placement="home_card" className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-border bg-card p-4 sm:px-5">
       <div className="min-w-0 flex-1 basis-72">
         <div className="flex flex-wrap items-center gap-x-2">
-          <h2 id="residents-h" className="text-title font-semibold" style={{ color: "#f1f4f7" }}>Know who&apos;s already there</h2>
-          <span className="rounded-full border border-[#5ccfe6] px-1.5 text-caption font-semibold text-[#5ccfe6]">New</span>
+          <h2 id="residents-h" className="text-title font-semibold">Know who&apos;s already there</h2>
+          <span className="rounded-full border border-current px-1.5 text-caption font-semibold text-sky">New</span>
         </div>
-        <p className="text-body text-[#a3abb3]">
-          <span className={green}>77K+</span> residents at <span className={green}>1,800+</span> PG hospitals, by course and year: MCC&apos;s official admitted lists, 2023–25.
+        <p className="text-body text-muted-foreground">
+          <span className="font-semibold text-sky">77K+</span> residents at <span className="font-semibold text-sky">1,800+</span> PG hospitals, by course and year: MCC&apos;s official admitted lists, 2023–25.
         </p>
-        {got && <p className="mt-1 text-caption font-semibold text-[#5fd36f]">{got}</p>}
+        {got && <p className="mt-1 text-caption font-semibold text-leaf">{got}</p>}
       </div>
       <div className="flex flex-wrap items-start gap-2 max-sm:w-full max-sm:flex-col max-sm:items-stretch">
         {!got && (
           <SeasonPassButton
             freeLabel="Get free Season Pass"
-            className="min-h-11 rounded-md bg-[#5fd36f] px-4 text-body font-semibold text-[#0b0e12] hover:bg-[#7fe08b] max-sm:w-full"
-            noteClassName="text-[#a3abb3]"
+            className="min-h-11 rounded-md bg-primary px-4 text-body font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 max-sm:w-full"
+            noteClassName="text-muted-foreground"
           />
         )}
-        <Link href={L.to("/decide/residents")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#5ccfe6] px-4 text-body font-semibold text-[#5ccfe6] hover:bg-[#5ccfe6]/10 max-sm:w-full">
-          Search residents <ArrowRight className="size-4" aria-hidden />
+        <Link href={L.to("/decide/residents")} className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-body font-semibold shadow-xs max-sm:w-full", got ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-edge bg-card text-sky hover:border-sky")}>
+          Search residents
         </Link>
       </div>
     </section>
