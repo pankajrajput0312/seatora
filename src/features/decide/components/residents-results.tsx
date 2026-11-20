@@ -47,7 +47,7 @@ const tabHref = (L: DecideLinks, r: ResidentRow) => L.to(`/decide/institutes/${r
 const collegeLink = "inline-flex min-h-6 items-center font-medium hover:text-sky hover:underline";
 
 const th = `${tbl.th} px-3`;
-const td = "px-3 py-1.5 align-top";
+const td = "px-3 py-1.5 align-top leading-6";
 
 /**
  * One page of residents as a table; the College cell opens that institute's Residents tab. Phones: two columns that fit
@@ -70,7 +70,7 @@ export function ResidentsTable({ rows, L, hide, caption, types }: { rows: Reside
             const type = types?.get(r.college.slug);
             return (
               <SyncedHideableRow key={r.id} id={r.id} name={r.name} hide={hide} colSpan={4} className={tbl.row}>
-                <th scope="row" className={`${td} min-w-36 text-left font-medium ${pin}`}>
+                <th scope="row" className={`${td} min-w-36 text-left font-semibold ${pin}`}>
                   {r.name}
                   <span className="block text-xs font-normal text-muted-foreground md:hidden">{courseName(r)}, <span className="numeric">{r.year}</span></span>
                 </th>
@@ -93,8 +93,8 @@ export function ResidentsTable({ rows, L, hide, caption, types }: { rows: Reside
 }
 
 /**
- * The same page as ResultCards: the year (and round) big on the left, the college (its Residents tab) and course, state
- * and type; the name, MCC list and quota in the header row.
+ * The same page as ResultCards: the year big on the left, the name as the card's heading, then the course and the college
+ * (its Residents tab), its state and type.
  */
 export function ResidentsCards({ rows, L, hide, types }: { rows: ResidentRow[]; L: DecideLinks; hide: Hide; types?: ResidentTypes }) {
   return (
@@ -107,11 +107,14 @@ export function ResidentsCards({ rows, L, hide, types }: { rows: ResidentRow[]; 
             id={r.id}
             name={r.name}
             hide={hide}
-            chips={[<span key="n" className="text-sm font-semibold text-foreground">{r.name}</span>]}
             stat={{ label: "Year", value: <span className="numeric whitespace-nowrap">{r.year}</span> }}
-            title={r.college.name}
-            href={tabHref(L, r)}
-            subtitle={courseName(r)}
+            title={r.name}
+            subtitle={
+              <>
+                {courseName(r)}
+                <Link href={tabHref(L, r)} className="hit mt-0.5 flex min-h-6 w-fit items-center font-medium underline hover:text-sky">{r.college.name}</Link>
+              </>
+            }
             meta={[r.college.state, type && <TypeBadge type={type} of={r.college.name} />]}
           />
         );
