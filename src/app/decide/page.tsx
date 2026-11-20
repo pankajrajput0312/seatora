@@ -24,6 +24,7 @@ import { YourPicture } from "@/features/decide/components/your-picture";
 import { HeldSeat } from "@/features/decide/components/held-seat";
 import { WhatChanged } from "@/features/decide/components/what-changed";
 import { YourResult } from "@/features/decide/components/your-result";
+import { RankByBranch } from "@/features/decide/components/rank-by-branch";
 import { kindName, roundShort } from "@/features/decide/types";
 import { QuotaName, RoundShort } from "@/features/decide/components/round-name";
 import { activeExam, examInfo } from "@/features/exams/active";
@@ -73,6 +74,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         {noGroup ? <GroupPrompt /> : <SetupCard />}
         <RoundStatusBanner params={params} />
         {exams[exam].crossover && <CrossoverLink L={decideLinks(params)} />}
+        <RankByBranch profile={null} exam={exam} L={decideLinks(params)} />
         <ToolGroups L={decideLinks(params)} E={await examInfo(exam)} />
       </AppPage>
     );
@@ -190,6 +192,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </>
         )}
       </section>
+      <RankByBranch profile={profile} exam={exam} L={L} />
       <ToolGroups L={L} E={E} />
       <RoundStatusBanner params={params} />
         {exams[exam].crossover && <CrossoverLink L={decideLinks(params)} />}

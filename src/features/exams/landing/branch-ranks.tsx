@@ -1,6 +1,7 @@
 // NEET PG's latest round with a result, last rank by branch (the home page, right after the hero, and /neet-pg): one
 // table per open quota and one of the restricted quotas, all server-rendered. Tabs, the phone's second column and the
-// PwD switch are form controls read by CSS (:has), the row fold a checkbox; only the search box is client JS.
+// PwD switch are form controls read by CSS (:has), the row fold a checkbox; only the search box is client JS. Decide Home
+// shows the same tables (BranchTables) in the app's look, and with her rank, her rank against each branch.
 import "server-only";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
@@ -9,11 +10,12 @@ import { SourceLabel } from "@/components/ui/source-label";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
+import type { BaseCategory, Category } from "@/features/decide/types";
 import { cn } from "@/lib/cn";
 import { BranchSearch } from "./branch-search";
-import { branchRanks } from "./data";
+import { branchRanks, vsRank, type BranchRow } from "./data";
 
-/** Rows shown before "Show all N": the page stays short; a search shows every match. */
+/** Rows shown before "Show all N" (Decide Home: 10): the page stays short; a search shows every match. */
 const FOLD = 25;
 type Tab = "aiq" | "deemed" | "dnb" | "restricted";
 // Whole class names, so Tailwind sees them: the panel and the controls the checked tab (#lr-t-…) shows or hides.
@@ -43,7 +45,7 @@ const SWITCHES = [
 /** A panel's rows past FOLD, until its "Show all" box is ticked. */
 const FOLDED = "[&_[data-more]]:hidden has-[.lr-more:checked]:[&_[data-more]]:table-row";
 /** A tab's name on phones (the rest from sm up), so the four fit one line. */
-const shortTab: Partial<Record<Tab, string>> = { deemed: "Deemed", restricted: "Restricted" };
+export const shortTab: Partial<Record<Tab, string>> = { deemed: "Deemed", restricted: "Restricted" };
 
 const th = "px-3 py-3 font-mono text-xs font-normal uppercase tracking-widest text-muted-foreground md:px-4";
 const td = "numeric px-3 py-2.5 text-right whitespace-nowrap md:px-4";
@@ -60,15 +62,9 @@ export async function BranchRanks() {
   if (!d) return null;
   const later = d.round !== "R1";
   const round = roundName[d.round];
-  const tabs = [...d.tabs.map((t) => ({ key: t.key as Tab, label: t.label, n: t.rows.length })), { key: "restricted" as Tab, label: "Restricted quotas", n: d.restricted.length }].filter((t) => t.n > 0);
-  const first = tabs[0]?.key;
-  // The phone's category picker and the PwD switch, hidden on a tab where they change nothing.
-  const noCats = [...d.tabs.filter((t) => t.cats.length < 2).map((t) => t.key), "restricted"] as Tab[];
-  const noPwd = [...d.tabs.filter((t) => !t.pwd).map((t) => t.key), "restricted"] as Tab[];
-  const seats = (n: number) => `${formatRank(n)} ${later ? "new " : ""}seat${n === 1 ? "" : "s"}`;
 
   return (
-    <section aria-labelledby="lr-h" data-lr className={cn("group/lr border-b border-border", SWITCHES)}>
+    <section aria-labelledby="lr-h" className="border-b border-border">
       <Container className="pt-8 pb-16 md:pt-12 md:pb-24">
         <p className="font-mono text-xs uppercase tracking-widest text-sky">Latest MCC result</p>
         <h2 id="lr-h" className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
@@ -84,8 +80,55 @@ export async function BranchRanks() {
           <SourceLabel provenance={{ sourceName: d.source.name, sourceUrl: d.source.url, sourceType: "OFFICIAL", academicYear: d.year }} />
         </p>
 
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <BranchSearch />
+        <BranchTables d={d} href={lastRanks} className="mt-8" />
+
+        <ul className="mt-6 grid max-w-prose gap-1.5 text-sm leading-relaxed text-muted-foreground">
+          <li>NRI, AFMS, university and minority quotas are shown separately, under Restricted quotas: they never mix into the All India, Deemed or DNB numbers.</li>
+          {!d.restricted.some((r) => /sponsor/i.test(r.quota)) && (
+            <li>MCC&apos;s NEET PG counselling has no sponsored seats; in-service and sponsored seats are filled in state counselling, which Seatora doesn&apos;t cover.</li>
+          )}
+        </ul>
+      </Container>
+    </section>
+  );
+}
+
+/** Her rank, category and the quotas she ticked (Decide Home's profile), for BranchTables' rows against her rank. */
+export type Me = { rank: number; category: BaseCategory; pwd: boolean; quotas: string[] };
+type Data = NonNullable<Awaited<ReturnType<typeof branchRanks>>>;
+const appTh = "px-3 py-3 text-xs font-semibold text-muted-foreground md:px-4";
+
+/** The tabs shown, each with its rows: the open quotas', then the restricted quotas' (with `me`, only the ones she ticked). */
+export const tabsOf = (d: Data, me?: Me) =>
+  [
+    ...d.tabs.map((t) => ({ key: t.key as Tab, label: t.label as string, rows: t.rows as BranchRow[] })),
+    { key: "restricted" as Tab, label: "Restricted quotas", rows: me ? d.restricted.filter((r) => me.quotas.includes(r.quota)) : d.restricted },
+  ].filter((t) => t.rows.length > 0);
+
+/**
+ * The search, the quota tabs and a table per tab, linking each branch to `href`. Without `me`: each seat category's
+ * last rank (a phone shows Open and one picked category beside it; the PwD switch). With `me` (Decide Home with her
+ * rank): her category's and Open's last rank, whether the branch reached her rank (vsRank: reached first) and its seats.
+ * `app`: Decide's look (no monospace caps) and 10 rows before "Show all".
+ */
+export function BranchTables({ d, href, me, app = false, className }: { d: Data; href: (slug: string, quota: string) => string; me?: Me; app?: boolean; className?: string }) {
+  const later = d.round !== "R1";
+  const round = roundName[d.round];
+  const tabs = tabsOf(d, me);
+  const first = tabs[0]?.key;
+  const fold = app ? 10 : FOLD;
+  const hc = app ? appTh : th;
+  // The phone's category picker and the PwD switch, hidden on a tab where they change nothing.
+  const noCats = [...d.tabs.filter((t) => t.cats.length < 2).map((t) => t.key), "restricted"] as Tab[];
+  const noPwd = [...d.tabs.filter((t) => !t.pwd).map((t) => t.key), "restricted"] as Tab[];
+  const seats = (n: number) => `${formatRank(n)} ${later ? "new " : ""}seat${n === 1 ? "" : "s"}`;
+  const mine = me && ((me.pwd ? `${me.category} PwD` : me.category) as Category);
+
+  return (
+    <div data-lr className={cn("group/lr", SWITCHES, className)}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <BranchSearch />
+        {!me && (
           <div className="flex flex-wrap items-center gap-x-5 text-sm">
             <fieldset className={cn("flex items-center gap-1 md:hidden", noCats.map((k) => hiddenOn[k]).join(" "))}>
               <legend className="sr-only">Category shown beside Open</legend>
@@ -102,110 +145,152 @@ export async function BranchRanks() {
               PwD seats
             </label>
           </div>
-        </div>
-
-        <fieldset className="mt-6 flex gap-6 overflow-x-auto border-b border-border">
-          <legend className="sr-only">Quota</legend>
-          {tabs.map((t) => (
-            <label key={t.key} className={cn(chip, "shrink-0 gap-1.5 border-b-2 border-transparent text-sm whitespace-nowrap text-muted-foreground hover:text-foreground has-[:checked]:border-foreground has-[:checked]:text-foreground")}>
-              <input type="radio" name="lr-tab" id={`lr-t-${t.key}`} defaultChecked={t.key === first} className="sr-only" />
-              <span>{shortTab[t.key] ? <>{shortTab[t.key]}<span className="hidden sm:inline">{t.label.slice(shortTab[t.key]!.length)}</span></> : t.label}</span>
-              <span className="numeric text-xs text-muted-foreground">{t.n}</span>
-            </label>
-          ))}
-        </fieldset>
-
-        {d.tabs.map((t) => (
-          <Panel key={t.key} tab={t.key} n={t.rows.length} what="branches">
-            <table className={cn("w-full text-sm", CELLS)}>
-              <caption className="sr-only">{`${t.label}: last rank by branch, NEET PG ${d.year} ${round}`}</caption>
-              <thead>
-                <tr>
-                  <th scope="col" className={cn(th, "text-left")}>Branch</th>
-                  {t.cats.map((c) => (
-                    <th key={c} scope="col" data-c={c === "Open" ? undefined : c} className={cn(th, "text-right")}>
-                      <span data-base>{c}</span>
-                      <span data-pwd>{c} PwD</span>
-                    </th>
-                  ))}
-                  <th scope="col" className={cn(th, "hidden text-right md:table-cell")}>{later ? "New seats" : "Seats"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {t.rows.map((r, i) => (
-                  <tr key={r.slug} data-name={r.course.toLowerCase()} data-more={i >= FOLD || undefined} className="border-t border-border hover:bg-muted">
-                    <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
-                      <Link href={lastRanks(r.slug, r.quota)} className={L}>{r.course}</Link>
-                      <span className="numeric block text-xs text-muted-foreground md:hidden">{seats(r.n)}</span>
-                    </th>
-                    {t.cats.map((c) => (
-                      <td key={c} data-c={c === "Open" ? undefined : c}>
-                        <span data-base>{rank(r.last[c])}</span>
-                        <span data-pwd>{rank(r.last[`${c} PwD`])}</span>
-                      </td>
-                    ))}
-                    <td className="hidden text-muted-foreground md:table-cell">{formatRank(r.n)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Panel>
-        ))}
-
-        {d.restricted.length > 0 && (
-          <Panel tab="restricted" n={d.restricted.length} what="rows">
-            <p className="border-b border-border px-3 py-3 text-sm leading-relaxed text-muted-foreground md:px-4">
-              Only for candidates eligible for that quota. The last rank on any of its seats.
-            </p>
-            <table className="w-full text-sm">
-              <caption className="sr-only">{`Restricted quotas: last rank by branch, NEET PG ${d.year} ${round}`}</caption>
-              <thead>
-                <tr>
-                  <th scope="col" className={cn(th, "hidden text-left md:table-cell")}>Quota</th>
-                  <th scope="col" className={cn(th, "text-left")}>Branch</th>
-                  <th scope="col" className={cn(th, "text-right")}>Last rank</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.restricted.map((r, i) => (
-                  <tr key={`${r.quota}|${r.slug}`} data-name={`${r.course} ${r.quota}`.toLowerCase()} data-more={i >= FOLD || undefined} className="border-t border-border hover:bg-muted">
-                    <td className="hidden px-4 py-2.5 text-muted-foreground md:table-cell">{r.quota}</td>
-                    <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
-                      <Link href={lastRanks(r.slug, r.quota)} className={L}>{r.course}</Link>
-                      <span className="block text-xs text-muted-foreground md:hidden">{r.quota}</span>
-                    </th>
-                    <td className={td}>{formatRank(r.max)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Panel>
         )}
+      </div>
 
-        <ul className="mt-6 grid max-w-prose gap-1.5 text-sm leading-relaxed text-muted-foreground">
-          <li>NRI, AFMS, university and minority quotas are shown separately, under Restricted quotas: they never mix into the All India, Deemed or DNB numbers.</li>
-          {!d.restricted.some((r) => /sponsor/i.test(r.quota)) && (
-            <li>MCC&apos;s NEET PG counselling has no sponsored seats; in-service and sponsored seats are filled in state counselling, which Seatora doesn&apos;t cover.</li>
-          )}
-        </ul>
-      </Container>
-    </section>
+      <fieldset className="mt-6 flex gap-6 overflow-x-auto border-b border-border">
+        <legend className="sr-only">Quota</legend>
+        {tabs.map((t) => (
+          <label key={t.key} className={cn(chip, "shrink-0 gap-1.5 border-b-2 border-transparent text-sm whitespace-nowrap text-muted-foreground hover:text-foreground has-[:checked]:border-foreground has-[:checked]:text-foreground")}>
+            <input type="radio" name="lr-tab" id={`lr-t-${t.key}`} defaultChecked={t.key === first} className="sr-only" />
+            <span>{shortTab[t.key] ? <>{shortTab[t.key]}<span className="hidden sm:inline">{t.label.slice(shortTab[t.key]!.length)}</span></> : t.label}</span>
+            <span className="numeric text-xs text-muted-foreground">{t.rows.length}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      {me && mine && tabs.map((t) => {
+        const rows = vsRank(t.rows, me.rank, me.category, me.pwd);
+        // Her category's column, then Open's (once when hers is Open); a tab without one of them (Deemed: Open only) leaves it out.
+        const cols = [...new Set<Category>([mine, "Open"])].filter((c) => t.rows.some((r) => r.last[c] != null));
+        const restricted = t.key === "restricted";
+        return (
+          <Panel key={t.key} tab={t.key} n={rows.length} what={restricted ? "rows" : "branches"} fold={fold}>
+            <table className={cn("w-full text-sm", CELLS)}>
+              <caption className="sr-only">{`${t.label}: last rank by branch against your rank, NEET PG ${d.year} ${round}`}</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className={cn(hc, "text-left")}>Branch</th>
+                  {cols.map((c) => (
+                    <th key={c} scope="col" className={cn(hc, "text-right")}>{c}<span className="max-md:sr-only"> last rank</span></th>
+                  ))}
+                  <th scope="col" className={cn(hc, "hidden text-right md:table-cell")}>Vs your rank</th>
+                  <th scope="col" className={cn(hc, "hidden text-right md:table-cell")}>{later ? "New seats" : "Seats"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  // The seat category that decided it, when no column shows it (a PwD's Open PwD seats).
+                  const via = r.best && !cols.includes(r.best.cat) ? ` (${r.best.cat})` : "";
+                  const mark = !r.best ? (
+                    <span className="text-muted-foreground">No allotment on your seats</span>
+                  ) : r.reached ? (
+                    <span className="font-semibold text-sky">Reached your rank{via}</span>
+                  ) : (
+                    <span className="text-muted-foreground">Closed {formatRank(me.rank - r.best.last)} before you{via}</span>
+                  );
+                  return (
+                    <tr key={`${r.quota}|${r.slug}`} data-name={(restricted ? `${r.course} ${r.quota}` : r.course).toLowerCase()} data-more={i >= fold || undefined} className="border-t border-border hover:bg-muted">
+                      <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
+                        <Link href={href(r.slug, r.quota)} className={L}>{r.course}</Link>
+                        {restricted && <span className="block text-xs text-muted-foreground">{r.quota}</span>}
+                        <span className="block text-xs md:hidden">{mark}<span className="numeric text-muted-foreground"> · {seats(r.n)}</span></span>
+                      </th>
+                      {cols.map((c) => <td key={c}>{rank(r.last[c])}</td>)}
+                      <td className="hidden md:table-cell">{mark}</td>
+                      <td className="hidden text-muted-foreground md:table-cell">{formatRank(r.n)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Panel>
+        );
+      })}
+
+      {!me && d.tabs.map((t) => (
+        <Panel key={t.key} tab={t.key} n={t.rows.length} what="branches" fold={fold}>
+          <table className={cn("w-full text-sm", CELLS)}>
+            <caption className="sr-only">{`${t.label}: last rank by branch, NEET PG ${d.year} ${round}`}</caption>
+            <thead>
+              <tr>
+                <th scope="col" className={cn(hc, "text-left")}>Branch</th>
+                {t.cats.map((c) => (
+                  <th key={c} scope="col" data-c={c === "Open" ? undefined : c} className={cn(hc, "text-right")}>
+                    <span data-base>{c}</span>
+                    <span data-pwd>{c} PwD</span>
+                  </th>
+                ))}
+                <th scope="col" className={cn(hc, "hidden text-right md:table-cell")}>{later ? "New seats" : "Seats"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {t.rows.map((r, i) => (
+                <tr key={r.slug} data-name={r.course.toLowerCase()} data-more={i >= fold || undefined} className="border-t border-border hover:bg-muted">
+                  <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
+                    <Link href={href(r.slug, r.quota)} className={L}>{r.course}</Link>
+                    <span className="numeric block text-xs text-muted-foreground md:hidden">{seats(r.n)}</span>
+                  </th>
+                  {t.cats.map((c) => (
+                    <td key={c} data-c={c === "Open" ? undefined : c}>
+                      <span data-base>{rank(r.last[c])}</span>
+                      <span data-pwd>{rank(r.last[`${c} PwD`])}</span>
+                    </td>
+                  ))}
+                  <td className="hidden text-muted-foreground md:table-cell">{formatRank(r.n)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      ))}
+
+      {!me && d.restricted.length > 0 && (
+        <Panel tab="restricted" n={d.restricted.length} what="rows" fold={fold}>
+          <p className="border-b border-border px-3 py-3 text-sm leading-relaxed text-muted-foreground md:px-4">
+            Only for candidates eligible for that quota. The last rank on any of its seats.
+          </p>
+          <table className="w-full text-sm">
+            <caption className="sr-only">{`Restricted quotas: last rank by branch, NEET PG ${d.year} ${round}`}</caption>
+            <thead>
+              <tr>
+                <th scope="col" className={cn(hc, "hidden text-left md:table-cell")}>Quota</th>
+                <th scope="col" className={cn(hc, "text-left")}>Branch</th>
+                <th scope="col" className={cn(hc, "text-right")}>Last rank</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.restricted.map((r, i) => (
+                <tr key={`${r.quota}|${r.slug}`} data-name={`${r.course} ${r.quota}`.toLowerCase()} data-more={i >= fold || undefined} className="border-t border-border hover:bg-muted">
+                  <td className="hidden px-4 py-2.5 text-muted-foreground md:table-cell">{r.quota}</td>
+                  <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
+                    <Link href={href(r.slug, r.quota)} className={L}>{r.course}</Link>
+                    <span className="block text-xs text-muted-foreground md:hidden">{r.quota}</span>
+                  </th>
+                  <td className={td}>{formatRank(r.max)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      )}
+    </div>
   );
 }
 
 /** One tab's table in its card, a line when the search matches none of it, and its fold. */
-function Panel({ tab, n, what, children }: { tab: Tab; n: number; what: string; children: React.ReactNode }) {
+function Panel({ tab, n, what, fold, children }: { tab: Tab; n: number; what: string; fold: number; children: React.ReactNode }) {
   return (
     <div data-panel={tab} className={cn("group/p mt-4 hidden", FOLDED, panelOn[tab])}>
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         {children}
         <p data-none hidden className="border-t border-border px-4 py-6 text-sm text-muted-foreground">No branch in this tab matches. Try another tab.</p>
       </div>
-      {n > FOLD && (
+      {n > fold && (
         <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center rounded-sm text-sm text-sky underline underline-offset-4 hover:no-underline has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring group-data-[searching]/lr:hidden">
           <input type="checkbox" className="lr-more sr-only" />
           <span className="group-has-[.lr-more:checked]/p:hidden">Show all {n} {what}</span>
-          <span className="hidden group-has-[.lr-more:checked]/p:inline">Show the first {FOLD}</span>
+          <span className="hidden group-has-[.lr-more:checked]/p:inline">Show the first {fold}</span>
         </label>
       )}
     </div>

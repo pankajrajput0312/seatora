@@ -7,8 +7,9 @@ import type { Category, Cutoff, DecideData, Round } from "@/features/decide/type
 vi.stubEnv("DATABASE_URL", "");
 let rankCheck: typeof import("./data").rankCheck;
 let branchTabs: typeof import("./data").branchTabs;
+let vsRank: typeof import("./data").vsRank;
 beforeAll(async () => {
-  ({ rankCheck, branchTabs } = await import("./data"));
+  ({ rankCheck, branchTabs, vsRank } = await import("./data"));
   setTestCatalog(data);
 });
 afterAll(() => setTestCatalog(null));
@@ -75,4 +76,26 @@ it("last rank by branch: per quota tab and seat category the highest rank, allot
   expect(deemed.rows.map((r) => [r.course, r.last.Open])).toEqual([["MD Anaesthesiology", 158950]]);
   expect(dnb.rows).toEqual([]);
   expect(restricted.map((r) => [r.quota, r.course, r.max])).toEqual([["Armed Forces Medical", "MD Anaesthesiology", 133207], ["Non-Resident Indian", "MD Anaesthesiology", 150000]]);
+});
+
+it("her rank against the branches: reached first, closest to her rank first, then closed before it, closest first, then none on her seats", () => {
+  const row = (course: string, last: Partial<Record<Category, number>>) => ({ course, slug: course, quota: "All India", last, n: 1 });
+  const rows = [
+    row("MD Anaesthesiology", { Open: 28979, OBC: 34013 }), // closed 8,271 before 42,284
+    row("DNB Family Medicine", { Open: 41045, OBC: 38624 }), // Open, a seat she can take too, decides: closed 1,239 before
+    row("NBEMS Diploma Anaesthesiology", { Open: 63323, OBC: 61995 }), // reached, by 21,039
+    row("MD Psychiatry", { OBC: 42284 }), // reached at her very rank: closest
+    row("Diploma Radiodiagnosis", { SC: 90000 }), // no Open or OBC allotment
+    row("DNB Pathology", { "OBC PwD": 150000 }), // PwD seats only for a PwD candidate
+  ];
+  const r = vsRank(rows, 42284, "OBC", false);
+  expect(r.map((x) => [x.course, x.reached, x.best?.last ?? null])).toEqual([
+    ["MD Psychiatry", true, 42284],
+    ["NBEMS Diploma Anaesthesiology", true, 63323],
+    ["DNB Family Medicine", false, 41045],
+    ["MD Anaesthesiology", false, 34013],
+    ["Diploma Radiodiagnosis", false, null], // A–Z
+    ["DNB Pathology", false, null],
+  ]);
+  expect(vsRank(rows, 42284, "OBC", true).find((x) => x.course === "DNB Pathology")).toMatchObject({ reached: true, best: { cat: "OBC PwD", last: 150000 } });
 });

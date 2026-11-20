@@ -205,6 +205,25 @@ export function branchTabs(rows: BranchAgg[]) {
   return { tabs, restricted };
 }
 
+/**
+ * Her rank against branch rows (Decide Home): each row's last rank on the seats she can be allotted (`best`: the deepest
+ * of eligibleCategories, as Options' "Reached"), reached when at or after `rank`. Reached first, closest to her rank
+ * first; then the ones that closed before it, closest first; then those with no allotment on her seats, A–Z.
+ */
+export function vsRank<R extends BranchRow>(rows: R[], rank: number, category: BaseCategory, pwd: boolean) {
+  const cats = eligibleCategories(category, pwd);
+  const scored = rows.map((r) => {
+    const best = cats.reduce<{ cat: Category; last: number } | null>((a, c) => {
+      const k = r.last[c];
+      return k != null && (!a || k > a.last) ? { cat: c, last: k } : a;
+    }, null);
+    return { ...r, best, reached: !!best && best.last >= rank };
+  });
+  const tier = (x: (typeof scored)[number]) => (!x.best ? 2 : x.reached ? 0 : 1);
+  const gap = (x: (typeof scored)[number]) => (x.best ? Math.abs(x.best.last - rank) : 0);
+  return scored.sort((a, b) => tier(a) - tier(b) || gap(a) - gap(b) || a.course.localeCompare(b.course) || a.quota.localeCompare(b.quota));
+}
+
 /** NEET PG's latest round with a result (lib/reach.ts latestRound: R1, then R2 once imported…), as branchTabs. */
 const branchTable = perImport(async () => {
   const cat = await getCatalog(DEFAULT_EXAM);
