@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Dialog, Tooltip } from "radix-ui";
 import { ArrowUp, Brain, Check, ChevronRight, Copy, FileText, GitCompareArrows, History, IndianRupee, ListOrdered, MessageSquarePlus, Microscope, Play, RotateCw, ShieldAlert, SlidersHorizontal, Square, TrendingUp, X } from "lucide-react";
 import { LogoMark } from "@/components/layout/logo";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { keepProfileParams } from "@/features/decide/profile";
 import { Markdown } from "./markdown";
@@ -16,7 +17,8 @@ import { parseSse, type ChatEvent } from "../sse";
 // is open. A turn streams in; when a run reaches its time slice the server says "continue" and the next run starts at
 // once; if the connection drops, the saved turn is read until it finishes (and continued if it waits at a checkpoint).
 // Nothing she sees turns into an error while the answer is still moving.
-// Look: Seatora's own (home-hub.tsx): ink, cyan and green, a faint pixel grid; a centred column, composer pinned below.
+// Look: the app's (docs/APP_DESIGN_SYSTEM.md): white sheets, the teal accent for what she can act on; a centred column,
+// composer pinned below.
 
 type Status = "streaming" | "checkpoint" | "done" | "partial" | "error" | "stopped";
 /** steps / started / took are this tab's own record of the turn's progress events (not saved; a reopened chat has none). */
@@ -35,12 +37,9 @@ const step = (m: Msg, p: string | null | undefined): Msg => ({ ...m, phase: p ??
 const secs = (ms: number) => (ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`);
 const bare = (label: string) => label.replace(/…$/, "");
 const isLive = (m: Msg) => m.status === "streaming" || m.status === "checkpoint";
-// The logo's colours on the ink tile, whatever the app theme maps sky / leaf to.
-const inkMark = { "--color-sky": "#5ccfe6", "--color-leaf": "#5fd36f" } as React.CSSProperties;
-
 function Mark() {
   return (
-    <span aria-hidden style={inkMark} className="grid size-7 shrink-0 place-items-center rounded-md bg-[#0b0e12]">
+    <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-md border border-wash-line bg-wash">
       <LogoMark className="size-4" />
     </span>
   );
@@ -50,7 +49,7 @@ function Tip({ label, children }: { label: string; children: React.ReactElement 
   return (
     <Tooltip.Root>
       <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
-      <Tooltip.Content side="bottom" sideOffset={6} className="z-50 rounded-md bg-[#0b0e12] px-2 py-1 text-xs text-[#f1f4f7]">
+      <Tooltip.Content side="bottom" sideOffset={6} className="z-50 rounded-md bg-foreground px-2 py-1 text-xs text-background shadow-overlay">
         {label}
       </Tooltip.Content>
     </Tooltip.Root>
@@ -92,7 +91,7 @@ function Progress({ m, now }: { m: Msg; now: number }) {
     <ol aria-label="Progress" className="grid gap-1 text-sm">
       {done.map((s, i) => <li key={i} className="flex items-center gap-2 text-muted-foreground"><Check className="size-3.5 shrink-0 text-leaf" aria-hidden />{bare(s)}</li>)}
       <li className="flex items-center gap-2 font-medium">
-        <span aria-hidden className="grid size-3.5 shrink-0 place-items-center"><span className="size-2 animate-pulse bg-[#5ccfe6] ring-2 ring-[#5ccfe6]/30" /></span>
+        <span aria-hidden className="grid size-3.5 shrink-0 place-items-center"><span className="size-2 animate-pulse rounded-full bg-mark ring-2 ring-mark/30" /></span>
         <span className="min-w-0">{current}</span>
         {m.started ? <span className="numeric ml-auto shrink-0 text-xs font-normal text-muted-foreground">{secs(now - m.started)}</span> : null}
       </li>
@@ -295,7 +294,7 @@ export function AskChat({ starters, youLine, head }: { starters: Starter[]; youL
       <div className="mx-auto flex min-h-[calc(100dvh-10.5rem-env(safe-area-inset-bottom))] w-full max-w-[760px] min-w-0 flex-col max-md:-mb-12 md:min-h-[calc(100dvh-5.5rem)]">
         <header className="flex items-center gap-2">
           {head}
-          <span className="rounded-full bg-sky px-2 py-0.5 text-[10px] font-bold tracking-wide text-white">BETA</span>
+          <Badge tone="info" className="font-semibold">Beta</Badge>
           <span className="ml-auto flex items-center gap-0.5">
             <Tip label="New chat">
               <button type="button" aria-label="New chat" className={iconBtn} disabled={busy || !msgs.length} onClick={newChat}>
@@ -320,30 +319,27 @@ export function AskChat({ starters, youLine, head }: { starters: Starter[]; youL
         <div className="flex-1 py-4">
           {msgs.length === 0 ? (
             <div className="grid gap-4">
-              <section aria-labelledby="ask-hello" className="relative overflow-hidden rounded-xl border border-[#1f2a33] bg-[#0b0e12] text-[#f1f4f7]">
-                <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(#5ccfe6_1px,transparent_1px),linear-gradient(90deg,#5ccfe6_1px,transparent_1px)] [background-size:14px_14px]" />
-                <div className="relative p-4 sm:p-5">
-                  <p className="font-mono text-[11px] tracking-[0.25em] text-[#5ccfe6]">▮ ASK SEATORA</p>
-                  <h2 id="ask-hello" className="mt-2 text-xl leading-tight font-bold tracking-tight sm:text-2xl" style={{ color: "#f1f4f7" }}>
-                    What should we work out this round?
-                  </h2>
+              <section aria-labelledby="ask-hello" className="flex gap-3 rounded-xl border border-border bg-card p-4 sm:p-5">
+                <Mark />
+                <div className="min-w-0">
+                  <h2 id="ask-hello" className="text-h2 font-semibold">What should we work out this round?</h2>
                   {youLine ? (
-                    <p className="numeric mt-2 text-sm font-semibold text-[#5fd36f]">{youLine}</p>
+                    <p className="mt-2 inline-flex rounded-full border border-wash-line bg-wash px-2.5 py-0.5 text-body font-semibold">{youLine}</p>
                   ) : (
-                    <p className="mt-2 text-sm text-[#a3abb3]">Set your rank (top of the page) and answers fit your rank, category and courses.</p>
+                    <p className="mt-2 text-body text-muted-foreground">Set your rank (top of the page) and answers fit your rank, category and courses.</p>
                   )}
-                  <p className="mt-1 max-w-xl text-sm text-[#a3abb3]">Ask about your options, a college&apos;s fee, bond and closing ranks, its residents, or let it build your choice list.</p>
+                  <p className="mt-1 max-w-xl text-body text-muted-foreground">Ask about your options, a college&apos;s fee, bond and closing ranks, its residents, or let it build your choice list.</p>
                 </div>
               </section>
               <section aria-labelledby="ask-try">
-                <h2 id="ask-try" className="mb-2 font-mono text-[11px] tracking-[0.2em] text-muted-foreground uppercase">Try asking</h2>
+                <h2 id="ask-try" className="section-label mb-2 text-muted-foreground">Try asking</h2>
                 <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {starters.map(({ kind, title, prompt }) => {
                     const Icon = starterIcon[kind];
                     return (
                       <li key={kind}>
-                        <button type="button" onClick={() => send(prompt)} className="group flex h-full w-full items-start gap-3 rounded-lg border border-border bg-card p-3 text-left hover:border-[#5ccfe6]">
-                          <span className="grid size-8 shrink-0 place-items-center rounded-md bg-[#0b0e12] text-[#5ccfe6]">
+                        <button type="button" onClick={() => send(prompt)} className="group flex h-full w-full items-start gap-3 rounded-xl border border-border bg-card p-3 text-left hover:border-wash-line hover:bg-wash/40">
+                          <span className="grid size-8 shrink-0 place-items-center rounded-md bg-wash text-sky">
                             <Icon className="size-[1.125rem]" strokeWidth={1.75} aria-hidden />
                           </span>
                           <span className="min-w-0">
@@ -362,7 +358,7 @@ export function AskChat({ starters, youLine, head }: { starters: Starter[]; youL
               {msgs.map((m, i) => {
                 if (m.role === "user")
                   return (
-                    <li key={i} className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 break-words whitespace-pre-wrap text-primary-foreground">
+                    <li key={i} className="ml-auto max-w-[85%] rounded-2xl rounded-br-md border border-border bg-card px-4 py-2.5 break-words whitespace-pre-wrap">
                       <span className="sr-only">You: </span>
                       {m.content}
                     </li>
@@ -412,7 +408,7 @@ export function AskChat({ starters, youLine, head }: { starters: Starter[]; youL
 
         <div className="sticky bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-10 bg-card pt-1 pb-2 md:bottom-0 md:pb-4 print:hidden">
           <form
-            className="rounded-2xl border border-input/50 bg-card shadow-sm focus-within:border-ring"
+            className="rounded-2xl border border-input bg-card shadow-xs focus-within:border-ring focus-within:ring-1 focus-within:ring-ring"
             onSubmit={(e) => {
               e.preventDefault();
               send(input);
@@ -443,7 +439,7 @@ export function AskChat({ starters, youLine, head }: { starters: Starter[]; youL
                   type="button"
                   aria-pressed={deep}
                   onClick={() => setDeepTo(!deep)}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium ${deep ? "border-transparent bg-[#0b0e12] text-[#5ccfe6]" : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium ${deep ? "border-sky bg-wash font-semibold text-sky" : "border-edge text-muted-foreground hover:border-input hover:bg-muted hover:text-foreground"}`}
                 >
                   <Microscope className="size-3.5" aria-hidden /> Deep analysis
                 </button>
@@ -451,31 +447,31 @@ export function AskChat({ starters, youLine, head }: { starters: Starter[]; youL
               <span className="numeric ml-auto text-xs text-muted-foreground">{input.length > MAX_INPUT - 200 ? `${input.length}/${MAX_INPUT}` : ""}</span>
               {busy ? (
                 <Tip label="Stop">
-                  <button type="button" aria-label="Stop the answer" onClick={stop} className="grid size-9 place-items-center rounded-full bg-[#0b0e12] text-[#5ccfe6]">
+                  <button type="button" aria-label="Stop the answer" onClick={stop} className="grid size-9 place-items-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
                     <Square className="size-3.5 fill-current" aria-hidden />
                   </button>
                 </Tip>
               ) : (
-                <button type="submit" aria-label="Send" disabled={!input.trim()} className="grid size-9 place-items-center rounded-full bg-[#0b0e12] text-[#5ccfe6] disabled:bg-muted disabled:text-muted-foreground">
+                <button type="submit" aria-label="Send" disabled={!input.trim()} className="grid size-9 place-items-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground">
                   <ArrowUp className="size-4" strokeWidth={2.25} aria-hidden />
                 </button>
               )}
             </div>
           </form>
-          <p className="mt-1.5 text-center text-[11px] leading-tight text-muted-foreground">Seatora&apos;s MCC data, saved 30 days. Closing ranks are history, not a prediction; check key terms with MCC and the college.</p>
+          <p className="mt-1.5 text-center text-caption text-muted-foreground">Seatora&apos;s MCC data, saved 30 days. Closing ranks are history, not a prediction; check key terms with MCC and the college.</p>
         </div>
       </div>
 
       {/* Past chats and memory: a sheet from the left (phones: from the bottom). Portalled into .app: above the shell's bars, with the app's tokens. */}
       <Dialog.Root open={panel != null} onOpenChange={(o) => !o && setPanel(null)}>
         <Dialog.Portal container={typeof document === "undefined" ? undefined : document.querySelector<HTMLElement>(".app")}>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-foreground/40" />
           <Dialog.Content
             aria-describedby={undefined}
-            className="ask-sheet fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-2xl border border-border bg-card pb-[env(safe-area-inset-bottom)] shadow-xl md:inset-y-0 md:right-auto md:left-0 md:max-h-none md:w-[24rem] md:rounded-none md:rounded-r-2xl"
+            className="ask-sheet fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-2xl border border-border bg-popover pb-[env(safe-area-inset-bottom)] shadow-overlay md:inset-y-0 md:right-auto md:left-0 md:max-h-none md:w-[24rem] md:rounded-none md:rounded-r-2xl"
           >
             <div className="flex items-center gap-2 border-b border-border p-3">
-              <Dialog.Title className="text-base font-semibold">{panel === "memory" ? "What Seatora remembers" : "Chat history"}</Dialog.Title>
+              <Dialog.Title className="text-title font-semibold">{panel === "memory" ? "What Seatora remembers" : "Chat history"}</Dialog.Title>
               <Dialog.Close asChild>
                 <button type="button" aria-label="Close" className={`${iconBtn} ml-auto`}>
                   <X className="size-5" aria-hidden />
@@ -484,7 +480,7 @@ export function AskChat({ starters, youLine, head }: { starters: Starter[]; youL
             </div>
             <div className="flex gap-1 px-3 pt-3" role="group" aria-label="Show">
               {(["chats", "memory"] as const).map((k) => (
-                <button key={k} type="button" aria-pressed={panel === k} onClick={() => setPanel(k)} className={`h-8 rounded-full px-3 text-xs font-medium ${panel === k ? "bg-[#0b0e12] text-[#5ccfe6]" : "text-muted-foreground hover:bg-muted"}`}>
+                <button key={k} type="button" aria-pressed={panel === k} onClick={() => setPanel(k)} className={`h-8 rounded-full px-3 text-xs font-medium ${panel === k ? "bg-wash font-semibold text-sky" : "text-muted-foreground hover:bg-muted"}`}>
                   {k === "chats" ? "Chats" : "Memory"}
                 </button>
               ))}
