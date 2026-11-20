@@ -50,28 +50,25 @@ export async function YourResult({ profile, exam, L }: { profile: Profile; exam:
         </p>
       )}
       {(said || joining || fill) && (
-        <div className="mt-3 border-t border-border pt-3 text-sm">
-          <h3 className="section-label text-muted-foreground">What to do next</h3>
-          <ul className="mt-1 grid gap-1">
-            {said && <li>{said}{notice && <> · {out(notice.url, `${w.by}'s notice`)}</>}</li>}
-            {joining && (
-              <li>
-                Last date of joining: <span className="numeric font-semibold">{joining.by}</span>
-                {joining.tentative && " (tentative: later dates may move)"}
-                {(joining.step.scheduledBy?.url ?? joining.step.url) && <> · {out((joining.step.scheduledBy?.url ?? joining.step.url)!, `${w.by}'s schedule`)}</>}
-              </li>
-            )}
-            {fill && <li>{w.roundName(fill.round)} choice filling: {fillWindow(fill)} · <Link href={L.choices()} className={`${smallLink} text-sky`}>Your Choice list</Link></li>}
-          </ul>
-        </div>
+        // Short (owner, 20 Nov): one line of what's next; the notice and schedule stay one tap away.
+        <p className="mt-2 text-sm">
+          <span className="font-semibold">Next:</span>{" "}
+          {[
+            said && (said.match(/until ([^,(]+)/)?.[1] ? `report errors to ${w.by} by ${said.match(/until ([^,(]+)/)![1].trim()}` : null),
+            said && /final result/i.test(said) ? "join only after the final result" : null,
+            !said && joining ? `join by ${joining.by}${joining.tentative ? " (tentative)" : ""}` : null,
+            fill ? `${w.roundName(fill.round)} choice filling ${fillWindow(fill)}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+          {notice && <> · {out(notice.url, "notice")}</>}
+          {fill && <> · <Link href={L.choices()} className={`${smallLink} text-sky`}>Choice list</Link></>}
+        </p>
       )}
       <p className="mt-3 flex flex-wrap gap-x-4 text-sm">
         {x.row?.collegeSlug && <Link href={L.institute(x.row.collegeSlug)} className={`${smallLink} text-sky`}>{x.row.collegeName}</Link>}
         {course && <Link href={L.lastRanks(course.slug)} className={`${smallLink} text-sky`}>Last ranks: {x.row!.courseName}</Link>}
-        {pdf?.url && out(pdf.url, `${w.by}'s ${round} result (PDF)`)}
-      </p>
-      <p className="mt-1 text-caption text-muted-foreground">
-        <TryingText saved={`From ${w.by}'s official PDF; Seatora only matches your saved rank.`} tried={`From ${w.by}'s official PDF; Seatora only matches the rank you're trying.`} />
+        {pdf?.url && out(pdf.url, `${w.by} PDF`)}
       </p>
     </section>
   );
