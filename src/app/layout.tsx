@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: { default: pageWords["/"].title, template: `%s · ${siteConfig.name}` },
   description: siteConfig.description,
+  // Search engines' site-ownership tags (Google Search Console, Bing Webmaster Tools): set the codes in Vercel, not here.
+  verification: {
+    ...(process.env.GOOGLE_SITE_VERIFICATION && { google: process.env.GOOGLE_SITE_VERIFICATION }),
+    ...(process.env.BING_SITE_VERIFICATION && { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } }),
+  },
   openGraph: { type: "website", siteName: siteConfig.name, title: `${siteConfig.name} · See the residents at every NEET PG hospital`, description: "77,000+ residents by hospital, course and year from MCC's official lists, plus options for your rank, seats, fees, stipend and bond. Free." },
   twitter: { card: "summary_large_image" },
   appleWebApp: { capable: true, title: siteConfig.name, statusBarStyle: "black" },
