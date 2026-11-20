@@ -72,6 +72,42 @@ describe("service on the test fixture", () => {
     expect(deep.counts).toEqual(base.counts);
   });
 
+  it("sorts by the toolbar's newer choices: Options' bond and name, Institutes' courses and fee, Allotments' institute and course", async () => {
+    // Lowest first (or as `key` orders), a missing value last, the same rows and counts as the default order.
+    const ordered = <T,>(rows: T[], key: (r: T) => number | string | null | undefined) => {
+      const xs = rows.map(key);
+      const known = xs.filter((x) => x != null);
+      expect(known).toEqual([...known].sort((a, b) => (typeof a === "string" ? a.localeCompare(b as string, "en", { sensitivity: "base", numeric: true }) : (a as number) - (b as number))));
+      expect(xs.slice(known.length).every((x) => x == null)).toBe(true);
+    };
+    const base = await svc.listOptions(her, { showClosed: true });
+    const bond = await svc.listOptions(her, { showClosed: true, sort: "bond" });
+    ordered(bond.rows, (r) => svc.feeValue.bondyrs(r.fees));
+    const name = await svc.listOptions(her, { showClosed: true, sort: "name" });
+    ordered(name.rows, (r) => r.college.name);
+    expect(new Set(name.rows.map((r) => r.id))).toEqual(new Set(base.rows.map((r) => r.id)));
+    expect(bond.counts).toEqual(base.counts);
+
+    const courses = (await svc.listInstitutes(null, { sort: "courses" })).rows;
+    ordered(courses, (r) => -r.courses.length);
+    const byFee = await svc.listInstitutes(null, { sort: "fee" });
+    expect(byFee.total).toBe((await svc.listInstitutes(null, {})).total);
+    // Most competitive: the figure given (none: last), ties by name.
+    const best = await svc.listInstitutes(null, { sort: "competitive", bestOf: (slug) => (slug === courses.at(-1)!.college.slug ? 1 : null) });
+    expect(best.rows[0].college.slug).toBe(courses.at(-1)!.college.slug);
+    ordered(best.rows.slice(1), (r) => r.college.name);
+
+    const f = { year: 2025, quota: "DNB Quota" };
+    const all = (await svc.listAllotments(f, { page: 1, pageSize: 1000 })).rows;
+    const inst = (await svc.listAllotments({ ...f, sort: "inst" }, { page: 1, pageSize: 1000 })).rows;
+    ordered(inst, (a) => a.college.name);
+    expect(inst).toHaveLength(all.length);
+    // Within one institute, the default order (newest round, then rank).
+    const one = inst.filter((a) => a.college.key === inst[0].college.key);
+    expect(one).toEqual(all.filter((a) => a.college.key === inst[0].college.key));
+    ordered((await svc.listAllotments({ ...f, sort: "course" }, { page: 1, pageSize: 1000 })).rows, (a) => a.courseName.slice(a.degree.length + 1));
+  });
+
   it("labels from per-year deepest closings agree with labels from every cutoff; deepest 2025 first within a label", async () => {
     const all = await svc.listOptions({ ...her, pwd: true }, { showClosed: true });
     for (const x of reachOrder) expect(all.rows.filter((r) => r.reach === x)).toHaveLength(all.counts[x]);

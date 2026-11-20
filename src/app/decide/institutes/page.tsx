@@ -16,9 +16,9 @@ import { ResultCard } from "@/features/decide/components/result-card";
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { Badge } from "@/components/ui/badge";
-import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
+import { ActiveFilters, control, EmptyState, FilterBar, Pager, rangeLabel, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes } from "@/features/decide/components/view-toggle";
-import { LayoutMenu } from "@/features/decide/components/view-menu";
+import { LayoutMenu, SortMenu } from "@/features/decide/components/view-menu";
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -28,25 +28,33 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { getDecideData, getMeta, listInstitutes } from "@/features/decide/service";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examInfo } from "@/features/exams/active";
-import { authorityOf, headYearIn, latestOf, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, headYearIn, latestOf, yearName } from "@/features/exams/registry";
+import { collegeIndex } from "@/features/exams/landing/colleges";
+import { roundShort } from "@/features/decide/types";
 import { instituteGroupOf, quotaIn } from "@/features/exams/exam";
 import { iniElsewhere } from "@/features/decide/lib/college-aliases";
 
 export const metadata: Metadata = { title: "Institutes" };
 const PAGE_SIZE = 24; // splits evenly into 2, 3 and 4 columns; small enough for a phone to paint fast
 const PATH = "/decide/institutes";
-const sortsFor = (last: string) => [
-  { value: "name", label: "Name" },
-  { value: "allotments", label: `Most allotments (${last})` },
-  { value: "beds", label: "Most beds (as reported)" },
-] as const;
+const sorts = ["name", "competitive", "courses", "allotments", "fee", "beds"] as const;
+type Sort = (typeof sorts)[number];
+/** The toolbar's Sort (`last`: the allotments' year; `round`: the competitive sort's, e.g. "2026 R2"); `short`: a phone's. */
+const sortWords = (last: string, round: string): Record<Sort, { label: string; short: string }> => ({
+  name: { label: "Name", short: "Name" },
+  competitive: { label: `Most competitive first (${round} Open last rank)`, short: "Competitive" },
+  courses: { label: "Most courses first", short: "Courses" },
+  allotments: { label: `Most allotments (${last})`, short: "Allotments" },
+  fee: { label: "Fee a year: lowest first (its cheapest course)", short: "Fee" },
+  beds: { label: "Most beds (as reported)", short: "Beds" },
+});
 const schema = z.object({
   q: z.string().max(100).optional(),
   state: z.array(z.string().max(100)).max(40).optional(), // pick one or more
   course: z.array(z.string().max(100)).max(40).optional(),
   /** INI-CET: institute groups (Exam.instituteGroups labels), one or more. */
   grp: z.array(z.string().max(40)).max(10).optional(),
-  sort: z.enum(["name", "allotments", "beds"]).default("name"),
+  sort: z.enum(sorts).default("name"),
   page: pageValue.default(1),
 });
 
@@ -67,15 +75,19 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
   // Allotments of the latest complete year (NEET PG: its later past year, as before).
   const HEAD = headYearIn(exam, meta.sources);
   const head = yearName(exam, HEAD); // as the exam names it (INI-CET: "Jan 2026")
-  // NEET MDS: no hospital beds (dental colleges): no Beds column or sort.
-  const sorts = sortsFor(head).filter((s) => E.has.beds || s.value !== "beds");
   const latest = latestOf(meta.sources, exam);
+  // NEET MDS: no hospital beds (dental colleges): no Beds column or sort; no fee data: no Fee sort. Most competitive: the
+  // public pages' figure (NEET PG's latest round, its most competitive course's Open last rank on All India, else Deemed, else DNB seats).
+  const words = sortWords(head, `${yearName(exam, latest.year)} ${roundShort(latest.round, exam)}`);
+  const sortable = sorts.filter((s) => (s !== "beds" || E.has.beds) && (s !== "fee" || E.has.fees) && (s !== "competitive" || exam === DEFAULT_EXAM));
+  const sort = sortable.includes(f.sort) ? f.sort : "name";
+  const best = sort === "competitive" ? new Map((await collegeIndex()).colleges.map((c) => [c.slug, c.best?.closing])) : null;
   // Term filters and the beds sort narrow and order the list before it is paged, so reach is read for one page only.
   // INI-CET's institute groups picked: their colleges only (with the term filters' pass list, both).
   const groups = (f.grp ?? []).filter((g) => E.instituteGroups?.some((x) => x.label === g));
   const inGroups = groups.length ? new Set<string>((await getDecideData(exam)).colleges.map((c) => c.key).filter((k) => groups.includes(instituteGroupOf(E, k) ?? ""))) : null;
   const only = inGroups && byTerms?.pass ? new Set([...byTerms.pass].filter((k) => inGroups.has(k))) : (inGroups ?? byTerms?.pass);
-  const filters = { search: f.q, state: f.state, course: f.course, sort: f.sort, only, bedsOf: (key: string) => info.get(key)?.beds?.n };
+  const filters = { search: f.q, state: f.state, course: f.course, sort, only, bedsOf: (key: string) => info.get(key)?.beds?.n, bestOf: best ? (slug: string) => best.get(slug) : undefined };
   const [res, unknown, untyped] = await Promise.all([
     listInstitutes(profile, filters, pg, exam),
     byTerms ? listInstitutes(null, { ...filters, only: byTerms.unknown }, { page: 1, pageSize: 1 }, exam).then((r) => r.total) : 0,
@@ -219,6 +231,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         clear={clear}
         total={res.total}
         noun="institutes"
+        sort={<SortMenu value={sort} choices={sortable.map((s) => ({ value: s, ...words[s], href: L.with(PATH, { sort: s === "name" ? null : s, page: null }) }))} />}
         view={res.total > 0 && <LayoutMenu page="institutes" view={view} />}
         search={
           <label className="min-w-0">
@@ -230,7 +243,6 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={f.state ?? []} none="All states" />
         <FilterDropdown label="Course" name="course" search options={meta.courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} selected={f.course ?? []} none="Any course" />
         {E.instituteGroups && <FilterDropdown label="Institute" name="grp" options={E.instituteGroups.map((g) => ({ value: g.label, label: g.label }))} selected={groups} none="Every institute" />}
-        <Field label="Sort"><Select name="sort" value={f.sort} options={[...sorts]} /></Field>
         <TermFilterControls f={tp} caps={profile} fees={E.has.fees} />
       </FilterBar>
       <ActiveFilters items={chips} clear={clear} />

@@ -20,6 +20,7 @@ export class ResidentsDenied extends Error {
 const orderBy = {
   year: [{ year: "desc" }, { college: { name: "asc" } }, { collegeId: "asc" }, { name: "asc" }],
   name: [{ name: "asc" }, { year: "desc" }],
+  course: [{ specialty: { name: "asc" } }, { specialty: { degree: "asc" } }, { year: "desc" }, { college: { name: "asc" } }, { collegeId: "asc" }, { name: "asc" }],
   college: [{ college: { name: "asc" } }, { collegeId: "asc" }, { year: "desc" }, { name: "asc" }],
 } satisfies Record<ResidentsQuery["sort"], Prisma.ResidentOrderByWithRelationInput[]>;
 

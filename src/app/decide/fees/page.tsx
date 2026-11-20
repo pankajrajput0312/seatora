@@ -19,7 +19,7 @@ import { TypeBadge } from "@/features/decide/components/type-badge";
 import { AboutData } from "@/features/decide/components/filter-form";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, tbl } from "@/features/decide/components/ui";
 import { ViewPanes } from "@/features/decide/components/view-toggle";
-import { LayoutMenu } from "@/features/decide/components/view-menu";
+import { LayoutMenu, SortMenu, type SortChoice } from "@/features/decide/components/view-menu";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -38,6 +38,8 @@ const schema = feesParamsSchema.extend({ page: pageValue.default(1) });
 /** The table's stat columns (TermStatCells order) and the sort each header sets. */
 const sortOf: Record<StatKey, Exclude<FeeSort, "name">> = { fee: "fee1", stipend: "stip1", bond: "bondyrs", bondInr: "bond", leaving: "leave" };
 const sortLabel: Record<FeeSort, string> = { fee1: "fee a year", stip1: "stipend, year 1", bondyrs: "bond years", bond: "bond penalty", leave: "leaving penalty", feetotal: "whole-course fee", name: "institute name" };
+/** The toolbar's Sort on a phone. */
+const sortShort: Record<FeeSort, string> = { fee1: "Fee", stip1: "Stipend", bondyrs: "Bond yrs", bond: "Bond ₹", leave: "Leaving", feetotal: "Fee total", name: "Name" };
 /** Stipend sorts highest first by default, the rest lowest first. */
 const natural = (k: FeeSort) => (k === "stip1" ? "desc" : "asc");
 const arrow = (on: boolean, dir: string) => (on ? <span aria-hidden="true">{dir === "asc" ? " ↑" : " ↓"}</span> : null);
@@ -61,12 +63,18 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const rowTitle = (r: (typeof rows)[number]) => (r.course ? `${r.course.degree} ${r.course.name}` : `${programmeTitle(r.terms)}, every course`);
   const { rows } = res;
   const dir = f.dir ?? natural(f.sort);
-  const byName = f.sort === "name";
   const sortHref = (k: FeeSort) => L.with("/decide/fees", { sort: k, dir: f.sort === k ? (dir === "asc" ? "desc" : "asc") : natural(k), page: null });
+  // The toolbar's Sort: each column its natural way (stipend highest first, the rest lowest first, names A to Z); the
+  // other way, set by a column header, is a choice too while it is on.
+  const words = (k: FeeSort, d: "asc" | "desc") => `${sortLabel[k][0].toUpperCase()}${sortLabel[k].slice(1)}: ${k === "name" ? (d === "asc" ? "A to Z" : "Z to A") : d === "asc" ? "lowest first" : "highest first"}`;
+  const sortChoices: SortChoice[] = (Object.keys(sortLabel) as FeeSort[]).map((k) => ({ value: k, label: words(k, natural(k)), short: sortShort[k], href: L.with("/decide/fees", { sort: k === "fee1" ? null : k, dir: null, page: null }) }));
+  if (dir !== natural(f.sort)) sortChoices.push({ value: `${f.sort} ${dir}`, label: words(f.sort, dir), short: sortShort[f.sort], href: L.with("/decide/fees", { sort: f.sort, dir, page: null }) });
   const ariaSort = (on: boolean) => (on ? (dir === "asc" ? "ascending" : "descending") : undefined);
   const years = (r: (typeof rows)[number]) => `${L.institute(r.college.slug, "fees")}#fees-${programmes[r.terms.programme].slug}`;
   const of = (r: (typeof rows)[number]) => `${r.college.name}, ${rowTitle(r)}`;
   const without = (k: string) => L.with("/decide/fees", { [k]: null, page: null });
+  // The sort is no filter (the toolbar's Sort shows it): Clear keeps it.
+  const clearAll = L.to("/decide/fees", { sort: params.get("sort"), dir: params.get("dir") });
   const chips = [
     ...cf.chips((v) => L.with("/decide/fees", { course: v, page: null }), (s) => L.without("/decide/fees", "course", s)),
     // Her profile's caps apply here (absent maxfee / bondyrs): a chip each, removed by "any".
@@ -193,9 +201,10 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         action="/decide/fees"
         params={params}
         active={chips.length}
-        clear={L.to("/decide/fees")}
+        clear={clearAll}
         total={res.total}
         noun={noun}
+        sort={<SortMenu value={dir === natural(f.sort) ? f.sort : `${f.sort} ${dir}`} choices={sortChoices} />}
         view={res.total > 0 && <LayoutMenu page="fees" view={view} />}
         search={
           <label className="grid min-w-0 text-sm">
@@ -214,15 +223,8 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             options={[...(d.states ? [{ value: "all", label: "All states" }] : []), ...meta.states.map((s) => ({ value: s, label: s }))]} />
         </Field>
         <TermFilterControls f={f} caps={d} />
-        <Field label="Sort by">
-          <Select name="sort" value={f.sort} options={(Object.keys(sortLabel) as FeeSort[]).map((k) => ({ value: k, label: sortLabel[k][0].toUpperCase() + sortLabel[k].slice(1) }))} />
-        </Field>
-        <Field label="Order">
-          <Select name="dir" value={f.dir} all={byName ? "A to Z" : natural(f.sort) === "desc" ? "Highest first" : "Lowest first"}
-            options={[{ value: "asc", label: byName ? "A to Z" : "Lowest first" }, { value: "desc", label: byName ? "Z to A" : "Highest first" }]} />
-        </Field>
       </FilterBar>
-      <ActiveFilters items={chips} clear={L.to("/decide/fees")} />
+      <ActiveFilters items={chips} clear={clearAll} />
 
       <div className={toolbarRow}>
         <AboutData>

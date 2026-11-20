@@ -19,7 +19,7 @@ import { SeatCards } from "@/features/decide/components/seats/seat-cards";
 import { kindNote, listTitle, SeatListPicker, SeatTable } from "@/features/decide/components/seats/seat-lists";
 import { SeatMatrix, SeatMatrixDisplay, type ClosingYear, type MatrixRow, type SeatGroup } from "@/features/decide/components/seats/seat-matrix";
 import { ViewField, ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
-import { ViewMenu, ViewMenuGroup } from "@/features/decide/components/view-menu";
+import { SortMenu, ViewMenu, ViewMenuGroup } from "@/features/decide/components/view-menu";
 import { chosenView } from "@/features/decide/server/view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
@@ -45,6 +45,8 @@ const kindSeats = (l: SeatList, exam: ExamKey) => (kindName(l.kind, exam) === "S
 const sortLabels: Record<SeatSort, string> = {
   reach: "Reach: beyond your rank first", closing: "Deepest past closing first", seats: "Most seats first", college: "By institute", state: "By state", fee: "Lowest fee first", bond: "Shortest bond first",
 };
+/** The toolbar's Sort on a phone. */
+const sortShort: Record<SeatSort, string> = { reach: "Reach", closing: "Deepest", seats: "Seats", college: "Institute", state: "State", fee: "Fee", bond: "Bond" };
 /** The matrix count line: "1,234 clear seats", "567 virtual", "89 newly added" (a round's two newly added PDFs: each dated, as the picker does). */
 const kindCount = (l: SeatList, n: number, round: SeatList[], exam: ExamKey) => {
   const day = round.some((x) => x !== l && x.kind === l.kind) ? listDay(l) : undefined;
@@ -241,13 +243,17 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
               </select>
             </Field>
           )}
-          <Field label="Sort">
-            <select name="sort" defaultValue={sort} className={control}>
-              {seatSorts.filter((s) => profile || s !== "reach").map((s) => <option key={s} value={s}>{s === "seats" && several ? `Most ${kindSeats(list, exam)} first` : s === "reach" && matrix ? "Reach: beyond your rank first" : sortLabels[s]}</option>)}
-            </select>
-          </Field>
         </Fragment>
         </FiltersPanel>
+        <SortMenu
+          value={sort}
+          choices={seatSorts.filter((s) => profile || s !== "reach").map((s) => ({
+            value: s,
+            label: s === "seats" && several ? `Most ${kindSeats(list, exam)} first` : s === "reach" && matrix ? "Reach: beyond your rank first" : sortLabels[s],
+            short: sortShort[s],
+            href: here({ sort: s === (profile ? "reach" : "college") ? null : s }),
+          }))}
+        />
         {/* The list, view and round pickers, behind View (results first). A list's chip filters to it: one list's seats
             (One list, Compare), or in the matrix the rows with seats in it. */}
         <ViewMenu current={`${title} list`}>

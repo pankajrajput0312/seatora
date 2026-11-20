@@ -19,7 +19,8 @@ import { TermFilterControls, UntypedNote } from "@/features/decide/components/te
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { VIEW_PARAM, ViewPanes } from "@/features/decide/components/view-toggle";
-import { LayoutMenu } from "@/features/decide/components/view-menu";
+import { LayoutMenu, SortMenu } from "@/features/decide/components/view-menu";
+import { allotmentSorts, type AllotmentSort } from "@/features/decide/service";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
@@ -47,6 +48,12 @@ const colsOf = (E: Exam) => [
   { key: "status", label: "Status" },
   ...(printsPrev(E.key) ? [{ key: "prev", label: "Previous seat" }] : []),
 ];
+/** The toolbar's Sort (`short`: a phone's). */
+const sortWords: Record<AllotmentSort, { label: string; short: string }> = {
+  rank: { label: "Rank (newest round first)", short: "Rank" },
+  inst: { label: "Institute A–Z", short: "Institute" },
+  course: { label: "Course A–Z", short: "Course" },
+};
 /** Its results print a choice number and the seat held a round earlier (MCC's R2 / R3); AIIMS's print neither. */
 const printsPrev = (exam: ExamKey) => authorityOf(exam) === "MCC";
 
@@ -113,7 +120,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   // Chips for the filters she set (the page's own default, the latest round, is not one); the institute has its own line.
   const here = (changes: Record<string, string | null>) => L.with("/decide/allotments", { page: null, ...changes });
   // Every allotment, not her profile's default: also where Reset and Clear all go.
-  const showAll = L.to("/decide/allotments", { inst: inst?.slug, mine: "0" });
+  const showAll = L.to("/decide/allotments", { inst: inst?.slug, mine: "0", sort: f.sort });
   const set = (k: string) => !!params.get(k)?.trim();
   const courseLabel = (slug: string) => {
     const c = meta.courses.find((x) => x.slug === slug);
@@ -209,7 +216,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const table = (
     <ScrollTable label="Allotments" scope="allotments" scrollClassName="scroll-pl-28 max-md:scroll-pl-[8.5rem]">
       <table className={tbl.table}>
-        <caption className="sr-only">Allotments, page {page}</caption>
+        <caption className="sr-only">Allotments, page {page}{f.sort && f.sort !== "rank" && `, sorted by ${sortWords[f.sort].label}`}</caption>
         <thead className={tbl.head}><tr className="text-left">
           {/* Phones: the round and the institute (course, at one institute) ride in the pinned Rank cell, so a row swiped
               sideways still says whose seat it is; their own columns go. */}
@@ -295,7 +302,16 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
       <div className="filter-row">
-      <FilterBar action="/decide/allotments" params={params} active={active.length} clear={showAll} total={total} noun="allotments" view={total > 0 && <LayoutMenu page="allotments" view={view} />}>
+      <FilterBar
+        action="/decide/allotments"
+        params={params}
+        active={active.length}
+        clear={showAll}
+        total={total}
+        noun="allotments"
+        sort={(total > 0 || f.sort) && <SortMenu value={f.sort ?? "rank"} choices={allotmentSorts.map((s) => ({ value: s, ...sortWords[s], href: here({ sort: s === "rank" ? null : s }) }))} />}
+        view={total > 0 && <LayoutMenu page="allotments" view={view} />}
+      >
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         {f.mine && <input type="hidden" name="mine" value={f.mine} />}
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>

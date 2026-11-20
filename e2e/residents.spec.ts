@@ -60,7 +60,7 @@ test("residents: her courses, newest year first, no rank; filters by college and
     await expect(page.locator("#page-sources summary")).toContainText(/Sources \(\d+\)/);
     // Quotas naming a religion are one "Minority", in the filter too; no rank sort.
     await expect(page.locator('select[name="rq"] option', { hasText: /Muslim Minority|Jain Minority/ })).toHaveCount(0);
-    await expect(page.locator('select[name="sort"] option')).toHaveText(["Year, newest first", "College", "Name"]);
+    await expect(page.getByRole("combobox", { name: "Sort" }).locator("option")).toHaveText(["Year, newest first", "Name A–Z", "Course A–Z", "College A–Z"]);
 
     // A college by name (type it in the search box, tick it, Search): only its residents in her courses.
     const college = await db.college.findFirstOrThrow({ where: { residents: { some: { hidden: false, ...hers } } }, orderBy: { name: "asc" }, select: { slug: true, name: true } });

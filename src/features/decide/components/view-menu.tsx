@@ -1,10 +1,88 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowUpDown, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { navigating } from "./nav-pending";
 import type { View } from "./view-toggle";
 import { ViewToggle } from "./view-toggle-client";
+
+/** One way to sort a list: `href` is this page with it (the server's own sort params, `page` dropped); `short`: phones' words. */
+export type SortChoice = { value: string; label: string; short?: string; href: string };
+
+/**
+ * The toolbar's "Sort: <current> ▾", beside View: a native <select> (labelled "Sort", the keyboard's and the screen
+ * reader's own control) over the words she sees, so the current sort is always on the page. Picking one loads its
+ * `href` (the sort lives in the address: Back, a shared link, the CSV); the new order is announced ("Sorted by …").
+ * With the keyboard (arrows change a closed select at once on some systems) it waits until she stops. Inside a filter
+ * form, the address's `sort` and `dir` ride along as hidden fields, so Apply keeps the order. `value`: the current
+ * choice's (a value no choice has: the first).
+ */
+export function SortMenu({ choices, value, className }: { choices: SortChoice[]; value: string; className?: string }) {
+  const id = useId();
+  const router = useRouter();
+  const sp = useSearchParams();
+  const on = choices.find((c) => c.value === value) ?? choices[0];
+  // What she picked, shown at once while its page loads; the page's own once it has.
+  const [v, setV] = useState(on.value);
+  useEffect(() => setV(on.value), [on.value]);
+  const shown = choices.find((c) => c.value === v) ?? on;
+  const keyed = useRef(false);
+  const wait = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const picked = useRef(false);
+  const [said, setSaid] = useState("");
+  // Said once the page shows the new order (this control stays mounted across the navigation).
+  useEffect(() => {
+    if (!picked.current) return;
+    picked.current = false;
+    setSaid(`Sorted by ${on.label}`);
+  }, [on.label]);
+  useEffect(() => () => clearTimeout(wait.current), []);
+  const go = (href: string) => {
+    picked.current = true;
+    navigating();
+    router.push(href, { scroll: false });
+  };
+  return (
+    <div
+      data-sort-menu
+      className={cn(
+        "relative inline-flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-md border border-input bg-secondary px-3 text-sm font-medium whitespace-nowrap hover:bg-raised has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring md:px-4",
+        className,
+      )}
+    >
+      {(["sort", "dir"] as const).map((k) => sp.get(k) && <input key={k} type="hidden" name={k} value={sp.get(k)!} />)}
+      <ArrowUpDown className="size-4 shrink-0" aria-hidden />
+      <span aria-hidden className="max-md:hidden">Sort:</span>
+      <span aria-hidden className="min-w-0 truncate font-normal text-muted-foreground md:max-w-64">
+        <span className="md:hidden">{shown.short ?? shown.label}</span>
+        <span className="max-md:hidden">{shown.label}</span>
+      </span>
+      <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <label htmlFor={id} className="sr-only">Sort</label>
+      <select
+        id={id}
+        value={shown.value}
+        onKeyDown={() => (keyed.current = true)}
+        onPointerDown={() => (keyed.current = false)}
+        onChange={(e) => {
+          const href = choices.find((c) => c.value === e.currentTarget.value)?.href;
+          setV(e.currentTarget.value);
+          if (!href) return;
+          clearTimeout(wait.current);
+          if (keyed.current) wait.current = setTimeout(() => go(href), 700);
+          else go(href);
+        }}
+        // Over the whole box (the words under it are what it shows): a tap or click opens the browser's own list.
+        className="absolute inset-0 size-full cursor-pointer appearance-none opacity-0"
+      >
+        {choices.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+      </select>
+      <span role="status" className="sr-only">{said}</span>
+    </div>
+  );
+}
 
 /**
  * The toolbar's "View" disclosure: a page's view, round and list pickers (links) in a panel under one button, so the

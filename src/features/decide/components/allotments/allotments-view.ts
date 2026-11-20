@@ -4,7 +4,7 @@ import { DEFAULT_EXAM, exams, perGroup, type ExamKey } from "@/features/exams/re
 import { pageValue, parseSearchParams, rankValue } from "../../lib/params";
 import { anyTermFilter, feeValue, termFilterLists, termFilters, termFilterShape, untypedOnly } from "../../lib/term-filters";
 import { profileFromParams, profileHasCourse, profileQuotas } from "../../profile";
-import { getCollege, getMeta, listAllotments } from "../../service";
+import { allotmentSorts, getCollege, getMeta, listAllotments } from "../../service";
 import { baseCategories, prevRemarkLabel, roundLabel, rounds, termLabel, type Allotment, type Source, type Term } from "../../types";
 import { collegeTypeLabel } from "../institute/college-type";
 import { reportedCount } from "../institute/hospital-bits";
@@ -31,6 +31,8 @@ const schema = z.object({
   from: rankValue.optional(),
   to: rankValue.optional(),
   page: pageValue.default(1),
+  /** service.ts allotmentSorts; absent = rank (newest year, round, then rank). */
+  sort: z.enum(allotmentSorts).optional(),
   /** Fee, stipend, bond, leaving, college type and `nd` on each allotment's course and quota (lib/term-filters.ts; an absent fee / bond cap is her profile's). */
   ...termFilterShape,
 });
@@ -81,6 +83,7 @@ export async function allotmentsView(params: URLSearchParams, pageSize: number, 
     from: fromProfile?.from ?? (rankError ? undefined : f.from),
     to: fromProfile?.to ?? (rankError ? undefined : f.to),
     terms: termFilters(f, profile),
+    sort: f.sort,
   };
   // `unknownTerms`: the rows "Include not declared" (nd=keep) would add, i.e. left out only because a filtered figure is
   // not declared (keep is a superset: it only lets unknown values through). Counted only when that box is unticked.

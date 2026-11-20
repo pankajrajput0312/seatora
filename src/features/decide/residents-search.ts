@@ -16,7 +16,7 @@ export const residentsQuery = z.object({
   course: z.array(z.string().max(80)).max(20).optional(), // Specialty.slug; empty/absent = all courses
   year: z.array(z.coerce.number().int().min(2023).max(2030)).max(10).optional(), // one or more
   quota: z.string().max(60).optional(), // MCC quota label, e.g. "All India"
-  sort: z.enum(["year", "name", "college"]).default("year"), // year: newest first, then college, then name
+  sort: z.enum(["year", "name", "course", "college"]).default("year"), // year: newest first, then college, then name
   page: z.coerce.number().int().min(1).max(10_000).default(1),
 });
 export type ResidentsQuery = z.infer<typeof residentsQuery>;

@@ -20,7 +20,8 @@ import { TermFilterControls } from "@/features/decide/components/term-filter-con
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes } from "@/features/decide/components/view-toggle";
-import { LayoutMenu } from "@/features/decide/components/view-menu";
+import { LayoutMenu, SortMenu } from "@/features/decide/components/view-menu";
+import { byNumber, byText, chain } from "@/features/decide/lib/sorts";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankShorthand } from "@/features/decide/lib/params";
@@ -53,8 +54,12 @@ const schema = z.object({
   year: z.coerce.number().int().optional(),
   w: z.enum(windows).optional(),
   round: z.enum(rounds).optional(),
+  /** Within each round: "rank" (absent) or "inst" (institute A to Z, then rank). */
+  sort: z.enum(["rank", "inst"]).optional(),
   page: pageValue.optional(),
 });
+/** The toolbar's Sort (`short`: a phone's); the rows stay grouped by round either way. */
+const sortWords = { rank: { label: "Rank (round by round)", short: "Rank" }, inst: { label: "Institute A–Z (round by round)", short: "Institute" } } as const;
 const multi = (params: URLSearchParams, k: string) => params.getAll(k).flatMap((v) => v.split(",")).filter(Boolean);
 
 export default async function RankScanPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -101,7 +106,8 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   // Every round's rows first (the By round line counts each), then the round picked.
   const terms = splitByTerms(scanned, tp.filters, (a) => a.fees, (a) => a.hospital?.type?.value);
   const inRound = <T extends { round: string }>(xs: T[]) => (round ? xs.filter((a) => a.round === round) : xs);
-  const [kept, unknown] = [inRound(terms.kept), inRound(terms.unknown)];
+  const [byRank, unknown] = [inRound(terms.kept), inRound(terms.unknown)];
+  const kept = f.sort === "inst" ? [...byRank].sort(chain(byNumber((a) => rounds.indexOf(a.round)), byText((a) => a.collegeName), byNumber((a) => a.rank))) : byRank;
   // Her courses have none in the range: the nearest ranks they had that year, below and above it (any filter but the terms).
   type Near = Awaited<ReturnType<typeof rankScan>>[number]["rows"][number];
   let nearest: { below: Near | null; above: Near | null } | null = null;
@@ -111,7 +117,8 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
     nearest = { below: pick(all.filter((a) => a.rank < rank - window), (a, b) => a.rank > b.rank), above: pick(all.filter((a) => a.rank > rank + window), (a, b) => a.rank < b.rank) };
   }
   type Row = (typeof kept)[number];
-  const you = rank ? youMarks(kept, rank) : new Set<Row>();
+  // "Your rank falls here": in rank order only.
+  const you = rank && f.sort !== "inst" ? youMarks(kept, rank) : new Set<Row>();
   const page = Math.min(Math.max(1, Math.ceil(kept.length / pageSize)), f.page ?? 1);
   const rows = kept.slice((page - 1) * pageSize, page * pageSize);
   const groups = rounds.map((rd) => ({ round: rd, rows: rows.filter((a) => a.round === rd) })).filter((g) => g.rows.length);
@@ -175,6 +182,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         clear={clear}
         total={rank && year && !invalid ? kept.length : undefined}
         noun="allotments"
+        sort={!invalid && (groups.length > 0 || f.sort) && <SortMenu value={f.sort ?? "rank"} choices={(["rank", "inst"] as const).map((s) => ({ value: s, ...sortWords[s], href: L.with(R, { sort: s === "rank" ? null : s, page: null }) }))} />}
         view={!invalid && groups.length > 0 && <LayoutMenu page={VIEW} view={view} />}
         search={
           <label className="flex min-w-0 items-center gap-2 text-sm">

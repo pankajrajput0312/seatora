@@ -13,7 +13,7 @@ import { FilterForm, FiltersPanel, ToolbarCount, ToolbarSearch } from "@/feature
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { OptionsResults } from "@/features/decide/components/option-actions";
 import { ViewField, ViewToggle } from "@/features/decide/components/view-toggle";
-import { ViewMenu, ViewMenuGroup } from "@/features/decide/components/view-menu";
+import { SortMenu, ViewMenu, ViewMenuGroup } from "@/features/decide/components/view-menu";
 import { chosenView } from "@/features/decide/server/view";
 import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, kindNote, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
@@ -65,13 +65,18 @@ const filtersSchema = z.object({
   up: z.literal("1").optional(),
   page: pageValue.default(1),
 });
-const sortLabels = (last: string): Record<OptionSort, string> => ({
+const sortLabels = (last: string, round: string | undefined): Record<OptionSort, string> => ({
   label: "Reach (reached first)",
   deep: `${last} closing: deepest first`,
   tight: `${last} closing: tightest first`,
   fee: "Fee a year: lowest first",
   stipend: "Stipend, year 1: highest first",
+  bond: "Bond: lightest first",
+  seats: `${round ?? "Round"} seats: most first`,
+  name: "Institute A–Z",
 });
+/** The toolbar's Sort on a phone. */
+const sortShort: Record<OptionSort, string> = { label: "Reach", deep: "Deepest", tight: "Tightest", fee: "Fee", stipend: "Stipend", bond: "Bond", seats: "Seats", name: "A–Z" };
 
 export default async function OptionsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
@@ -110,7 +115,6 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   ]);
   // The sorts' year: the latest complete one (NEET PG: its later past year, as before).
   const HEAD = yearName(exam, headYearIn(exam, meta.sources)); // as the exam names it (INI-CET: "Jan 2026")
-  const sortLabel = sortLabels(HEAD);
   const lists = r.seatLists;
   const roundView = r.view === "round";
   // The round view lists the seats with no past allotment as rows; the other view names them and links Seats.
@@ -130,6 +134,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const by = authorityOf(exam); // MCC; INI-CET: AIIMS
   const counted = reachWindow(latest, PAST_YEARS, !f.prov);
   const round = lists[0] && `${yearName(exam, lists[0].year)} ${roundShort(lists[0].round, exam)}`;
+  const sortLabel = sortLabels(HEAD, round);
   const roundWords = lists[0] && roundName[lists[0].round];
   // Switching views drops the filters whose default differs by view (seats, closed), so each view opens as itself, and
   // the "new" label, which only the round view has.
@@ -184,7 +189,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   for (const [k, v] of Object.entries(tp)) if (v != null) api.set(k, Array.isArray(v) ? v.join(",") : String(v));
   // INI-CET: one list a session, AIIMS's seat position (never clear / virtual / newly added).
   const sp = kindName("clear", exam) === "Seat position";
-  const caption = `Options for ${E.rankWord} ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? (sp ? `; ${round} seat position` : `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added`) : ""}`;
+  const caption = `Options for ${E.rankWord} ${formatRank(profile.rank)} (${profile.category}${profile.pwd ? " PwD" : ""}), closing ranks on ${seats} seats${lists.length ? (sp ? `; ${round} seat position` : `; ${round} seats per list (${lists.map((l) => l.kind).join(", ")}), never added`) : ""}${f.sort && f.sort !== "label" ? `; sorted by ${sortLabel[f.sort]}` : ""}`;
   // Chips for what narrows this list beyond her courses: each removes one filter, Clear all removes them all.
   // One name per value, the chip's and the Filters sheet's alike ("any" is any of the round's lists, never with or without).
   const seatsWords = (s: SeatKind | "any") => (s === "any" || sp ? `Has seats in ${sp ? `the ${round} seat position` : `any ${round} list`}` : `Has ${round} ${seatKindLabel[s].toLowerCase()}${s === "new" ? "" : " seats"}`);
@@ -201,7 +206,6 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     lists.length > 0 && !r.seats && f.seats && { label: `With or without ${round} seats`, param: "seats", href: here({ seats: null }) },
     f.closed && f.closed !== closedDefault && !f.reach && { label: f.closed === "1" ? "Closed before your rank: shown" : "Closed before your rank: hidden", href: here({ closed: null }) },
     f.prov && { label: `Without ${latestName} (provisional)`, param: "prov", href: here({ prov: null }) },
-    f.sort && f.sort !== "label" && { label: `Sorted: ${sortLabel[f.sort]}`, param: "sort", href: here({ sort: null }) },
     // One chip per course (or specialty and degree), quota and state, her profile's for this visit: the × takes that one out.
     ...(profile.pairs?.length
       ? profile.pairs.map((c) => ({ label: pairLabel(c), param: "c", href: L.without("/decide/options", "c", c) }))
@@ -217,7 +221,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
     profile.maxBondYears != null && tp.bondyrs == null && { label: `Your cap: ${termValueLabel.bondyrs(profile.maxBondYears)}`, param: "bondyrs", href: here({ bond: null }) },
     ...termChips(tp).map((c) => ({ label: c.label, param: c.key, href: c.value ? L.without("/decide/options", c.key, c.value) : here({ [c.key]: null }) })),
   ].filter((x) => !!x);
-  const clearAll = here({ capped: null, up: null, q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, sort: null, ...(perGroup(exam) ? {} : { quota: null }), st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
+  // The sort is no filter (the toolbar's Sort shows it): Clear all keeps it.
+  const clearAll = here({ capped: null, up: null, q: null, reach: null, seats: roundView ? "all" : null, closed: null, prov: null, ...(perGroup(exam) ? {} : { quota: null }), st: null, fee: null, bond: null, ...Object.fromEntries(termKeys.map((k) => [k, null])) });
   // Another exam (most of its MCC profiles give no fee figure): a cap never empties the list unsaid.
   const capped = "capped" in r ? (r.capped ?? 0) : 0;
   const caps = [profile.maxFeeLakh != null && tp.maxfee == null && termValueLabel.maxfee(profile.maxFeeLakh), profile.maxBondYears != null && tp.bondyrs == null && termValueLabel.bondyrs(profile.maxBondYears)].filter(Boolean).join(", ");
@@ -417,11 +422,6 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
                 </select>
               </Field>
             )}
-            <Field label="Sort by">
-              <select name="sort" defaultValue={f.sort ?? "label"} className={control}>
-                {optionSorts.filter((s) => E.has.fees || (s !== "fee" && s !== "stipend")).map((s) => <option key={s} value={s}>{sortLabel[s]}</option>)}
-              </select>
-            </Field>
             <TermFilterControls f={tp} caps={profile} fees={E.has.fees} />
             {latest.provisional && (
               <span className="flex min-h-12 items-center gap-1 border-b border-border text-sm">
@@ -434,6 +434,14 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             )}
           </Fragment>
         </FiltersPanel>
+        {(r.total > 0 || f.sort) && (
+          <SortMenu
+            value={f.sort ?? "label"}
+            choices={optionSorts
+              .filter((s) => (E.has.fees || !["fee", "stipend", "bond"].includes(s)) && (s !== "seats" || lists.length > 0))
+              .map((s) => ({ value: s, label: sortLabel[s], short: sortShort[s], href: here({ sort: s === "label" ? null : s }) }))}
+          />
+        )}
         {/* Reach and Cards | Table behind View (results first); the closed-before toggle the reach list's last chip. */}
         <ViewMenu current={f.reach ? reachLabel(f.reach, latest, PAST_YEARS, !f.prov) : view === "cards" ? "Cards" : "Table"}>
           <ViewMenuGroup label="Reach">

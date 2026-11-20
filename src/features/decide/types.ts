@@ -155,7 +155,7 @@ export const seatKinds = ["clear", "virtual", "new"] as const;
  * year's deepest closing, deepest or tightest first), "fee" (year 1, lowest first), "stipend" (year 1, highest first).
  * A missing value goes last either way.
  */
-export const optionSorts = ["label", "deep", "tight", "fee", "stipend"] as const;
+export const optionSorts = ["label", "deep", "tight", "fee", "stipend", "bond", "seats", "name"] as const;
 export type OptionSort = (typeof optionSorts)[number];
 export type SeatKind = (typeof seatKinds)[number];
 export const seatKindLabel: Record<SeatKind, string> = { clear: "Clear vacancy", virtual: "Virtual vacancy", new: "Newly added seats" };

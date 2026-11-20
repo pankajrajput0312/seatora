@@ -16,6 +16,7 @@ import { findAllotments, findCutoffs, findReachInputs, type CutoffQuery } from "
 import { hasOption, listSeats, optionSeats, pickLists, seatLists, type OptionSeats } from "./server/seats";
 import { bucketOfDegree, collegeTerms, courseTerms, type Programme, type ProgrammeTerms } from "./server/terms";
 import { yearlyFee } from "./lib/stat-format";
+import { byNumber, byText, chain, type Cmp } from "./lib/sorts";
 import { optionId, rounds, seatKinds, type OptionSort, type Allotment, type Category, type College, type Course, type Cutoff, type Notice, type OptionsView, type Round, type SeatKind, type SeatList, type Source, type Term } from "./types";
 
 // Data comes from Postgres (MCC import, prisma/import-mcc.ts) through ./server; the small, slow-changing part (colleges,
@@ -568,20 +569,30 @@ export async function listOptions(profile: Profile | null, f: OptionFilters = {}
     ? newOptions(cat, profileSeats, profile, (o) => inProfile(cat, o, profile) && termVerdict(optTerms(cat, o), types?.get(o.college)?.type?.value, tf) === "unknown")
     : [];
   const by = new Map(profileSeats ? [...mine, ...fresh, ...split.unknown, ...freshUnknown].map((o) => [o.id, seatsByKind(lists, profileSeats.get(o.id)).by]) : []);
+  // The seats sort in a view that reads no seats (every option): her profile's seats in the round, for the order only.
+  const sortSeats = f.sort === "seats" && !profileSeats && lists.length ? await optionSeats(lists, profile ? { ...profileCourseFilter(profile), quotas: profileQuotas(profile, exams[cat.exam].quotas), categories: seatCats(profile, cat.exam) } : {}, cat.exam) : null;
+  const seatsOf = sortSeats ? new Map(opts.map((o) => [o.id, seatsByKind(lists, sortSeats.get(o.id)).by])) : by;
   const asNew = (o: Opt): Ranked => ({ o, reach: "new", provisional: false, deepest: undefined });
   const ranked: Ranked[] = [...labelled, ...fresh.filter(text).map(asNew)];
   const clear = (x: Ranked) => by.get(x.o.id)?.clear ?? 0;
   if (round) ranked.sort((a, b) => roundReachOrder.indexOf(a.reach) - roundReachOrder.indexOf(b.reach) || clear(b) - clear(a) || byLabel(a, b));
-  // Her sort (stable: ties keep the label order); a missing value last either way.
-  const key: Record<Exclude<OptionSort, "label">, (x: Ranked) => number | null | undefined> = {
-    deep: (x) => (x.deepest ? -x.deepest.closing : null),
-    tight: (x) => x.deepest?.closing,
-    fee: (x) => feeValue.yearly(optTerms(cat, x.o)),
-    stipend: (x) => { const v = feeValue.stip1(optTerms(cat, x.o)); return v == null ? null : -v; },
-  };
+  // Her sort (stable: ties keep the label order); a missing value last either way (lib/sorts.ts).
   if (f.sort && f.sort !== "label") {
-    const k = key[f.sort];
-    ranked.sort((a, b) => { const [x, y] = [k(a) ?? Infinity, k(b) ?? Infinity]; return x === y ? 0 : x - y; });
+    const termsOf = new Map<Ranked, ProgrammeTerms>();
+    const t = (x: Ranked) => termsOf.get(x) ?? termsOf.set(x, optTerms(cat, x.o)).get(x)!;
+    // Seats: in the list the seats filter picks, else the most in any one of the round's lists (they overlap: never added).
+    const seatsIn = (x: Ranked) => { const s = seatsOf.get(x.o.id); return !s ? null : kind && kind !== "any" ? s[kind] : Math.max(-1, ...Object.values(s).map((n) => n ?? -1)); };
+    const cmp: Record<Exclude<OptionSort, "label">, Cmp<Ranked>> = {
+      deep: byNumber((x) => x.deepest?.closing, "desc"),
+      tight: byNumber((x) => x.deepest?.closing),
+      fee: byNumber((x) => feeValue.yearly(t(x))),
+      stipend: byNumber((x) => feeValue.stip1(t(x)), "desc"),
+      // Lightest: no bond, then the fewest years, then the smallest penalty.
+      bond: chain(byNumber((x) => feeValue.bondyrs(t(x))), byNumber((x) => feeValue.bond(t(x)))),
+      seats: byNumber((x) => { const n = seatsIn(x); return n == null || n < 0 ? null : n; }, "desc"),
+      name: chain(byText((x) => cat.collegeByKey.get(x.o.college)?.name), byText((x) => `${cat.courseOf.get(`${x.o.degree}|${x.o.specialty}`)?.name ?? x.o.specialty} ${x.o.degree}`), byText((x) => x.o.quota)),
+    };
+    ranked.sort(cmp[f.sort]);
   }
   const has = (x: Ranked, k: SeatKind | "any") => hasSeatsIn(by.get(x.o.id) ?? {}, k);
   const inReach = (x: Ranked) => !f.reach?.length || f.reach.includes(x.reach);
@@ -960,15 +971,20 @@ export async function dashboard(profile: Profile, exam: ExamKey = DEFAULT_EXAM, 
 
 // ---------- Institutes, allotments, fees ----------
 
-/** `only`: these college keys (a term filter's verdict); `bedsOf`: the beds to sort "beds" by (else the catalog's). */
+/**
+ * `only`: these college keys (a term filter's verdict); `bedsOf`: the beds to sort "beds" by (else the catalog's);
+ * `bestOf`: the "competitive" sort's figure by college slug, lowest first (the public pages' most competitive course's
+ * Open last rank); none: no college has one.
+ */
 export type InstituteFilters = {
   search?: string;
   state?: string | string[];
   type?: string;
   course?: string | string[];
-  sort?: "name" | "beds" | "established" | "allotments";
+  sort?: "name" | "beds" | "established" | "allotments" | "courses" | "competitive" | "fee";
   only?: Set<string>;
   bedsOf?: (collegeKey: string) => number | null | undefined;
+  bestOf?: (slug: string) => number | null | undefined;
 };
 
 /**
@@ -990,7 +1006,20 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
     .map((college) => ({ college, allotments2025: sumYear(byCollege.get(college.key) ?? [], headYearIn(exam, cat.sources)) }));
   const by = f.sort ?? "name";
   const beds = (c: (typeof colleges)[number]["college"]) => (f.bedsOf ? f.bedsOf(c.key) : c.beds) ?? -1;
-  colleges.sort((a, b) =>
+  // Most courses, most competitive, cheapest course a year: each row's figure read once (lib/sorts.ts: none last), ties by name.
+  type Row = (typeof colleges)[number];
+  const of = (c: Row) => byCollege.get(c.college.key) ?? [];
+  const figures: Partial<Record<NonNullable<InstituteFilters["sort"]>, [(c: Row) => number | null | undefined, "asc" | "desc"]>> = {
+    courses: [(c) => new Set(of(c).map((o) => `${o.degree}|${o.specialty}`)).size, "desc"],
+    competitive: [(c) => f.bestOf?.(c.college.slug), "asc"],
+    fee: [(c) => { const xs = of(c).flatMap((o) => feeValue.yearly(optTerms(cat, o)) ?? []); return xs.length ? Math.min(...xs) : null; }, "asc"],
+  };
+  const figure = figures[by];
+  if (figure) {
+    const v = new Map(colleges.map((c) => [c, figure[0](c)]));
+    colleges.sort(chain(byNumber((c) => v.get(c), figure[1]), byText((c) => c.college.name)));
+  } else
+    colleges.sort((a, b) =>
     by === "beds" ? (beds(b.college) - beds(a.college) || a.college.name.localeCompare(b.college.name))
     : by === "established" ? (a.college.established ?? 9999) - (b.college.established ?? 9999)
     : by === "allotments" ? (b.allotments2025 ?? -1) - (a.allotments2025 ?? -1)
@@ -1032,7 +1061,10 @@ export async function listInstitutes(profile: Profile | null, f: InstituteFilter
 /** `terms`: fee, stipend, bond, leaving and college-type filters on each allotment's course and quota (lib/term-filters.ts). */
 /** `course`: one course slug; `courses`: any of these (with `course`, both narrow). */
 /** `quotas`: any of these (NEET SS: her question group's). */
-export type AllotmentFilters = { year?: number; round?: Round; course?: string; courses?: string[]; quota?: string; quotas?: string[]; category?: string; state?: string; from?: number; to?: number; terms?: TermFilters };
+/** `sort`: the default order (newest year, round, then rank), or institute or course first (queries.ts findAllotments `order`). */
+export type AllotmentFilters = { year?: number; round?: Round; course?: string; courses?: string[]; quota?: string; quotas?: string[]; category?: string; state?: string; from?: number; to?: number; terms?: TermFilters; sort?: AllotmentSort };
+export const allotmentSorts = ["rank", "inst", "course"] as const;
+export type AllotmentSort = (typeof allotmentSorts)[number];
 
 /**
  * Allotments (ranks only, never names), newest year, then round, then rank, one page. A page past the end returns the
@@ -1064,7 +1096,7 @@ export async function listAllotments(f: AllotmentFilters, pg: PageQuery, college
     ? cat.options.filter((o) => (!inCs || inCs.has(o.cs)) && (!f.quota || o.quota === f.quota) && optMatches(cat, o, null, tf, types)).map((o) => [o.cs, o.quota] as [string, string])
     : undefined;
   const q = { cs, csQuota, year: f.year, round: f.round, quota: f.quota, ...(f.quotas && { quotas: f.quotas }), category: f.category, from: f.from, to: f.to };
-  const at = (page: number) => findAllotments(cat, q, { limit: pg.pageSize, offset: (page - 1) * pg.pageSize, count: true, newestRound: true });
+  const at = (page: number) => findAllotments(cat, q, { limit: pg.pageSize, offset: (page - 1) * pg.pageSize, count: true, newestRound: true, order: f.sort === "rank" ? undefined : f.sort });
   let page = Math.max(1, pg.page);
   let res = await at(page);
   const last = Math.max(1, Math.ceil(res.total / pg.pageSize));

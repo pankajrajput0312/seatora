@@ -126,7 +126,11 @@ export async function findReachInputs(
  * NEET PG's never do, so its order is as before). `total` counts every match (only when `count` is set). `newestRound`:
  * a year's rounds newest first (the Allotments list: 2026 R2 before R1); else oldest first (a rank's journey, a scan).
  */
-export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { limit?: number; offset?: number; count?: boolean; newestRound?: boolean } = {}): Promise<{ total: number; rows: Allotment[] }> {
+/**
+ * `order`: institute ("inst": name A to Z, the same college's rows together) or course ("course": its name, then
+ * degree) first, then the default order (newest year, round, rank).
+ */
+export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { limit?: number; offset?: number; count?: boolean; newestRound?: boolean; order?: "inst" | "course" } = {}): Promise<{ total: number; rows: Allotment[] }> {
   const dir = opts.newestRound ? -1 : 1;
   const roundSql = opts.newestRound ? Prisma.sql`DESC` : Prisma.empty;
   if (q.cs?.length === 0 || q.csQuota?.length === 0) return { total: 0, rows: [] };
@@ -149,6 +153,8 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
           (!q.ranks || q.ranks.includes(a.rank)),
       )
       .sort((a, b) => b.year - a.year || dir * (roundPos(a.round) - roundPos(b.round)) || a.rank - b.rank);
+    const by = (a: Allotment) => (opts.order === "inst" ? [cat.collegeByKey.get(a.college)?.name ?? "", a.college] : [cat.courseOf.get(`${a.degree}|${a.specialty}`)?.name ?? a.specialty, a.degree]);
+    if (opts.order) all.sort((a, b) => by(a)[0].localeCompare(by(b)[0]) || by(a)[1].localeCompare(by(b)[1]));
     return { total: all.length, rows: all.slice(offset, opts.limit == null ? undefined : offset + opts.limit) };
   }
   const where = [
@@ -165,6 +171,11 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
     q.ranks && Prisma.sql`rank = ANY(${q.ranks})`,
   ].filter((x): x is Prisma.Sql => !!x);
   const whereSql = Prisma.sql`WHERE ${Prisma.join(where, " AND ")}`;
+  // The institute's or course's name beside each row (nm.sn, then nm.sk: its key or degree), only for that order.
+  const named =
+    opts.order === "inst" ? Prisma.sql`LEFT JOIN LATERAL (SELECT c.name AS sn, c.key AS sk FROM "CollegeSpecialty" p JOIN "College" c ON c.id = p."collegeId" WHERE p.id = "Allotment"."collegeSpecialtyId") nm ON true`
+    : opts.order === "course" ? Prisma.sql`LEFT JOIN LATERAL (SELECT s.name AS sn, s.degree AS sk FROM "CollegeSpecialty" p JOIN "Specialty" s ON s.id = p."specialtyId" WHERE p.id = "Allotment"."collegeSpecialtyId") nm ON true`
+    : null;
   const [rows, total] = await Promise.all([
     // Previous seat's college key and course from the joins after the page is cut (the schema 2 columns: raw SQL).
     db.$queryRaw<
@@ -173,12 +184,12 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
       SELECT a.*, pc.key AS pk, ps.degree AS pd, ps.code AS psp
       FROM (
         SELECT "collegeSpecialtyId" AS cs, "counsellingYear" AS y, round AS r, rank AS k, quota AS q, category AS c, status AS st,
-          "candidateCategory" AS cc, "optionNo" AS o, "prevCollegeId" AS pci, "prevSpecialtyId" AS psi, "prevQuota" AS pq, "prevRemark" AS pr, id
-        FROM "Allotment" ${whereSql}
-        ORDER BY "counsellingYear" DESC, array_position(${sqlRounds}::text[], round) ${roundSql}, rank, quota, id
+          "candidateCategory" AS cc, "optionNo" AS o, "prevCollegeId" AS pci, "prevSpecialtyId" AS psi, "prevQuota" AS pq, "prevRemark" AS pr, id${named ? Prisma.sql`, nm.sn, nm.sk` : Prisma.empty}
+        FROM "Allotment" ${named ?? Prisma.empty} ${whereSql}
+        ORDER BY ${named ? Prisma.sql`nm.sn, nm.sk, ` : Prisma.empty}"counsellingYear" DESC, array_position(${sqlRounds}::text[], round) ${roundSql}, rank, quota, id
         ${opts.limit == null ? Prisma.empty : Prisma.sql`LIMIT ${opts.limit}`} OFFSET ${offset}
       ) a LEFT JOIN "College" pc ON pc.id = a.pci LEFT JOIN "Specialty" ps ON ps.id = a.psi
-      ORDER BY a.y DESC, array_position(${sqlRounds}::text[], a.r) ${roundSql}, a.k, a.q, a.id`,
+      ORDER BY ${named ? Prisma.sql`a.sn, a.sk, ` : Prisma.empty}a.y DESC, array_position(${sqlRounds}::text[], a.r) ${roundSql}, a.k, a.q, a.id`,
     opts.count ? db.$queryRaw<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM "Allotment" ${whereSql}`.then(([r]) => r.n) : Promise.resolve(-1),
   ]);
   const out = rows.flatMap((r) => {

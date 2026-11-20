@@ -19,7 +19,7 @@ import { TermFilterControls, UntypedNote } from "@/features/decide/components/te
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
 import { ViewPanes } from "@/features/decide/components/view-toggle";
-import { LayoutMenu, ViewMenuGroup } from "@/features/decide/components/view-menu";
+import { LayoutMenu, SortMenu, ViewMenuGroup } from "@/features/decide/components/view-menu";
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankRange } from "@/features/decide/lib/params";
@@ -292,6 +292,16 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
     </>
   );
 
+  // The toolbar's Sort: the default order, Best, then each year and round, deepest first (the table's headers sort both
+  // ways: a tightest-first order picked there is a choice too, so it shows).
+  const sortTo = (sort: string | null, dir: "asc" | null = null) => L.with(LR, { sort, dir, page: null });
+  const sortChoices = [
+    closing ? { value: "", label: "Best in the range", short: "Best", href: sortTo(null) } : { value: "", label: "Institute name", short: "Name", href: sortTo(null) },
+    { value: "best", label: "Best: deepest first", short: "Best", href: sortTo("best") },
+    ...cols.flatMap((c) => c.rounds.map((rd) => ({ value: `${c.year}-${rd}`, label: `${yearName(exam, c.year)} ${roundIn(E, c.year, rd)}: deepest first`, short: `${yearName(exam, c.year)} ${roundIn(E, c.year, rd)}`, href: sortTo(`${c.year}-${rd}`) }))),
+  ];
+  const on = f.sort && sortChoices.find((c) => c.value === f.sort);
+  if (on && f.dir === "asc") sortChoices.push({ ...on, value: `${f.sort} asc`, label: on.label.replace("deepest first", "tightest first"), href: sortTo(f.sort!, "asc") });
   // Best's sort link and its (i): what the number is (THE deepest closing, reach.ts deepestOf), never a prediction.
   const bestOn = f.sort === "best";
   const bestNote = (
@@ -412,6 +422,7 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         clear={clear}
         total={lr.total}
         noun="options"
+        sort={(lr.total > 0 || f.sort) && <SortMenu value={f.sort ? `${f.sort}${f.dir === "asc" ? " asc" : ""}` : ""} choices={sortChoices} />}
         view={
           lr.total > 0 && (
             <LayoutMenu page={VIEW} view={view}>
@@ -443,10 +454,6 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         <Field label="Closing rank from"><input name="rmin" defaultValue={f.rmin ?? ""} aria-invalid={range.bad.includes(f.rmin ?? "") || undefined} aria-describedby={range.bad.length ? "range-note" : undefined} placeholder={exam === DEFAULT_EXAM ? "e.g. 40,000 or 40k" : `e.g. ${E.exampleRank}`} className={`${control} numeric`} /></Field>
         <Field label="Closing rank to"><input name="rmax" defaultValue={f.rmax ?? ""} aria-invalid={range.bad.includes(f.rmax ?? "") || undefined} aria-describedby={range.bad.length ? "range-note" : undefined} placeholder={exam === DEFAULT_EXAM ? "e.g. 60,000 or 0.6L" : "e.g. 5k"} className={`${control} numeric`} /></Field>
         <Field label="From year"><Select name="since" value={f.since ? String(f.since) : undefined} all="All years" options={[...lr.columns].sort((a, b) => b.year - a.year).map((c) => ({ value: String(c.year), label: yearName(exam, c.year) }))} /></Field>
-        {/* Best or any year and round, deepest first (the table's headers sort both ways). */}
-        <Field label="Sort by">
-          <Select name="sort" value={f.sort} all={closing ? "Best in the range" : "Institute name"} options={[{ value: "best", label: "Best (deepest closing)" }, ...cols.flatMap((c) => c.rounds.map((rd) => ({ value: `${c.year}-${rd}`, label: `${yearName(exam, c.year)} ${roundIn(E, c.year, rd)}` })))]} />
-        </Field>
         {open && <input type="hidden" name="expand" value="1" />}
         <TermFilterControls f={tp.params} caps={profile} fees={E.has.fees} />
       </FilterBar>

@@ -10,9 +10,9 @@ import { hospitalInfo } from "@/features/decide/components/institute/institute-d
 import { residentsFilters, ResidentsAbout, ResidentsCards, ResidentsTable, type ResidentTypes } from "@/features/decide/components/residents-results";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { ResidentsCollegeFilter, ResidentsPicks, ResidentsSearch } from "@/features/decide/components/residents-search";
-import { ActiveFilters, EmptyState, Field, FilterBar, Pager, Select, smallLink } from "@/features/decide/components/ui";
+import { ActiveFilters, EmptyState, FilterBar, Pager, smallLink } from "@/features/decide/components/ui";
 import { ViewPanes } from "@/features/decide/components/view-toggle";
-import { LayoutMenu } from "@/features/decide/components/view-menu";
+import { LayoutMenu, SortMenu } from "@/features/decide/components/view-menu";
 import { decideLinks } from "@/features/decide/lib/links";
 import { specialtyName } from "@/features/decide/lib/specialty-search";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
@@ -31,11 +31,13 @@ import { countResidents, findResidentColleges, findResidentNames, listResidentCo
 // People's names: never indexed.
 export const metadata: Metadata = { title: "Residents", robots: { index: false, follow: false } };
 
+/** The toolbar's Sort (`short`: a phone's). */
 const sorts = [
-  { value: "year", label: "Year, newest first" },
-  { value: "college", label: "College" },
-  { value: "name", label: "Name" },
-] satisfies { value: ResidentsQuery["sort"]; label: string }[];
+  { value: "year", label: "Year, newest first", short: "Year" },
+  { value: "name", label: "Name A–Z", short: "Name" },
+  { value: "course", label: "Course A–Z", short: "Course" },
+  { value: "college", label: "College A–Z", short: "College" },
+] satisfies { value: ResidentsQuery["sort"]; label: string; short: string }[];
 
 export default async function ResidentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const gated = await examGate("/decide/residents");
@@ -104,9 +106,9 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
     ...(query.state ?? []).map((s) => ({ label: s, param: "state", href: L.without(R, "state", s) })),
     ...(query.year ?? []).map((y) => ({ label: String(y), param: "year", href: L.without(R, "year", String(y)) })),
     query.quota && { label: residentQuota(query.quota), href: here({ rq: null }) },
-    query.sort !== "year" && { label: `Sorted by ${sorts.find((s) => s.value === query.sort)!.label.toLowerCase()}`, param: "sort", href: here({ sort: null }) },
   ].filter((x) => !!x);
-  const clear = L.to("/decide/residents", { course: "all" });
+  // The sort is no filter (the toolbar's Sort shows it): Clear keeps it.
+  const clear = L.to("/decide/residents", { course: "all", sort: query.sort === "year" ? undefined : query.sort });
   const collegeOpts = pickedColleges.map((c) => ({ value: c.slug, label: c.state ? `${c.name}, ${c.state}` : c.name }));
   // Why nothing matched: a search found nothing (never "hidden": that is rare), or the filters together leave none.
   const ini = query.q ? iniCetIn(query.q) : null;
@@ -148,6 +150,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         total={total}
         noun="residents"
         recount={countResidents}
+        sort={<SortMenu value={query.sort} choices={sorts.map((s) => ({ ...s, href: here({ sort: s.value === "year" ? null : s.value }) }))} />}
         view={total > 0 && <LayoutMenu page="residents" view={view} />}
         search={<ResidentsSearch q={query.q} colleges={collegeOpts} names={query.name ?? []} findColleges={findResidentColleges} findNames={findResidentNames} />}
       >
@@ -155,7 +158,6 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         <FilterDropdown label="Course" name="course" search options={courseChoices} selected={allCourses ? ["all"] : typedCourses.length ? typedCourses : mine} none={yours ? `Your courses (${yours.length})` : "All courses"} info={yours ? "Your profile's courses are ticked. None ticked also means your courses; tick All courses for every one." : undefined} />
         <FilterDropdown label="State" name="state" search options={meta.states.map((s) => ({ value: s, label: s }))} selected={query.state ?? []} none="All states" />
         <FilterDropdown label="Year" name="year" options={years.map((y) => ({ value: String(y), label: String(y) }))} selected={(query.year ?? []).map(String)} none="All years" />
-        <Field label="Sort by"><Select name="sort" value={query.sort} options={sorts} /></Field>
       </FilterBar>
       </ResidentsPicks>
       <ActiveFilters items={chips} clear={clear} />

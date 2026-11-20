@@ -27,11 +27,14 @@ import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm, FiltersPanel } from "@/features/decide/components/filter-form";
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl, toolbar } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { SortMenu } from "@/features/decide/components/view-menu";
+import { byNumber, byText, chain, type Cmp } from "@/features/decide/lib/sorts";
+import { feeValue } from "@/features/decide/lib/term-filters";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { fmtDay } from "@/features/decide/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
-import { eligibleCategories, latestText } from "@/features/decide/lib/reach";
+import { eligibleCategories, latestText, reachOrder } from "@/features/decide/lib/reach";
 import { MISSING_WORDS, statKeys, statLabel } from "@/features/decide/lib/stat-format";
 import { profileFromParams, profileHasCourse, toURLSearchParams } from "@/features/decide/profile";
 import { getCollege, getInstitute, getMeta, listAllotments, optionsView, renamedCollege } from "@/features/decide/service";
@@ -67,8 +70,12 @@ const schema = z.object({
   scat: z.literal("all").optional(),
   year: z.coerce.number().int().optional(),
   course: z.string().max(100).optional(),
+  /** Courses tab: courseSorts; Allotments tab: service.ts allotmentSorts (rank, course). Absent: the tab's own order. */
+  sort: z.string().max(20).optional(),
   page: pageValue.default(1),
 });
+/** The Courses tab's Sort (`short`: a phone's); "": as listed (degree, then course, then quota). */
+const courseSorts = ["", "reach", "name", "deep", "tight", "fee"] as const;
 
 /** The tabs the exam has (its data: features/exams/active.tsx examInfo): residents and hospital facts are NEET PG's. */
 const tabsFor = ({ has }: Exam) => {
@@ -144,12 +151,35 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const onePosition = kindName("clear", exam) === "Seat position"; // INI-CET: one seat list a session
   const w = (s: string) => inExamWords(exam, s); // a sentence in the exam's words (NEET PG, SS, MDS: as written)
   const head = yn(HEAD);
+  // The Courses tab's order (lib/sorts.ts: none last; ties keep the listed order).
+  const courseSort = (courseSorts as readonly string[]).includes(f.sort ?? "") && tab === "courses" ? (f.sort as (typeof courseSorts)[number]) : "";
+  type CourseRow = (typeof options)[number];
+  const deepOf = (r: CourseRow) => r.byYear[HEAD]?.closing;
+  const courseCmp: Cmp<CourseRow> | null = {
+    "": null,
+    reach: chain(byNumber((r: CourseRow) => reachOrder.indexOf(r.reach)), byNumber(deepOf, "desc")),
+    name: chain(byText((r: CourseRow) => r.course.name), byText((r) => r.course.degree)),
+    deep: byNumber(deepOf, "desc"),
+    tight: byNumber(deepOf),
+    fee: byNumber((r: CourseRow) => feeValue.yearly(r.fees)),
+  }[courseSort];
+  const courseSortWords: Record<(typeof courseSorts)[number], { label: string; short: string }> = {
+    "": { label: "Degree, then course", short: "Degree" },
+    reach: { label: "Reach (reached first)", short: "Reach" },
+    name: { label: "Course A–Z", short: "Course" },
+    deep: { label: `${head} closing: deepest first`, short: "Deepest" },
+    tight: { label: `${head} closing: tightest first`, short: "Tightest" },
+    fee: { label: "Fee a year: lowest first", short: "Fee" },
+  };
+  const courseRows = courseCmp ? [...options].sort(courseCmp) : options;
   const n2025 = allotmentsByYear.find((a) => a.year === HEAD)?.n ?? null;
   const LATER = HEAD === LATEST_YEAR ? PAST_YEARS[1] : LATEST_YEAR;
   const nLatest = allotmentsByYear.find((a) => a.year === LATER)?.n ?? null;
 
   // Allotments tab: one page from SQL; a page past the end shows the last page.
-  const allot = tab === "allotments" ? await listAllotments({ year: allotYear, course: allotCourse }, { page: f.page, pageSize: await pageSizeFor(PAGE_SIZE) }, college.key, exam) : null;
+  // The Allotments tab's Sort: rank (newest round first) or course first (one institute: no institute sort).
+  const allotSort = f.sort === "course" ? "course" : undefined;
+  const allot = tab === "allotments" ? await listAllotments({ year: allotYear, course: allotCourse, sort: allotSort }, { page: f.page, pageSize: await pageSizeFor(PAGE_SIZE) }, college.key, exam) : null;
   // ponytail: every row on one page (largest institute ~930 rows, ~1.6 MB HTML); add a course filter if that grows.
   const residentsAccess = tab !== "residents" ? null : !(await canSeeResidents()) ? "locked" : ((await residentsDenied("read")) ?? "ok");
   const residents = residentsAccess === "ok" ? await listResidents(college.key) : null;
@@ -430,7 +460,12 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             {mine && round.length > 0 && options.length > 0 ? (
               <CategoryToggle mine={mine} all={!seatCats} href={(all) => L.with(`/decide/institutes/${slug}`, { scat: all ? "all" : null })} />
             ) : <span className="max-md:hidden" />}
-            {options.length > 0 && <ViewToggle page="institute-courses" />}
+            {options.length > 0 && (
+              <span className="flex flex-wrap items-center gap-2">
+                <SortMenu value={courseSort} choices={courseSorts.filter((s) => (s !== "reach" || profile) && (s !== "fee" || E.has.fees)).map((s) => ({ value: s, ...courseSortWords[s], href: L.with(`/decide/institutes/${slug}`, { sort: s || null, page: null }) }))} />
+                <ViewToggle page="institute-courses" />
+              </span>
+            )}
           </div>
           {options.length === 0 ? (
             <p className="text-sm text-muted-foreground">No courses with past {by} allotments here, so there are no closing ranks to show.</p>
@@ -440,7 +475,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               view={await chosenView(sp, "institute-courses")}
               cards={
                 <ul className="grid gap-3 lg:grid-cols-2">
-                  {options.map((r) => {
+                  {courseRows.map((r) => {
                     const d = r.byYear[HEAD];
                     const name = `${college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`;
                     return (
@@ -480,7 +515,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {options.flatMap((r) => [
+                      {courseRows.flatMap((r) => [
                         <tr key={r.id} className={`expand-host ${tbl.row}`}>
                           {/* Without a rank the reach is unknown, so nothing would be saved with the choice: star only with a profile. */}
                           <td className="px-1 py-2"><div className="grid justify-items-center">{profile && <ChoiceStar item={toChoiceItem(r, latest)} />}<CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} /></div></td>
@@ -575,7 +610,25 @@ export default async function InstitutePage({ params, searchParams }: Props) {
       {tab === "allotments" && allot && (
         <section aria-labelledby="allot-h" className="grid grid-cols-1 gap-4">
           <h2 id="allot-h" className="sr-only">Allotments</h2>
-          <FilterBar action={`/decide/institutes/${slug}`} params={sp} active={(allotYear ? 1 : 0) + (allotCourse ? 1 : 0)} clear={L.institute(slug, "allotments")} total={allot.total} noun="allotments">
+          <FilterBar
+            action={`/decide/institutes/${slug}`}
+            params={sp}
+            active={(allotYear ? 1 : 0) + (allotCourse ? 1 : 0)}
+            clear={L.institute(slug, "allotments", { sort: allotSort })}
+            total={allot.total}
+            noun="allotments"
+            sort={
+              (allot.total > 0 || allotSort) && (
+                <SortMenu
+                  value={allotSort ?? "rank"}
+                  choices={[
+                    { value: "rank", label: "Rank (newest round first)", short: "Rank", href: L.with(`/decide/institutes/${slug}`, { sort: null, page: null }) },
+                    { value: "course", label: "Course A–Z", short: "Course", href: L.with(`/decide/institutes/${slug}`, { sort: "course", page: null }) },
+                  ]}
+                />
+              )
+            }
+          >
             <input type="hidden" name="tab" value="allotments" />
             <Field label="Year"><Select name="year" value={allotYear ? String(allotYear) : undefined} all="All years" options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
             <Field label="Course"><Select name="course" value={allotCourse} all="All courses" options={courses.map((c) => ({ value: c.slug, label: `${c.degree} ${c.name}` }))} /></Field>

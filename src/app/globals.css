@@ -559,6 +559,11 @@ html:has(.app dialog[data-filters][open]) { overflow: hidden; }
   .app .filter-toolbar { position: sticky; top: var(--app-top, 3.5625rem); z-index: 20; margin-inline: calc(var(--spacing) * -4); padding: 0.375rem calc(var(--spacing) * 4); background: var(--color-card); border-bottom: 1px solid var(--color-border); }
   .app .filter-toolbar :is(input:not([type="hidden"]), select) { height: 2.75rem; }
   .app .chip-row a, .app [aria-label="Active filters"] > a { min-height: 2rem; }
+  /* With a Sort (view-menu.tsx SortMenu) the row can't hold them all: the search and Filters on the first line, then
+     Sort, View and the count. */
+  .app .filter-toolbar:has([data-sort-menu]) { flex-wrap: wrap; }
+  .app .filter-toolbar:has([data-sort-menu]) .toolbar-search { flex-basis: 55%; }
+  .app .filter-toolbar [data-sort-menu] { flex-shrink: 1; }
 }
 
 /* Below the desktop breakpoint the side menu is the drawer (closed until ☰ or More), never a column squeezing the page:
