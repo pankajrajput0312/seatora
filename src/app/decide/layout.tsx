@@ -15,8 +15,9 @@ import { DecideShell } from "@/features/decide/components/decide-shell";
 import { NavPending } from "@/features/decide/components/nav-pending";
 import type { ProfileMeta } from "@/features/decide/components/profile-dialog";
 import { EmptyState } from "@/features/decide/components/ui";
-import { nextChoiceFilling, roundName, stepsNow } from "@/features/decide/lib/round-status";
+import { nextChoiceFilling, RESULT_CLOSED_COOKIE, roundName, stepsNow } from "@/features/decide/lib/round-status";
 import { roundStatus } from "@/features/decide/server/notices";
+import { resultNews } from "@/features/decide/server/your-result";
 import { isPhone } from "@/features/decide/server/view";
 import { examGroupCourses, examGroups, getMeta } from "@/features/decide/service";
 import { activeExam, examInfo } from "@/features/exams/active";
@@ -76,6 +77,9 @@ export default async function DecideLayout({ children }: { children: React.React
   const fill = rs && nextChoiceFilling(stepsNow(rs, new Date()));
   // Another exam has no MCC schedule in the data: its first list is named for the exam, not a NEET PG round.
   const listName = fill ? `${roundName[fill.round]} · ${yearName(exam, rs.year)}` : exam === DEFAULT_EXAM ? null : `${exams[exam].label} list`;
+  // The latest round's result while it is the newest news: the nav's entry, and the strip above every page unless she closed it.
+  const result = meta ? await resultNews(exam).catch(() => null) : null;
+  const resultStrip = !!result && decodeURIComponent((await cookies()).get(RESULT_CLOSED_COOKIE)?.value ?? "") !== result.id;
   // Admin's nav entry: only for an owner or admin.
   const admin = !!meta && (await staffUser().catch(() => null)) != null;
   // The sidebar's account footer and the header's plan chip: her name, her plan, and "Upgrade" without the Season Pass.
@@ -92,7 +96,7 @@ export default async function DecideLayout({ children }: { children: React.React
   return (
     <div className={`app ${app.variable} ${mono.variable} min-h-screen`}>
       <AstryxProvider>
-        <DecideShell phone={phone} ask={ask} admin={admin} exam={admin ? await examInfo(exam) : undefined} choices={admin ? await examChoices() : undefined} account={account} listName={listName} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
+        <DecideShell phone={phone} ask={ask} admin={admin} exam={admin ? await examInfo(exam) : undefined} choices={admin ? await examChoices() : undefined} account={account} listName={listName} result={result} resultStrip={resultStrip} meta={meta ?? { courses: [], specialties: [], degrees: [], quotas: [], states: [] }}>
           {meta ? (
             <NavPending>{children}</NavPending>
           ) : (

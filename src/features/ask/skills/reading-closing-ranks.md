@@ -9,9 +9,9 @@ description: How to read closing ranks, allotments and Seatora's reach labels co
 3. **R1 vs R2/R3.** In Round 2 and Round 3 the results list only new or upgraded allotments, so an R2/R3 "closing" is the deepest rank that newly got that seat in that round, often deeper than R1 because seats freed up. Count (n) = allotments made in that round, not the seat matrix.
 4. **Stray rounds** fill leftover seats, often far deeper than R1-R3. Seatora never counts them as "reached": a rank reached only there is labelled "Reached only in stray rounds".
 5. **Provisional** results may change; say so when a figure is provisional.
-6. **Reach labels** (Seatora's, history only; counted on 2024, 2025 and 2026 R1, rounds R1-R3):
-   - Reached in 2026 R1 / Reached in 2024 and 2025 / Reached in 2024 or 2025: her rank was within the closing rank of that round.
+6. **Reach labels** (Seatora's, history only; counted on 2024, 2025 and the latest year's rounds so far (2026 R1 to its newest round with a result), rounds R1-R3):
+   - Reached in 2026 R1 to R2 (the latest year's rounds so far, as the label names them) / Reached in 2024 and 2025 / Reached in 2024 or 2025: her rank was within the closing rank of that round.
    - Within 10% in a past round: the closing was at least 90% of her rank (just short).
    - Reached only in stray rounds; Closed before your rank; No allotment in your categories; Never allotted before (no past allotment; listed only because the current round's seat lists print seats for it).
-7. **Judging reach for a choice list**: dream = closed a little before her rank (within 10%, or a bit further) in recent rounds; realistic = reached in 2026 R1 or in 2025; safe = reached comfortably in both past years. More rounds reached = steadier.
+7. **Judging reach for a choice list**: dream = closed a little before her rank (within 10%, or a bit further) in recent rounds; realistic = reached in the latest year's rounds so far or in 2025; safe = reached comfortably in both past years. More rounds reached = steadier.
 8. Always add the page link (Last ranks, Options or the institute) so she can check the numbers.

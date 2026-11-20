@@ -15,7 +15,7 @@ import { roundStatus } from "@/features/decide/server/notices";
 import { chosenView } from "@/features/decide/server/view";
 import { currentSeatLists, getMeta, optionsView } from "@/features/decide/service";
 import { activeExam } from "@/features/exams/active";
-import { authorityOf, DEFAULT_EXAM, exams, latestOf, yearName } from "@/features/exams/registry";
+import { authorityOf, exams, latestOf, yearName } from "@/features/exams/registry";
 import { currentPlan } from "@/features/plans/usage";
 import { liveReach } from "./actions";
 
@@ -41,8 +41,8 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
         <Button asChild variant="secondary" className="max-sm:w-full"><Link href={L.to("/decide/choices/suggest")}><ListOrdered className="size-4" aria-hidden />Suggest my Choice list</Link></Button>
         Your options in a suggested order, each with its reason. Nothing is added until you choose.
       </p>
-      {/* Another exam: "no seats in the lists" only while their round is current (no result yet: its choice filling). */}
-      <ChoicesView reachFor={liveReach} view={view} maxLists={me?.eff.limits.choiceLists} hasLists={lists.length > 0} nextRound={nextRound} latest={latestOf(meta.sources, exam)} listsCurrent={exam === DEFAULT_EXAM || optionsView(undefined, lists, meta.sources) === "round"} />
+      {/* "No seats in the lists" only while their round is current (no result yet: its choice filling), every exam. */}
+      <ChoicesView reachFor={liveReach} view={view} maxLists={me?.eff.limits.choiceLists} hasLists={lists.length > 0} nextRound={nextRound} latest={latestOf(meta.sources, exam)} listsCurrent={optionsView(undefined, lists, meta.sources) === "round"} />
       <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
         <HistoryNote />
         {/* The reach labels read the past years' closing ranks and the latest year's rounds; the seat counts these lists. */}

@@ -9,7 +9,7 @@ import { hospitalInfo } from "@/features/decide/components/institute/institute-d
 import { collegeTypeLabel, typesIn } from "@/features/decide/components/institute/college-type";
 import { courseName, toChoiceItem } from "@/features/decide/components/options-view";
 import { ASK_DRAFT, CHOICES_KEY, defaultChoices, parseChoices, pinOf, toMccText, type ChoiceItem, type ChoicesState } from "@/features/decide/lib/choices";
-import { LATEST_YEAR, latestRound, PAST_YEARS, reachLabel, reachOrder, type Latest } from "@/features/decide/lib/reach";
+import { LATEST_YEAR, latestRound, latestText, PAST_YEARS, reachLabel, reachOrder, type Latest } from "@/features/decide/lib/reach";
 import { clockNote, currentSteps, fmtIST, roundName, stepName, stepsNow } from "@/features/decide/lib/round-status";
 import { statCells } from "@/features/decide/lib/stat-format";
 import { typeValues, type TermFilters } from "@/features/decide/lib/term-filters";
@@ -764,7 +764,7 @@ const handlers: Handlers = {
       realistic: pick("realistic"),
       safe: pick("safe"),
       unknown: pick("unknown"),
-      rules: "dream = closed within ~20% before her rank in recent rounds; realistic = reached in 2026 R1 or 2024/2025; safe = reached in both 2024 and 2025 by 25%+ margin; unknown = no past allotment on her seats. History, not a prediction.",
+      rules: `dream = closed within ~20% before her rank in recent rounds; realistic = reached in ${latestText(latestRound(m.sources))} or 2024/2025; safe = reached in both 2024 and 2025 by 25%+ margin; unknown = no past allotment on her seats. History, not a prediction.`,
       choicesLink: "/decide/choices",
     };
   },

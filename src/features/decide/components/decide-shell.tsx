@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, House, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { CircleArrowUp, Gift, Globe, LogOut, Menu, MessageCircle, Pencil, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Award, CircleArrowUp, Gift, Globe, LogOut, Menu, MessageCircle, Pencil, ShieldCheck, Sparkles, X } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -26,6 +26,8 @@ import { BackToTop } from "./back-to-top";
 import { NAV_EVENT, navigating, TOAST_EVENT } from "./nav-pending";
 import { categoryName, ProfileDialog, profileSub, type ProfileMeta } from "./profile-dialog";
 import { RenamedSaved } from "./renamed-saved";
+import { ResultStrip } from "./result-strip";
+import type { ResultNews } from "../server/your-result";
 import { PHONE_QUERY, WIDTH_COOKIE } from "./view-toggle";
 
 const sections = [
@@ -65,6 +67,8 @@ const bottom = [
   { href: "/decide/institutes", label: "Institutes", icon: Building2 },
   { href: "/decide/last-ranks", label: "Last ranks", icon: TrendingUp },
 ];
+/** The nav's "Round 2 result" entry (layout.tsx `result`): its link is the round's allotments, made in Shell. */
+const RESULT_ITEM = "result";
 /** The pages the nav brings her back to with their filters (this tab, each exam its own: sessionStorage). */
 const navPaths = [...sections.flatMap((x) => x.items), ...bottom].map(({ href }) => href);
 const filtersKey = (path: string, exam: ExamKey) => scopedKey(`decide:filters:${path}`, exam);
@@ -74,6 +78,7 @@ const filtersKey = (path: string, exam: ExamKey) => scopedKey(`decide:filters:${
 /** `admin`: the server says she is an owner or admin (layout.tsx); only then is the Admin nav entry rendered. */
 /** `account`: the signed-in user (layout.tsx) for the sidebar's footer and the header's plan chip; null signed out. */
 /** `listName`: the round she fills next, for her first choice list's name (RenamedSaved). */
+/** `result`: the latest round's result while it is the newest news (layout.tsx): the nav's "Round 2 result" and, unless she closed it (`resultStrip` false), the strip above every page. */
 /**
  * `exam`: staff only (layout.tsx): the exam shown, with a switcher (`choices`: every exam, with the pages each lacks) in
  * the header; the nav leaves out pages it has no data for, and every saved thing (her profile, choice lists, compare
@@ -87,9 +92,9 @@ export function DecideShell(props: ShellProps) {
   );
 }
 export type ExamChoice = { key: ExamKey; label: string; lacks: string[] };
-type ShellProps = { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; exam?: Exam; choices?: ExamChoice[]; account: ShellAccount | null; listName?: string | null; children: React.ReactNode };
+type ShellProps = { meta: ProfileMeta; phone?: boolean; ask?: boolean; admin?: boolean; exam?: Exam; choices?: ExamChoice[]; account: ShellAccount | null; listName?: string | null; result?: ResultNews | null; resultStrip?: boolean; children: React.ReactNode };
 
-function Shell({ meta, phone, ask, admin, exam, choices, account, listName, children }: ShellProps) {
+function Shell({ meta, phone, ask, admin, exam, choices, account, listName, result, resultStrip, children }: ShellProps) {
   const E = exam ?? neetPg;
   const ex = E.key;
   const pathname = usePathname();
@@ -272,8 +277,11 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
   // them. Her name, plan and "Upgrade" are the footer (AccountFooter), pinned to the sidebar's and the menu's bottom.
   const help = sections.at(-1)!;
   const shows = ({ href }: { href: string }) => examShows(E, href);
+  // The round's result while it is the newest news: under Schedule, every allotment of that round (the drawer on phones too).
+  const resultHref = result && L.allotments({ year: result.year, round: result.round });
+  const onResult = !!result && pathname === "/decide/allotments" && sp.get("year") === String(result.year) && sp.get("round") === result.round;
   const nav = [
-    ...sections.slice(0, -1),
+    ...sections.slice(0, -1).map((sec) => (result && sec.title === "Counselling" ? { ...sec, items: [...sec.items, { href: RESULT_ITEM, label: `${result.name} result`, icon: Award }] } : sec)),
     { title: "Account", items: [{ href: "/decide/refer", label: "Refer & earn", icon: Gift }] },
     { ...help, items: [...help.items, ...(ask ? [{ href: "/decide/ask", label: "Ask Seatora", icon: Sparkles }] : []), ...(admin ? [{ href: "/decide/admin", label: "Admin", icon: ShieldCheck }] : [])] },
   ]
@@ -378,7 +386,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
             {nav.map((sec) => (
               <SideNavSection key={sec.title} title={sec.title}>
                 {sec.items.map(({ href, label, icon }) => (
-                  <SideNavItem key={href} label={label} icon={icon} href={href.startsWith("/decide") ? navHref(href) : href} isSelected={isCurrent(href)} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className={newBadge}>New</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 text-xs font-bold text-white">BETA</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-full bg-foreground px-1.5 text-xs font-bold text-background">20%</span> })} {...(href === "/" && { className: "md:hidden" })} />
+                  <SideNavItem key={href} label={label} icon={icon} href={href === RESULT_ITEM ? resultHref! : href.startsWith("/decide") ? navHref(href) : href} isSelected={href === RESULT_ITEM ? onResult : isCurrent(href) && !(onResult && href === "/decide/allotments")} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className={newBadge}>New</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 text-xs font-bold text-white">BETA</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-full bg-foreground px-1.5 text-xs font-bold text-background">20%</span> })} {...(href === "/" && { className: "md:hidden" })} />
                 ))}
               </SideNavSection>
             ))}
@@ -388,6 +396,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, chil
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
         <div aria-busy={loading || undefined} data-no-terms={!E.has.fees || undefined} className={cn("isolate transition-opacity md:pb-0", compare.length ? "pb-[calc(9rem+env(safe-area-inset-bottom))]" : "pb-[calc(6rem+env(safe-area-inset-bottom))]", loading && "opacity-60")}>
           <RenamedSaved listName={listName} />
+          {result && resultStrip && <ResultStrip news={result} />}
           {(trying || badCat) && inUrl && (
             <div className="grid gap-2 px-4 pt-4 md:px-6 xl:px-10" data-print-hide>
               {badCat && (

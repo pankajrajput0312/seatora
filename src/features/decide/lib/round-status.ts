@@ -109,6 +109,8 @@ export function fillWindow(s: StepNow) {
 
 /** The cookie the alert strip's ✕ sets: the closed notice's id, so it stays closed until MCC posts another. */
 export const NOTICE_CLOSED_COOKIE = "seatora_notice_closed";
+/** The result strip's ✕ (result-strip.tsx): the closed result's id, so the final result's strip shows again. */
+export const RESULT_CLOSED_COOKIE = "seatora_result_closed";
 
 /**
  * Home's alert strip: the first step MCC has held or suspended (a result "on hold", choice filling "suspended"), with its

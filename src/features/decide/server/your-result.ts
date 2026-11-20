@@ -7,7 +7,8 @@ import { heldParts } from "../lib/held";
 import { roundName } from "../lib/round-status";
 import { yourResult, type ResultWords } from "../lib/your-result";
 import { profileHasCourse, profileSchema, type Profile } from "../profile";
-import { getDecideData, getMeta, rankJourney } from "../service";
+import { currentSeatLists, getDecideData, getMeta, rankJourney } from "../service";
+import { rounds } from "../types";
 import { scheduleYear } from "./notices";
 
 // "Your Round 2 result" (lib/your-result.ts): her saved or tried rank in the latest round's result (Home, Ask), and the
@@ -25,6 +26,22 @@ async function resultRound(exam: ExamKey) {
   const words: ResultWords = { rankWord: E.rankWord, by: authorityOf(exam), round: latest.round, roundName: (r) => E.roundWords?.[r] ?? roundName[r], provisional: latest.provisional, quota: (q) => quotaIn(E, q) };
   return { meta, latest, words, pdf: meta.sources.find((s) => s.year === latest.year && s.round === latest.round && s.url) ?? null };
 }
+
+/**
+ * The latest round's result while it is the newest news (the strip on every Decide page, the nav's "Round 2 result",
+ * Home's Today): resultRound's, until a later round's seat lists are out. NEET PG only for now. `id` changes from the
+ * provisional result to the final one (its source), so a strip she closed shows again for the final.
+ */
+export async function resultNews(exam: ExamKey = DEFAULT_EXAM) {
+  if (exam !== DEFAULT_EXAM) return null;
+  const r = await resultRound(exam);
+  if (!r) return null;
+  const { year, round, provisional } = r.latest;
+  const [l] = await currentSeatLists(exam);
+  if (l && (l.year > year || (l.year === year && rounds.indexOf(l.round) > rounds.indexOf(round)))) return null;
+  return { id: r.pdf?.key ?? `${year}/${round}/${provisional}`, year, round, name: r.words.roundName(round), provisional };
+}
+export type ResultNews = NonNullable<Awaited<ReturnType<typeof resultNews>>>;
 
 /** Her rank's rows that year (NEET SS: in her question group; INI-CET: on her courses' rank list) and what they say; null while there is no later round's result. */
 export async function rankResult(profile: Profile, exam: ExamKey = DEFAULT_EXAM) {

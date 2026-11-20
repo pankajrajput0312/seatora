@@ -6,6 +6,7 @@ import { authorityOf, DEFAULT_EXAM, exams, yearName, type ExamKey } from "@/feat
 import { decideLinks } from "../lib/links";
 import { alertOf, badgeOf, currentSteps, NOTICE_CLOSED_COOKIE, dueToday, fmtIST, fmtNote, nextDate, notStarted, roundName, stepName, stepsNow, type StepNow } from "../lib/round-status";
 import { listNotices, roundStatus, scheduleYear } from "../server/notices";
+import { resultNews } from "../server/your-result";
 import { InfoTip } from "./info-tip";
 import { NoticeStrip } from "./notice-strip";
 import { MCC_PG } from "./pages/mcc-link";
@@ -80,6 +81,9 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
     );
   }
   const { live, next } = currentSteps(all);
+  // The latest round's result while it is the newest news: said here with the way to it (the round's allotments).
+  const news = await resultNews(exam).catch(() => null);
+  const newsStep = news && all.find((s) => s.round === news.round && s.step === (news.provisional ? "provisional_result" : "final_result"));
   const today = next && dueToday(next, now) ? next : null;
   // "Full schedule" opens at the round of the step on today (or next), not at the finished Round 1 the page starts with.
   const at = (live[0] ?? next)?.round;
@@ -116,6 +120,16 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
         </p>
       )}
       {!live.length && !today && <p>{label} no {by} counselling step is open.</p>}
+      {news && (
+        <p className="flex flex-wrap items-center gap-x-2">
+          <span className="text-muted-foreground">Out:</span>
+          <strong className="font-semibold">
+            {rn(news.round)} {news.provisional ? "provisional " : ""}result{newsStep?.date && <>, <span className="numeric">{fmtIST(newsStep.date)}</span></>}
+          </strong>
+          <Link href={decideLinks(params).allotments({ year: news.year, round: news.round })} className={`${smallLink} text-sky`}>{news.name} result</Link>
+          <Link href={decideLinks(params).to("/decide", {}, "#your-result-h")} className={`${smallLink} text-sky`}>Your result</Link>
+        </p>
+      )}
       {next && !today && (
         <p className="flex flex-wrap items-center gap-x-2">
           <span className="text-muted-foreground">Next:</span>
