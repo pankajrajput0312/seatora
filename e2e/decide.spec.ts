@@ -164,6 +164,8 @@ test("Cards | Table writes `layout`, keeps the page's own `view`, renders only t
     await expect(page.locator('[data-view-pane="table"]').first(), path).toBeVisible();
     await expect(page.locator('[data-view-pane="cards"]'), path).toHaveCount(0);
   }
+  // Seats' list, view and round pickers sit behind its toolbar's View button.
+  await page.locator("[data-view-menu] > summary").click();
   await expect(page.getByRole("link", { name: "One list" })).toHaveAttribute("aria-current", "true");
   await page.goto(`/decide/options?${PROFILE}&view=all&layout=cards`);
   await expect(page.locator("#options-count")).toContainText("of 641 options");
@@ -196,7 +198,9 @@ test("filters sit behind a Filters button: its count, a sheet with sections, Esc
   await showResults(page); // a plain GET form: the page loads again, the sheet closed
   await expect(sheet).toBeHidden();
   await expect(page).toHaveURL(/maxleave=5/);
-  // The chip's words open its filter in the sheet, its section open; only its × removes it.
+  // The applied filters are listed at the top of the sheet (no chip row on the page); a chip's words open its filter, its section open; only its × removes it.
+  await expect(page.getByRole("group", { name: "Active filters" })).toBeHidden();
+  await openFilters(page);
   await page.getByRole("group", { name: "Active filters" }).getByRole("button", { name: /^Change filter: Leaving penalty/ }).click();
   await expect(sheet).toBeVisible();
   await expect(sheet.getByRole("combobox", { name: "Leaving penalty" })).toBeFocused();
@@ -370,6 +374,7 @@ test("last ranks show the official closings: closing on one seat category, allot
   const many = ["md-anaesthesiology", "md-general-medicine", "md-paediatrics", "md-pathology", "md-psychiatry", "md-radio-diagnosis", "ms-general-surgery"];
   await page.goto(`/decide/last-ranks?${PROFILE}&${many.map((c) => `course=${c}`).join("&")}`);
   const chips = page.getByRole("group", { name: "Active filters" });
+  await openFilters(page);
   await expect(chips.getByRole("button", { name: "Change filter: 7 courses" })).toBeVisible();
   await chips.getByRole("link", { name: "Remove filter: 7 courses" }).click();
   await expect(page).not.toHaveURL(/course=/);
@@ -541,9 +546,10 @@ test("fees: a fee in the profile's own words shows no figure anywhere; MCC's Rou
   await expect(md.getByRole("definition").filter({ hasText: "What MCC lets the college keep" })).toContainText("₹8,432");
 });
 
-test("removing a filter chip moves focus to the chip now in its place, and with none left to the results heading", async ({ page }) => {
+test("removing a filter chip (in the Filters sheet, which stays open) moves focus to the chip now in its place, else the one before it", async ({ page }) => {
   await page.goto(`/decide/fees?${PROFILE}&maxfee=5&minstip=60000`);
   const chips = page.getByRole("group", { name: "Active filters" });
+  await openFilters(page);
   await chips.getByRole("link", { name: /^Remove filter: Fee up to/ }).click();
   await expect(page).not.toHaveURL(/maxfee=/);
   await expect(page.getByRole("status").filter({ hasText: /^Removed Fee up to/ })).toContainText("Undo");
@@ -551,7 +557,7 @@ test("removing a filter chip moves focus to the chip now in its place, and with 
   await expect(stipend).toBeFocused();
   await stipend.press("Enter");
   await expect(page).not.toHaveURL(/minstip=/);
-  await expect(page.locator("#results")).toBeFocused();
+  await expect(chips.getByRole("link", { name: /^Remove filter: Your courses/ })).toBeFocused();
 });
 
 test("hospital facts: self-reported values with their sources, the disclosed stipend, block flags said once", async ({ page }) => {

@@ -19,6 +19,7 @@ import { SeatCards } from "@/features/decide/components/seats/seat-cards";
 import { kindNote, listTitle, SeatListPicker, SeatTable } from "@/features/decide/components/seats/seat-lists";
 import { SeatMatrix, SeatMatrixDisplay, type ClosingYear, type MatrixRow, type SeatGroup } from "@/features/decide/components/seats/seat-matrix";
 import { ViewField, ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { ViewMenu, ViewMenuGroup } from "@/features/decide/components/view-menu";
 import { chosenView } from "@/features/decide/server/view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
@@ -181,26 +182,6 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      {/* A list's chip filters to it: one list's seats (One list, Compare), or in the matrix the rows with seats in it. */}
-      <SeatListPicker lists={all} exam={exam} apartName={exams[exam].apartQuotas?.name} current={list.key} href={(key) => here({ list: key, has: matrix ? all.find((l) => l.key === key)?.kind ?? null : null })} />
-      <div className="chip-row flex flex-wrap items-center gap-2">
-        <nav aria-label="Seats view" className="flex flex-wrap gap-2">
-          <Link href={here({ view: null })} aria-current={matrix ? "true" : undefined} className={chip(matrix)}>Seat matrix</Link>
-          <Link href={here({ view: "list", rounds: null, has: null })} aria-current={f.view === "list" ? "true" : undefined} className={chip(f.view === "list")}>One list</Link>
-          {/* INI-CET: one list a session, nothing to compare side by side. */}
-          {(!sp || compare) && <Link href={here({ view: "compare", rounds: null, has: null })} aria-current={compare ? "true" : undefined} className={chip(compare)}>Compare the {round} lists</Link>}
-        </nav>
-        {matrix && (
-          <nav aria-label="Seat matrix rounds" className="flex flex-wrap gap-2 sm:border-l sm:border-border sm:pl-2">
-            <Link href={here({ rounds: null })} aria-current={!allRounds ? "true" : undefined} className={chip(!allRounds)}>This round only</Link>
-            <Link href={here({ rounds: "all" })} aria-current={allRounds ? "true" : undefined} className={chip(allRounds)}>All rounds</Link>
-          </nav>
-        )}
-        <InfoTip label={matrix ? "the seat matrix" : compare ? `the ${round} lists side by side` : `the ${title} list`}>{about}</InfoTip>
-      </div>
-      </div>
-
       {/* As on Options: the toolbar (pinned on phones) has the search box, Filters (the rest, in a sheet) and the count;
           the form, its buttons and the sheet stay mounted, the fields remount to show what was applied. */}
       <FilterForm action="/decide/seats" role="search" aria-label="Filter seats" className={toolbar}>
@@ -265,6 +246,30 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
           </Field>
         </Fragment>
         </FiltersPanel>
+        {/* The list, view and round pickers, behind View (results first). A list's chip filters to it: one list's seats
+            (One list, Compare), or in the matrix the rows with seats in it. */}
+        <ViewMenu current={`${title} list`}>
+          <ViewMenuGroup label="List">
+            <SeatListPicker lists={all} exam={exam} apartName={exams[exam].apartQuotas?.name} current={list.key} href={(key) => here({ list: key, has: matrix ? all.find((l) => l.key === key)?.kind ?? null : null })} />
+          </ViewMenuGroup>
+          <ViewMenuGroup label="Show as">
+            <nav aria-label="Seats view" className="flex flex-wrap gap-2">
+              <Link href={here({ view: null })} aria-current={matrix ? "true" : undefined} className={chip(matrix)}>Seat matrix</Link>
+              <Link href={here({ view: "list", rounds: null, has: null })} aria-current={f.view === "list" ? "true" : undefined} className={chip(f.view === "list")}>One list</Link>
+              {/* INI-CET: one list a session, nothing to compare side by side. */}
+              {(!sp || compare) && <Link href={here({ view: "compare", rounds: null, has: null })} aria-current={compare ? "true" : undefined} className={chip(compare)}>Compare the {round} lists</Link>}
+              <InfoTip label={matrix ? "the seat matrix" : compare ? `the ${round} lists side by side` : `the ${title} list`}>{about}</InfoTip>
+            </nav>
+          </ViewMenuGroup>
+          {matrix && (
+            <ViewMenuGroup label="Rounds">
+              <nav aria-label="Seat matrix rounds" className="flex flex-wrap gap-2">
+                <Link href={here({ rounds: null })} aria-current={!allRounds ? "true" : undefined} className={chip(!allRounds)}>This round only</Link>
+                <Link href={here({ rounds: "all" })} aria-current={allRounds ? "true" : undefined} className={chip(allRounds)}>All rounds</Link>
+              </nav>
+            </ViewMenuGroup>
+          )}
+        </ViewMenu>
         <ToolbarCount total={r.total} noun="rows, your filters" />
       </FilterForm>
       <ActiveFilters items={active} clear={clearAll} />
@@ -287,6 +292,7 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
         <div className="flex flex-wrap items-center justify-between gap-2 md:gap-x-4">
         <AboutData className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground">
+            {several && <><span className="font-semibold text-foreground">{title} list</span> · </>}
             {matrix ? (
               <>
                 <span className="numeric text-base font-semibold text-foreground">{formatRank(r.total)}</span> {r.total === 1 ? "row" : "rows"} in {round}{allRounds && " and every other round"}, your filters

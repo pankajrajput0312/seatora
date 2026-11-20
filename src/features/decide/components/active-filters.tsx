@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -51,13 +52,13 @@ export function foldChips(items: Chip[], max = 6): Chip[] {
 }
 
 /**
- * The filters a page applies, as chips under its toolbar (one row that scrolls sideways on phones), one per value
- * ("Karnataka", "Deemed"), more than six of one field as one ("50 courses", foldChips). The chip's words open that
- * filter in the Filters sheet (`param`: its field's name); its × removes it in one click (`href` = this page without
- * it), and a "Removed Karnataka · Undo" note follows. "Clear all" (`clear`) when there are two or more and it changes
- * the page (not only her profile's defaults, as "Your courses (7)", are set). Nothing when
- * none is set. After a removal focus moves to the chip now in its place (else the one before it), never to <body>; with
- * none left, to the results heading (else the h1).
+ * The filters a page applies, as chips at the top of its Filters sheet (FiltersPanel's [data-applied]; the page itself
+ * shows only the button's count, so the results come first), one per value ("Karnataka", "Deemed"), more than six of
+ * one field as one ("50 courses", foldChips). The chip's words open that filter in the sheet (`param`: its field's
+ * name); its × removes it in one click (`href` = this page without it), and a "Removed Karnataka · Undo" note follows.
+ * The sheet's footer has "Clear all" (`clear`). Nothing when none is set; a page without a sheet shows them where this
+ * renders. After a removal focus moves to the chip now in its place (else the one before it), never to <body>; with
+ * none left, to the sheet's close button while it is open, else the results heading (else the h1).
  */
 export function ActiveFilters({ items: all, clear }: { items: Chip[]; clear: string }) {
   // Each label in the exam's words (INI-CET: AIIMS, its prospectus; the rest as written).
@@ -66,6 +67,9 @@ export function ActiveFilters({ items: all, clear }: { items: Chip[]; clear: str
   const params = useSearchParams();
   const box = useRef<HTMLDivElement>(null);
   const [undo, setUndo] = useState<{ label: string; back: string } | null>(null);
+  // The sheet's slot, once mounted (none on the server: the sheet opens closed, so nothing moves).
+  const [slot, setSlot] = useState<Element | null | undefined>(undefined);
+  useEffect(() => setSlot(document.querySelector("dialog[data-filters] [data-applied]")), []);
   const sig = items.map((i) => i.label).join("\n");
   useEffect(() => {
     try {
@@ -80,7 +84,8 @@ export function ActiveFilters({ items: all, clear }: { items: Chip[]; clear: str
     removed = null;
     const links = [...(box.current?.querySelectorAll<HTMLElement>("a") ?? [])];
     // (On phones the results line may be folded under "About this data": the next one in view.)
-    const to = links[Math.min(at, links.length - 1)] ?? ["results", "options-count", "main-h1"].map((id) => document.getElementById(id)).find((e) => e?.hasAttribute("tabindex") && e.checkVisibility());
+    const sheet = box.current?.closest("dialog[open]");
+    const to = links[Math.min(at, links.length - 1)] ?? (sheet ? sheet.querySelector<HTMLElement>("button[aria-label='Close filters']") : ["results", "options-count", "main-h1"].map((id) => document.getElementById(id)).find((e) => e?.hasAttribute("tabindex") && e.checkVisibility()));
     to?.focus();
   }, [sig]);
   useEffect(() => {
@@ -96,30 +101,36 @@ export function ActiveFilters({ items: all, clear }: { items: Chip[]; clear: str
       // storage blocked: no Undo
     }
   };
+  const inSheet = !!slot;
+  const row = (
+    <div ref={box} role="group" aria-label="Active filters" className={cn("flex flex-wrap items-center gap-x-2 gap-y-1 text-sm", inSheet ? "border-b border-border py-3" : "chip-row", !items.length && "hidden")}>
+      {items.length > 0 && <span className={cn("text-muted-foreground", inSheet ? "basis-full text-xs font-semibold" : "max-md:sr-only")}>{inSheet ? "Applied" : "Filtered by"}</span>}
+      {items.map((i, n) => (
+        <span key={`${i.label}|${i.href}`} className="inline-flex min-h-11 items-center rounded-full border border-border bg-card max-md:min-h-[2rem]">
+          {i.param ? (
+            <button type="button" onClick={() => edit(i.param!)} aria-label={`Change filter: ${i.label}`} className="inline-flex min-h-[inherit] items-center rounded-l-full pr-1 pl-3 hover:text-sky">{i.label}</button>
+          ) : (
+            <span className="pr-1 pl-3">{i.label}</span>
+          )}
+          <Link href={i.href} scroll={false} onClick={() => remember(i.label, n)} aria-label={`Remove filter: ${i.label}`} className="hit inline-flex min-h-[inherit] items-center rounded-r-full pr-2.5 pl-1 text-muted-foreground hover:text-foreground">
+            <X className="size-4" aria-hidden />
+          </Link>
+        </span>
+      ))}
+      {!inSheet && items.length > 1 && clears(clear, params) && <Link href={clear} scroll={false} onClick={() => remember("all filters", 0)} className="inline-flex min-h-11 items-center px-1 text-sky underline hover:text-foreground max-md:min-h-[2rem]">Clear all</Link>}
+    </div>
+  );
+  const note = undo && (
+    <p role="status" className="fixed inset-x-4 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-sm items-center justify-between gap-3 rounded-lg bg-foreground px-4 py-1 text-sm text-background shadow-overlay md:bottom-6">
+      <span className="min-w-0 truncate">Removed {undo.label}</span>
+      <a href={undo.back} className="inline-flex min-h-11 shrink-0 items-center font-semibold underline">Undo</a>
+    </p>
+  );
   return (
     <>
-      <div ref={box} role="group" aria-label="Active filters" className={cn("chip-row flex flex-wrap items-center gap-x-2 gap-y-1 text-sm", !items.length && "hidden")}>
-        {items.length > 0 && <span className="text-muted-foreground max-md:sr-only">Filtered by</span>}
-        {items.map((i, n) => (
-          <span key={`${i.label}|${i.href}`} className="inline-flex min-h-11 items-center rounded-full border border-border bg-card max-md:min-h-[2rem]">
-            {i.param ? (
-              <button type="button" onClick={() => edit(i.param!)} aria-label={`Change filter: ${i.label}`} className="inline-flex min-h-[inherit] items-center rounded-l-full pr-1 pl-3 hover:text-sky">{i.label}</button>
-            ) : (
-              <span className="pr-1 pl-3">{i.label}</span>
-            )}
-            <Link href={i.href} scroll={false} onClick={() => remember(i.label, n)} aria-label={`Remove filter: ${i.label}`} className="hit inline-flex min-h-[inherit] items-center rounded-r-full pr-2.5 pl-1 text-muted-foreground hover:text-foreground">
-              <X className="size-4" aria-hidden />
-            </Link>
-          </span>
-        ))}
-        {items.length > 1 && clears(clear, params) && <Link href={clear} scroll={false} onClick={() => remember("all filters", 0)} className="inline-flex min-h-11 items-center px-1 text-sky underline hover:text-foreground max-md:min-h-[2rem]">Clear all</Link>}
-      </div>
-      {undo && (
-        <p role="status" className="fixed inset-x-4 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-sm items-center justify-between gap-3 rounded-lg bg-foreground px-4 py-1 text-sm text-background shadow-overlay md:bottom-6">
-          <span className="min-w-0 truncate">Removed {undo.label}</span>
-          <a href={undo.back} className="inline-flex min-h-11 shrink-0 items-center font-semibold underline">Undo</a>
-        </p>
-      )}
+      {slot === null ? row : slot && createPortal(row, slot)}
+      {/* In the sheet while it is open (a modal: the page behind it is inert), else on the page. */}
+      {undo && (slot ? createPortal(note, slot.closest("dialog")!) : note)}
     </>
   );
 }

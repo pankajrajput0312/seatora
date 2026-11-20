@@ -185,8 +185,9 @@ export function FiltersPanel({ count, clear, total, counts, recount, saveDefault
         )}
       </button>
       {count > 0 && clear && clears(clear, params) && (
-        <Link href={clear} scroll={false} className="inline-flex h-11 shrink-0 items-center px-1 text-sm text-sky underline hover:text-foreground">
-          Clear<span className="max-md:sr-only">&nbsp;filters</span>
+        // Phones: in the sheet only (its Clear all), so the row stays the search box's.
+        <Link href={clear} scroll={false} className="inline-flex h-11 shrink-0 items-center px-1 text-sm text-sky underline hover:text-foreground max-md:hidden">
+          Clear filters
         </Link>
       )}
       <dialog
@@ -240,7 +241,11 @@ export function FiltersPanel({ count, clear, total, counts, recount, saveDefault
             <Button type="button" variant="ghost" size="icon" aria-label="Close filters" onClick={close}><X className="size-5" aria-hidden /></Button>
           </div>
         </div>
-        <div data-sheet-body className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">{children}</div>
+        <div data-sheet-body className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
+          {/* The filters applied (ActiveFilters puts them here), each removable, above the sections. */}
+          <div data-applied className="empty:hidden" />
+          {children}
+        </div>
         {saveDefaults && <SaveDefaults sheet={sheet} />}
         <div className={cn("flex items-center gap-3 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]", !saveDefaults && "border-t border-border")}>
           {clear ? (
