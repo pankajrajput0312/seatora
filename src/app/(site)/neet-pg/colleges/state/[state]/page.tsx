@@ -10,14 +10,16 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { roundName } from "@/features/decide/lib/round-status";
 import { stateWords } from "@/features/exams/landing/college-words";
 import { CollegeList, Crumbs, L } from "@/features/exams/landing/college-list";
-import { collegeIndex, collegePath, collegesPath, stateColleges, statePath, statesOf } from "@/features/exams/landing/colleges";
+import { collegePath, collegesPath, stateColleges, statePath } from "@/features/exams/landing/colleges";
 import { breadcrumbLd, JsonLd, pageMeta } from "@/lib/seo";
 
 // One state's NEET PG colleges (/neet-pg/colleges/state/maharashtra): every one, most competitive first. Static, hourly;
 // every state is built with the site, a slug no state has is a 404.
 export const revalidate = 3600;
 export const dynamicParams = true;
-export const generateStaticParams = async () => statesOf((await collegeIndex().catch(() => null))?.colleges ?? []).map((s) => ({ state: s.slug }));
+// Rendered on first visit, then cached for the hour (revalidate): pre-rendering these at build ran the build out of DB
+// connections (20 Nov 2026). ponytail: prebuild a few again if first-visit latency matters.
+export const generateStaticParams = async () => [];
 
 type Props = { params: Promise<{ state: string }> };
 

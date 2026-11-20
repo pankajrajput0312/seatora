@@ -13,7 +13,7 @@ import { roundName } from "@/features/decide/lib/round-status";
 import { BranchNotes, BranchTables, branchHref } from "@/features/exams/landing/branch-ranks";
 import { collegeFaqs, collegeWords } from "@/features/exams/landing/college-words";
 import { Crumbs, L } from "@/features/exams/landing/college-list";
-import { branchPath, branchSlugs, collegeIndex, collegePage, collegePath, collegesPath, movedTo, statePath } from "@/features/exams/landing/colleges";
+import { branchPath, branchSlugs, collegePage, collegePath, collegesPath, movedTo, statePath } from "@/features/exams/landing/colleges";
 import { cutoffPath } from "@/features/exams/landing/cutoff";
 import { breadcrumbLd, JsonLd, pageMeta } from "@/lib/seo";
 
@@ -23,11 +23,9 @@ import { breadcrumbLd, JsonLd, pageMeta } from "@/lib/seo";
 // import retired redirects (308) to the college's slug now.
 export const revalidate = 3600;
 export const dynamicParams = true;
-export const generateStaticParams = async () =>
-  ((await collegeIndex().catch(() => null))?.colleges ?? [])
-    .toSorted((a, b) => b.allotments - a.allotments)
-    .slice(0, 300)
-    .map((c) => ({ slug: c.slug }));
+// Rendered on first visit, then cached for the hour (revalidate): pre-rendering these at build ran the build out of DB
+// connections (20 Nov 2026). ponytail: prebuild a few again if first-visit latency matters.
+export const generateStaticParams = async () => [];
 
 type Props = { params: Promise<{ slug: string }> };
 const load = async ({ params }: Props) => {

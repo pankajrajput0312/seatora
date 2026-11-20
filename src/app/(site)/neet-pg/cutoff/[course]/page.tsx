@@ -12,7 +12,7 @@ import { roundName } from "@/features/decide/lib/round-status";
 import { BranchNotes, BranchTables } from "@/features/exams/landing/branch-ranks";
 import { branchFaqs, branchWords } from "@/features/exams/landing/college-words";
 import { Crumbs, L } from "@/features/exams/landing/college-list";
-import { branchPage, branchPath, branchSlugs, collegePath, collegesPath } from "@/features/exams/landing/colleges";
+import { branchPage, branchPath, collegePath, collegesPath } from "@/features/exams/landing/colleges";
 import { cutoffPath } from "@/features/exams/landing/cutoff";
 import { breadcrumbLd, JsonLd, pageMeta } from "@/lib/seo";
 
@@ -21,7 +21,9 @@ import { breadcrumbLd, JsonLd, pageMeta } from "@/lib/seo";
 // the site (a course with no allotment in the round or last year is a 404). The hub, /neet-pg/cutoff, is its own page.
 export const revalidate = 3600;
 export const dynamicParams = true;
-export const generateStaticParams = async () => (await branchSlugs().catch(() => [])).map((b) => ({ course: b.slug }));
+// Rendered on first visit, then cached for the hour (revalidate): pre-rendering these at build ran the build out of DB
+// connections (20 Nov 2026). ponytail: prebuild a few again if first-visit latency matters.
+export const generateStaticParams = async () => [];
 
 type Props = { params: Promise<{ course: string }> };
 const load = async ({ params }: Props) => branchPage((await params).course);
