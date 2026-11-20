@@ -104,13 +104,13 @@ export function DisplayMenu({ cols, hidden, setHidden, always = "The institute c
         e.currentTarget.querySelector("summary")?.focus();
       }}
     >
-      <summary className="flex h-11 max-md:h-[2.375rem] cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-card px-3 text-sm whitespace-nowrap hover:border-foreground/70 [&::-webkit-details-marker]:hidden">
-        <span className="text-muted-foreground">Display</span>
-        <span className="font-semibold">{cols.length - hidden.size} of {cols.length} columns</span>
+      <summary className="flex h-11 cursor-pointer list-none items-center gap-2 rounded-md border border-edge bg-secondary px-3 text-sm font-medium whitespace-nowrap shadow-xs hover:border-input hover:bg-muted group-open:border-input group-open:bg-muted [&::-webkit-details-marker]:hidden">
+        <span>Display</span>
+        <span className="font-normal text-muted-foreground">{cols.length - hidden.size} of {cols.length} columns</span>
         <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
       </summary>
       {/* Phones: in flow under the button (absolute right-0 would open off-screen when the button sits on the left). */}
-      <fieldset className="absolute right-0 z-20 mt-1 max-h-96 min-w-64 max-w-[calc(100vw-2rem)] overflow-auto rounded-lg border border-border bg-card p-2 shadow-overlay max-sm:static">
+      <fieldset className="absolute right-0 z-20 mt-1.5 max-h-96 min-w-64 max-w-[calc(100vw-2rem)] overflow-auto rounded-lg border border-border bg-popover p-2 shadow-overlay max-sm:static">
         <legend className="sr-only">Columns shown</legend>
         {cols.map((c) => (
           <label key={c.key} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-muted">
@@ -345,19 +345,19 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
     <Dialog.Root open={!!r} onOpenChange={(o) => !o && onClose()}>
       {/* Portalled to .app: out of the page's isolated layer (so it covers the sticky header), still on the case-sheet tokens. Client-only (opens on a click). */}
       <Dialog.Portal container={typeof document === "undefined" ? undefined : document.querySelector<HTMLElement>(".app")}>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-foreground/40" />
         <Dialog.Content
           onCloseAutoFocus={(e) => {
             e.preventDefault();
             refocus();
           }}
-          className="fixed inset-y-0 right-0 z-50 grid w-full max-w-xl content-start gap-6 overflow-y-auto border-l border-border bg-popover p-6 shadow-overlay"
+          className="fixed inset-y-0 right-0 z-50 grid w-full max-w-xl content-start gap-6 overflow-y-auto border-l border-border bg-popover p-6 shadow-overlay max-sm:p-4 sm:rounded-l-2xl"
         >
           {r && (
             <>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <Dialog.Title className="text-xl font-semibold">{r.college.name}</Dialog.Title>
+                  <Dialog.Title className="text-h2 font-semibold">{r.college.name}</Dialog.Title>
                   <Dialog.Description className="mt-1 text-sm text-muted-foreground">
                     {courseOf(r)} · {r.quota != null ? quotaIn(E, r.quota) : "quota not printed"}{r.quota != null && isRestricted(E, r.quota) && " (restricted quota)"} · {r.category} seats · {r.college.state ?? "state not listed"}
                   </Dialog.Description>
@@ -368,7 +368,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
               </div>
 
               <section aria-labelledby="row-seats" className="grid gap-2">
-                <h3 id="row-seats" className="font-semibold">Seats in {authorityOf(E.key)}&apos;s lists</h3>
+                <h3 id="row-seats" className="text-title font-semibold">Seats in {authorityOf(E.key)}&apos;s lists</h3>
                 <p className="text-xs text-muted-foreground">{kindName("clear", E.key) === "Seat position" ? "The session's seat position as its PDF printed it." : "Each list as its PDF printed it. The lists overlap (newly added seats are mostly also clear vacancies; a virtual vacancy opens only if its holder moves), so never add them."}</p>
                 <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
                   {lists.map((l) => (
@@ -384,7 +384,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
               </section>
 
               <section aria-labelledby="row-closing" className="grid gap-2">
-                <h3 id="row-closing" className="font-semibold">Closing ranks on {r.quota != null ? quotaIn(E, r.quota) : "this quota"}, {r.category} seats</h3>
+                <h3 id="row-closing" className="text-title font-semibold">Closing ranks on {r.quota != null ? quotaIn(E, r.quota) : "this quota"}, {r.category} seats</h3>
                 <p className="text-xs text-muted-foreground">The highest {E.rankName} {authorityOf(E.key)} allotted in that round; allotments made in brackets (not seats). Each round links its {authorityOf(E.key)} result PDF. {LATER_ROUNDS_NOTE}</p>
                 <div className="overflow-x-auto overflow-y-hidden">
                   <table className="text-sm">
@@ -417,7 +417,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
 
               {ranked && (
                 <section aria-labelledby="row-chances" className="grid gap-2">
-                  <h3 id="row-chances" className="font-semibold">Reach</h3>
+                  <h3 id="row-chances" className="text-title font-semibold">Reach</h3>
                   {r.reach ? <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} on={r.category} /> : <p className="text-sm">{r.noLabel}.</p>}
                   <p className="text-xs text-muted-foreground">Options&apos; label on this one seat category, counting {reachWindow(latest, pastOf(latest))} (every round). {HISTORY_CAPTION}</p>
                 </section>
@@ -425,7 +425,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
 
               {E.has.fees && (
                 <section aria-labelledby="row-terms" className="grid gap-2">
-                  <h3 id="row-terms" className="font-semibold">Fee, stipend, bond and leaving penalty: {programmeTitle(r.fees)}</h3>
+                  <h3 id="row-terms" className="text-title font-semibold">Fee, stipend, bond and leaving penalty: {programmeTitle(r.fees)}</h3>
                   {/* The row's own cells, so the drawer never reads differently from it. */}
                   <TermStatCells t={r.fees} of={`${r.college.name}, ${courseOf(r)}, ${quotaIn(E, r.quota ?? "")}`} className="rounded-lg border border-border" />
                   <p className="text-xs text-muted-foreground">Year by year, with each figure&apos;s source and the bond&apos;s exact words: the institute&apos;s Fees &amp; bond tab.</p>
@@ -434,7 +434,7 @@ function RowDetails({ row: r, groups, years, results, ranked, latest, onClose, r
               )}
 
               <section aria-labelledby="row-hospital" className="grid gap-2">
-                <h3 id="row-hospital" className="font-semibold">The institute</h3>
+                <h3 id="row-hospital" className="text-title font-semibold">The institute</h3>
                 <dl className="grid gap-3 text-sm">
                   {E.has.beds && <div>
                     <dt className="text-xs font-semibold text-muted-foreground">Hospital beds, as reported</dt>

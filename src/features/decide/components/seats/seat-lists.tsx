@@ -13,7 +13,7 @@ import { Dash, InstName, Provisional, ReachBadge } from "../bits";
 import { InfoTip } from "../info-tip";
 import { TermStatCells } from "../stat-cells";
 import { TypeBadge } from "../type-badge";
-import { smallLink, tbl } from "../ui";
+import { chip, smallLink, tbl } from "../ui";
 import { PAST_ROUNDS, type SeatLine, type SeatSort } from "./find-seats";
 import { seatCourse as courseOf } from "./seat-cards";
 import { ScrollTable } from "../scroll-table";
@@ -60,10 +60,7 @@ export function SeatListPicker({ lists, current, href, exam = DEFAULT_EXAM, apar
           key={l.key}
           href={href(l.key)}
           aria-current={l.key === current ? "true" : undefined}
-          className={cn(
-            "inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm",
-            l.key === current ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input",
-          )}
+          className={chip(l.key === current)}
         >
           <span className="sr-only">{g} </span>{kindName(l.kind, exam)}{" "}
           {/* INI-CET: the open seats and those notified apart, as AIIMS's two notices total them. */}
@@ -125,7 +122,7 @@ function PastClosings({ r, name, latest }: { r: SeatLine; name: string; latest: 
     <div className="grid justify-items-end gap-1 whitespace-nowrap">
       {d ? (
         <span className="numeric">
-          <span className="text-[15px] font-semibold">{formatRank(d.closing)}</span>
+          <span className="text-[0.9375rem] font-semibold">{formatRank(d.closing)}</span>
           <span className="block text-xs text-muted-foreground"><YearName year={d.year} /> <RoundName year={d.year} round={d.round} /></span>
         </span>
       ) : (
