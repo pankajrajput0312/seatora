@@ -21,7 +21,7 @@ export default async function ResetPage({ searchParams }: { searchParams: Promis
       ) : (
         <p role="alert" className="text-sm text-muted-foreground">
           {allowed ? "This reset link has expired or was already used. Links work once, for an hour." : "Too many attempts. Please wait 15 minutes and open the link again."}{" "}
-          <Link href="/forgot" className="text-foreground underline hover:text-sky">Ask for a new link</Link>.
+          <Link href="/forgot" className="text-sky underline">Ask for a new link</Link>.
         </p>
       )}
     </AuthShell>
