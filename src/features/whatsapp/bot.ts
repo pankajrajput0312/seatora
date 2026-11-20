@@ -96,9 +96,13 @@ async function saveProfile(userId: string, current: Profile | null, input: z.inf
 
 /** One WhatsApp message in, the assistant's reply out (text, then any options). A repeated delivery is ignored. */
 const BOT_PAUSED = true;
+/** Numbers the bot still answers while paused (owner, 20 Nov 2026: his and Aditi's): WHATSAPP_BOT_ALLOW, comma-separated
+ * 91… numbers, set in Vercel, never in the code. */
+const botAllowed = (phone: string) => (process.env.WHATSAPP_BOT_ALLOW ?? "").split(",").map((s) => s.trim()).filter(Boolean).includes(phone);
 
 export async function handleMessage(m: Incoming) {
-  if (!m.text) return;
+  const allowed = botAllowed(m.phone);
+  if (!m.text) return allowed ? sendText(m.phone, "I can read text messages only for now. Please type your question.") : undefined;
   // "Continue with WhatsApp": the login message (or its bare code) signs her in on the website; it is not a question.
   const login = parseLoginCode(m.text);
   if (login) {
@@ -113,11 +117,12 @@ export async function handleMessage(m: Incoming) {
     if (r === "expired" || login.full) return sendText(m.phone, "That code has expired. Tap Continue with WhatsApp again.");
   }
   // Bot paused for every number (owner, 20 Nov 2026): only the login code above gets a reply. Delete this line to resume.
-  if (BOT_PAUSED) return;
+  if (BOT_PAUSED && !allowed) return;
   void typing(m.id);
   // Only a number with a Seatora account gets the assistant (owner, 20 Nov 2026): anyone else gets the sign-up link,
   // and no account is made from a chat message (an account is made only by signing up, e.g. the login code above).
-  const user = await db.user.findUnique({ where: { phone: m.phone } });
+  // An allowed number always has an account (made here if missing); anyone else needs one already.
+  const user = allowed ? await accountOf(m.phone, m.name) : await db.user.findUnique({ where: { phone: m.phone } });
   if (!user) return signupPrompt(m.phone);
   const cfg = askConfig();
   // Speed over depth on a chat (the voice agent's bot runs a fast model with no thinking): low effort always, and
