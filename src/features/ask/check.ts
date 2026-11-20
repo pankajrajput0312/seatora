@@ -14,7 +14,7 @@ export function lakhAmounts(text: string): number[] {
   return [...text.matchAll(/₹\s?(\d+(?:\.\d+)?)\s?(L|lakh|Cr|crore)\b/gi)].map((m) => Math.round(Number(m[1]) * (/^c/i.test(m[2]) ? 1e7 : 1e5)));
 }
 
-const STATIC = new Set(["/decide", "/decide/options", "/decide/seats", "/decide/choices", "/decide/compare", "/decide/counselling", "/decide/institutes", "/decide/last-ranks", "/decide/allotments", "/decide/rank-scan", "/decide/rank-tools", "/decide/fees", "/decide/residents", "/decide/requests", "/decide/ask"]);
+const STATIC = new Set(["/decide", "/decide/options", "/decide/seats", "/decide/choices", "/decide/compare", "/decide/counselling", "/decide/institutes", "/decide/last-ranks", "/decide/allotments", "/decide/rank-tools", "/decide/fees", "/decide/residents", "/decide/requests", "/decide/ask"]);
 
 /** A site path is a Seatora page: a known route, an institute by a slug that exists, or a report link. */
 export function knownRoute(href: string, slugs: Set<string>): boolean {

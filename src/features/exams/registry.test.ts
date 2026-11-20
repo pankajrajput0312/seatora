@@ -4,7 +4,7 @@ import { LATEST_YEAR, latestRound, latestText, PAST_YEARS, pastOf, reachLabel, r
 import { CHOICES_KEY, COMPARE_KEY } from "@/features/decide/lib/choices";
 import { PROFILE_KEY, profileQuotas } from "@/features/decide/profile";
 import { baseCategories, openQuotas, openQuotasNote, quotaScopeNote, rounds, type Source } from "@/features/decide/types";
-import { completeYear, examShows, headYearOf, neetPg, quotaIn, roundIn, roundNamesOf, tidyLabel } from "./exam";
+import { completeYear, examShows, headYearOf, hiddenPages, neetPg, quotaIn, roundIn, roundNamesOf, tidyLabel } from "./exam";
 import { DEFAULT_EXAM, examFor, examKeys, exams, examYears, groupOf, groupsOf, headYearIn, isExam, latestOf, markerKey, pageNeeds, restrictedQuota, roundNameIn, scopedKey, rankListIn, rankListParam, showsPage, yearName } from "./registry";
 import { authorityOf, inExamWords, rankListOf, seatCategoriesFor, sessionOf } from "./keys";
 import { instituteGroupOf } from "./exam";
@@ -117,9 +117,10 @@ describe("examFor: only staff get an exam other than NEET PG", () => {
 describe("nav and page gating (pageNeeds)", () => {
   const lacking = ["/decide/residents", "/decide/rank-tools", "/decide/fees"];
   // Schedule too: every exam has one (its round status once its data has it, else where its counselling body publishes it).
-  const shown = ["/decide", "/decide/options", "/decide/seats", "/decide/choices", "/decide/compare", "/decide/counselling", "/decide/institutes", "/decide/last-ranks", "/decide/allotments", "/decide/rank-scan", "/decide/rank-journey"];
+  const shown = ["/decide", "/decide/options", "/decide/seats", "/decide/choices", "/decide/compare", "/decide/counselling", "/decide/institutes", "/decide/last-ranks", "/decide/allotments", "/decide/rank-journey"];
   it("NEET PG shows every page; NEET SS and MDS hide those without data and show the rest, Seats and Schedule included", () => {
-    for (const href of [...Object.keys(pageNeeds), ...shown]) expect(showsPage("neet-pg", href)).toBe(true);
+    for (const href of [...Object.keys(pageNeeds).filter((h) => !hiddenPages.has(h)), ...shown]) expect(showsPage("neet-pg", href)).toBe(true);
+    for (const exam of examKeys) expect(showsPage(exam, "/decide/rank-scan")).toBe(false); // hidden (owner, 21 Nov)
     for (const exam of ["neet-ss", "neet-mds"] as const) {
       expect(lacking.map((h) => showsPage(exam, h))).toEqual(lacking.map(() => false));
       expect(shown.every((h) => showsPage(exam, h))).toBe(true);

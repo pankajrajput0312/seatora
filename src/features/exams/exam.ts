@@ -111,7 +111,10 @@ export const pageNeeds: Record<string, keyof ExamHas> = {
   "/decide/rank-scan": "allotments",
   "/decide/rank-journey": "allotments",
 };
+/** Pages hidden from every exam's nav and Home (21 Nov 2026, owner: "hide the rank scan part"); the page sends her Home. */
+export const hiddenPages = new Set(["/decide/rank-scan"]);
 export const examShows = (E: Pick<Exam, "has">, href: string) => {
+  if (hiddenPages.has(href)) return false;
   const need = pageNeeds[href];
   return !need || E.has[need];
 };

@@ -29,7 +29,7 @@ import { profileFromParams, toURLSearchParams } from "@/features/decide/profile"
 import { roundLabel, roundShort, type Round } from "@/features/decide/types";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
 import { activeExam, examGate, examInfo } from "@/features/exams/active";
-import { authorityOf, DEFAULT_EXAM, groupsOf, perGroup, rankListOf, rankListParam, roundNameIn, termsDocOf, yearName, type ExamKey } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, groupsOf, perGroup, rankListOf, roundNameIn, termsDocOf, yearName, type ExamKey } from "@/features/exams/registry";
 import { QuotaName } from "@/features/decide/components/round-name";
 import { quotaIn, type Exam } from "@/features/exams/exam";
 import { PgOr } from "@/features/decide/components/round-name";
@@ -152,9 +152,9 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
   const mdsRank = (a: AllotmentRow) => rankListOf(exam, a.degree) !== "";
   const rankLink = (a: AllotmentRow, className: string) => (
     <>
-      <Link href={L.rankScan(a.rank, a.year, rankListParam(exam, a.degree))} className={className} title="Scan ranks around this one">
-        {formatRank(a.rank)}<span className="sr-only">: {mdsRank(a) ? `${a.degree} rank list, ` : ""}scan the ranks around it in {yn(a.year)}</span>
-      </Link>
+      <span className={className}>
+        {formatRank(a.rank)}{mdsRank(a) && <span className="sr-only">: {a.degree} rank list</span>}
+      </span>
       {mdsRank(a) && <span aria-hidden className="block text-xs font-normal text-muted-foreground">{a.degree} rank list</span>}
     </>
   );

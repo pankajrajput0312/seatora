@@ -48,7 +48,7 @@ import { checkAndCount, currentPlan } from "@/features/plans/usage";
 import { kindName, type SeatList } from "@/features/decide/types";
 import { hideResidentAction } from "./actions";
 import { ScrollTable } from "@/features/decide/components/scroll-table";
-import { authorityOf, DEFAULT_EXAM, headYearIn, inExamWords, latestOf, rankListParam, yearName } from "@/features/exams/registry";
+import { authorityOf, DEFAULT_EXAM, headYearIn, inExamWords, latestOf, yearName } from "@/features/exams/registry";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { quotaIn, roundIn, type Exam } from "@/features/exams/exam";
 import { QuotaName } from "@/features/decide/components/round-name";
@@ -653,7 +653,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                     <li key={i} className="grid min-w-0">
                       <ResultCard
                         chips={[<span key="yr"><span className="numeric">{yn(a.year)}</span> · {roundIn(E, a.year, a.round)}</span>, a.quota, `${a.category} seat`, a.provisional && <Provisional key="p" when />]}
-                        stat={{ label: "Rank", value: <Link href={L.rankScan(a.rank, a.year, rankListParam(exam, a.degree))} className="numeric inline-flex min-h-11 items-center hover:text-sky hover:underline">{formatRank(a.rank)}<span className="sr-only">: scan ranks around it</span></Link> }}
+                        stat={{ label: "Rank", value: <span className="numeric inline-flex min-h-11 items-center">{formatRank(a.rank)}</span> }}
                         title={a.courseName}
                         href={L.lastRanks(a.courseSlug, { inst: slug })}
                         meta={[a.remark]}
@@ -675,7 +675,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                       {allot.rows.map((a, i) => (
                         <tr key={i} className={tbl.row}>
                           <td className={`${tbl.num} ${stick} max-md:px-2`}>
-                            <Link href={L.rankScan(a.rank, a.year, rankListParam(exam, a.degree))} className="hover:text-sky hover:underline" title="Scan ranks around this one">{formatRank(a.rank)}</Link>
+                            {formatRank(a.rank)}
                             <span className="block text-xs font-normal whitespace-nowrap md:hidden"><span className="numeric">{yn(a.year)}</span> {roundIn(E, a.year, a.round)} <Provisional when={a.provisional} /></span>
                           </td>
                           <td className={`${tbl.td} whitespace-nowrap max-md:hidden`}><span className="numeric">{yn(a.year)}</span> {roundIn(E, a.year, a.round)} <Provisional when={a.provisional} /></td>

@@ -57,6 +57,8 @@ const nextConfig: NextConfig = {
       { source: "/faq", destination: "/#faq", permanent: true },
       { source: "/residents", destination: "/neet-pg/residents", permanent: true },
       { source: "/decide/schedule", destination: "/decide/counselling", permanent: false },
+      // Hidden (21 Nov 2026, owner; src/features/exams/exam.ts hiddenPages): delete both to bring it back.
+      { source: "/decide/rank-scan", destination: "/decide", permanent: false },
     ];
   },
 };

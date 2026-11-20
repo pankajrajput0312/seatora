@@ -13,7 +13,6 @@ description: Which Seatora page answers what, with link formats (/decide/options
 - Institutes `/decide/institutes`; one institute `/decide/institutes/<slug>` with `?tab=overview|courses|seats|allotments|fees|clinical|residents`.
 - Last ranks `/decide/last-ranks?course=<course-slug>` (course slug like `dnb-anaesthesiology`, `md-family-medicine`; `&lcat=OBC` seat category, `&lquota=DNB Quota`).
 - Allotments `/decide/allotments?course=<course-slug>&inst=<slug>&year=2025`: every allotment row.
-- Rank scan `/decide/rank-scan?scan=<rank>&year=2025`: what ranks near hers got.
 - Score & rank `/decide/rank-tools`: score ↔ rank in NBEMS results.
 - Fees & bond `/decide/fees`: fees, stipend, bond and leaving penalty per institute and programme.
 - Residents `/decide/residents`: names from MCC admitted lists, across colleges.

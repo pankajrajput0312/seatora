@@ -50,8 +50,8 @@ export function CourseReach({ hit, missed, nearest, rank, when }: { hit: CourseH
 
 /**
  * What she can still do when none of her options reached her rank: Home's panel, and the top of Options (one
- * component, so the two never drift). Every item is a real control: an Options filter, her profile, the schedule,
- * Rank scan. `list`: the newest round's seat list while Options lists that round; `fresh`: its options never
+ * component, so the two never drift). Every item is a real control: an Options filter, her profile, the schedule.
+ * `list`: the newest round's seat list while Options lists that round; `fresh`: its options never
  * allotted before. `courses` (Options): which courses nearest hers reached her rank (CourseReach), the first item.
  */
 export function StillCanDo({ L, rank, list, fresh, counts, title, id, exam = DEFAULT_EXAM, cap, courses }: {
@@ -91,7 +91,6 @@ export function StillCanDo({ L, rank, list, fresh, counts, title, id, exam = DEF
           <li><Link href={L.to("/decide", { editProfile: 1 })} className={smallLink}>{perGroup(exam) ? "Widen your courses or states" : "Widen your courses, quotas or states"}</Link>: other states, more courses{perGroup(exam) ? " of your question group" : `, other quotas you can take (${exams[exam].quotas.map((q) => quotaIn(exams[exam], q)).join(", ")})`}.</li>
         )}
         {pg && <li>The stray vacancy round comes after Round 3: see the <Link href={L.to("/decide/counselling")} className={smallLink}>schedule and notices</Link>.</li>}
-        <li><Link href={L.rankScan(rank)} className={smallLink}>Rank scan</Link> shows what ranks near yours were allotted in past rounds.</li>
       </ul>
     </section>
   );

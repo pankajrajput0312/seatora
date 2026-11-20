@@ -13,7 +13,7 @@ import { cardMeta, subLink, termCol, withRowInfo } from "@/features/decide/compo
 import { ResultCard, ResultCards } from "@/features/decide/components/result-card";
 import { TermStatCells } from "@/features/decide/components/stat-cells";
 import { TypeBadge } from "@/features/decide/components/type-badge";
-import { control, EmptyState, Field, FilterBar, Select, smallLink, tbl } from "@/features/decide/components/ui";
+import { control, EmptyState, Field, FilterBar, Select, tbl } from "@/features/decide/components/ui";
 import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
@@ -95,8 +95,6 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
           <EmptyState
             title={`No allotment to rank ${formatRank(rank)} in ${yearWords}`}
             description={`${by}'s ${yearWords} results (${year.rounds.map(roundOf).join(", ")}) list no seat for this rank in any round.`}
-            href={L.rankScan(rank, year.year, list == null ? undefined : list ? list.toLowerCase() : "main")}
-            action={`Scan ranks around ${formatRank(rank)}`}
           />
           {source}
         </>
@@ -115,7 +113,6 @@ export default async function RankJourneyPage({ searchParams }: { searchParams: 
                   earlier round was kept. Seat category is the seat&apos;s, candidate category the candidate&apos;s own; choice no.
                   and the previous seat (the seat held one round back, with the remark printed beside it) are printed in R2 and R3 results only.
                 </InfoTip>
-                <Link href={L.rankScan(rank, year.year, list == null ? undefined : list ? list.toLowerCase() : "main")} className={`${smallLink} text-sky sm:ml-2`}>Scan nearby</Link>
               </div>
               {source}
             </div>
