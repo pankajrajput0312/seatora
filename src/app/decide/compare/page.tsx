@@ -267,7 +267,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       ) : (
         <>
         {me && known.length > cap && <Paywall feature="compare" eff={me.eff} className="mt-6" />}
-        {risk && <p className="mt-3 text-sm">{risk}</p>}
+        {risk && <p className="mt-3 max-w-prose text-sm">{risk}</p>}
         {/* INI-CET: the rules where its counselling and NEET PG's meet ("If you leave" for someone in both). */}
         {E.crossover && fees && (
           <p className="mt-2 text-sm">
@@ -299,7 +299,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           ))}
         </ul>
         {/* md up: fixed columns, 12rem at least: four options fit beside the labels from 1280px (a wide grid scrolls in its cell). */}
-        <ScrollTable label="Comparison" className="mt-8 rounded-xl border border-border bg-card max-md:hidden" scrollClassName="[scroll-padding-inline-start:11rem]">
+        <ScrollTable label="Comparison" className="mt-4 rounded-xl border border-border bg-card max-md:hidden" scrollClassName="[scroll-padding-inline-start:11rem]">
           <table className="w-full min-w-[calc(11rem+var(--n)*12rem)] table-fixed text-sm" style={{ "--n": options.length } as React.CSSProperties}>
             <caption className="sr-only">Comparison of {options.length} {options.length === 1 ? "option" : "options"}</caption>
             <thead className={tbl.head}>

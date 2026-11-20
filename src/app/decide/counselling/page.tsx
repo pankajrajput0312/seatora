@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, Megaphone } from "lucide-react";
 import { z } from "zod";
+import { cn } from "@/lib/cn";
 import { Badge } from "@/components/ui/badge";
 import { sourceTypeLabels } from "@/components/ui/source-label";
 import { formatRank } from "@/features/cutoffs/lib/format";
@@ -137,7 +138,7 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
     <section aria-labelledby="schedule-h" className="grid gap-4">
       <div className="grid gap-1">
         <div className="flex items-center gap-1">
-          <h2 id="schedule-h" className="text-lg font-semibold">{exam === DEFAULT_EXAM ? `PG counselling ${rs.year}` : `${w.E.label} ${yearName(exam, rs.year, true)}`}{idle ? "" : ", round by round"}</h2>
+          <h2 id="schedule-h" className="text-h2 font-semibold">{exam === DEFAULT_EXAM ? `PG counselling ${rs.year}` : `${w.E.label} ${yearName(exam, rs.year, true)}`}{idle ? "" : ", round by round"}</h2>
           <InfoTip label="the round statuses">
             Each status comes from {w.by}&apos;s notices as of <span className="numeric">{fmtIST(rs.asOf)}</span> and moves on only when today (<span className="numeric">{fmtIST(now.toISOString())}</span>) passes a date printed in {w.by}&apos;s schedule. Dates are as printed; tentative ones may change. Each step links the {w.by} notice behind its status.
           </InfoTip>
@@ -181,7 +182,7 @@ async function Schedule({ L, exam }: { L: DecideLinks; exam: ExamKey }) {
         return (
         <section key={r.round} aria-labelledby={`round-${r.round}`} className="scroll-mt-24 rounded-xl border border-border bg-card">
           <div className="flex flex-wrap items-center justify-between gap-x-3 border-b border-border px-4">
-            <h3 id={`round-${r.round}`} className="scroll-mt-24 py-2.5 font-semibold">{w.round(r.round)}</h3>
+            <h3 id={`round-${r.round}`} className="scroll-mt-24 py-2.5 text-title font-semibold">{w.round(r.round)}</h3>
             <Link href={L.to("/decide/counselling", { tab: "announcements", year: rs.year, round: r.round })} className={`${smallLink} text-sm text-sky`}>
               {w.round(r.round)} notices
             </Link>
@@ -241,8 +242,9 @@ function Step({ s, by, note }: { s: StepNow; by: string; note: string | null }) 
   const dates = sc && (sc.on ? fmtIST(sc.on) : [sc.from && fmtIST(sc.from), sc.to && fmtIST(sc.to)].filter(Boolean).join(" – "));
   const why = clockNote(s);
   return (
-    <li className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 border-b border-border px-4 py-3 last:border-0 md:grid-cols-[11rem_8rem_1fr]">
-      <span className="font-medium">{stepName[s.step]}</span>
+    // The step open now in the accent's tint (where the round is); a done step's name in secondary ink.
+    <li className={cn("grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 border-b border-border px-4 py-3 last:border-0 md:grid-cols-[11rem_8rem_1fr]", s.now === "open" && "bg-wash")}>
+      <span className={cn("text-sm font-medium", s.now === "done" && "text-muted-foreground")}>{stepName[s.step]}</span>
       <span><Badge tone={badgeOf(s).tone}>{badgeOf(s).text}</Badge></span>
       <div className="col-span-2 grid gap-0.5 text-sm md:col-span-1">
         {(dates || s.now !== "done") && (
@@ -313,9 +315,9 @@ async function Announcements({ f, params, L, exam }: { f: Filters; params: URLSe
           </EmptyState>
         )
       ) : (
-        <ol className="grid gap-2" aria-label={`${w.by} notices`}>
+        <ol className="divide-y divide-border rounded-xl border border-border bg-card" aria-label={`${w.by} notices`}>
           {res.rows.map((n) => (
-            <li key={`${n.date}|${n.url}|${n.title}`} className="flex flex-wrap items-center justify-between gap-x-3 rounded-xl border border-border bg-card px-4 py-3">
+            <li key={`${n.date}|${n.url}|${n.title}`} className="flex flex-wrap items-center justify-between gap-x-3 px-4 py-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   <time dateTime={n.date} className="numeric">{fmtIST(n.date, true)}</time>
@@ -351,7 +353,7 @@ async function MeritLists() {
     <section aria-labelledby="merit-h" className="grid gap-3">
       <div className="grid gap-1">
         <div className="flex items-center gap-1">
-          <h2 id="merit-h" className="text-lg font-semibold">NEET PG results</h2>
+          <h2 id="merit-h" className="text-h2 font-semibold">NEET PG results</h2>
           <InfoTip label="the NEET PG results">The NBEMS result PDFs behind Decide&apos;s score and rank history. Each year has its own maximum marks, so compare ranks across years, not scores.</InfoTip>
         </div>
         <p className="text-sm text-muted-foreground">History only: compare ranks, not scores.</p>
