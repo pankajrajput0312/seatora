@@ -113,13 +113,18 @@ export function BranchNotes({ d }: { d: Pick<Data, "restricted"> }) {
   );
 }
 
+/** What a table's rows are: branches (default), a college's courses, a branch's colleges; `eg`, the search's example. */
+export type Noun = { one: string; many: string; eg: string };
+const BRANCH: Noun = { one: "branch", many: "branches", eg: "radio" };
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
 /** Her rank, category and the quotas she ticked (Decide Home's profile), for BranchTables' rows against her rank. */
 export type Me = { rank: number; category: BaseCategory; pwd: boolean; quotas: string[] };
 type Data = NonNullable<Awaited<ReturnType<typeof branchRanks>>>;
 const appTh = "px-3 py-3 text-xs font-semibold text-muted-foreground md:px-4";
 
 /** The tabs shown, each with its rows: the open quotas', then the restricted quotas' (with `me`, only the ones she ticked). */
-export const tabsOf = (d: Data, me?: Me) =>
+export const tabsOf = (d: Pick<Data, "tabs" | "restricted">, me?: Me) =>
   [
     ...d.tabs.map((t) => ({ key: t.key as Tab, label: t.label as string, rows: t.rows as BranchRow[] })),
     { key: "restricted" as Tab, label: "Restricted quotas", rows: me ? d.restricted.filter((r) => me.quotas.includes(r.quota)) : d.restricted },
@@ -129,9 +134,13 @@ export const tabsOf = (d: Data, me?: Me) =>
  * The search, the quota tabs and a table per tab, linking each branch to `href`. Without `me`: each seat category's
  * last rank (a phone shows Open and one picked category beside it; the PwD switch). With `me` (Decide Home with her
  * rank): her category's and Open's last rank, whether the branch reached her rank (vsRank: reached first) and its seats.
- * `app`: Decide's look (no monospace caps) and 10 rows before "Show all".
+ * `app`: Decide's look (no monospace caps) and 10 rows before "Show all". `noun`: what the rows are (a college's
+ * courses, a branch's colleges: each row's `sub` under its name); `cols`: the headers of the rows' `prev` (last year's
+ * deepest) and `seats` columns, shown from md up when given.
  */
-export function BranchTables({ d, href, me, app = false, className }: { d: Data; href: (slug: string, quota: string) => string; me?: Me; app?: boolean; className?: string }) {
+export function BranchTables({ d, href, me, app = false, className, noun = BRANCH, cols = {} }: {
+  d: Pick<Data, "year" | "round" | "tabs" | "restricted">; href: (slug: string, quota: string) => string; me?: Me; app?: boolean; className?: string; noun?: Noun; cols?: { prev?: string; seats?: string };
+}) {
   const later = d.round !== "R1";
   const round = roundName[d.round];
   const tabs = tabsOf(d, me);
@@ -148,7 +157,7 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
     <div data-lr className={cn("group/lr", SWITCHES, className)}>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <BranchSearch />
+          <BranchSearch label={`Search a ${noun.one}`} placeholder={`Search a ${noun.one}, e.g. ${noun.eg}`} />
           {/* The first option is the server's order (most competitive first; with her rank, closest to it first). */}
           <BranchSort fold={fold} store={app ? "seatora.lr-sort.app" : "seatora.lr-sort"}>
             {me && <option value="">Closest to my rank</option>}
@@ -162,7 +171,7 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
               mine !== "Open" && <option value="mine">{mine} last rank</option>
             )}
             <option value="n-desc">Most seats</option>
-            <option value="name">Branch A–Z</option>
+            <option value="name">{cap(noun.one)} A–Z</option>
           </BranchSort>
         </div>
         {!me && (
@@ -199,16 +208,16 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
       {me && mine && tabs.map((t) => {
         const rows = vsRank(t.rows, me.rank, me.category, me.pwd);
         // Her category's column, then Open's (once when hers is Open); a tab without one of them (Deemed: Open only) leaves it out.
-        const cols = [...new Set<Category>([mine, "Open"])].filter((c) => t.rows.some((r) => r.last[c] != null));
+        const cats = [...new Set<Category>([mine, "Open"])].filter((c) => t.rows.some((r) => r.last[c] != null));
         const restricted = t.key === "restricted";
         return (
-          <Panel key={t.key} tab={t.key} n={rows.length} what={restricted ? "rows" : "branches"} fold={fold}>
+          <Panel key={t.key} tab={t.key} n={rows.length} what={restricted ? "rows" : noun.many} none={noun.one} fold={fold}>
             <table className={cn("w-full text-sm", CELLS)}>
               <caption className="sr-only">{`${t.label}: last rank by branch against your rank, NEET PG ${d.year} ${round}`}</caption>
               <thead>
                 <tr>
-                  <th scope="col" className={cn(hc, "text-left")}>Branch</th>
-                  {cols.map((c) => (
+                  <th scope="col" className={cn(hc, "text-left")}>{cap(noun.one)}</th>
+                  {cats.map((c) => (
                     <th key={c} scope="col" className={cn(hc, "text-right")}>{c}<span className="max-md:sr-only"> last rank</span></th>
                   ))}
                   <th scope="col" className={cn(hc, "hidden text-right md:table-cell")}>Vs your rank</th>
@@ -218,7 +227,7 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
               <tbody>
                 {rows.map((r, i) => {
                   // The seat category that decided it, when no column shows it (a PwD's Open PwD seats).
-                  const via = r.best && !cols.includes(r.best.cat) ? ` (${r.best.cat})` : "";
+                  const via = r.best && !cats.includes(r.best.cat) ? ` (${r.best.cat})` : "";
                   const mark = !r.best ? (
                     <span className="text-muted-foreground">No allotment on your seats</span>
                   ) : r.reached ? (
@@ -233,7 +242,7 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
                         {restricted && <span className="block text-xs text-muted-foreground">{r.quota}</span>}
                         <span className="block text-xs md:hidden">{mark}<span className="numeric text-muted-foreground"> · {seats(r.n)}</span></span>
                       </th>
-                      {cols.map((c) => <td key={c}>{rank(r.last[c])}</td>)}
+                      {cats.map((c) => <td key={c}>{rank(r.last[c])}</td>)}
                       <td className="hidden md:table-cell">{mark}</td>
                       <td className="hidden text-muted-foreground md:table-cell">{formatRank(r.n)}</td>
                     </tr>
@@ -246,35 +255,45 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
       })}
 
       {!me && d.tabs.map((t) => (
-        <Panel key={t.key} tab={t.key} n={t.rows.length} what="branches" fold={fold}>
+        <Panel key={t.key} tab={t.key} n={t.rows.length} what={noun.many} none={noun.one} fold={fold}>
           <table className={cn("w-full text-sm", CELLS)}>
             <caption className="sr-only">{`${t.label}: last rank by branch, NEET PG ${d.year} ${round}`}</caption>
             <thead>
               <tr>
-                <th scope="col" className={cn(hc, "text-left")}>Branch</th>
+                <th scope="col" className={cn(hc, "text-left")}>{cap(noun.one)}</th>
                 {t.cats.map((c) => (
                   <th key={c} scope="col" data-c={c === "Open" ? undefined : c} className={cn(hc, "text-right")}>
                     <span data-base>{c}</span>
                     <span data-pwd>{c} PwD</span>
                   </th>
                 ))}
+                {cols.prev && <th scope="col" className={cn(hc, "hidden text-right md:table-cell")}>{cols.prev}</th>}
                 <th scope="col" className={cn(hc, "hidden text-right md:table-cell")}>{later ? "New seats" : "Seats"}</th>
+                {cols.seats && <th scope="col" className={cn(hc, "hidden text-right md:table-cell")}>{cols.seats}</th>}
               </tr>
             </thead>
             <tbody>
               {t.rows.map((r, i) => (
-                <tr key={r.slug} data-name={r.course.toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { open: r.last.Open, ...Object.fromEntries(phoneCats.map((c) => [c.toLowerCase(), r.last[c]])) })} className="border-t border-border hover:bg-muted">
+                <tr key={r.slug} data-name={`${r.course} ${r.sub ?? ""}`.trim().toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { open: r.last.Open, ...Object.fromEntries(phoneCats.map((c) => [c.toLowerCase(), r.last[c]])) })} className="border-t border-border hover:bg-muted">
                   <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
                     <Link href={href(r.slug, r.quota)} className={L}>{r.course}</Link>
-                    <span className="numeric block text-xs text-muted-foreground md:hidden">{seats(r.n)}</span>
+                    {r.sub && <span className="block text-xs text-muted-foreground">{r.sub}</span>}
+                    <span className="numeric block text-xs text-muted-foreground md:hidden">{seats(r.n)}{cols.prev && r.prev != null && ` · ${cols.prev}: ${formatRank(r.prev)}`}</span>
                   </th>
-                  {t.cats.map((c) => (
-                    <td key={c} data-c={c === "Open" ? undefined : c}>
-                      <span data-base>{rank(r.last[c])}</span>
-                      <span data-pwd>{rank(r.last[`${c} PwD`])}</span>
-                    </td>
-                  ))}
+                  {t.cats.map((c) =>
+                    // Neither seat has a rank: one dash, whichever the PwD switch shows (most cells; the page stays small).
+                    r.last[c] == null && r.last[`${c} PwD`] == null ? (
+                      <td key={c} data-c={c === "Open" ? undefined : c} data-na="">—</td>
+                    ) : (
+                      <td key={c} data-c={c === "Open" ? undefined : c}>
+                        <span data-base>{rank(r.last[c])}</span>
+                        <span data-pwd>{rank(r.last[`${c} PwD`])}</span>
+                      </td>
+                    ),
+                  )}
+                  {cols.prev && <td className="hidden md:table-cell">{rank(r.prev)}</td>}
                   <td className="hidden text-muted-foreground md:table-cell">{formatRank(r.n)}</td>
+                  {cols.seats && <td className="hidden md:table-cell">{rank(r.seats ?? undefined)}</td>}
                 </tr>
               ))}
             </tbody>
@@ -283,7 +302,7 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
       ))}
 
       {!me && d.restricted.length > 0 && (
-        <Panel tab="restricted" n={d.restricted.length} what="rows" fold={fold}>
+        <Panel tab="restricted" n={d.restricted.length} what="rows" none={noun.one} fold={fold}>
           <p className="border-b border-border px-3 py-3 text-sm leading-relaxed text-muted-foreground md:px-4">
             Only for candidates eligible for that quota. The last rank on any of its seats.
           </p>
@@ -292,13 +311,13 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
             <thead>
               <tr>
                 <th scope="col" className={cn(hc, "hidden text-left md:table-cell")}>Quota</th>
-                <th scope="col" className={cn(hc, "text-left")}>Branch</th>
+                <th scope="col" className={cn(hc, "text-left")}>{cap(noun.one)}</th>
                 <th scope="col" className={cn(hc, "text-right")}>Last rank</th>
               </tr>
             </thead>
             <tbody>
               {d.restricted.map((r, i) => (
-                <tr key={`${r.quota}|${r.slug}`} data-name={`${r.course} ${r.quota}`.toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { last: r.max })} className="border-t border-border hover:bg-muted">
+                <tr key={`${r.quota}|${r.slug}`} data-name={`${r.course} ${r.sub ?? ""} ${r.quota}`.toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { last: r.max })} className="border-t border-border hover:bg-muted">
                   <td className="hidden px-4 py-2.5 text-muted-foreground md:table-cell">{r.quota}</td>
                   <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
                     <Link href={href(r.slug, r.quota)} className={L}>{r.course}</Link>
@@ -316,12 +335,12 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
 }
 
 /** One tab's table in its card, a line when the search matches none of it, and its fold. */
-function Panel({ tab, n, what, fold, children }: { tab: Tab; n: number; what: string; fold: number; children: React.ReactNode }) {
+function Panel({ tab, n, what, none = BRANCH.one, fold, children }: { tab: Tab; n: number; what: string; none?: string; fold: number; children: React.ReactNode }) {
   return (
     <div data-panel={tab} className={cn("group/p mt-4 hidden", FOLDED, panelOn[tab])}>
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         {children}
-        <p data-none hidden className="border-t border-border px-4 py-6 text-sm text-muted-foreground">No branch in this tab matches. Try another tab.</p>
+        <p data-none hidden className="border-t border-border px-4 py-6 text-sm text-muted-foreground">No {none} in this tab matches. Try another tab.</p>
       </div>
       {n > fold && (
         <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center rounded-sm text-sm text-sky underline underline-offset-4 hover:no-underline has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring group-data-[searching]/lr:hidden">

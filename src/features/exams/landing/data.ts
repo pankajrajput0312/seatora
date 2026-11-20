@@ -173,9 +173,14 @@ export const branchQuotas = [
   { key: "deemed", quota: "Deemed/Paid Seats", label: "Deemed (Self-Financed Merit Seat)" },
   { key: "dnb", quota: "DNB Quota", label: "DNB" },
 ] as const;
-/** One course in one quota of a round: its last (highest) rank on each seat category, and the allotments it made. */
-export type BranchRow = { course: string; slug: string; quota: string; last: Partial<Record<Category, number>>; n: number };
-type BranchAgg = { degree: string; name: string; slug: string; quota: string; category: string; closing: number | null; n: number };
+/**
+ * One course in one quota of a round: its last (highest) rank on each seat category, and the allotments it made. A public
+ * college or branch page's row (./colleges.ts) adds `sub` (a line under its name), `prev` (last year's deepest Open
+ * closing) and `seats` (in the newest clear vacancy list).
+ */
+export type BranchRow = { course: string; slug: string; quota: string; last: Partial<Record<Category, number>>; n: number; sub?: string; prev?: number; seats?: number | null };
+/** A row of the round's cutoffs summed per course (or, `degree` "", per college: `name`), quota and seat category. */
+export type BranchAgg = { degree: string; name: string; slug: string; quota: string; category: string; closing: number | null; n: number };
 
 /**
  * A round's cutoffs, summed per course, quota and seat category (SQL), as the branch tables: each open quota's courses,
@@ -187,7 +192,7 @@ export function branchTabs(rows: BranchAgg[]) {
   const by = new Map<string, BranchRow>();
   for (const r of rows) {
     const k = `${r.quota}|${r.slug}`;
-    const b = by.get(k) ?? by.set(k, { course: `${r.degree} ${r.name}`, slug: r.slug, quota: r.quota, last: {}, n: 0 }).get(k)!;
+    const b = by.get(k) ?? by.set(k, { course: r.degree ? `${r.degree} ${r.name}` : r.name, slug: r.slug, quota: r.quota, last: {}, n: 0 }).get(k)!;
     const c = r.category as Category;
     b.n += r.n;
     if (r.closing != null) b.last[c] = Math.max(b.last[c] ?? 0, r.closing);
