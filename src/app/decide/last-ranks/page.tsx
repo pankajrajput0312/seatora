@@ -360,8 +360,8 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
             const here = inst?.slug === r.college.slug;
             const of = `${r.college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`;
             return [
-              <tr key={r.id} className={`expand-host border-b border-border hover:bg-muted/50 ${here ? "bg-sky/10" : ""}`}>
-                <th scope="row" className={`sticky left-0 z-[1] max-w-64 min-w-[8.5rem] px-3 py-2 text-left font-normal md:min-w-60 ${here ? "bg-mist" : "bg-card"} ${tbl.pin}`}>
+              <tr key={r.id} className={`expand-host border-b border-border hover:bg-muted/60 ${here ? "bg-wash" : ""}`}>
+                <th scope="row" className={`sticky left-0 z-[1] max-w-64 min-w-[8.5rem] px-3 py-2 text-left font-normal md:min-w-60 ${here ? "bg-wash" : "bg-card"} ${tbl.pin}`}>
                   <Link href={L.institute(r.college.slug)} title={r.college.name} className="font-medium hover:text-sky hover:underline"><InstName name={r.college.name} state={r.college.state} /></Link>
                   <span className="block text-xs">{courseName(r)}</span>
                   <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">

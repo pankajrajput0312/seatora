@@ -156,7 +156,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                     <TypeBadge type={type} of={r.college.name} />
                   </span>
                 </th>
-                <TermStatCells t={t} variant="table" years total={total} of={of(r)} tdClassName="text-[15px]" />
+                <TermStatCells t={t} variant="table" years total={total} of={of(r)} tdClassName="text-[0.9375rem]" />
               </tr>
             );
           })}

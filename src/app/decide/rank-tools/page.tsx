@@ -36,8 +36,8 @@ const Sources = ({ s, more, block }: { s: MeritSource; more?: string; block: str
 
 function Sheet({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <li className="grid content-start gap-2 rounded-xl border border-border bg-card p-4">
-      <h3 className="font-semibold">{title}</h3>
+    <li className="grid content-start gap-2 rounded-xl border border-border bg-card p-4 sm:p-5">
+      <h3 className="text-title font-semibold">{title}</h3>
       {children}
     </li>
   );
@@ -79,7 +79,7 @@ export default async function RankToolsPage({ searchParams }: { searchParams: Pr
 
       <section aria-labelledby="score-h" className="grid grid-cols-1 gap-3">
         <div className="flex items-center gap-1">
-          <h2 id="score-h" className="text-lg font-semibold">Score to rank</h2>
+          <h2 id="score-h" className="text-h2 font-semibold">Score to rank</h2>
           <InfoTip label="score to rank">
             Each year has its own scale ({lists.map((l) => `${l.year} out of ${l.maxMarks}`).join(", ")}), so the same score means different things in different years: compare ranks, not scores.
           </InfoTip>
@@ -115,7 +115,7 @@ export default async function RankToolsPage({ searchParams }: { searchParams: Pr
 
       <section aria-labelledby="merit-h" className="grid grid-cols-1 gap-3">
         <div className="flex items-center gap-1">
-          <h2 id="merit-h" className="text-lg font-semibold">Merit position</h2>
+          <h2 id="merit-h" className="text-h2 font-semibold">Merit position</h2>
           <InfoTip label="merit position">How many candidates of one category had a NEET PG rank at or ahead of the one you enter, in an earlier AIQ merit list. Counts only, from that year: the candidates, category mix and seats change every year.</InfoTip>
         </div>
         <div aria-live="polite">
