@@ -50,11 +50,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }, ...noindex];
   },
-  // The FAQ is a section of the home page. Decide's Schedule (its nav name) is the Counselling page: a typed
+  // The FAQ is a section of the home page; a typed /residents opens the public residents list. Decide's Schedule (its nav name) is the Counselling page: a typed
   // /decide/schedule opens it, never a not-found (its query, ?exam= too, goes with it).
   async redirects() {
     return [
       { source: "/faq", destination: "/#faq", permanent: true },
+      { source: "/residents", destination: "/neet-pg/residents", permanent: true },
       { source: "/decide/schedule", destination: "/decide/counselling", permanent: false },
     ];
   },

@@ -3,16 +3,16 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 /**
- * The branch tables' search and sort (branch-ranks.tsx). The search hides the rows whose `data-name` lacks a typed word,
+ * The branch tables' search and sort (branch-ranks.tsx; the search, the residents pages' hospitals too). The search hides the rows whose `data-name` lacks a typed word,
  * and marks the section `data-searching` so its folded rows show while she searches. The tables are server-rendered;
  * this is all the JS.
  */
-export function BranchSearch() {
+export function BranchSearch({ label = "Search a branch", placeholder = "Search a branch, e.g. radio" }: { label?: string; placeholder?: string }) {
   return (
     <input
       type="search"
-      aria-label="Search a branch"
-      placeholder="Search a branch, e.g. radio"
+      aria-label={label}
+      placeholder={placeholder}
       className="h-11 w-full rounded-md border border-input bg-card px-3 text-base outline-none placeholder:text-muted-foreground focus:border-sky focus-visible:ring-2 focus-visible:ring-ring sm:w-xs sm:text-sm"
       onChange={(e) => {
         const root = e.currentTarget.closest<HTMLElement>("[data-lr]");

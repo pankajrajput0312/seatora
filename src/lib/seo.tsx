@@ -81,6 +81,14 @@ export const appLd = {
   operatingSystem: "Web",
   inLanguage: "en-IN",
   publisher: { "@id": organizationLd["@id"] },
+  featureList: [
+    "Last rank by branch for each MCC NEET PG round",
+    "College-wise closing ranks by round, quota and category",
+    "MCC seat lists (seat matrix)",
+    "Fees, stipends, bonds and seat-leaving penalties",
+    "Residents at each college by course and year, from MCC's admitted candidates lists (counts public, names for signed-in members)",
+    "Choice list builder",
+  ],
   offers: [
     { "@type": "Offer", name: "Free account", price: "0", priceCurrency: "INR", url: at("/pricing") },
     { "@type": "Offer", name: `${PLANS.season_pass.description}, NEET PG 2026 season`, price: String(PLANS.season_pass.amount / 100), priceCurrency: PLANS.season_pass.currency, url: at("/pricing") },

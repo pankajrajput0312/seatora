@@ -277,23 +277,3 @@ export const cutoffPage = (path: string) =>
     const status = await roundStatus(at.year);
     return { d, at, rounds, status: status && { asOf: status.asOf, steps: stepsNow(status, new Date()) } };
   });
-
-/**
- * Residents for the public pages, counts only (never a name, which only signed-in members see): every resident Seatora
- * shows (not hidden) and the years they cover, and at one institute (`collegeKey`) how many per course and
- * year, the biggest courses first. Null when no resident is loaded.
- */
-export async function residentCounts(collegeKey: string | null, take = 5) {
-  const [all] = await db.$queryRaw<{ n: number; y0: number | null; y1: number | null }[]>`
-    SELECT count(*)::int AS n, min(year) AS y0, max(year) AS y1 FROM "Resident" WHERE NOT hidden`;
-  if (!all?.n) return null;
-  const at = collegeKey
-    ? await db.resident.groupBy({ by: ["specialtyId", "year"], where: { hidden: false, college: { key: collegeKey } }, _count: { _all: true } })
-    : [];
-  const names = new Map((await db.specialty.findMany({ where: { id: { in: [...new Set(at.map((g) => g.specialtyId))] } }, select: { id: true, degree: true, name: true } })).map((s) => [s.id, `${s.degree} ${s.name}`]));
-  const years = [...new Set(at.map((g) => g.year))].sort();
-  const courses = [...new Set(at.map((g) => g.specialtyId))]
-    .map((id) => ({ course: names.get(id) ?? "", byYear: years.map((y) => at.find((g) => g.specialtyId === id && g.year === y)?._count._all ?? 0) }))
-    .sort((a, b) => sum(b.byYear) - sum(a.byYear) || a.course.localeCompare(b.course));
-  return { ...all, at: { years, courses: courses.slice(0, take), more: Math.max(0, courses.length - take), total: sum(courses.map((c) => sum(c.byYear))) } };
-}

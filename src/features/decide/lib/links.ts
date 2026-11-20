@@ -54,7 +54,7 @@ export function decideLinks(params: URLSearchParams | string = "") {
     without,
     /** Same page and filters, another page number (page 1 drops the param). */
     page: (path: string, n: number) => withChanges(path, { page: n > 1 ? n : null }),
-    institute: (slug: string, tab?: "overview" | "courses" | "allotments" | "fees" | "clinical", extra: Extra = {}) => to(`/decide/institutes/${slug}`, { tab, ...extra }),
+    institute: (slug: string, tab?: "overview" | "courses" | "allotments" | "fees" | "clinical" | "residents", extra: Extra = {}) => to(`/decide/institutes/${slug}`, { tab, ...extra }),
     lastRanks: (course: string, o: { category?: string; quota?: string; inst?: string } = {}) =>
       to("/decide/last-ranks", { course, lcat: o.category, lquota: o.quota, inst: o.inst }, o.inst ? `#inst-${o.inst}` : ""),
     allotments: (o: { course?: string; inst?: string; year?: number; round?: string; quota?: string; category?: string; state?: string; from?: number; to?: number } = {}) =>

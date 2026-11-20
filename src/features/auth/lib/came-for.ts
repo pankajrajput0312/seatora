@@ -19,12 +19,13 @@ const PAGES: [string, string][] = [
   ["/decide", "your planner"],
 ];
 
-/** "your options for AIR 18,500 (OBC)", "the residents at each hospital"…; null without `next` or for any other page. */
+/** "your options for AIR 18,500 (OBC)", "the residents at each hospital", "this hospital's residents"…; null without `next` or for any other page. */
 export function cameFor(next: string | undefined | null) {
   if (!next?.startsWith("/")) return null;
   const u = new URL(next, "http://x");
   const what = PAGES.find(([p]) => u.pathname === p || u.pathname.startsWith(p.endsWith("/") ? p : `${p}/`))?.[1];
   if (!what) return null;
+  if (what === "this institute's page" && u.searchParams.get("tab") === "residents") return "this hospital's residents";
   const rank = Number(u.searchParams.get("rank"));
   const cat = u.searchParams.get("cat");
   if (what !== "your options" || !Number.isInteger(rank) || rank < 1) return what;

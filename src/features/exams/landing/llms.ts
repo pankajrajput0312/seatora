@@ -1,5 +1,6 @@
 // /llms.txt and /llms-full.txt (llmstxt.org): Seatora in plain Markdown for AI answer engines: what it covers and what
-// it doesn't, its public pages, and (full) the latest round's last rank by branch and the FAQs, every figure from the data.
+// it doesn't, its public pages, the residents in counts (never a name), and (full) the latest round's last rank by
+// branch, residents by state and hospital, and the FAQs, every figure from the data.
 import "server-only";
 import { faqs, faqText } from "@/components/marketing/faq";
 import { priceLine } from "@/components/marketing/price-line";
@@ -9,7 +10,8 @@ import { roundName } from "@/features/decide/lib/round-status";
 import type { Category } from "@/features/decide/types";
 import { DEFINITION } from "@/lib/seo";
 import { cutoffPath, cutoffWords } from "./cutoff";
-import { cutoffPage, cutoffRounds, landingData, residentCounts } from "./data";
+import { cutoffPage, cutoffRounds, landingData } from "./data";
+import { listsLine, residentsData, residentsFaqs, residentsPath, yearsOf } from "./residents";
 import { cutoffText } from "./words";
 
 const n = formatRank;
@@ -17,7 +19,7 @@ const at = (path: string) => `${siteConfig.url}${path}`;
 const qa = (xs: { q: string; text: string | null }[]) => xs.flatMap((f) => (f.text ? [`### ${f.q}`, "", f.text, ""] : []));
 
 export async function llmsText(full: boolean) {
-  const [landing, rounds, residents] = await Promise.all([landingData("neet-pg").catch(() => null), cutoffRounds(), residentCounts(null).catch(() => null)]);
+  const [landing, rounds, residents] = await Promise.all([landingData("neet-pg").catch(() => null), cutoffRounds(), residentsData().catch(() => null)]);
   const k = landing?.counts;
   const latest = rounds[0];
   const lines = [
@@ -29,7 +31,7 @@ export async function llmsText(full: boolean) {
     "",
     ...(k
       ? [
-          `Data today: ${n(k.institutes)} institutes, ${n(k.courses)} courses and ${n(k.allotments)} allotments in MCC's NEET PG results from ${k.first} to ${k.last} (${n(k.resultPdfs)} result PDFs), ${n(k.seatLists)} MCC seat lists, ${n(k.termDocs)} fee, stipend and bond documents and ${n(k.notices)} MCC notices${residents ? `; ${n(residents.n)} residents, ${residents.y0} to ${residents.y1}` : ""}.`,
+          `Data today: ${n(k.institutes)} institutes, ${n(k.courses)} courses and ${n(k.allotments)} allotments in MCC's NEET PG results from ${k.first} to ${k.last} (${n(k.resultPdfs)} result PDFs), ${n(k.seatLists)} MCC seat lists, ${n(k.termDocs)} fee, stipend and bond documents and ${n(k.notices)} MCC notices${residents ? `; ${n(residents.total)} residents, ${yearsOf(residents)}` : ""}.`,
           "",
         ]
       : []),
@@ -53,19 +55,50 @@ export async function llmsText(full: boolean) {
     `- [Home](${at("/")}): the planner, the latest round's last rank by branch, and the FAQ.`,
     `- [NEET PG counselling](${at("/neet-pg")}): what MCC's counselling covers, closing ranks by round, where counselling stands.`,
     ...(latest ? [`- [${cutoffWords(latest).name}${latest.provisional ? " (provisional)" : ""}](${at(cutoffPath(latest))}): last rank by branch, quota and category.`] : []),
+    ...(residents ? [`- [NEET PG residents list by college](${at(residentsPath())}): the residents at each hospital by state, course and year, in counts.`] : []),
     `- [Pricing](${at("/pricing")}): ${priceLine()}`,
     `- [About](${at("/about")}): what Seatora is and who runs it.`,
     "",
+    ...(residents
+      ? [
+          "## Residents (counts only)",
+          "",
+          `${n(residents.total)} residents admitted through MCC's NEET PG counselling in ${yearsOf(residents)}, at ${n(residents.hospitals.length)} hospitals in ${residents.states.length} states and union territories, in ${residents.courses} courses, from MCC's official admitted candidates lists (${listsLine(residents)}). Public pages give counts by state, hospital, course and year; names, with course, year and All India Rank, are for signed-in members only, and a name is hidden on request. State quota seats are not in MCC's lists.`,
+          "",
+        ]
+      : []),
     "## Optional",
     "",
-    ...(full ? [] : [`- [Full text](${at("/llms-full.txt")}): the latest round's last rank by branch as tables, and the FAQs.`]),
+    ...(full ? [] : [`- [Full text](${at("/llms-full.txt")}): the latest round's last rank by branch as tables, residents by state and hospital (counts), and the FAQs.`]),
     ...rounds.slice(1).map((r) => `- [${cutoffWords(r).name}](${at(cutoffPath(r))})`),
     "",
   ];
   if (!full) return lines.join("\n");
 
+  // Residents by state and the hospitals with the most: counts only.
+  const people = residents
+    ? [
+        "## NEET PG residents by state",
+        "",
+        `Counts only, from MCC's admitted candidates lists. Page: ${at(residentsPath())}`,
+        "",
+        "| State | Hospitals | Residents |",
+        "|---|---:|---:|",
+        ...residents.states.map((x) => `| [${x.state}](${at(residentsPath(x.state))}) | ${n(x.hospitals)} | ${n(x.residents)} |`),
+        "",
+        "### Hospitals with the most residents",
+        "",
+        `| Hospital | State | ${residents.years.join(" | ")} | Residents |`,
+        `|---|---|${residents.years.map(() => "---:").join("|")}|---:|`,
+        ...residents.hospitals.slice(0, 25).map((h) => `| ${h.hospital} | ${h.state ?? "—"} | ${h.byYear.map((k) => (k ? n(k) : "—")).join(" | ")} | ${n(h.total)} |`),
+        "",
+        "## Questions about the residents list",
+        "",
+        ...qa(residentsFaqs(residents).map((f) => ({ q: f.q, text: f.a }))),
+      ]
+    : [];
   const page = latest ? await cutoffPage(cutoffPath(latest)).catch(() => null) : null;
-  if (!page) return lines.join("\n");
+  if (!page) return [...lines, ...people].join("\n");
   const { d } = page;
   const round = roundName[d.round];
   return [
@@ -90,6 +123,7 @@ export async function llmsText(full: boolean) {
         : [];
     }),
     ...(d.restricted.length ? ["### Restricted quotas", "", "| Quota | Branch | Last rank |", "|---|---|---:|", ...d.restricted.map((r) => `| ${r.quota} | ${r.course} | ${n(r.max)} |`), ""] : []),
+    ...people,
     `## Questions about the ${round} cutoff`,
     "",
     ...qa(cutoffText(page).faqs.map((f) => ({ q: f.q, text: f.a }))),

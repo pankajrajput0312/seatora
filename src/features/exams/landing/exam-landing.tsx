@@ -164,7 +164,13 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
 
       {exam === DEFAULT_EXAM && <BranchRanks pageLink />}
 
-      <Inside d={d} title={`What's inside for ${E.label}`} />
+      <Inside d={d} title={`What's inside for ${E.label}`}>
+        {exam === DEFAULT_EXAM && (
+          <p className="mt-10">
+            <Link href="/neet-pg/residents" className={link}>NEET PG residents list by college: residents at each hospital by state, course and year</Link>
+          </p>
+        )}
+      </Inside>
 
       <section aria-labelledby="how-h" className="border-b border-border">
         <Container className="py-16 md:py-24">

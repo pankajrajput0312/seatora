@@ -11,7 +11,7 @@ export const siteConfig = {
   /** The public pages every menu links (header, phone menu, footer); the planner link is PlannerCta's, signed-in aware. */
   nav: [
     { label: "NEET PG counselling", href: "/neet-pg" },
-    { label: "Residents", href: "/#preview" },
+    { label: "Residents", href: "/neet-pg/residents" },
     { label: "Pricing", href: "/pricing" },
     { label: "FAQ", href: "/#faq" },
   ],

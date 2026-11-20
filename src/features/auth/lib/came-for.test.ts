@@ -8,6 +8,7 @@ describe("cameFor", () => {
     expect(cameFor("/decide/options")).toBe("your options");
     expect(cameFor("/decide/residents")).toBe("the residents at each hospital");
     expect(cameFor("/decide/institutes/aiims-new-delhi?tab=fees")).toBe("this institute's page");
+    expect(cameFor("/decide/institutes/aiims-new-delhi?tab=residents")).toBe("this hospital's residents");
     expect(cameFor("/decide/institutes")).toBe("every institute");
     expect(cameFor("/pricing#buy")).toBe("the Season Pass");
     expect(cameFor("/decide")).toBe("your planner");
