@@ -4,16 +4,14 @@ import { activeExam } from "@/features/exams/active";
 import { examShows, neetPg, type Exam } from "@/features/exams/exam";
 import { authorityOf, exams, inExamWords } from "@/features/exams/registry";
 import { kindName } from "../types";
-import { PLANS } from "@/features/payments/plans";
+import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import { passView } from "@/features/plans/components/plan-cards";
-import { freeNow } from "@/features/plans/plans";
-import { formatPaise } from "@/features/referrals/lib";
 import { cn } from "@/lib/cn";
 import type { DecideLinks } from "../lib/links";
 
 // The planner's home, in Seatora's own look (the logo's ink, cyan and green): the tools as cards under the sidebar's own
-// names, and the Residents card just above them. The Season Pass line in it: ₹0 now and "Get free Season Pass" while
-// FREE_FOR_ALL_UNTIL is ahead, then ~~₹499~~ ₹199 and "Upgrade". The schedule is the status strip (round-status.tsx), not a card.
+// names, and the Residents card just above them, with the Season Pass button ("Get free Season Pass" while
+// FREE_FOR_ALL_UNTIL is ahead, then "Upgrade for ₹199"). The schedule is the status strip (round-status.tsx), not a card.
 
 const groups = [
   {
@@ -79,17 +77,17 @@ export function ToolGroups({ L, E = neetPg }: { L: DecideLinks; E?: Exam }) {
 }
 
 /**
- * The Residents card, one row: what it is, "Search residents", and her Season Pass in a small line (the plan page has
- * the plans; the sidebar's footer and the header chip say "Upgrade" too).
+ * The Residents card, one row: what it is, then its two actions, the Season Pass button (SeasonPassButton: the price, her
+ * invite or coupon, the free claim while the free period lasts; an upgrade_click at home_card) and "Search residents",
+ * stacked on phones. With a pass (or staff), a small line says so in place of the button.
  */
 export async function ResidentsPromo({ L }: { L: DecideLinks }) {
   if (!exams[await activeExam()].has.residents) return null;
-  const free = freeNow();
-  const { got, invite } = await passView(); // what the plan cards say: her pass, or her invite's price
-  const list = PLANS.season_pass.amount;
+  const { got } = await passView(); // what the plan cards say: her pass, or nothing to say
   const green = "font-mono font-semibold text-[#5fd36f]";
+  // Light-on-dark theme tokens inside this black card, so shared parts (the coupon field and its Apply) stay readable.
   return (
-    <section aria-labelledby="residents-h" className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-[#1f2a33] bg-[#0b0e12] p-4 text-[#f1f4f7]">
+    <section aria-labelledby="residents-h" data-placement="home_card" className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-[#1f2a33] bg-[#0b0e12] p-4 text-[#f1f4f7] [--color-foreground:#f1f4f7] [--color-input:#5b6b78] [--color-muted-foreground:#a3abb3]">
       <div className="min-w-0 flex-1 basis-72">
         <div className="flex flex-wrap items-center gap-x-2">
           <h2 id="residents-h" className="text-title font-semibold" style={{ color: "#f1f4f7" }}>Know who&apos;s already there</h2>
@@ -98,27 +96,20 @@ export async function ResidentsPromo({ L }: { L: DecideLinks }) {
         <p className="text-body text-[#a3abb3]">
           <span className={green}>77K+</span> residents at <span className={green}>1,800+</span> PG hospitals, by course and year: MCC&apos;s official admitted lists, 2023–25.
         </p>
-        <p className="mt-1 text-caption text-[#a3abb3]">
-          Season Pass:{" "}
-          {got ? (
-            <span className="font-semibold text-[#5fd36f]">{got}</span>
-          ) : (
-            <>
-              {free ? (
-                // As the plan card: ₹0 now, never a struck "was" price beside it.
-                <><span className={green}>₹0</span> now, then {formatPaise(invite?.amount ?? list)}{invite && ` with ${invite.name}'s invite`}</>
-              ) : (
-                <><s className="font-mono text-[#6b7480]"><span className="sr-only">was </span>{formatPaise(PLANS.season_pass.wasAmount)}</s> <span className={green}>{formatPaise(invite?.amount ?? list)}</span>{invite && ` with ${invite.name}'s invite`}</>
-              )}
-              {" · "}
-              <Link href={L.to("/decide/plan")} data-upgrade="home_card" className="hit font-semibold text-[#5ccfe6] underline underline-offset-2">{free ? "Get free Season Pass" : "Upgrade"}</Link>
-            </>
-          )}
-        </p>
+        {got && <p className="mt-1 text-caption font-semibold text-[#5fd36f]">{got}</p>}
       </div>
-      <Link href={L.to("/decide/residents")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#5ccfe6] px-4 text-body font-semibold text-[#5ccfe6] hover:bg-[#5ccfe6]/10 max-sm:w-full">
-        Search residents <ArrowRight className="size-4" aria-hidden />
-      </Link>
+      <div className="flex flex-wrap items-start gap-2 max-sm:w-full max-sm:flex-col max-sm:items-stretch">
+        {!got && (
+          <SeasonPassButton
+            freeLabel="Get free Season Pass"
+            className="min-h-11 rounded-md bg-[#5fd36f] px-4 text-body font-semibold text-[#0b0e12] hover:bg-[#7fe08b] max-sm:w-full"
+            noteClassName="text-[#a3abb3]"
+          />
+        )}
+        <Link href={L.to("/decide/residents")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#5ccfe6] px-4 text-body font-semibold text-[#5ccfe6] hover:bg-[#5ccfe6]/10 max-sm:w-full">
+          Search residents <ArrowRight className="size-4" aria-hidden />
+        </Link>
+      </div>
     </section>
   );
 }
