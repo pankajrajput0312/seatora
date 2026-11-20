@@ -442,9 +442,10 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
       </p>
 
       <BackToTop />
-      {/* Phones: the Compare tray, a one-line pill above the bottom bar's left end (Top sits at its right end). */}
+      {/* Phones: the Compare tray, a one-line pill above the bottom bar's left end (Top sits at its right end). Hidden
+          while a View menu is open, so it never covers the menu's last choices. */}
       {compare.length > 0 && !isCurrent("/decide/compare") && (
-        <Link href={L.compare(compare)} data-compare-pill className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.75rem)] left-3 z-30 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-sm font-semibold whitespace-nowrap shadow-overlay md:hidden print:hidden">
+        <Link href={L.compare(compare)} data-compare-pill className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.75rem)] left-3 z-30 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-sm font-semibold whitespace-nowrap shadow-overlay md:hidden print:hidden [.app:has(details[data-view-menu][open])_&]:hidden">
           <GitCompareArrows className="size-4" aria-hidden />Compare <span className="numeric">{compare.length}/{MAX_COMPARE}</span><span className="sr-only"> selected</span>
         </Link>
       )}
