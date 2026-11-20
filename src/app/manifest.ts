@@ -4,7 +4,7 @@ import { siteConfig } from "@/config/site";
 // Makes Seatora installable ("Add to Home Screen"): opens on the planner, full screen, in the app's dark ink.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: `${siteConfig.name} · NEET PG planner`,
+    name: `${siteConfig.name}: NEET PG counselling planner`,
     short_name: siteConfig.name,
     description: siteConfig.description,
     id: "/",

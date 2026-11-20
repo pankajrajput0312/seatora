@@ -10,7 +10,7 @@ const rows = [
 
 export function QuestionMarquee() {
   return (
-    <section aria-label="Questions Seatora helps answer" className="mask-x relative overflow-hidden border-b border-border py-10">
+    <section aria-label="Questions Seatora helps answer" data-nosnippet className="mask-x relative overflow-hidden border-b border-border py-10">
       <ul className="sr-only">{rows.flat().map((q) => <li key={q}>{q}</li>)}</ul>
       {rows.map((row, i) => (
         <div

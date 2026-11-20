@@ -14,7 +14,7 @@ import { roundName } from "@/features/decide/lib/round-status";
 import type { BaseCategory, Category } from "@/features/decide/types";
 import { cn } from "@/lib/cn";
 import { BranchSearch, BranchSort } from "./branch-search";
-import { branchRanks, vsRank, type BranchRow } from "./data";
+import { branchRanks, hasSponsored, vsRank, type BranchRow } from "./data";
 
 /** Rows shown before "Show all N" (Decide Home: 10): the page stays short; a search shows every match. */
 const FOLD = 25;
@@ -55,13 +55,18 @@ const CELLS = "[&_td]:numeric [&_td]:px-3 [&_td]:py-2.5 [&_td]:text-right [&_td]
 const chip = "inline-flex min-h-11 cursor-pointer items-center has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring";
 const rank = (k: number | undefined) => (k == null ? <span data-na="">—</span> : formatRank(k));
 const viaSignup = (next: string) => `/signup?${new URLSearchParams({ next })}`;
-const lastRanks = (slug: string, quota: string) => viaSignup(decideLinks("").lastRanks(slug, { quota }));
+/** A branch's Last ranks in Decide, sign-up first (the public tables' links). */
+export const branchHref = (slug: string, quota: string) => viaSignup(decideLinks("").lastRanks(slug, { quota }));
 const L = "underline decoration-foreground/25 underline-offset-4 hover:text-sky";
 /** A row's values for the sort (branch-search.tsx ordered): `data-i`, its place in the server's order. */
 const sortData = (r: BranchRow, i: number, keys: Partial<Record<string, number>>) =>
   Object.fromEntries(Object.entries({ i, n: r.n, ...keys }).map(([k, v]) => [`data-${k}`, v]));
 
-export async function BranchRanks() {
+/**
+ * The latest round's tables, its heading a link to that round's cutoff page (/neet-pg/round-2-cutoff-2026; on the home
+ * page it looks as before, an underline on hover). `pageLink` (/neet-pg): a line linking that page too.
+ */
+export async function BranchRanks({ pageLink = false }: { pageLink?: boolean }) {
   const d = await branchRanks();
   if (!d) return null;
   const later = d.round !== "R1";
@@ -72,7 +77,7 @@ export async function BranchRanks() {
       <Container className="pt-8 pb-16 md:pt-12 md:pb-24">
         <p className="font-mono text-xs uppercase tracking-widest text-sky">Latest MCC result</p>
         <h2 id="lr-h" className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
-          NEET PG {d.year} {round}: last rank by branch
+          <Link href={d.path} className="decoration-foreground/25 underline-offset-4 hover:underline">NEET PG {d.year} {round}: last rank by branch</Link>
           {d.provisional && <Badge tone="warning" className="ml-3 align-middle">Provisional</Badge>}
         </h2>
         <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted-foreground">
@@ -83,17 +88,28 @@ export async function BranchRanks() {
         <p className="mt-2">
           <SourceLabel provenance={{ sourceName: d.source.name, sourceUrl: d.source.url, sourceType: "OFFICIAL", academicYear: d.year }} />
         </p>
+        {pageLink && (
+          <p className="mt-2 text-sm">
+            <Link href={d.path} className={L}>NEET PG {d.year} {round} cutoff: every branch, with the questions about it</Link>
+          </p>
+        )}
 
-        <BranchTables d={d} href={lastRanks} className="mt-8" />
-
-        <ul className="mt-6 grid max-w-prose gap-1.5 text-sm leading-relaxed text-muted-foreground">
-          <li>NRI, AFMS, university and minority quotas are shown separately, under Restricted quotas: they never mix into the All India, Deemed or DNB numbers.</li>
-          {!d.restricted.some((r) => /sponsor/i.test(r.quota)) && (
-            <li>MCC&apos;s NEET PG counselling has no sponsored seats; in-service and sponsored seats are filled in state counselling, which Seatora doesn&apos;t cover.</li>
-          )}
-        </ul>
+        <BranchTables d={d} href={branchHref} className="mt-8" />
+        <BranchNotes d={d} />
       </Container>
     </section>
+  );
+}
+
+/** What the tables leave out: restricted quotas apart, and (none in MCC's data) sponsored seats. */
+export function BranchNotes({ d }: { d: Pick<Data, "restricted"> }) {
+  return (
+    <ul className="mt-6 grid max-w-prose gap-1.5 text-sm leading-relaxed text-muted-foreground">
+      <li>NRI, AFMS, university and minority quotas are shown separately, under Restricted quotas: they never mix into the All India, Deemed or DNB numbers.</li>
+      {!hasSponsored(d) && (
+        <li>MCC&apos;s NEET PG counselling has no sponsored seats; in-service and sponsored seats are filled in state counselling, which Seatora doesn&apos;t cover.</li>
+      )}
+    </ul>
   );
 }
 

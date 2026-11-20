@@ -3,11 +3,12 @@ import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { SeasonPassPrice } from "@/components/marketing/price-line";
 import { business } from "@/config/business";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta("/terms", {
   title: "Terms & Conditions",
   description: "The terms for using Seatora, an independent NEET PG counselling planner: accounts, acceptable use, disclaimers and liability.",
-};
+});
 
 export default function TermsPage() {
   const { email, sellerName } = business;

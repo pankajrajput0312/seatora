@@ -5,8 +5,9 @@ export const siteConfig = {
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
   /** Where privacy and deletion requests go. Set NEXT_PUBLIC_CONTACT_EMAIL before launch. */
   contactEmail: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "",
+  /** The home page's meta description (≤ 155 characters), also the manifest's and the root layout's default. */
   description:
-    "The NEET PG planner: institutes, specialties, previous-year ranks, seat matrices, fees, stipends, bonds, residents by college and counselling updates in one place.",
+    "Seatora is a NEET PG 2026 counselling planner for MCC seats: last rank by branch, college-wise closing ranks, seat matrix, fees, bonds and residents.",
   /** The public pages every menu links (header, phone menu, footer); the planner link is PlannerCta's, signed-in aware. */
   nav: [
     { label: "NEET PG counselling", href: "/neet-pg" },

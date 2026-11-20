@@ -3,11 +3,12 @@ import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { business } from "@/config/business";
 import { openAccess } from "@/lib/site-access";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta("/privacy", {
   title: "Privacy Policy",
   description: "What Seatora collects, why, where it is stored, the cookies it uses, how long data is kept and how to have it deleted.",
-};
+});
 
 export default function PrivacyPage() {
   const { email, sellerName } = business;

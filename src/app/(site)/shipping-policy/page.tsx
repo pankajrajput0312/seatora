@@ -3,11 +3,12 @@ import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { SeasonPassPrice } from "@/components/marketing/price-line";
 import { business } from "@/config/business";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta("/shipping-policy", {
   title: "Shipping & Delivery Policy",
   description: "Seatora is an online service: nothing physical is shipped. Access is switched on for your account immediately.",
-};
+});
 
 export default function ShippingPolicyPage() {
   const { email } = business;

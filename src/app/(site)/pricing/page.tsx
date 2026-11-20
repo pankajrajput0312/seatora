@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
 import { Button } from "@/components/ui/button";
-import { istDateTime, priceLine, PriceLine } from "@/components/marketing/price-line";
+import { istDateTime, PriceLine } from "@/components/marketing/price-line";
 import { askConfig } from "@/features/ask/config";
 import { getCurrentUser } from "@/features/auth/lib/session";
 import { couponCodeSchema } from "@/features/payments/coupons";
@@ -17,11 +17,9 @@ import { TrackView } from "@/features/funnel/components/beacon";
 import { InviteBanner } from "@/features/referrals/components/invite-banner";
 import { discountedPrice, formatPaise, REF_COOKIE, REFERRAL_PERCENT } from "@/features/referrals/lib";
 import { quote } from "@/features/referrals/service";
+import { pageMeta, pageWords } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Pricing — Seatora NEET PG 2026 Season Pass",
-  description: `${priceLine(null)} Paid once, with no subscription or auto-renewal. Free and Season Pass limits compared.`,
-};
+export const metadata: Metadata = pageMeta("/pricing", pageWords["/pricing"]);
 
 /** Rendered per request: her price (a referral, or ?coupon=CODE), her Season Pass, and whether the free period and payments are on. */
 export default async function PricingPage({ searchParams }: { searchParams: Promise<{ coupon?: string | string[] }> }) {

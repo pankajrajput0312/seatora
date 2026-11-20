@@ -2,6 +2,7 @@ import "server-only";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { staffUser } from "@/features/auth/lib/session";
+import { pageMeta } from "@/lib/seo";
 import { exams, type ExamKey } from "../registry";
 import { landingWords } from "./words";
 
@@ -24,12 +25,8 @@ export async function landingGate(exam: ExamKey) {
  */
 export async function landingMetadata(exam: ExamKey): Promise<Metadata> {
   if (!(await canSee(exam))) return {};
-  const { title, description } = landingWords[exam];
   return {
-    title,
-    description,
-    alternates: { canonical: `/${exam}` },
-    openGraph: { title, description, url: `/${exam}` },
+    ...pageMeta(`/${exam}`, landingWords[exam]),
     ...(!exams[exam].public && { robots: { index: false, follow: false } }),
   };
 }

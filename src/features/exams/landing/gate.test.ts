@@ -55,8 +55,8 @@ it("staff see a staff-only exam's page, noindex", async () => {
   }
 });
 
-it("the sitemap lists /neet-pg and no staff-only exam's page", () => {
-  const urls = sitemap().map((e) => new URL(e.url).pathname);
+it("the sitemap lists /neet-pg and no staff-only exam's page", async () => {
+  const urls = (await sitemap()).map((e) => new URL(e.url).pathname);
   expect(urls).toContain("/neet-pg");
   for (const k of staffOnly) expect(urls).not.toContain(`/${k}`);
 });

@@ -39,7 +39,7 @@ export function CrewScene() {
   const hp = phase.id === "hurt" || phase.id === "arrive" ? 2 : phase.id === "scan" ? 4 : 10;
 
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[540px] overflow-hidden rounded-[2rem] border border-border bg-[radial-gradient(ellipse_at_50%_35%,var(--color-muted),var(--color-background)_70%)]" aria-hidden>
+    <div className="relative mx-auto aspect-square w-full max-w-[540px] overflow-hidden rounded-[2rem] border border-border bg-[radial-gradient(ellipse_at_50%_35%,var(--color-muted),var(--color-background)_70%)]" aria-hidden data-nosnippet>
       {stars.map((s, n) => <span key={n} className={cn("twinkle absolute bg-white/70", s.size)} style={{ left: s.left, top: s.top, animationDelay: s.delay }} />)}
 
       {/* Patient's HP bar */}

@@ -17,6 +17,7 @@ import { db } from "@/lib/db";
 import { quotaIn, roundIn, roundNamesOf, tidyLabel, type Exam } from "../exam";
 import { yearName } from "../keys";
 import { DEFAULT_EXAM, exams, headYearIn, restrictedQuota, type ExamKey } from "../registry";
+import { cutoffPath, roundsOf, type CutoffRound } from "./cutoff";
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const byAllotments = (year: number) => (a: Opt, b: Opt) => (b.byYear[year] ?? 0) - (a.byYear[year] ?? 0) || (a.id < b.id ? -1 : 1);
@@ -224,10 +225,15 @@ export function vsRank<R extends BranchRow>(rows: R[], rank: number, category: B
   return scored.sort((a, b) => tier(a) - tier(b) || gap(a) - gap(b) || a.course.localeCompare(b.course) || a.quota.localeCompare(b.quota));
 }
 
-/** NEET PG's latest round with a result (lib/reach.ts latestRound: R1, then R2 once imported…), as branchTabs. */
-const branchTable = perImport(async () => {
+/**
+ * NEET PG's last rank by branch in one round, as branchTabs: `key`, its cutoff page's path (./cutoff.ts); "" the latest
+ * round with a result (lib/reach.ts latestRound: R1, then R2 once imported…). Null for a round with no result.
+ */
+const branchTable = perImport(async (key) => {
   const cat = await getCatalog(DEFAULT_EXAM);
-  const { year, round, provisional } = latestRound(cat.sources);
+  const at = key ? roundsOf(cat.sources).find((r) => cutoffPath(r) === key) : latestRound(cat.sources);
+  if (!at) return null;
+  const { year, round, provisional } = at;
   const src = cat.sources.find((s) => s.year === year && s.round === round);
   if (!src) return null;
   const rows = await db.$queryRaw<BranchAgg[]>`
@@ -235,13 +241,41 @@ const branchTable = perImport(async () => {
     FROM "Cutoff" c JOIN "CollegeSpecialty" cs ON cs.id = c."collegeSpecialtyId" JOIN "Specialty" s ON s.id = cs."specialtyId"
     WHERE c.exam = ${DEFAULT_EXAM} AND c."counsellingYear" = ${year} AND c.round = ${round}
     GROUP BY s.id, c.quota, c.category`;
-  return rows.length ? { year: yearName(DEFAULT_EXAM, year), round, provisional, source: { name: src.name, url: src.url }, ...branchTabs(rows) } : null;
+  return rows.length
+    ? { year: yearName(DEFAULT_EXAM, year), round, provisional, path: cutoffPath({ year, round }), source: { name: src.name, url: src.url }, ...branchTabs(rows) }
+    : null;
 });
 /** The home page's and /neet-pg's last rank by branch; null (the section hidden) without data or when the read fails. */
 export const branchRanks = () =>
   asTrustedServer(() => branchTable()).catch((e) => {
     console.error("branch last ranks", e);
     return null;
+  });
+
+/** Whether MCC's data has a sponsored quota (none in NEET PG's so far: those seats are state counselling's). */
+export const hasSponsored = (d: { restricted: { quota: string }[] }) => d.restricted.some((r) => /sponsor/i.test(r.quota));
+
+/** NEET PG's result rounds, newest first, each with a cutoff page (./cutoff.ts); [] when the read fails (the sitemap, llms.txt). */
+export const cutoffRounds = () =>
+  asTrustedServer(async () => roundsOf((await getCatalog(DEFAULT_EXAM)).sources)).catch((e) => {
+    console.error("cutoff rounds", e);
+    return [] as CutoffRound[];
+  });
+
+/**
+ * A cutoff page (/neet-pg/round-2-cutoff-2026): its round's branch tables, that year's round steps now (MCC's notices:
+ * none for a year without them) and every round. Null for a path with no round; a failed read throws (the page keeps
+ * its last good render).
+ */
+export const cutoffPage = (path: string) =>
+  asTrustedServer(async () => {
+    // The path is checked against the data first: branchTable keeps every key it is given until the next import.
+    const rounds = roundsOf((await getCatalog(DEFAULT_EXAM)).sources);
+    const at = rounds.find((r) => cutoffPath(r) === path);
+    const d = at && (await branchTable(path));
+    if (!at || !d) return null;
+    const status = await roundStatus(at.year);
+    return { d, at, rounds, status: status && { asOf: status.asOf, steps: stepsNow(status, new Date()) } };
   });
 
 /**

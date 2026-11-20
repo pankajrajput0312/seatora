@@ -11,11 +11,13 @@ import { accessFaq, Faq } from "@/components/marketing/faq";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SourceLabel } from "@/components/ui/source-label";
+import { siteConfig } from "@/config/site";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { fmtDay } from "@/features/decide/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
 import { alertOf, badgeOf, fmtIST, fmtNote, roundName, stepName } from "@/features/decide/lib/round-status";
 import { kindName, type Round } from "@/features/decide/types";
+import { breadcrumbLd, JsonLd } from "@/lib/seo";
 import { crossover } from "../crossover";
 import { authorityOf, DEFAULT_EXAM, sessionExams, type ExamKey } from "../keys";
 import { BranchRanks } from "./branch-ranks";
@@ -110,12 +112,13 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
   const { who, L, viaSignup, lastRanks } = linksOf(d);
   const body = who === "AIIMS" ? "AIIMS New Delhi" : "MCC";
   const step = (r: Round) => E.roundWords?.[r] ?? roundName[r];
-  const faqs = [...commonFaqs(d), ...w.faqs(d), accessFaq];
+  const faqs = [...commonFaqs(d), ...w.faqs(d), accessFaq()];
   const held = d.status && alertOf(d.status.steps);
   const heldStep = held && d.status!.steps.find((s) => s.url === held.url);
 
   return (
     <>
+      <JsonLd data={breadcrumbLd([[siteConfig.name, "/"], [`${E.label} counselling`, `/${exam}`]])} />
       <section aria-labelledby="hero-h" className="border-b border-border">
         <Container className="grid gap-10 pt-8 pb-14 sm:pt-16 md:pb-20 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-16">
           <div>
@@ -159,7 +162,7 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
         </Container>
       </section>
 
-      {exam === DEFAULT_EXAM && <BranchRanks />}
+      {exam === DEFAULT_EXAM && <BranchRanks pageLink />}
 
       <Inside d={d} title={`What's inside for ${E.label}`} />
 

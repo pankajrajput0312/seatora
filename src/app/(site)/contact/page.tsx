@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
 import { business } from "@/config/business";
 import { RequestForm } from "@/features/requests/components/request-form";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta("/contact", {
   title: "Contact Us",
   description: "How to reach Seatora about your account, payments, refunds, data or residents' names. We reply within 2 working days.",
-};
+});
 
 const link = "inline-flex min-h-11 items-center text-sky underline";
 

@@ -7,8 +7,9 @@ import { LogoMark } from "./logo";
 import { MobileNav } from "./mobile-nav";
 
 export function SiteHeader() {
+  // data-nosnippet: the menu and buttons ("Get Seatora — Free") never become a search result's snippet.
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
+    <header data-nosnippet className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
       <Container className="flex h-16 items-center justify-between gap-6">
         <Link href="/" className="flex min-h-11 items-center gap-2.5 font-pixel text-lg tracking-tight text-foreground">
           <LogoMark className="size-6" />

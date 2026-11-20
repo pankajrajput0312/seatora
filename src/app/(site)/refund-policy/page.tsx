@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { Container } from "@/components/layout/container";
 import { SeasonPassPrice } from "@/components/marketing/price-line";
 import { business } from "@/config/business";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta("/refund-policy", {
   title: "Refund & Cancellation Policy",
   description: "Seatora Season Pass payments: no refunds once access is granted, except for duplicate charges or payments where access was never granted.",
-};
+});
 
 export default function RefundPolicyPage() {
   const { email } = business;
