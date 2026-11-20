@@ -29,7 +29,7 @@ import { TermStatCells } from "./stat-cells";
 import { CourseKindTag, QuotaTerm, Term } from "./term";
 import { TypeBadge } from "./type-badge";
 import { Skeleton } from "./skeleton";
-import { control, EmptyState, smallLink, tbl } from "./ui";
+import { chip, control, EmptyState, smallLink, tbl } from "./ui";
 import { ViewToggle, type View } from "./view-toggle";
 import { ScrollTable } from "./scroll-table";
 
@@ -332,13 +332,14 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
         return (
           <li key={item.id} {...drop(i)} className={cn("grid min-w-0 rounded-xl", picking && "ring-2 ring-sky")}>
             <ResultCard
-              chips={[<QuotaTerm key="quota" quota={item.quota} shown={quotaIn(E, item.quota)} />, reachOf(item, lr), typed && typedBadge]}
+              chips={[<QuotaTerm key="quota" quota={item.quota} shown={quotaIn(E, item.quota)} />, typed && typedBadge]}
               actions={<>{handle(item, i, picking)}{upDown(item, i)}</>}
               stat={{ label: "Choice", value: formatRank(i + 1) }}
               title={item.institute}
               href={L.institute(item.slug)}
               external={lr?.hospital?.mccProfileUrl ? { href: lr.hospital.mccProfileUrl, label: `MCC profile: ${item.institute}` } : undefined}
-              subtitle={<>{item.course} <CourseKindTag specialty={item.id.split("~")[2] ?? ""} /></>}
+              // The reach under the course (as Options puts it under its number), so the header stays one line.
+              subtitle={<>{item.course} <CourseKindTag specialty={item.id.split("~")[2] ?? ""} /><span className="mt-1 block text-xs">{reachOf(item, lr)}</span></>}
               meta={[item.state ?? "State not listed", lr && <TypeBadgeM key="type" type={lr.hospital?.type} of={item.institute} />, lr?.hospital?.beds && <BedsM b={lr.hospital.beds} inst={item.institute} of={name(item)} unit />]}
               footer={
                 <>
@@ -398,7 +399,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
                     {handle(item, i, picking)}
                     {/* The choice number is its "Move to #": pick a position, the row goes straight there. */}
                     <label className="sr-only" htmlFor={`pos-${item.id}`}>Move {name(item)} to position</label>
-                    <select id={`pos-${item.id}`} value={i + 1} onChange={(e) => moveTo(i, Number(e.target.value), "pos")} className="numeric mr-1.5 h-11 min-w-12 shrink-0 cursor-pointer rounded-md border border-input bg-card px-1 text-base font-bold">
+                    <select id={`pos-${item.id}`} value={i + 1} onChange={(e) => moveTo(i, Number(e.target.value), "pos")} className="numeric mr-1.5 h-11 min-w-12 shrink-0 cursor-pointer rounded-md border border-input bg-card px-1 text-base font-semibold hover:border-foreground/60">
                       {items.map((x, k) => <option key={x.id} value={k + 1}>{k + 1}</option>)}
                     </select>
                     <span className="min-w-0 py-1">
@@ -449,9 +450,9 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
     <div className="mt-6 grid gap-4">
       <div className="flex flex-wrap items-center gap-2" data-print-hide>
         {state.lists.map((l) => (
-          <Button key={l.id} variant={l.id === list.id ? "primary" : "secondary"} aria-pressed={l.id === list.id} onClick={() => setState((s) => ({ ...s, activeId: l.id }))}>
-            <span className="sr-only">{CHOICE_LIST}: </span>{l.name} <span className="opacity-70">({l.items.length})</span>
-          </Button>
+          <button key={l.id} type="button" className={chip(l.id === list.id)} aria-pressed={l.id === list.id} onClick={() => setState((s) => ({ ...s, activeId: l.id }))}>
+            <span className="sr-only">{CHOICE_LIST}: </span>{l.name} <span className={cn("numeric font-normal", l.id !== list.id && "text-muted-foreground")}>({l.items.length})</span>
+          </button>
         ))}
         {state.lists.length < maxLists ? (
           <Button
@@ -512,7 +513,7 @@ export function ChoicesView({ reachFor, view, maxLists = Infinity, hasLists, nex
       <p className="sr-only" aria-live="assertive">{announce}</p>
       <p className="sr-only" aria-live="polite">{copyMsg?.text.replace(/:$/, ".") ?? ""}</p>
       {removed && (
-        <p className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm" data-print-hide>
+        <p className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-2 text-sm" data-print-hide>
           Removed {name(removed.item)} from {removed.listName}.
           <Button id="choices-undo" variant="ghost" onClick={undo}>Undo</Button>
         </p>

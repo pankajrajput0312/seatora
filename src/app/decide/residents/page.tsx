@@ -191,7 +191,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
           Only the first <span className="numeric">{formatRank(pages * res.pageSize)}</span> ({pages} pages) are shown: narrow the filters (name, college, course, state or year) to see the others.
         </p>
       )}
-      <footer className="flex flex-wrap items-center gap-x-3 text-caption text-muted-foreground">
+      <footer className="flex flex-wrap items-center gap-x-3 border-t border-border pt-3 text-caption text-muted-foreground">
         <span>From MCC&apos;s official admitted lists{years.length > 0 && <>, <span className="numeric">{years.length > 1 ? `${years.at(-1)}–${years[0]}` : years[0]}</span></>}: seats filled through MCC counselling only. Year: the year of admission.</span>
         <a href={removal} className={`${smallLink} text-sky`}>Request removal</a>
       </footer>

@@ -72,10 +72,10 @@ describe("Residents views", () => {
     expect(html).not.toMatch(/categor/i);
   });
 
-  it("cards: ResultCards, one item per resident; year and round, college link, course, chips, state and type; Hide in the header", () => {
+  it("cards: ResultCards, one item per resident; the name as heading, year, college link, course, state and type; no Hide", () => {
     const html = renderToStaticMarkup(createElement(ResidentsCards, { rows: [row(), row({ id: "r2", quota: null, round: null, college: { slug: "other", name: "Other College", state: null } })], L, hide, types }));
     expect(html.match(/<li/g)).toHaveLength(2);
-    expect(html.match(/<h3/g)).toHaveLength(2); // the college, a heading per card
+    expect(html.match(/<h3/g)).toHaveLength(2); // the name, a heading per card
     expect(html).toContain('href="/decide/institutes/some-college?rank=40000&amp;cat=Open&amp;tab=residents"');
     expect(html).not.toMatch(/\bRank\b|AIR /);
     for (const s of ["Test Resident A", "Year", "2025", "MD Anaesthesiology", "Kerala", ">Govt<"]) expect(html).toContain(s);

@@ -127,7 +127,7 @@ export default async function SuggestPage({ searchParams }: { searchParams: Prom
           </>
         }
       />
-      <p role="note" className="rounded-md border border-sky/40 bg-sky/10 px-3 py-2 text-sm font-semibold">Suggested from past closing ranks — not a prediction. Edit freely.</p>
+      <p role="note" className="rounded-lg border border-wash-line bg-wash px-3 py-2.5 text-sm font-semibold">Suggested from past closing ranks — not a prediction. Edit freely.</p>
 
       <section aria-label="What the list is built from" className="grid gap-1 text-sm">
         <p>

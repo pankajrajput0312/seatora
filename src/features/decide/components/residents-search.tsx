@@ -127,7 +127,7 @@ export function ResidentsSearch({ q, colleges, names, findColleges, findNames }:
         {pickedColleges.map((c) => <input key={c.value} type="hidden" name="college" value={c.value} />)}
         {pickedNames.map((n) => <input key={n} type="hidden" name="name" value={n} />)}
         {open && any && (
-          <div id={`${id}-list`} role="group" aria-label="Matches" className="absolute top-full left-0 z-40 mt-1 max-h-[40dvh] w-[calc(100vw_-_var(--spacing)*8)] overflow-y-auto overscroll-contain rounded-md border border-border bg-popover p-1 shadow-lg md:right-0 md:w-auto">
+          <div id={`${id}-list`} role="group" aria-label="Matches" className="absolute top-full left-0 z-40 mt-1 max-h-[40dvh] w-[calc(100vw_-_var(--spacing)*8)] overflow-y-auto overscroll-contain rounded-lg border border-border bg-popover p-1 shadow-overlay md:right-0 md:w-auto">
             {browsing && all !== null && all.length === 0 && <p className="px-2 py-2 text-sm text-muted-foreground">Loading hospitals…</p>}
             {!browsing && shownColleges.length > 0 && <p className="px-2 pt-1 pb-0.5 text-xs font-semibold text-muted-foreground">Hospitals</p>}
             {shownColleges.map((o, i) => (
