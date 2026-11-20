@@ -9,7 +9,8 @@ import type { Catalog } from "./catalog";
 export type CutoffQuery = { cs?: string[]; quotas?: string[]; categories?: string[]; years?: number[] };
 /** `csQuota`: only these (CollegeSpecialty id, quota) pairs (the term filters' options); [] matches nothing. */
 /** `quotas`: any of these (NEET SS: her question group's, as a rank is within one group). */
-export type AllotmentQuery = { cs?: string[]; csQuota?: [string, string][]; year?: number; round?: Round; quota?: string; quotas?: string[]; category?: string; from?: number; to?: number };
+/** `ranks`: any of these ranks (the owner's list of saved ranks). */
+export type AllotmentQuery = { cs?: string[]; csQuota?: [string, string][]; year?: number; round?: Round; quota?: string; quotas?: string[]; category?: string; from?: number; to?: number; ranks?: number[] };
 
 /** MCC's remark, from the status: "Allotted" (R1, stray rounds), "Fresh" (a fresh allotment in R2 / R3), "Upgraded" (moved up a seat). */
 export const remarkOf = (status: string): Allotment["remark"] => (status === "upgraded" ? "Upgraded" : status === "fresh" ? "Fresh" : "Allotted");
@@ -141,7 +142,8 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
           (!q.quotas || q.quotas.includes(a.quota)) &&
           (!q.category || a.category === q.category) &&
           (!q.from || a.rank >= q.from) &&
-          (!q.to || a.rank <= q.to),
+          (!q.to || a.rank <= q.to) &&
+          (!q.ranks || q.ranks.includes(a.rank)),
       )
       .sort((a, b) => b.year - a.year || roundPos(a.round) - roundPos(b.round) || a.rank - b.rank);
     return { total: all.length, rows: all.slice(offset, opts.limit == null ? undefined : offset + opts.limit) };
@@ -157,6 +159,7 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
     q.category && Prisma.sql`category = ${q.category}`,
     q.from && Prisma.sql`rank >= ${q.from}`,
     q.to && Prisma.sql`rank <= ${q.to}`,
+    q.ranks && Prisma.sql`rank = ANY(${q.ranks})`,
   ].filter((x): x is Prisma.Sql => !!x);
   const whereSql = Prisma.sql`WHERE ${Prisma.join(where, " AND ")}`;
   const [rows, total] = await Promise.all([

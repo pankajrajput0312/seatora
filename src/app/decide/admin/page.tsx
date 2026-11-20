@@ -8,6 +8,8 @@ import { PageHead } from "@/features/decide/components/bits";
 import { Pager, smallLink, tbl } from "@/features/decide/components/ui";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
 import { toURLSearchParams } from "@/features/decide/profile";
+import { savedRankResults } from "@/features/decide/server/your-result";
+import { prevRemarkLabel } from "@/features/decide/types";
 import { funnelReport, possibleDuplicates, RANGES, recentErrors, type Range } from "@/features/funnel/admin";
 import { STAGES } from "@/features/funnel/lib";
 import { couponAdmin } from "@/features/payments/service";
@@ -57,7 +59,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const me = await staffUser();
   if (!me) notFound();
   const f = parseSearchParams(schema, toURLSearchParams(await searchParams));
-  const [users, totals, refs, fun, dupes, errors, coupons] = await Promise.all([
+  const [users, totals, refs, fun, dupes, errors, coupons, results] = await Promise.all([
     listUsers(f.q || undefined, f.page),
     adminTotals(),
     referralAdmin(),
@@ -65,6 +67,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     possibleDuplicates(),
     recentErrors(),
     couponAdmin(),
+    savedRankResults(),
   ]);
   const people = (c: { events: number; people: number }) => [n(c.events), n(c.people)];
   const href = (page: number) => `${PATH}?${new URLSearchParams({ ...(f.q && { q: f.q }), page: String(page) })}`;
@@ -73,6 +76,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     <AppPage className="grid grid-cols-1 gap-6">
       <PageHead title="Admin" about="The upgrade funnel, accounts, plans, usage, referral payouts, coupons, possible duplicate accounts and errors. Roles, Season Pass dates, payouts and coupons change here; every change is logged." />
       {f.msg && MESSAGES[f.msg] && <p role="status" className="rounded-md border border-border bg-card px-3 py-2 text-sm">{MESSAGES[f.msg]}</p>}
+
+      {results && <SavedRankResults r={results} />}
 
       <section aria-labelledby="funnel-h" className="grid gap-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -381,5 +386,67 @@ function SmallTable({ caption, head, rows }: { caption: string; head: string[]; 
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * Who got what: every account's saved rank in the latest round's result (server/your-result.ts, as Home's card reads
+ * it), counts first, then the accounts it lists. User ids only: no email or phone.
+ */
+function SavedRankResults({ r }: { r: NonNullable<Awaited<ReturnType<typeof savedRankResults>>> }) {
+  const { words: w, latest, users } = r;
+  const round = w.roundName(latest.round);
+  const of = (k: string) => users.filter((u) => u.result.kind === k);
+  const found = of("found").sort((a, b) => a.profile.rank - b.profile.rank);
+  const several = of("several");
+  return (
+    <section aria-labelledby="results-h" className="grid gap-3">
+      <h2 id="results-h" className="scroll-mt-24 text-lg font-semibold">{round} result for saved ranks{latest.provisional && " (provisional)"}</h2>
+      <p className="text-sm text-muted-foreground">
+        Accounts whose saved {w.rankWord} is in {w.by}&apos;s {latest.year} {round} result, matched as Home&apos;s &ldquo;Your {round} result&rdquo; card matches
+        it: the rank only. User ids only.
+      </p>
+      <SmallTable
+        caption="Saved ranks"
+        head={["", "Accounts"]}
+        rows={[
+          ["Saved a rank", n(users.length)],
+          [`In the ${round} result (new allotments)`, n(found.length)],
+          ["… fresh / upgraded", `${n(found.filter((u) => u.result.row?.status !== "upgraded").length)} / ${n(found.filter((u) => u.result.row?.status === "upgraded").length)}`],
+          ["… candidate category not the saved one", n(found.filter((u) => u.result.flag).length)],
+          [`Not in ${round}, in an earlier round`, n(of("kept").length)],
+          ["In no result this year", n(of("none").length)],
+          ...(several.length ? [["Several rows for the rank", n(several.length)]] : []),
+        ]}
+      />
+      <details>
+        <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold">Who got what ({n(found.length)})</summary>
+        <div className={tbl.wrap}>
+          <table className={`${tbl.table} stack-md`}>
+            <caption className="sr-only">Accounts whose saved rank is in the {round} result, by rank</caption>
+            <thead>
+              <tr className={tbl.headRow}>{["User id", "Saved rank", `${round} seat`, "Remark", "Candidate category"].map((h) => <th key={h} scope="col" className={tbl.th}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {found.map(({ userId, profile: p, result: { row, flag } }) => (
+                <tr key={userId} className={tbl.row}>
+                  <td className={`${tbl.td} font-mono text-xs`}>{userId}</td>
+                  <td data-label="Saved rank" className={`${tbl.td} numeric`}>{n(p.rank)} <span className="text-xs text-muted-foreground">{p.category}{p.pwd && " PwD"}</span></td>
+                  <td data-label="Seat" className={tbl.td}>
+                    <span className="block">{row!.courseName}, {row!.collegeName}</span>
+                    <span className="block text-xs text-muted-foreground">{w.quota(row!.quota)} · {row!.category} seat</span>
+                  </td>
+                  <td data-label="Remark" className={tbl.td}>
+                    {row!.status === "upgraded" ? "Upgraded" : "Fresh"}
+                    {row!.prev && <span className="block text-xs text-muted-foreground">Previous seat {prevRemarkLabel[row!.prev.remark]}</span>}
+                  </td>
+                  <td data-label="Candidate category" className={cn(tbl.td, flag && "font-semibold text-sun")}>{row!.candidateCategory ?? "—"}{flag && " (not the saved one)"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
   );
 }

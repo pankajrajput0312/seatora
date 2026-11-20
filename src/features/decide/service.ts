@@ -756,11 +756,11 @@ export async function rankScan(rank: number, year: number, window = 500, exam: E
 /**
  * One NEET PG rank's allotments in a year, round by round (rank = one candidate per year): the seat, MCC's status
  * (allotted / fresh / upgraded), the candidate's option number (R2 / R3) and own category, and the seat the PDF prints
- * one round back with its remark. Ranks and seats only, never a name; history, not a prediction.
+ * one round back with its remark. Ranks and seats only, never a name; history, not a prediction. Several ranks: each one's.
  */
-export async function rankJourney(year: number, rank: number, exam: ExamKey = DEFAULT_EXAM, quotas?: string[]) {
+export async function rankJourney(year: number, rank: number | number[], exam: ExamKey = DEFAULT_EXAM, quotas?: string[]) {
   const cat = await getCatalog(exam);
-  const { rows } = await findAllotments(cat, { year, from: rank, to: rank, ...(quotas && { quotas }) });
+  const { rows } = await findAllotments(cat, { year, ...(Array.isArray(rank) ? { ranks: rank } : { from: rank, to: rank }), ...(quotas && { quotas }) });
   return rows.map((a) => ({ ...a, ...seatNames(cat, a), prev: namedPrev(cat, a.prev) }));
 }
 

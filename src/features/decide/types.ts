@@ -104,6 +104,8 @@ export type Allotment = {
   prev: PrevSeat | null;
 };
 export type PrevSeat = { college: string; degree: string; specialty: string; quota: string; remark: "reported" | "not_reported" | "seat_surrendered" | "seat_cancelled" };
+/** The remark the PDF prints beside the previous round's seat. */
+export const prevRemarkLabel: Record<PrevSeat["remark"], string> = { reported: "reported", not_reported: "not reported", seat_surrendered: "seat surrendered", seat_cancelled: "seat cancelled" };
 export type Notice = { date: string; title: string; authority: string; url: string; kind: "schedule" | "announcement" | "merit"; status?: "done" | "open" | "upcoming" };
 
 /** A whole dataset in memory: the shape of the unit-test fixture (test/decide.demo.ts). Runtime reads Postgres. */

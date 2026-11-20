@@ -23,6 +23,7 @@ import { dashboard, getMeta, listOptions, optionsPicture, type StripPoint } from
 import { YourPicture } from "@/features/decide/components/your-picture";
 import { HeldSeat } from "@/features/decide/components/held-seat";
 import { WhatChanged } from "@/features/decide/components/what-changed";
+import { YourResult } from "@/features/decide/components/your-result";
 import { kindName, roundShort } from "@/features/decide/types";
 import { QuotaName, RoundShort } from "@/features/decide/components/round-name";
 import { activeExam, examInfo } from "@/features/exams/active";
@@ -141,6 +142,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <AppPage className="grid grid-cols-1 gap-4">
       {title}
+      {/* What the latest round's result (R2 on) lists for her rank: first, above everything else. */}
+      <YourResult profile={profile} exam={exam} L={L} />
       {/* Since her last visit (never on a first one), then the seat she holds and what she risks by upgrading from it. */}
       <WhatChanged exam={exam} round={list && sum ? { list, sum } : null} />
       <HeldSeat profile={profile} exam={exam} L={L} where="home" />

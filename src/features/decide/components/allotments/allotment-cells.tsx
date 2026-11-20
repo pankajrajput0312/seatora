@@ -1,11 +1,10 @@
 import Link from "next/link";
 import type { DecideLinks } from "../../lib/links";
-import type { PrevSeat } from "../../types";
+import { prevRemarkLabel, type PrevSeat } from "../../types";
 import { QuotaName } from "../round-name";
 import { Dash } from "../bits";
 import type { ReportedBeds } from "../institute/institute-data";
 import { Beds as OneBeds } from "../pages/beds";
-import { prevRemarkLabel } from "./allotments-view";
 
 type NamedPrev = PrevSeat & { collegeName: string; collegeSlug: string; courseName: string };
 

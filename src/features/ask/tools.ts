@@ -16,6 +16,7 @@ import { typeValues, type TermFilters } from "@/features/decide/lib/term-filters
 import { profileQuotas, type Profile } from "@/features/decide/profile";
 import { meritLists, scoreToRank } from "@/features/decide/server/merit";
 import { listNotices, roundStatus } from "@/features/decide/server/notices";
+import { rankResult } from "@/features/decide/server/your-result";
 import { canSeeResidents, listResidents, residentsDenied } from "@/features/decide/server/residents";
 import { optionSeats, pickLists, seatLists } from "@/features/decide/server/seats";
 import { eligibleCategories } from "@/features/decide/lib/reach";
@@ -167,7 +168,7 @@ const descriptions: Record<ToolName, string> = {
   remember_preference: "Save something she states about her choices (course priority, budget, bond tolerance, states, home state, college types, other) to her account, so later chats know it. Only what she said; tell her you saved it.",
   get_preferences: "What she has asked Seatora to remember (course priority, budget, bond tolerance, states…).",
   load_skill: "Load a skill's instructions and domain knowledge by name. Load the relevant skill before answering in its area.",
-  get_profile: "Her Seatora profile from this page: AIR, category, PwD, courses, quotas, states, fee and bond caps.",
+  get_profile: "Her Seatora profile from this page: AIR, category, PwD, courses, quotas, states, fee and bond caps; and `result`: what MCC's latest round result (Round 2 on) lists for her AIR. Use it for 'my result' / 'what did I get'.",
   search_options: "Options (college + course + quota) for a rank, with Seatora's reach label, closing ranks by year and round, seats in the current round's lists, fee/stipend/bond. Like the Options page.",
   college_profile: "One college: type, state, beds, its courses here with closing history and current-round seats, and fee/stipend/bond/bond penalty/leaving penalty per course.",
   last_ranks: "Closing ranks of a course at every college (or one college), newest year first, rounds R1-R3 and stray. History only.",
@@ -369,6 +370,14 @@ const cell = (s: string | null | undefined) => (s ?? "—").replace(/\|/g, "/").
 
 const lakh = (v: number | undefined) => (v == null ? undefined : Math.round(v * 100000));
 
+/** Home's "Your Round 2 result" lines, with MCC's PDF; null before a later round's result (server/your-result.ts). */
+async function profileResult(profile: Profile) {
+  const r = await rankResult(profile);
+  if (!r) return null;
+  const { head, before, held, flag } = r.result;
+  return { text: [head, before, held, flag].filter(Boolean).join("\n"), pdf: r.pdf?.url ?? null, note: "From MCC's official PDF, matched by her saved AIR only.", link: "/decide" };
+}
+
 // ---- handlers ----
 
 type Handlers = { [K in ToolName]: (input: z.infer<(typeof toolSchemas)[K]>, ctx: ToolContext) => Promise<unknown> };
@@ -396,6 +405,7 @@ const handlers: Handlers = {
       states: profile.states,
       maxFeeLakh: profile.maxFeeLakh,
       maxBondYears: profile.maxBondYears,
+      result: await profileResult(profile),
     };
   },
 

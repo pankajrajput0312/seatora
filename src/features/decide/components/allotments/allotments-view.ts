@@ -5,7 +5,7 @@ import { pageValue, parseSearchParams, rankValue } from "../../lib/params";
 import { anyTermFilter, feeValue, termFilterLists, termFilters, termFilterShape, untypedOnly } from "../../lib/term-filters";
 import { profileFromParams, profileHasCourse, profileQuotas } from "../../profile";
 import { getCollege, getMeta, listAllotments } from "../../service";
-import { baseCategories, roundLabel, rounds, termLabel, type Allotment, type PrevSeat, type Source, type Term } from "../../types";
+import { baseCategories, prevRemarkLabel, roundLabel, rounds, termLabel, type Allotment, type Source, type Term } from "../../types";
 import { collegeTypeLabel } from "../institute/college-type";
 import { reportedCount } from "../institute/hospital-bits";
 import { hospitalInfo } from "../institute/institute-data";
@@ -37,8 +37,6 @@ const schema = z.object({
 
 /** MCC's remark in that round (Allotment.status). */
 export const statusLabel: Record<Allotment["status"], string> = { allotted: "Allotted", fresh: "Fresh", upgraded: "Upgraded" };
-/** The remark the PDF prints beside the previous round's seat. */
-export const prevRemarkLabel: Record<PrevSeat["remark"], string> = { reported: "reported", not_reported: "not reported", seat_surrendered: "seat surrendered", seat_cancelled: "seat cancelled" };
 
 /** The rank window around her rank that the page opens on: −25% to +25%. */
 export const rankWindow = (rank: number) => ({ from: Math.max(1, Math.round(rank * 0.75)), to: Math.round(rank * 1.25) });

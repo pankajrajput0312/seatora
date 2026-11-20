@@ -63,7 +63,7 @@ counselling-basics · reading-closing-ranks · fees-stipend-bond · choice-list-
 | assess_chances({courses, rank, category, quotas, states, maxFeeLakh, maxBondYears, govtOnly}) | every option with seats in this round's lists (≈ 0.5 s): closings 2024-2026 by round, R1 trend, seat change vs last year's same round (clear vacancy), fee and bond, banded Likely / Possible / Long shot / Unlikely / No history by the rule in `chances.ts`, top 12 per band, counts and a summary per course and quota |
 | present_choice_list({title, items: [{ref, why}]}) | shows the ordered table + copy block itself |
 | remember_preference({key, value}), get_preferences() | AskPreference |
-| load_skill, get_profile, search_options, college_profile, last_ranks, round_seats, residents_at, compare, schedule, score_to_rank, find_colleges, draft_choice_list, save_choice_list, create_report | as before: the Options, institute, Last ranks, Seats, Residents, Compare, Counselling and Score & rank reads; save_choice_list writes "Ask Seatora plan" into her account's Choices only after she says yes; create_report stores an AskReport |
+| load_skill, get_profile, search_options, college_profile, last_ranks, round_seats, residents_at, compare, schedule, score_to_rank, find_colleges, draft_choice_list, save_choice_list, create_report | as before: the Options, institute, Last ranks, Seats, Residents, Compare, Counselling and Score & rank reads; get_profile also gives `result`, Home's "Your Round 2 result" lines for her saved AIR with MCC's PDF (null before a later round's result), so "my result" on Ask and WhatsApp is one lookup; save_choice_list writes "Ask Seatora plan" into her account's Choices only after she says yes; create_report stores an AskReport |
 
 ## Env
 | Variable | Default | |
