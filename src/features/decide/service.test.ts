@@ -6,7 +6,7 @@ import { remarkOf } from "./server/queries";
 import { programmeOfDegree } from "./server/terms";
 import type { FeeRow } from "./service";
 import { decideDemoData as fx } from "./test/decide.demo";
-import type { SeatList } from "./types";
+import { rounds, type SeatList } from "./types";
 
 // The service code over the in-memory test fixture (no database). Runtime never sees the fixture.
 vi.stubEnv("DATABASE_URL", "");
@@ -137,11 +137,11 @@ describe("service on the test fixture", () => {
     }
   });
 
-  it("allotments: filters, total, order (newest year, round, rank) and pages (past the end: the last page)", async () => {
+  it("allotments: filters, total, order (newest year, its newest round first, rank) and pages (past the end: the last page)", async () => {
     const all = fx.allotments.filter((a) => a.year === 2025 && a.quota === "DNB Quota");
     const page1 = await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, { page: 1, pageSize: 10 });
     expect(page1.total).toBe(all.length);
-    expect(page1.rows[0].round).toBe("R1");
+    expect(page1.rows[0].round).toBe(rounds.filter((r) => all.some((a) => a.round === r)).at(-1));
     expect(page1.rows.map((r) => r.rank)).toEqual([...page1.rows.map((r) => r.rank)].sort((a, b) => a - b));
     const page2 = await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, { page: 2, pageSize: 10 });
     expect(page2.rows[0]).toEqual((await svc.listAllotments({ year: 2025, quota: "DNB Quota" }, { page: 1, pageSize: 11 })).rows[10]);

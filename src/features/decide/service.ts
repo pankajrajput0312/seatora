@@ -1064,7 +1064,7 @@ export async function listAllotments(f: AllotmentFilters, pg: PageQuery, college
     ? cat.options.filter((o) => (!inCs || inCs.has(o.cs)) && (!f.quota || o.quota === f.quota) && optMatches(cat, o, null, tf, types)).map((o) => [o.cs, o.quota] as [string, string])
     : undefined;
   const q = { cs, csQuota, year: f.year, round: f.round, quota: f.quota, ...(f.quotas && { quotas: f.quotas }), category: f.category, from: f.from, to: f.to };
-  const at = (page: number) => findAllotments(cat, q, { limit: pg.pageSize, offset: (page - 1) * pg.pageSize, count: true });
+  const at = (page: number) => findAllotments(cat, q, { limit: pg.pageSize, offset: (page - 1) * pg.pageSize, count: true, newestRound: true });
   let page = Math.max(1, pg.page);
   let res = await at(page);
   const last = Math.max(1, Math.ceil(res.total / pg.pageSize));

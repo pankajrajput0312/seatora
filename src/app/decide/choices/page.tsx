@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { AppPage } from "@/features/decide/components/app-page";
 import { HistoryNote, PageHead } from "@/features/decide/components/bits";
 import { ChoicesView } from "@/features/decide/components/choices-view";
-import { DataSource, SeatSource } from "@/features/decide/components/data-source";
+import { DataSource, ListsHistory, SeatSource } from "@/features/decide/components/data-source";
 import { CHOICE_LIST } from "@/features/decide/lib/choices";
 import { decideLinks } from "@/features/decide/lib/links";
 import { fillWindow, nextChoiceFilling, roundName, stepsNow } from "@/features/decide/lib/round-status";
@@ -42,6 +42,7 @@ export default async function ChoicesPage({ searchParams }: { searchParams: Prom
         Your options in a suggested order, each with its reason. Nothing is added until you choose.
       </p>
       {/* "No seats in the lists" only while their round is current (no result yet: its choice filling), every exam. */}
+      <ListsHistory lists={lists} className="mt-3" />
       <ChoicesView reachFor={liveReach} view={view} maxLists={me?.eff.limits.choiceLists} hasLists={lists.length > 0} nextRound={nextRound} latest={latestOf(meta.sources, exam)} listsCurrent={optionsView(undefined, lists, meta.sources) === "round"} />
       <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
         <HistoryNote />

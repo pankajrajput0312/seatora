@@ -88,6 +88,26 @@ export async function SeatSource({ lists, L }: { lists: SeatList[]; L: DecideLin
   );
 }
 
+/**
+ * Where the newest seat lists show (Options, Seats, Choice list, an institute's Courses): once their round's result is in
+ * the data (2026 R2's on 20 Nov), they are the round just allotted, not the next round's, and say so. Null while their
+ * round is current (no result yet: its choice filling). NEET PG only for now.
+ */
+export async function ListsHistory({ lists, className }: { lists: SeatList[]; className?: string }) {
+  const l = lists[0];
+  const exam = await activeExam();
+  if (!l || exam !== DEFAULT_EXAM) return null;
+  const result = (await getMeta(exam)).sources.find((s) => s.year === l.year && s.round === l.round);
+  if (!result) return null;
+  const next = rounds[rounds.indexOf(l.round) + 1];
+  return (
+    <p role="note" className={`rounded-md border border-border bg-card px-3 py-2 text-sm ${className ?? ""}`}>
+      These are MCC&apos;s <span className="font-semibold">{roundName[l.round]} seat lists ({l.year})</span>, the round just allotted: its result is out{result.provisional && " (provisional)"}.
+      {next && <> {roundName[next]}&apos;s seat lists aren&apos;t out yet.</>}
+    </p>
+  );
+}
+
 type Used = { year: number; round?: string };
 
 /**

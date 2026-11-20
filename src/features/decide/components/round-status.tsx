@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { activeExam, examInfo } from "@/features/exams/active";
 import { authorityOf, DEFAULT_EXAM, exams, yearName, type ExamKey } from "@/features/exams/registry";
 import { decideLinks } from "../lib/links";
-import { alertOf, badgeOf, currentSteps, NOTICE_CLOSED_COOKIE, dueToday, fmtIST, fmtNote, nextDate, notStarted, roundName, stepName, stepsNow, type StepNow } from "../lib/round-status";
+import { alertOf, badgeOf, currentSteps, NOTICE_CLOSED_COOKIE, dueToday, fillWindow, fmtIST, fmtNote, nextDate, notStarted, roundName, stepName, stepsNow, type StepNow } from "../lib/round-status";
 import { listNotices, roundStatus, scheduleYear } from "../server/notices";
 import { resultNews } from "../server/your-result";
 import { InfoTip } from "./info-tip";
@@ -84,9 +84,11 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
   // The latest round's result while it is the newest news: said here with the way to it (the round's allotments).
   const news = await resultNews(exam).catch(() => null);
   const newsStep = news && all.find((s) => s.round === news.round && s.step === (news.provisional ? "provisional_result" : "final_result"));
+  // Its final result, still to come with no date (none announced, or MCC's moved): next, before any dated step.
+  const finalNext = news?.provisional ? all.find((s) => s.round === news.round && s.step === "final_result" && s.now === "upcoming" && !nextDate(s)) : undefined;
   const today = next && dueToday(next, now) ? next : null;
   // "Full schedule" opens at the round of the step on today (or next), not at the finished Round 1 the page starts with.
-  const at = (live[0] ?? next)?.round;
+  const at = (live[0] ?? finalNext ?? next)?.round;
   const full = <Link href={`${decideLinks(params).to("/decide/counselling")}${at ? `#round-${at}` : ""}`} className={`${smallLink} text-sky`}>Full schedule</Link>;
   const datesNote = `Dates are as ${by} printed them; tentative ones may change.${live.some((s) => s.clock === "started") ? ` "Not yet confirmed by ${by}": the step started as scheduled, and no ${by} notice confirms it yet.` : ""}`;
   const label = <span className="font-semibold">Today:</span>;
@@ -130,12 +132,19 @@ export async function RoundStatusBanner({ params }: { params: URLSearchParams })
           <Link href={decideLinks(params).to("/decide", {}, "#your-result-h")} className={`${smallLink} text-sky`}>Your result</Link>
         </p>
       )}
-      {next && !today && (
+      {finalNext && (
         <p className="flex flex-wrap items-center gap-x-2">
           <span className="text-muted-foreground">Next:</span>
+          <span>{rn(finalNext.round)} final result, date not announced yet</span>
+        </p>
+      )}
+      {next && !today && (
+        <p className="flex flex-wrap items-center gap-x-2">
+          <span className="text-muted-foreground">{finalNext ? "Then:" : "Next:"}</span>
           <span>
-            {rn(next.round)} {stepName[next.step].toLowerCase()} {next.scheduled?.from ? "from" : "on"} <span className="numeric">{fmtIST(nextDate(next)!)}</span>
-            {next.scheduled?.tentative && " (tentative)"}
+            {/* A choice filling's whole window (MCC's schedule), the deadline being what she plans for. */}
+            {rn(next.round)} {stepName[next.step].toLowerCase()}{" "}
+            {next.step === "choice_filling" ? <span className="numeric">{fillWindow(next)}</span> : <>{next.scheduled?.from ? "from" : "on"} <span className="numeric">{fmtIST(nextDate(next)!)}</span>{next.scheduled?.tentative && " (tentative)"}</>}
           </span>
           <NoticeLink s={next.scheduledBy ?? next}>{by} schedule</NoticeLink>
         </p>

@@ -44,7 +44,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
           <PriceLine />
         </p>
         <p className="mt-3 text-muted-foreground">
-          Online NEET PG counselling planner for MCC All India counselling: Round 2 seats, past closing ranks, fees, stipends and bonds, and
+          Online NEET PG counselling planner for MCC All India counselling: each round&apos;s seat lists, past closing ranks, fees, stipends and bonds, and
           residents at each college, from official MCC, NBEMS and NMC documents. A free account opens the planner straight away.
         </p>
         <section id="buy" data-placement="pricing" aria-labelledby="plans-h" className="mt-8 scroll-mt-24 md:w-[44rem]">
@@ -77,7 +77,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
           <section>
             <h2>What you get</h2>
             <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>Round 2 seats in your courses from MCC&apos;s clear vacancy, virtual vacancy and newly added seat lists.</li>
+              <li>Each round&apos;s seats in your courses from MCC&apos;s clear vacancy, virtual vacancy and newly added seat lists.</li>
               <li>Every option with past closing ranks (2023 to 2026, by round and seat category) and a label showing how your rank compares.</li>
               <li>Seat matrix and allotment tables for every college, course and quota.</li>
               <li>Fee, stipend, service bond and seat-leaving penalty for each college, with the official source of each figure.</li>

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { AppPage } from "@/features/decide/components/app-page";
 import { toolbarRow } from "@/features/decide/components/csv-link";
-import { DataSource, SeatSource } from "@/features/decide/components/data-source";
+import { DataSource, ListsHistory, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Closing, Dash, HistoryNote, PageHead, Provisional, ReachBadge } from "@/features/decide/components/bits";
 import { FeesSection, programmeTitle, termDocs } from "@/features/decide/components/fees";
@@ -539,6 +539,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                   Every course here, each list as its {by} PDF printed it.{onePosition ? "" : " The kinds of list overlap (most newly added seats are also clear vacancies), so their seats are never added together."}
                 </InfoTip>
               </h2>
+              <ListsHistory lists={roundLists} />
             </div>
             {round.map(({ list, rows }, i) => {
               const n = rows.reduce((a, r) => a + r.seats, 0);

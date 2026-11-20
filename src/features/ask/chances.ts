@@ -10,7 +10,7 @@ export type Seats = { clear?: number | null; virtual?: number | null; new?: numb
 export type Band = "likely" | "possible" | "longShot" | "unlikely" | "noHistory";
 
 export const BAND_RULES: Record<Band, string> = {
-  likely: "Likely: her rank was within the R1 or R2 closing in 2 or more of the recent years, or within the latest year's R1 closing.",
+  likely: "Likely: her rank was within the R1 or R2 closing in 2 or more of the recent years, or within the latest year's R1 or R2 closing (provisional while MCC's result is).",
   possible: "Possible: reached in R1/R2 in one recent year, or reached in R3, or closed within 10% of her rank in a main round, or seats are up on last year's same round with a closing within 20%.",
   longShot: "Long shot: reached only in a stray round, or a main-round closing within 20% of her rank.",
   unlikely: "Unlikely: every main-round and stray closing on her seat categories was more than 20% before her rank.",
@@ -45,7 +45,7 @@ export function seatChange(now: Seats, last: Seats | null, lastLabel: string): {
 
 /**
  * The band of one option for `rank`, with a one-line reason. `years`: the recent years counted (e.g. 2024, 2025, 2026);
- * `latestYear`: the year whose R1 alone can make an option likely.
+ * `latestYear`: the year whose R1 or R2 alone can make an option likely (as Options' "Reached in 2026 R1 to R2").
  */
 export function bandOf(rank: number, grid: Grid, o: { years: number[]; latestYear: number; seatsUp?: boolean }): { band: Band; why: string } {
   const cells = o.years.flatMap((y) => Object.entries(grid[y] ?? {}).map(([r, c]) => ({ y, r: r as Round, c: c!.closing })));
@@ -56,8 +56,8 @@ export function bandOf(rank: number, grid: Grid, o: { years: number[]; latestYea
   const reached = (rs: Round[]) => cells.filter((x) => rs.includes(x.r) && x.c >= rank);
   const r1r2 = reached(["R1", "R2"]);
   const r1r2Years = [...new Set(r1r2.map((x) => x.y))];
-  const latestR1 = grid[o.latestYear]?.R1;
-  if (latestR1 && latestR1.closing >= rank) return { band: "likely", why: `Reached in ${o.latestYear} R1 (closed ${formatRank(latestR1.closing)}).` };
+  const latest = (["R1", "R2"] as const).flatMap((r) => { const c = grid[o.latestYear]?.[r]; return c && c.closing >= rank ? [{ r, c }] : []; })[0];
+  if (latest) return { band: "likely", why: `Reached in ${o.latestYear} ${latest.r}${latest.c.provisional ? " (provisional)" : ""} (closed ${formatRank(latest.c.closing)}).` };
   if (r1r2Years.length >= 2) return { band: "likely", why: `Reached in R1/R2 in ${r1r2Years.join(" and ")} (${r1r2.slice(0, 2).map(fmt).join("; ")}).` };
   if (r1r2Years.length === 1) return { band: "possible", why: `Reached in R1/R2 only in ${r1r2Years[0]} (${fmt(r1r2[0])}).` };
   const r3 = reached(["R3"]);

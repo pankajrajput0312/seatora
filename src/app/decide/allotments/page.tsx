@@ -53,7 +53,7 @@ const printsPrev = (exam: ExamKey) => authorityOf(exam) === "MCC";
 /** The page's (i) beside its title: what a row is and what each part means (in the exam's words: MCC's, INI-CET's AIIMS). */
 const aboutOf = (exam: ExamKey) => (
   <>
-    Every allotment in {authorityOf(exam)}&apos;s result PDFs, newest year first, then round and rank. Ranks only, never names. With no filter
+    Every allotment in {authorityOf(exam)}&apos;s result PDFs, newest year first, then its newest round first, then rank. Ranks only, never names. With no filter
     the page opens on the latest round: pick All years under Year for every round. Select a rank to
     scan the allotments around it that year, Journey for that rank&apos;s seat in every round of the year, a course for its last
     ranks at that institute.<br /><br />

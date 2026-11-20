@@ -74,17 +74,19 @@ describe.skipIf(!dbUrl)("tools on the real import", async () => {
     }
   });
 
-  it("assess_chances bands every option with seats this round in one fast call; present_choice_list shows a 30-line list", async () => {
+  it("assess_chances bands every option in one fast call (2026 R2's lists are history once its result is in); present_choice_list shows a 30-line list", async () => {
     const refs = new Map<string, string>();
     const t0 = Date.now();
     const a = (await runTool("assess_chances", { courses: ["Anaesthesiology"], rank: 25000, category: "Open" }, { ...ctx, refs }, 15_000)) as { ok: true; data: Record<string, unknown> };
     expect(a.ok).toBe(true);
     expect(Date.now() - t0).toBeLessThan(3000);
-    const d = a.data as { counts: Record<string, number>; summary: string[]; likely: { ref: string; why: string; seatChange: string | null; trend: string | null }[]; possible: { ref: string }[]; comparedWith: string };
+    const d = a.data as { round: string; counts: Record<string, number>; summary: string[]; likely: { ref: string; why: string; seatChange: string | null; seatsNow: unknown; trend: string | null }[]; possible: { ref: string }[]; comparedWith: string | null };
     expect(Object.keys(d.counts)).toEqual(["likely", "possible", "longShot", "unlikely", "noHistory"]);
-    expect(d.summary.join("\n")).toMatch(/MD Anaesthesiology · All India: \d+ options with seats/);
-    expect(d.comparedWith).toMatch(/^2025 R2 seat lists/);
-    expect(d.likely[0]).toMatchObject({ ref: "c1", why: expect.stringMatching(/^Reached/), seatChange: expect.stringMatching(/clear vs 2025 R2/) });
+    expect(d.summary.join("\n")).toMatch(/MD Anaesthesiology · All India: \d+ options; /);
+    // The 2026 R2 result is in: every option with past allotments, no seat counts or change from the allotted lists.
+    expect(d.round).toMatch(/^every option with past allotments: the newest seat lists \(2026 R2\) are history/);
+    expect(d.comparedWith).toBeNull();
+    expect(d.likely[0]).toMatchObject({ ref: "c1", why: expect.stringMatching(/^Reached/), seatChange: null, seatsNow: null });
     expect(JSON.stringify(a.data).length).toBeLessThan(60_000);
 
     const shown: string[] = [];

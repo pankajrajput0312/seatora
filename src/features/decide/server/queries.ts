@@ -123,9 +123,12 @@ export async function findReachInputs(
 
 /**
  * Allotments, newest year first, then round, then rank (then quota and row: NEET SS ranks repeat across question groups,
- * NEET PG's never do, so its order is as before). `total` counts every match (only when `count` is set).
+ * NEET PG's never do, so its order is as before). `total` counts every match (only when `count` is set). `newestRound`:
+ * a year's rounds newest first (the Allotments list: 2026 R2 before R1); else oldest first (a rank's journey, a scan).
  */
-export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { limit?: number; offset?: number; count?: boolean } = {}): Promise<{ total: number; rows: Allotment[] }> {
+export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { limit?: number; offset?: number; count?: boolean; newestRound?: boolean } = {}): Promise<{ total: number; rows: Allotment[] }> {
+  const dir = opts.newestRound ? -1 : 1;
+  const roundSql = opts.newestRound ? Prisma.sql`DESC` : Prisma.empty;
   if (q.cs?.length === 0 || q.csQuota?.length === 0) return { total: 0, rows: [] };
   const offset = opts.offset ?? 0;
   if (cat.mem) {
@@ -145,7 +148,7 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
           (!q.to || a.rank <= q.to) &&
           (!q.ranks || q.ranks.includes(a.rank)),
       )
-      .sort((a, b) => b.year - a.year || roundPos(a.round) - roundPos(b.round) || a.rank - b.rank);
+      .sort((a, b) => b.year - a.year || dir * (roundPos(a.round) - roundPos(b.round)) || a.rank - b.rank);
     return { total: all.length, rows: all.slice(offset, opts.limit == null ? undefined : offset + opts.limit) };
   }
   const where = [
@@ -172,10 +175,10 @@ export async function findAllotments(cat: Catalog, q: AllotmentQuery, opts: { li
         SELECT "collegeSpecialtyId" AS cs, "counsellingYear" AS y, round AS r, rank AS k, quota AS q, category AS c, status AS st,
           "candidateCategory" AS cc, "optionNo" AS o, "prevCollegeId" AS pci, "prevSpecialtyId" AS psi, "prevQuota" AS pq, "prevRemark" AS pr, id
         FROM "Allotment" ${whereSql}
-        ORDER BY "counsellingYear" DESC, array_position(${sqlRounds}::text[], round), rank, quota, id
+        ORDER BY "counsellingYear" DESC, array_position(${sqlRounds}::text[], round) ${roundSql}, rank, quota, id
         ${opts.limit == null ? Prisma.empty : Prisma.sql`LIMIT ${opts.limit}`} OFFSET ${offset}
       ) a LEFT JOIN "College" pc ON pc.id = a.pci LEFT JOIN "Specialty" ps ON ps.id = a.psi
-      ORDER BY a.y DESC, array_position(${sqlRounds}::text[], a.r), a.k, a.q, a.id`,
+      ORDER BY a.y DESC, array_position(${sqlRounds}::text[], a.r) ${roundSql}, a.k, a.q, a.id`,
     opts.count ? db.$queryRaw<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM "Allotment" ${whereSql}`.then(([r]) => r.n) : Promise.resolve(-1),
   ]);
   const out = rows.flatMap((r) => {

@@ -6,7 +6,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { PageHead, Provisional, SetRankPrompt } from "@/features/decide/components/bits";
 import { CsvLink } from "@/features/decide/components/csv-link";
-import { DataSource, SeatSource } from "@/features/decide/components/data-source";
+import { DataSource, ListsHistory, SeatSource } from "@/features/decide/components/data-source";
 import { termDocs } from "@/features/decide/components/fees";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm, FiltersPanel, ToolbarCount, ToolbarSearch } from "@/features/decide/components/filter-form";
@@ -304,6 +304,8 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
         </div>
       )}
 
+      {/* The seat lists' round allotted already (its result in): said before any of their seat counts. */}
+      <ListsHistory lists={lists} />
       {/* Phones: one line (the counts that matter, the rest and the view links behind its (i)); md up as it was. */}
       {sum && (
         <section aria-label={`${round} seats in your courses`} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">

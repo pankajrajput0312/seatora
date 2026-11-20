@@ -69,7 +69,8 @@ export const allotmentsQuerySchema = pageSchema
   .refine((q) => !q.from || !q.to || q.from <= q.to, { message: "from must be ≤ to", path: ["from"] });
 export const rankScanQuerySchema = z.object({
   rank: rankValue,
-  year: int.min(2000).max(2100).default(2025),
+  /** Absent: the newest year with results (the route reads it from the data). */
+  year: int.min(2000).max(2100).optional(),
   window: int.min(1).max(1000).default(500),
 });
 export const trendsQuerySchema = pageSchema.extend({ specialty: z.string().optional(), degree: z.string().optional() });

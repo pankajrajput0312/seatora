@@ -5,7 +5,7 @@ import { Fragment } from "react";
 import { LayoutGrid } from "lucide-react";
 import { AppPage } from "@/features/decide/components/app-page";
 import { CsvLink } from "@/features/decide/components/csv-link";
-import { DataSource, SeatSource } from "@/features/decide/components/data-source";
+import { DataSource, ListsHistory, SeatSource } from "@/features/decide/components/data-source";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { Dash, HistoryNote, PageHead } from "@/features/decide/components/bits";
 import { termDocs } from "@/features/decide/components/fees";
@@ -182,6 +182,8 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
 
   return (
     <>
+      {/* The newest round's lists once that round is allotted: said, so they are never read as the next round's. */}
+      {all[0]?.year === list.year && all[0]?.round === list.round && <ListsHistory lists={roundLists} />}
       {/* As on Options: the toolbar (pinned on phones) has the search box, Filters (the rest, in a sheet) and the count;
           the form, its buttons and the sheet stay mounted, the fields remount to show what was applied. */}
       <FilterForm action="/decide/seats" role="search" aria-label="Filter seats" className={toolbar}>

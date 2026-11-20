@@ -76,8 +76,9 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
   const mineQ = E.quotaScoped && profile && params.get("rq") !== "all" ? profileQuotas(profile, E.quotas) : undefined;
   const invalid = typed != null && f.scan == null;
   const rank = invalid ? null : (f.scan ?? profile?.rank ?? null);
-  // Default: the newest year whose results are final.
-  const year = meta.years.find((y) => y.year === f.year) ?? meta.years.find((y) => !y.provisional) ?? meta.years[0];
+  // Default: the newest year with a final result (2026 once its R1 is final, its provisional R2 marked; the year before
+  // while its only result is provisional).
+  const year = meta.years.find((y) => y.year === f.year) ?? meta.years.find((y) => meta.sources.some((s) => s.year === y.year && !s.provisional)) ?? meta.years[0];
   const window = f.w ? halfWindow(f.w, rank ?? 0) : defaultWindow(rank ?? 0);
   const round = f.round && year?.rounds.includes(f.round) ? f.round : undefined;
   // Her courses, and the seat categories she can take, unless she picks others ("all" lifts one): what is near her rank for her.

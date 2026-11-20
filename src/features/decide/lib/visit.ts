@@ -1,7 +1,7 @@
 // "What changed since your last visit" (pure, client-safe): the exam's data as items with stable keys (each notice,
 // each round step's status and dates now, each seat list, each result), and the ones whose key she hasn't seen.
 import { fingerprint } from "./account-sync";
-import { statusNow } from "./round-status";
+import { stepsNow } from "./round-status";
 import type { MccNotice, Round, RoundStepInfo, RoundStepName, SeatKind, SeatList, Source, StepStatus } from "../types";
 
 export type VisitItem =
@@ -17,7 +17,7 @@ export const VISIT_NOTICES = 40;
 export const noticeKey = (n: Pick<MccNotice, "date" | "url" | "title">) => fingerprint(["n", n.date, n.url ?? n.title]);
 
 /**
- * Items of what Home shows now. A step's key holds its status now (round-status.ts statusNow: the schedule's clock
+ * Items of what Home shows now. A step's key holds its status now (round-status.ts stepsNow: the schedule's clock
  * included) and its dates, so a status or a date that moved is a new key; a result's holds provisional, so the final
  * one replacing it is new.
  */
@@ -25,14 +25,11 @@ export function visitItems(d: { notices: MccNotice[]; rounds: { round: Round; st
   const k = (...xs: unknown[]) => fingerprint(xs);
   return [
     ...d.notices.slice(0, VISIT_NOTICES).map((n): VisitItem => ({ kind: "notice", k: noticeKey(n), title: n.title, date: n.date, url: n.url, by: n.authority })),
-    ...(d.rounds ?? []).flatMap((r) =>
-      r.steps.map((s): VisitItem => {
-        const st = statusNow(s, now).status;
-        const from = s.scheduled?.from ?? s.scheduled?.on ?? null;
-        const to = s.scheduled?.to ?? null;
-        return { kind: "step", k: k("s", r.round, s.step, st, from, to), round: r.round, step: s.step, now: st, from, to };
-      }),
-    ),
+    ...stepsNow({ rounds: d.rounds ?? [] }, now).map((s): VisitItem => {
+      const from = s.scheduled?.from ?? s.scheduled?.on ?? null;
+      const to = s.scheduled?.to ?? null;
+      return { kind: "step", k: k("s", s.round, s.step, s.now, from, to), round: s.round, step: s.step, now: s.now, from, to };
+    }),
     ...d.lists.map((l): VisitItem => ({ kind: "list", k: k("l", l.key), year: l.year, round: l.round, list: l.kind, url: l.url, date: l.publishedAt })),
     ...d.sources.map((s): VisitItem => ({ kind: "result", k: k("r", s.key, s.provisional), year: s.year, round: s.round, provisional: s.provisional, url: s.url })),
   ];

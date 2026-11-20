@@ -44,7 +44,7 @@ describe("query schemas", () => {
     const r = parseQuery(compareQuerySchema, qs("ids=a&ids=a&ids=a&ids=a&ids=a,b"), ["ids"]);
     expect(r.success && r.data.ids).toEqual(["a", "b"]);
     const s = parseQuery(rankScanQuerySchema, qs("rank=42,284"));
-    expect(s.success && s.data).toEqual({ rank: 42284, year: 2025, window: 500 });
+    expect(s.success && s.data).toEqual({ rank: 42284, window: 500 }); // no year: the route takes the newest one in the data
   });
 });
 

@@ -31,7 +31,7 @@ export const fmtNote = (note: string) => note.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\
  * passed is done ("ended"), an upcoming step whose start passed is open ("started"), and an upcoming step whose last
  * date passed with no notice is unknown ("passed": check MCC).
  */
-export function statusNow(s: Pick<RoundStepInfo, "status" | "scheduled">, now: Date): { status: StepStatus; clock: "ended" | "started" | "passed" | null } {
+export function statusNow(s: Pick<RoundStepInfo, "status" | "scheduled">, now: Date): { status: StepStatus; clock: "ended" | "started" | "passed" | "moved" | null } {
   const { from, to, on } = s.scheduled ?? {};
   const end = to ?? on;
   if (s.status === "open" && end && instant(end, true) < now) return { status: "done", clock: "ended" };
@@ -41,8 +41,20 @@ export function statusNow(s: Pick<RoundStepInfo, "status" | "scheduled">, now: D
 }
 
 export type StepNow = RoundStepInfo & { round: Round; now: StepStatus; clock: ReturnType<typeof statusNow>["clock"] };
+/**
+ * Every step's status now. A step whose scheduled date passed before an earlier step of its round came (a hold moved the
+ * round: 2026 R2's final result, scheduled 17 Nov, after a provisional result on 20 Nov) stays upcoming ("moved"), its
+ * old date no longer its next date.
+ */
 export const stepsNow = (rs: { rounds: { round: Round; steps: RoundStepInfo[] }[] }, now: Date): StepNow[] =>
-  rs.rounds.flatMap((r) => r.steps.map((s) => { const n = statusNow(s, now); return { ...s, round: r.round, now: n.status, clock: n.clock }; }));
+  rs.rounds.flatMap((r) =>
+    r.steps.map((s) => {
+      const n = statusNow(s, now);
+      const end = (s.scheduled?.to ?? s.scheduled?.on)?.slice(0, 10);
+      const moved = n.clock === "passed" && !!end && r.steps.some((o) => o.status === "done" && !!o.date && o.date > end);
+      return { ...s, round: r.round, now: moved ? "upcoming" : n.status, clock: moved ? "moved" : n.clock };
+    }),
+  );
 
 /** Why the clock moved a step on, or null. */
 export function clockNote(s: StepNow) {
@@ -50,11 +62,12 @@ export function clockNote(s: StepNow) {
   if (s.clock === "ended") return `Closed at ${fmtIST((to ?? on)!)} as scheduled; no later MCC notice is in the data.`;
   if (s.clock === "started") return `Open from ${fmtIST(from!)} as scheduled; no MCC notice in the data confirms it yet.`;
   if (s.clock === "passed") return `Scheduled for ${fmtIST((to ?? on)!)}; no MCC notice about it is in the data yet. Check MCC.`;
+  if (s.clock === "moved") return `Scheduled for ${fmtIST((to ?? on)!)}, but the round's earlier step came after that date; no new date from MCC in the data yet.`;
   return null;
 }
 
 /** An upcoming step's first scheduled date (start of a window, or its one day). */
-export const nextDate = (s: StepNow) => (s.now === "upcoming" ? s.scheduled?.from ?? s.scheduled?.on ?? null : null);
+export const nextDate = (s: StepNow) => (s.now === "upcoming" && s.clock !== "moved" ? s.scheduled?.from ?? s.scheduled?.on ?? null : null);
 
 /** True when an upcoming step's first scheduled date (nextDate) is today in IST: Home says "Today" for it, not "Next". */
 export const dueToday = (s: StepNow, now: Date) => nextDate(s)?.slice(0, 10) === new Date(now.getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10);

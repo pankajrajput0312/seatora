@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoundStepInfo } from "../types";
-import { alertOf, badgeOf, currentSteps, dueToday, fillWindow, fmtIST, fmtNote, nextChoiceFilling, nextFilling, joiningOf, notStarted, sharedNote, shortNote, statusNow, stepsNow, withoutJoining, type StepNow } from "./round-status";
+import { alertOf, badgeOf, currentSteps, dueToday, fillWindow, fmtIST, fmtNote, nextChoiceFilling, nextDate, nextFilling, joiningOf, notStarted, sharedNote, shortNote, statusNow, stepsNow, withoutJoining, type StepNow } from "./round-status";
 
 // 2026 R2 as round_status.json gives it (as of 14 Nov 2026 17:27 IST).
 const choice = { status: "open", scheduled: { from: "2026-11-10T13:00:00+05:30", to: "2026-11-15T23:55:00+05:30", on: null, tentative: false } } as const;
@@ -85,6 +85,20 @@ describe("alertOf", () => {
     expect(alertOf(r2(held("provisional_result"), held("final_result")))).toEqual({ id: "202611171047091852.pdf", url: "https://x/202611171047091852.pdf", text: "Round 2 result on hold" });
     expect(alertOf(r2(held("choice_filling", "https://x/n9.pdf")))?.text).toBe("Round 2 choice filling suspended");
     expect(alertOf(r2({ ...held("final_result"), status: "upcoming" }))).toBeNull();
+  });
+});
+
+describe("a schedule date the round has moved past (2026 R2: final result scheduled 17 Nov, provisional result 20 Nov)", () => {
+  const base = { url: null, title: null, note: null, scheduledBy: null, events: [] };
+  const prov: RoundStepInfo = { ...base, step: "provisional_result", status: "done", date: "2026-11-20", scheduled: { from: null, to: null, on: "2026-11-16", tentative: false } };
+  const fin: RoundStepInfo = { ...base, step: "final_result", status: "upcoming", date: null, scheduled: { from: null, to: null, on: "2026-11-17", tentative: false } };
+  const at = (...steps: RoundStepInfo[]) => stepsNow({ rounds: [{ round: "R2", steps }] }, new Date("2026-11-20T15:00:00+05:30"));
+  it("stays upcoming with no next date once an earlier step came after it; still 'not confirmed' without one", () => {
+    const [, f] = at(prov, fin);
+    expect([f.now, f.clock, nextDate(f)]).toEqual(["upcoming", "moved", null]);
+    expect(currentSteps([f]).next).toBeNull();
+    const [g] = at(fin);
+    expect([g.now, g.clock]).toEqual(["unknown", "passed"]);
   });
 });
 

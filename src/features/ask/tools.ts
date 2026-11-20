@@ -20,7 +20,7 @@ import { rankResult } from "@/features/decide/server/your-result";
 import { canSeeResidents, listResidents, residentsDenied } from "@/features/decide/server/residents";
 import { optionSeats, pickLists, seatLists } from "@/features/decide/server/seats";
 import { eligibleCategories } from "@/features/decide/lib/reach";
-import { choiceOptions, getDecideData, getInstitute, getMeta, lastRanks, listOptions, seatsByKind, type OptionRow } from "@/features/decide/service";
+import { choiceOptions, getDecideData, getInstitute, getMeta, lastRanks, listOptions, optionsView, seatsByKind, type OptionRow } from "@/features/decide/service";
 import { baseCategories, optionId, roundLabel, rounds, seatKinds, type SeatList } from "@/features/decide/types";
 import { db } from "@/lib/db";
 import { loadSkills } from "./skills";
@@ -487,7 +487,7 @@ const handlers: Handlers = {
       optionsWithSeats: r.total,
       summary: r.summary,
       rows: r.rows.map((x) => ({ id: x.id, college: x.college.name, state: x.college.state, course: courseName(x), quota: x.quota, seats: seatsOf(x), reach: reachLabel(x.reach, latestRound(m.sources), PAST_YEARS), lastClosing: lastClosing(x), link: instLink(x.college.slug, "seats") })),
-      note: "Seat kinds overlap (a newly added seat is also in the clear vacancy list): never add them. Lists as MCC published them.",
+      note: `Seat kinds overlap (a newly added seat is also in the clear vacancy list): never add them. Lists as MCC published them.${r.seatLists[0] && optionsView(undefined, r.seatLists, m.sources) === "all" ? ` These are ${r.seatLists[0].year} ${roundLabel[r.seatLists[0].round]}'s lists: that round's result is out, so they are history, and the next round's lists aren't out yet.` : ""}`,
       link: "/decide/seats",
     };
   },
@@ -589,10 +589,12 @@ const handlers: Handlers = {
     };
     const all = await seatLists();
     const [cur] = pickLists(all, {});
-    const round = !!cur;
+    // The newest lists count only while their round is current (no result yet, as Options' default view); after its
+    // result they are history (2026 R2's on 20 Nov) and every option with past allotments is assessed, no seat change.
+    const round = !!cur && optionsView(undefined, [cur], m.sources) === "round";
     const r = await listOptions(p, { view: round ? "round" : "all", hasSeats: round ? "any" : undefined, showClosed: true, terms: tf }, { page: 1, pageSize: 3000 });
     // Last year's lists of the same round, one per kind (as the current ones), for the seat change.
-    const prev = cur ? seatKinds.flatMap((kind) => pickLists(all, { kind, year: cur.year - 1, round: cur.round }).slice(0, 1)) : [];
+    const prev = round ? seatKinds.flatMap((kind) => pickLists(all, { kind, year: cur.year - 1, round: cur.round }).slice(0, 1)) : [];
     const cats = eligibleCategories(p.category, p.pwd);
     const prevSeats = prev.length ? await optionSeats(prev, { ...(p.pairs?.length ? { pairs: p.pairs } : { specialties: p.specialties }), quotas: profileQuotas(p), categories: cats }) : null;
     const prevLabel = cur ? `${cur.year - 1} ${roundLabel[cur.round]}` : "";
@@ -619,7 +621,7 @@ const handlers: Handlers = {
         why: y.why,
         trend: y.trend ? `${y.trend.arrow} ${y.trend.text}` : null,
         closings: yearRounds(y.x).slice(0, 2),
-        seatsNow: y.now,
+        seatsNow: round ? y.now : null,
         seatChange: y.change?.text ?? null,
         fee: t.fee,
         stipend: t.stipend,
@@ -651,11 +653,11 @@ const handlers: Handlers = {
       const lastC = ys.reduce((n, y) => n + (y.last?.clear ?? 0), 0);
       const pct = prev.length && lastC ? Math.round(((nowC - lastC) / lastC) * 100) : null;
       const bands = order.filter((b) => ys.some((y) => y.band === b)).map((b) => `${ys.filter((y) => y.band === b).length} ${b}`).join(", ");
-      return `${k}: ${ys.length} options with seats; ${bands}. ${r12 ? `${r12} reached ${formatRank(p.rank)} in R1/R2` : `none reached ${formatRank(p.rank)} in R1/R2`}${r3 ? `; ${r3} only in R3` : ""}${stray ? `; ${stray} only in stray` : ""} (${years.join(", ")}). Clear seats ${nowC} now${prev.length ? ` vs ${lastC} in ${prevLabel}${pct != null ? ` (${pct >= 0 ? "+" : ""}${pct}%)` : ""}` : ""}.`;
+      return `${k}: ${ys.length} options${round ? " with seats" : ""}; ${bands}. ${r12 ? `${r12} reached ${formatRank(p.rank)} in R1/R2` : `none reached ${formatRank(p.rank)} in R1/R2`}${r3 ? `; ${r3} only in R3` : ""}${stray ? `; ${stray} only in stray` : ""} (${years.join(", ")}).${round ? ` Clear seats ${nowC} now${prev.length ? ` vs ${lastC} in ${prevLabel}${pct != null ? ` (${pct >= 0 ? "+" : ""}${pct}%)` : ""}` : ""}.` : ""}`;
     });
     return {
       for: { rank: p.rank, category: p.category, seatCategories: cats, quotas: profileQuotas(p), govtOnly: !!i.govtOnly, maxFeeLakh: i.maxFeeLakh ?? p.maxFeeLakh ?? null, maxBondYears: tf.maxBondYears },
-      round: cur ? `${cur.year} ${roundLabel[cur.round]} seat lists (${listNames(r.seatLists).join("; ")})` : "no current seat lists: every option with past allotments",
+      round: round ? `${cur.year} ${roundLabel[cur.round]} seat lists (${listNames(r.seatLists).join("; ")})` : cur ? `every option with past allotments: the newest seat lists (${cur.year} ${roundLabel[cur.round]}) are history, that round's result is out and the next round's lists aren't yet` : "no current seat lists: every option with past allotments",
       comparedWith: prev.length ? `${prevLabel} seat lists (${listNames(prev).join("; ")})` : null,
       options: rows.length,
       leftOutNotPublished: r.unknownTerms,

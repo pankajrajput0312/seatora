@@ -5,8 +5,9 @@ const o = { years: [2024, 2025, 2026], latestYear: 2026 };
 const rank = 25000;
 
 describe("bandOf", () => {
-  it("likely: reached in the latest R1, or in R1/R2 in two years", () => {
+  it("likely: reached in the latest R1 or R2, or in R1/R2 in two years", () => {
     expect(bandOf(rank, { 2026: { R1: { closing: 26100 } } }, o)).toEqual({ band: "likely", why: "Reached in 2026 R1 (closed 26,100)." });
+    expect(bandOf(rank, { 2026: { R1: { closing: 20000 }, R2: { closing: 26100, provisional: true } } }, o)).toEqual({ band: "likely", why: "Reached in 2026 R2 (provisional) (closed 26,100)." });
     expect(bandOf(rank, { 2024: { R2: { closing: 25500 } }, 2025: { R1: { closing: 25001 } }, 2026: { R1: { closing: 20000 } } }, o).band).toBe("likely");
   });
   it("possible: one R1/R2 year, R3 only, within 10%, or seats up within 20%", () => {

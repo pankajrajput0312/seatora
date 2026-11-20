@@ -6,7 +6,9 @@ export async function GET(req: Request) {
   return handle(async () => {
     const q = parseQuery(rankScanQuerySchema, new URL(req.url).searchParams);
     if (!q.success) return invalid(q.error);
-    const [meta, groups] = await Promise.all([getMeta(), rankScan(q.data.rank, q.data.year, q.data.window)]);
-    return ok(groups, { sources: sourcesFor(meta.sources, groups.map((g) => ({ year: q.data.year, round: g.round }))) });
+    const meta = await getMeta();
+    const year = q.data.year ?? meta.years[0]?.year ?? new Date().getFullYear();
+    const groups = await rankScan(q.data.rank, year, q.data.window);
+    return ok(groups, { sources: sourcesFor(meta.sources, groups.map((g) => ({ year, round: g.round }))) });
   });
 }

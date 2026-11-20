@@ -30,9 +30,9 @@ const collegeKey = async (prefix: string) => (await svc.getDecideData()).college
 
 // (importing ./service loads Prisma, which reads .env, so the guard sees DATABASE_URL from .env too)
 describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout: 120_000 }, () => {
-  it("loads the catalog with the MCC result PDFs (2026 R1 final)", async () => {
+  it("loads the catalog with the MCC result PDFs (2026 R1 final, R2 provisional)", async () => {
     const meta = await timed("catalog (cold)", () => svc.getMeta());
-    expect(meta.years[0]).toMatchObject({ year: 2026, rounds: ["R1"], provisional: false, label: "2026 (R1)" });
+    expect(meta.years[0]).toMatchObject({ year: 2026, rounds: ["R1", "R2"], provisional: true, label: "2026 (R1, R2, provisional)" });
     expect(meta.years.find((y) => y.year === 2025)?.label).toBe("2025");
   });
 
@@ -73,15 +73,15 @@ describe.skipIf(!process.env.DATABASE_URL)("service on real MCC data", { timeout
     const all = await timed("listOptions her (showClosed)", () => svc.listOptions(her, { ...v, showClosed: true }));
     const shown = await timed("listOptions her (all view)", () => svc.listOptions(her, v));
     console.log("her options", all.rows.length, all.counts, "shown", shown.rows.length, "hidden closed", shown.hiddenClosed);
-    // Every quota ticked: every option in both specialties (cutoffs.ndjson: 1,312 college × course × quota; 1,295 of them
-    // with an Open or OBC allotment). The round-2 bundle's merged colleges hold one option where two keys held two.
+    // Every quota ticked: every option in both specialties (cutoffs.ndjson with 2026 R2 provisional: 1,356 college ×
+    // course × quota). The round-2 bundle's merged colleges hold one option where two keys held two.
     const every = await svc.listOptions({ ...her, quotas: (await svc.getMeta()).quotas }, { ...v, showClosed: true });
-    expect(every.total).toBe(1312);
-    expect(every.counts).toMatchObject({ "reached-latest": 294, "reached-both": 55, "reached-one": 121, "within-10": 75, "stray-only": 40, "closed-before": 672, "no-data": 55 });
-    // None ticked: the open quotas only (30 options in restricted quotas left out).
-    expect(all.total).toBe(1282);
+    expect(every.total).toBe(1356);
+    expect(every.counts).toMatchObject({ "reached-latest": 334, "reached-both": 48, "reached-one": 100, "within-10": 80, "stray-only": 40, "closed-before": 695, "no-data": 59 });
+    // None ticked: the open quotas only (31 options in restricted quotas left out).
+    expect(all.total).toBe(1325);
     expect(all.rows.every((r) => ["All India", "DNB Quota", "Deemed/Paid Seats"].includes(r.quota))).toBe(true);
-    expect(shown.total + shown.hiddenClosed).toBe(1282);
+    expect(shown.total + shown.hiddenClosed).toBe(1325);
     const page2 = await svc.listOptions(her, v, { page: 2, pageSize: 50 });
     expect(page2.rows.map((r) => r.id)).toEqual(shown.rows.slice(50, 100).map((r) => r.id));
     const t = performance.now();
@@ -168,11 +168,14 @@ describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "seats.ndjson
     ["AIR 15,000 Open, MD General Medicine", gm, null],
   ] as const) {
     it(`${name}: every option with 2026 R2 seats, new ones included, as in seats.ndjson; sorted; API and CSV the same`, async () => {
+      // The 2026 R2 result is in: the default view is every option with past allotments; the round view on asking.
+      const R = { view: "round" } as const;
+      expect((await svc.listOptions(p, {}, { page: 1, pageSize: 1 })).view).toBe("all");
       const lists = await svc.currentSeatLists();
       expect(lists.map((l) => l.key)).toEqual(["mcc/2026/R2_clear_vacancy.pdf", "mcc/2026/R2_virtual_vacancy.pdf", "mcc/2026/R2_new_seats.pdf"]);
       const expected = fromFile(p, lists.map((l) => l.key));
-      const r = await timed(`listOptions ${name} (round view, every row)`, () => svc.listOptions(p, {}, { page: 1, pageSize: 100000 }));
-      const page1 = await timed(`listOptions ${name} (round view, page 1)`, () => svc.listOptions(p, {}, { page: 1, pageSize: 25 }));
+      const r = await timed(`listOptions ${name} (round view, every row)`, () => svc.listOptions(p, R, { page: 1, pageSize: 100000 }));
+      const page1 = await timed(`listOptions ${name} (round view, page 1)`, () => svc.listOptions(p, R, { page: 1, pageSize: 25 }));
       expect([r.view, r.seats, r.showClosed, r.hiddenClosed]).toEqual(["round", "any", true, 0]);
       expect(new Set(r.rows.map((x) => fileId(x.id)))).toEqual(new Set(expected.keys()));
       expect(page1.rows.map((x) => x.id)).toEqual(r.rows.slice(0, 25).map((x) => x.id));
@@ -213,19 +216,20 @@ describe.skipIf(!process.env.DATABASE_URL || !existsSync(join(dir, "seats.ndjson
         expect((await svc.getOptionsByIds(ids, p)).map((x) => x.id)).toEqual(ids.slice(0, 2));
       }
       // Toggles: every option with or without R2 seats; closed hidden.
-      const wide = await svc.listOptions(p, { hasSeats: false }, { page: 1, pageSize: 1 });
+      const wide = await svc.listOptions(p, { ...R, hasSeats: false }, { page: 1, pageSize: 1 });
       expect(wide.total).toBe(history.size + summary.fresh);
-      const hide = await svc.listOptions(p, { showClosed: false }, { page: 1, pageSize: 1 });
+      const hide = await svc.listOptions(p, { ...R, showClosed: false }, { page: 1, pageSize: 1 });
       expect([hide.total, hide.hiddenClosed]).toEqual([r.total - r.counts["closed-before"], r.counts["closed-before"]]);
       // Every state ticked leaves out only the options at institutes with no state, and noState counts exactly those.
-      const states = await svc.listOptions({ ...p, states: (await svc.getMeta()).states }, {}, { page: 1, pageSize: 1 });
+      const states = await svc.listOptions({ ...p, states: (await svc.getMeta()).states }, R, { page: 1, pageSize: 1 });
       expect([r.noState, states.total + states.noState]).toEqual([0, r.total]);
       // The API and the CSV follow the same view and params; older params keep their meaning.
       const qs = profileToParams(p);
       const api = async (extra: string) => (await (await optionsApi(new Request(`http://x/api/v1/options?${qs}&pageSize=25${extra}`))).json()) as { data: typeof r; page: { total: number } };
-      const a = await api("");
+      expect((await api("")).data.view).toBe("all");
+      const a = await api("&view=round");
       expect([a.data.view, a.data.summary, a.page.total, a.data.rows.map((x) => x.id)]).toEqual(["round", r.summary, r.total, page1.rows.map((x) => x.id)]);
-      expect((await api("&hasSeats=1&showClosed=1")).page.total).toBe(summary.clear);
+      expect((await api("&view=round&hasSeats=1&showClosed=1")).page.total).toBe(summary.clear);
       expect((await api("&view=all")).data.view).toBe("all");
       // (the export route itself renders JSX-free code but imports a page caption; checked on the build) its rows and note:
       const csv = optionsCsv(r.rows, { lists: r.seatLists, latest: latestRound((await svc.getMeta()).sources), includeLatest: true, notes: [roundViewNote(lists[0], r.summary!, r.seats, resultsSpan((await svc.getMeta()).years))], sources: [] });
@@ -296,7 +300,7 @@ describe.skipIf(!process.env.DATABASE_URL)("bundle schema 2 on real MCC data", {
     expect(dnb.fee).toMatchObject({ display: "numbers", perYear: [{ amount: 125000, kind: "nbems_ceiling", maximum: true }, {}, {}] });
     expect(dnb.stipendPerMonth[0]).toMatchObject({ inr: 43000, kind: "nbems_minimum", minimum: true });
     const md = await feesFor((await collegeKey("AARUPADAIVEEDUMEDICALCOLLEGEANDHOSPITALP")).key, "MD/MS");
-    expect(md.map((g) => [g.quotaGroup, g.fee.display, "perYear" in g.fee])).toEqual([["Deemed/Paid", "verbatim", false], ["NRI", "verbatim", false]]);
+    expect(md.map((g) => [g.quotaGroup, g.fee.display, "perYear" in g.fee])).toEqual([["Deemed/Paid", "numbers", true], ["NRI", "verbatim", false]]); // the R2 bundle's deemed fee figures (2026-27 fee sheet)
     expect(await feesFor(`${KOKILA_NM}#400710`, "MCh")).toEqual([]);
   });
 });
