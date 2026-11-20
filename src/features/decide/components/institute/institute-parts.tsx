@@ -10,7 +10,7 @@ import { InfoTip } from "../info-tip";
 import { RegisterSources } from "../page-sources";
 import { fmtDay } from "../seats/seat-lists";
 import { ScrollTable } from "../scroll-table";
-import { smallLink, tbl } from "../ui";
+import { chip as chipClass, smallLink, tbl } from "../ui";
 import { reportedCount, SELF_REPORTED, sourceName, ValueSource } from "./hospital-bits";
 import type { AllotmentMix, ClinicalAt, ValueMeta } from "./institute-data";
 import { QuotaName } from "../round-name";
@@ -24,7 +24,7 @@ export function CategoryToggle({ mine, all, href }: { mine: string[]; all: boole
       href={href(to)}
       scroll={false}
       aria-current={on ? "true" : undefined}
-      className={cn("inline-flex min-h-11 items-center rounded-full border px-3 text-sm", on ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input")}
+      className={chipClass(on)}
     >
       {text}
     </Link>
@@ -258,7 +258,7 @@ export function HospitalFacts({ f, name }: { f: ClinicalAt; name: string }) {
       {/* Each document once in the page's Sources (the Source column links them where they are used). */}
       <RegisterSources docs={[...new Map(Object.values(f.values_meta ?? {}).flatMap((m) => (m?.url ? [[m.url, { name: `${name}: ${sourceName(m)}`, url: m.url, note: SELF_REPORTED }] as const] : []))).values()]} />
       <div className="grid gap-1">
-        <h2 id="facts-h" className="text-lg font-semibold">Hospital facts (as reported)</h2>
+        <h2 id="facts-h" className="text-title font-semibold">Hospital facts (as reported)</h2>
         <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
           {SELF_REPORTED}.
           <InfoTip label="hospital facts">
@@ -281,7 +281,7 @@ export function HospitalFacts({ f, name }: { f: ClinicalAt; name: string }) {
       <FactsTable caption={`Hospital facts at ${name}, as reported`} groups={groups} whole={meta("facts")} />
       {f.courses.length > 0 && (
         <div className="grid gap-4">
-          <h3 className="text-base font-semibold">By course, as reported</h3>
+          <h3 className="text-title font-semibold">By course, as reported</h3>
           {f.courses.map((c) => {
             const m = (k: string) => meta(`courses[${c.i}].${k}`);
             const t = c.trainees;

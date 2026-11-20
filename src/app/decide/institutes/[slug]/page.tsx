@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ExternalLink, Globe } from "lucide-react";
+import { ChevronDown, ExternalLink, Globe } from "lucide-react";
 import { notFound, permanentRedirect, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
@@ -241,9 +241,6 @@ export default async function InstitutePage({ params, searchParams }: Props) {
   const website = websiteUrl(info?.website ?? null);
   const roundLists = round.map((x) => x.list);
   const stick = "sticky left-0 z-[1] border-r border-border bg-card";
-  // The Courses table's own columns, a little tighter than tbl's (px-3): with the five term cells it fits 1366px.
-  const thTight = "px-3 py-3 text-xs font-semibold text-muted-foreground";
-  const numTight = "px-3 py-3 text-right align-top text-[15px] font-semibold tabular-nums";
   const roundName = round[0] && `${yn(round[0].list.year)} ${roundIn(E, round[0].list.year, round[0].list.round)}`;
   const mine = profile ? eligibleCategories(profile.category, profile.pwd) : null;
   const seatCats = mine && f.scat !== "all" ? mine : undefined;
@@ -360,9 +357,9 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             ]}
           />
 
-          <section aria-labelledby="yours" className="rounded-xl border border-border bg-card p-5">
+          <section aria-labelledby="yours" className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id="yours" className="text-lg font-semibold">{profile ? "Your options here" : "Courses and quotas here"}</h2>
+              <h2 id="yours" className="text-title font-semibold">{profile ? "Your options here" : "Courses and quotas here"}</h2>
               <Link href={L.institute(slug, "courses")} className={`${smallLink} text-sm text-sky`}>All courses</Link>
             </div>
             {unlistedNote && <div className="mt-2">{unlistedNote}</div>}
@@ -393,9 +390,9 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <HistoryNote className="mt-3" more={!profile && "Closing ranks shown across all seat categories."} />
           </section>
 
-          {E.has.fees && <section aria-labelledby="terms-h" className="grid gap-3 rounded-xl border border-border bg-card p-5">
+          {E.has.fees && <section aria-labelledby="terms-h" className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id="terms-h" className="flex items-center gap-1 text-lg font-semibold">
+              <h2 id="terms-h" className="flex items-center gap-1 text-title font-semibold">
                 Fees, stipend and bond
                 <InfoTip label="fees, stipend and bond">
                   {exam === "ini-cet" ? <>Year 1 figures, as the INI-CET prospectus (Part B) prints them. &quot;—&quot; means it prints none, not &quot;none&quot;.</> : <>Year 1 figures, from what the college declared to MCC and NBEMS rules. &quot;—&quot; means not in the MCC profile fields Seatora imports, not &quot;none&quot;.</>}{" "}
@@ -419,8 +416,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             <DataSource terms={termDocs(fees)} results={false} />
           </section>}
 
-          <section aria-labelledby="trend" className="rounded-xl border border-border bg-card p-5">
-            <h2 id="trend" className="flex items-center gap-1 text-lg font-semibold">
+          <section aria-labelledby="trend" className="rounded-xl border border-border bg-card p-4 sm:p-5">
+            <h2 id="trend" className="flex items-center gap-1 text-title font-semibold">
               Allotments made by year
               <InfoTip label="allotments made by year">All courses, rounds and seat categories here. This counts allotments, not seats.</InfoTip>
             </h2>
@@ -438,8 +435,8 @@ export default async function InstitutePage({ params, searchParams }: Props) {
             </table>
           </section>
 
-          <section aria-labelledby="mix-h" className="grid gap-3 rounded-xl border border-border bg-card p-5">
-            <h2 id="mix-h" className="flex items-center gap-1 text-lg font-semibold">
+          <section aria-labelledby="mix-h" className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:p-5">
+            <h2 id="mix-h" className="flex items-center gap-1 text-title font-semibold">
               Allotments by quota and seat category
               <InfoTip label="allotments by quota and seat category">
                 All courses here, from {by}&apos;s allotment results: the latest round, then each year with all its rounds. These count allotments (in R2 and later rounds, only fresh
@@ -508,9 +505,9 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                         <th scope="col" className="w-12 px-1 py-3"><span className="sr-only">Add to choices, compare</span></th>
                         {/* Sticky: scrolled sideways to the fee columns, the course stays in view (the star scrolls under it).
                             Reach and the round's seats sit under the course, so every fee and bond cell fits a 1366px screen. */}
-                        <th scope="col" className={`${thTight} ${stick} z-[3]`}>Course</th>
-                        <th scope="col" className={`${thTight} text-right`}>{latestText(latest)}</th>
-                        <th scope="col" className={`${thTight} text-right`}>{head} deepest</th>
+                        <th scope="col" className={`${tbl.th} ${stick} z-[3]`}>Course</th>
+                        <th scope="col" className={`${tbl.th} text-right`}>{latestText(latest)}</th>
+                        <th scope="col" className={`${tbl.th} text-right`}>{head} deepest</th>
                         {statKeys.map((k) => <th key={k} scope="col" data-col={k} className={`${tbl.th} text-right`}>{statLabel[k]}</th>)}
                       </tr>
                     </thead>
@@ -519,22 +516,27 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                         <tr key={r.id} className={`expand-host ${tbl.row}`}>
                           {/* Without a rank the reach is unknown, so nothing would be saved with the choice: star only with a profile. */}
                           <td className="px-1 py-2"><div className="grid justify-items-center">{profile && <ChoiceStar item={toChoiceItem(r, latest)} />}<CompareToggle id={r.id} label={`${college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} /></div></td>
-                          <th scope="row" className={`${stick} min-w-48 px-3 py-3 text-left align-top font-medium`}>
+                          <th scope="row" className={`${stick} min-w-48 px-3 py-2.5 text-left align-top font-medium`}>
                             <Link href={L.lastRanks(r.course.slug, { inst: slug })} className="hover:text-sky hover:underline">{courseName(r)}</Link>
                             <span className="block text-xs font-normal text-muted-foreground"><QuotaName quota={r.quota} /></span>
                             {profile && <span className="mt-1 block font-normal"><ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} otherGroup={r.otherGroup} from={r.reachFrom} seats={r} /><SeatsBelowNote r={r} latest={latest} /></span>}
                             {round.length > 0 && <span className="mt-1 flex flex-wrap gap-x-3 text-xs font-normal">{seatLinks(r).length ? seatLinks(r) : <span className="text-muted-foreground">No {roundIn(E, round[0].list.year, round[0].list.round)} seats</span>}</span>}
-                            <div className="flex flex-wrap items-center gap-x-3 text-xs font-normal">
-                              <details className="w-fit"><summary className="cursor-pointer py-3 text-sky">Rounds by year</summary></details>
-                              <Link href={L.institute(slug, "allotments", { course: r.course.slug })} className="py-3 text-sky underline hover:text-foreground">Allotments</Link>
+                            {/* 24px tall, each with a 44px hit area (hit): the row stays as tall as its words. */}
+                            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-normal">
+                              <details className="group w-fit">
+                                <summary className="hit inline-flex min-h-6 cursor-pointer list-none items-center gap-1 text-sky hover:text-foreground [&::-webkit-details-marker]:hidden">
+                                  Rounds by year<ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden />
+                                </summary>
+                              </details>
+                              <Link href={L.institute(slug, "allotments", { course: r.course.slug })} className={`${smallLink} text-sky`}>Allotments</Link>
                             </div>
                           </th>
-                          <td className={numTight}>
+                          <td className={tbl.num}>
                             <Closing d={r.latest} year={latest.year} />
                             {/* ReachBadge already carries the marker for the latest round's label. */}
                             <Provisional when={r.latest?.provisional && !(profile && r.reachProvisional)} />
                           </td>
-                          <td className={numTight}><Closing d={r.byYear[HEAD]} year={HEAD} /></td>
+                          <td className={tbl.num}><Closing d={r.byYear[HEAD]} year={HEAD} /></td>
                           <TermStatCells t={r.fees} variant="table" of={`${college.name}, ${courseName(r)}, ${quotaIn(E, r.quota)}`} />
                         </tr>,
                         <tr key={`${r.id}-rounds`} className="expand-row bg-muted/30">
@@ -568,7 +570,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         ) : (
           <section aria-labelledby="seats-h" className="grid grid-cols-1 gap-8">
             <div className="grid gap-2">
-              <h2 id="seats-h" className="flex items-center gap-1 text-lg font-semibold">
+              <h2 id="seats-h" className="flex items-center gap-1 text-h2 font-semibold">
                 {roundName} seat lists here
                 <InfoTip label="seat lists">
                   Every course here, each list as its {by} PDF printed it.{onePosition ? "" : " The kinds of list overlap (most newly added seats are also clear vacancies), so their seats are never added together."}
@@ -585,7 +587,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               const open = n - restricted.reduce((a, [, m]) => a + m, 0);
               return (
                 <section key={list.key} aria-labelledby={`seats-${i}`} className="grid gap-3">
-                  <h3 id={`seats-${i}`} className="flex flex-wrap items-center gap-x-2 text-base font-semibold">
+                  <h3 id={`seats-${i}`} className="flex flex-wrap items-center gap-x-2 text-title font-semibold">
                     {kindName(list.kind, exam)}
                     {rows.length > 0 && (
                       <span className="numeric text-sm font-normal text-muted-foreground">
@@ -709,7 +711,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                 </nav>
               )}
               {fees.map((p, i) => (
-                <div key={p.programme} className="rounded-xl border border-border bg-card p-5">
+                <div key={p.programme} className="rounded-xl border border-border bg-card p-4 sm:p-5">
                   <FeesSection t={p} groups={feeGroups[i]} courses={feeCourses.filter((c) => programmeOfDegree(c.degree, exam) === p.programme)} id={`fees-${programmes[p.programme].slug}`} />
                 </div>
               ))}
@@ -781,7 +783,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               {residentsNote && <p className="text-sm text-muted-foreground">{residentsNote}</p>}
               {residentGroups.map((g) => (
                 <section key={g.course.slug} aria-labelledby={`res-${g.course.slug}`} className="grid gap-2">
-                  <h3 id={`res-${g.course.slug}`} tabIndex={-1} className="flex flex-wrap items-center gap-2 text-base font-semibold">
+                  <h3 id={`res-${g.course.slug}`} tabIndex={-1} className="flex flex-wrap items-center gap-2 text-title font-semibold">
                     {g.course.degree} {g.course.name} <span className="numeric text-sm font-normal text-muted-foreground">{formatRank(g.total)}</span>
                     {profile && g.mine && <Badge tone="info">In your profile</Badge>}
                   </h3>
