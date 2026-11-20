@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { createResetLink } from "./actions";
 
-const button = "inline-flex min-h-9 items-center rounded-md border border-input px-3 text-sm font-semibold";
+const button = "inline-flex min-h-9 items-center rounded-md border border-edge bg-card px-3 text-sm font-semibold shadow-xs hover:border-input hover:bg-muted";
 
 /** "Create reset link": shows the one-time link once (state only, gone on reload) with a Copy button, to send to her. */
 export function ResetLink({ userId, email }: { userId: string; email: string }) {
@@ -14,7 +14,7 @@ export function ResetLink({ userId, email }: { userId: string; email: string }) 
     return (
       <span className="mt-2 grid gap-1 text-xs">
         <span className="flex flex-wrap items-center gap-2">
-          <input readOnly value={r.link} aria-label={`Reset link for ${email}`} onFocus={(e) => e.currentTarget.select()} className="h-9 w-64 rounded-md border border-input bg-background px-2 font-mono text-xs" />
+          <input readOnly value={r.link} aria-label={`Reset link for ${email}`} onFocus={(e) => e.currentTarget.select()} className="h-9 w-64 rounded-md border border-input bg-card px-2 font-mono text-xs" />
           <button type="button" className={button} onClick={() => navigator.clipboard.writeText(r.link).then(() => setCopied(true), () => setCopied(false))}>{copied ? "Copied" : "Copy"}</button>
         </span>
         <span role="status" className="text-muted-foreground">

@@ -19,7 +19,7 @@ export function UpiForm({ upi }: { upi: string | null }) {
     >
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor="upi-id" className="sr-only">UPI ID</label>
-        <input id="upi-id" name="upi" required maxLength={100} defaultValue={upi ?? ""} placeholder="name@bank" autoComplete="off" spellCheck={false} className="h-11 w-64 max-w-full rounded-md border border-input bg-background px-3 text-sm" />
+        <input id="upi-id" name="upi" required maxLength={100} defaultValue={upi ?? ""} placeholder="name@bank" autoComplete="off" spellCheck={false} className="h-11 w-64 max-w-full rounded-md border border-input bg-card px-3 text-sm placeholder:text-muted-foreground hover:border-foreground/60 focus:border-sky" />
         <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save"}</Button>
       </div>
       <p role="status" className="text-sm">{message}</p>

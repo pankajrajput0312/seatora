@@ -44,27 +44,27 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
 
       <section id="report" aria-labelledby="report-h" className="grid max-w-2xl scroll-mt-24 gap-3 rounded-xl border border-border bg-card p-4 sm:p-6">
         <div>
-          <h2 id="report-h" className="text-lg font-semibold">Report wrong data</h2>
+          <h2 id="report-h" className="text-title font-semibold">Report wrong data</h2>
           <p className="text-sm text-muted-foreground">A fee, bond, seat, closing rank or name that doesn&apos;t match the official document: name the college and what&apos;s wrong. We check it against the source and fix it.</p>
         </div>
         <RequestForm email={user?.email} page={PATH} kinds={["data"]} message={f.about ? `${f.about}: ` : ""} />
       </section>
 
       <section aria-labelledby="feature-h" className="grid max-w-2xl gap-3 rounded-xl border border-border bg-card p-4 sm:p-6">
-        <h2 id="feature-h" className="text-lg font-semibold">Request a feature</h2>
+        <h2 id="feature-h" className="text-title font-semibold">Request a feature</h2>
         <RequestForm email={user?.email} page={PATH} kinds={["feature", "customization", "other"]} />
       </section>
 
       {(siteConfig.contactEmail || whatsapp) && (
         <section aria-labelledby="contact-h" className="grid max-w-2xl gap-1 text-sm">
-          <h2 id="contact-h" className="text-lg font-semibold">Contact us</h2>
+          <h2 id="contact-h" className="text-h2 font-semibold">Contact us</h2>
           {siteConfig.contactEmail && <p>Email: <a href={`mailto:${siteConfig.contactEmail}`} className="break-all text-sky underline">{siteConfig.contactEmail}</a></p>}
           {whatsapp && <p>WhatsApp: <a href={`https://wa.me/${whatsapp.replace("+", "")}`} target="_blank" rel="noopener noreferrer" className="numeric text-sky underline">{whatsapp}</a></p>}
         </section>
       )}
 
       <section aria-labelledby="mine-h" className="grid max-w-2xl grid-cols-1 gap-3">
-        <h2 id="mine-h" className="text-lg font-semibold">Your requests</h2>
+        <h2 id="mine-h" className="text-h2 font-semibold">Your requests</h2>
         {mine.length === 0 ? (
           <p className="text-sm text-muted-foreground">None yet. Requests you send appear here with their status.</p>
         ) : (
@@ -84,7 +84,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
 
       {all && (
         <section aria-labelledby="all-h" className="grid grid-cols-1 gap-3">
-          <h2 id="all-h" tabIndex={-1} className="text-lg font-semibold">All requests</h2>
+          <h2 id="all-h" tabIndex={-1} className="text-h2 font-semibold">All requests</h2>
           <FilterBar action={PATH} params={params} cols="md:grid-cols-[1fr_1fr_auto]">
             <Field label="Status"><Select name="status" value={f.status} all="Any status" options={REQUEST_STATUSES.map((s) => ({ value: s, label: statusLabel[s] }))} /></Field>
             <Field label="Kind"><Select name="kind" value={f.kind} all="Any kind" options={REQUEST_KINDS.map((k) => ({ value: k, label: requestKindLabel[k] }))} /></Field>
