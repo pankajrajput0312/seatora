@@ -112,7 +112,7 @@ export function Markdown({ text, codeAction }: { text: string; codeAction?: (b: 
         const k = `b${n}`;
         switch (b.kind) {
           case "h":
-            return <p key={k} className={b.level <= 2 ? "mt-2 text-lg leading-snug font-bold tracking-tight" : b.level === 3 ? "mt-1 font-semibold" : "text-sm font-semibold text-muted-foreground"}>{inline(b.text, k)}</p>;
+            return <p key={k} className={b.level <= 2 ? "mt-2 text-title font-semibold" : b.level === 3 ? "mt-1 font-semibold" : "text-sm font-semibold text-muted-foreground"}>{inline(b.text, k)}</p>;
           case "p":
             return <p key={k} className="whitespace-pre-line">{inline(b.text, k)}</p>;
           case "ul":
@@ -126,14 +126,14 @@ export function Markdown({ text, codeAction }: { text: string; codeAction?: (b: 
           }
           case "table":
             return (
-              <div key={k} tabIndex={0} role="region" aria-label="Table, scrolls sideways" className="max-w-full overflow-x-auto overflow-y-hidden rounded-lg border border-border bg-card">
+              <div key={k} tabIndex={0} role="region" aria-label="Table, scrolls sideways" className="max-w-full overflow-x-auto overflow-y-hidden rounded-xl border border-border bg-card">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-muted text-xs text-muted-foreground">
+                  <thead className="border-b border-edge text-xs text-muted-foreground">
                     <tr>{b.head.map((c, j) => <th key={j} scope="col" className="px-3 py-2 font-semibold whitespace-nowrap">{inline(c, `${k}-h${j}`)}</th>)}</tr>
                   </thead>
                   <tbody>
                     {b.rows.map((r, j) => (
-                      <tr key={j} className="border-t border-border align-top even:bg-muted/50">
+                      <tr key={j} className="border-t border-border align-top first:border-t-0">
                         {r.map((c, x) => <td key={x} className={`numeric px-3 py-2 ${c.length > 14 ? "min-w-[10rem]" : "whitespace-nowrap"}`}>{inline(c, `${k}-${j}-${x}`)}</td>)}
                       </tr>
                     ))}

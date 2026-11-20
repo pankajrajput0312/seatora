@@ -66,7 +66,7 @@ export function AuthForm({ mode, next, open = false, refCode }: { mode: Mode; ne
         autoComplete: isSignUp ? "new-password" : "current-password",
         placeholder: isSignUp ? "At least 8 characters" : undefined,
       })}
-      {!isSignUp && <Link href="/forgot" className="-mt-2 inline-flex min-h-11 items-center justify-self-end text-sm text-muted-foreground underline hover:text-sky">Forgot password?</Link>}
+      {!isSignUp && <Link href="/forgot" className="-mt-2 inline-flex min-h-11 items-center justify-self-end text-sm text-sky underline">Forgot password?</Link>}
       {isSignUp && !open && field("invite", "Invite code", { autoComplete: "off", spellCheck: false })}
       {state?.error && <p role="alert" className="rounded-md border border-ember/30 bg-ember/10 px-3 py-2 text-sm text-ember">{state.error}</p>}
       <Button type="submit" size="lg" aria-disabled={pending || undefined} className="mt-2 aria-disabled:opacity-50">
@@ -77,7 +77,7 @@ export function AuthForm({ mode, next, open = false, refCode }: { mode: Mode; ne
         {isSignUp ? "Already have an account? " : open ? "New here? " : "Invited, and new here? "}
         <Link
           href={{ pathname: isSignUp ? "/login" : "/signup", query: next ? { next } : undefined }}
-          className="text-foreground underline hover:text-sky"
+          className="font-medium text-sky underline"
         >
           {isSignUp ? "Sign in" : "Create your account"}
         </Link>

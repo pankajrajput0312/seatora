@@ -46,7 +46,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
       {/* Staff have no limits: the plans' limits ("200 residents searches a day") would contradict it. */}
       {!eff?.staff && (
         <section data-placement="plan_page" aria-labelledby="plans-h" className="grid gap-3">
-          <h2 id="plans-h" className="text-lg font-semibold">Plans</h2>
+          <h2 id="plans-h" className="text-h2 font-semibold">Plans</h2>
           <PlanCards coupon={coupon} />
         </section>
       )}

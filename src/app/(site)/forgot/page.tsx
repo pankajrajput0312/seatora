@@ -5,7 +5,7 @@ import { AuthShell } from "@/features/auth/components/auth-shell";
 
 export const metadata: Metadata = { title: "Forgot password", robots: { index: false } };
 
-const link = "text-foreground underline hover:text-sky";
+const link = "text-sky underline";
 
 /**
  * There is no email provider: she writes from her account's email (or WhatsApp, NEXT_PUBLIC_CONTACT_WHATSAPP when set),

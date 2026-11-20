@@ -8,6 +8,7 @@ import { getReport } from "@/features/ask/reports";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { AppPage } from "@/features/decide/components/app-page";
 import { HISTORY_CAPTION } from "@/features/decide/components/bits";
+import { tbl } from "@/features/decide/components/ui";
 import { fmtDay } from "@/features/decide/lib/format";
 
 // A plan report Ask Seatora saved (create_report): only its own account (the owner) can open it. A snapshot of the
@@ -18,8 +19,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: "Ask Seatora report", robots: { index: false, follow: false } };
 }
 
-const th = "px-2 py-1.5 text-left font-semibold";
-const td = "px-2 py-1.5 align-top";
+// The app's table classes (on paper globals.css tightens every cell).
+const { th, td } = tbl;
 
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await askUser();
@@ -33,8 +34,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       <header className="grid gap-2 border-b border-border pb-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="text-xs tracking-wide text-muted-foreground uppercase">Ask Seatora report</p>
-            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{report.title}</h1>
+            <p className="text-caption text-muted-foreground">Ask Seatora report</p>
+            <h1 className="text-h1 font-semibold">{report.title}</h1>
           </div>
           <PrintButton />
         </div>
@@ -45,21 +46,21 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       </header>
 
       <section aria-labelledby="sum-h" className="grid gap-2">
-        <h2 id="sum-h" className="text-lg font-semibold">Where you stand this round</h2>
+        <h2 id="sum-h" className="text-h2 font-semibold">Where you stand this round</h2>
         <Markdown text={c.summary} />
       </section>
 
       <section aria-labelledby="list-h" className="grid gap-2">
-        <h2 id="list-h" className="text-lg font-semibold">Choice list, in order</h2>
+        <h2 id="list-h" className="text-h2 font-semibold">Choice list, in order</h2>
         {c.choices.length ? (
-          <div className="overflow-x-auto overflow-y-hidden rounded-lg border border-border">
+          <div className={tbl.wrap}>
             <table className="w-full text-sm">
-              <thead className="bg-muted">
+              <thead className={tbl.headRow}>
                 <tr><th scope="col" className={th}>No.</th><th scope="col" className={th}>College</th><th scope="col" className={th}>Course</th><th scope="col" className={th}>Quota</th><th scope="col" className={th}>Latest closing</th><th scope="col" className={th}>Reach (history)</th><th scope="col" className={th}>Why</th></tr>
               </thead>
               <tbody>
                 {c.choices.map((x, i) => (
-                  <tr key={i} className="border-t border-border">
+                  <tr key={i} className={tbl.row}>
                     <td className={`${td} numeric`}>{i + 1}</td>
                     <td className={td}><Link href={`/decide/institutes/${x.slug}`} className="text-sky underline-offset-2 hover:underline">{x.college}</Link>{x.state && <span className="text-muted-foreground">, {x.state}</span>}</td>
                     <td className={td}>{x.course}</td>
@@ -80,15 +81,15 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
       {top.length > 0 && (
         <section aria-labelledby="money-h" className="grid gap-2 break-inside-avoid">
-          <h2 id="money-h" className="text-lg font-semibold">Fee, stipend and bond: top {top.length}</h2>
-          <div className="overflow-x-auto overflow-y-hidden rounded-lg border border-border">
+          <h2 id="money-h" className="text-h2 font-semibold">Fee, stipend and bond: top {top.length}</h2>
+          <div className={tbl.wrap}>
             <table className="w-full text-sm">
-              <thead className="bg-muted">
+              <thead className={tbl.headRow}>
                 <tr><th scope="col" className={th}>No.</th><th scope="col" className={th}>College · course</th><th scope="col" className={th}>Fee</th><th scope="col" className={th}>Stipend</th><th scope="col" className={th}>Bond period</th><th scope="col" className={th}>Bond penalty</th><th scope="col" className={th}>Leaving penalty</th></tr>
               </thead>
               <tbody>
                 {top.map((x, i) => (
-                  <tr key={i} className="border-t border-border">
+                  <tr key={i} className={tbl.row}>
                     <td className={`${td} numeric`}>{i + 1}</td>
                     <td className={td}>{x.college} · {x.course} · {x.quota}</td>
                     <td className={`${td} numeric`}>{x.fee}</td>
@@ -107,7 +108,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
       {c.residents.length > 0 && (
         <section aria-labelledby="res-h" className="grid gap-2 break-inside-avoid">
-          <h2 id="res-h" className="text-lg font-semibold">Residents at your top choices</h2>
+          <h2 id="res-h" className="text-h2 font-semibold">Residents at your top choices</h2>
           <ul className="grid gap-1 text-sm">
             {c.residents.map((r) => (
               <li key={r.slug}>
@@ -121,13 +122,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
       {c.risks.length > 0 && (
         <section aria-labelledby="risk-h" className="grid gap-2 break-inside-avoid">
-          <h2 id="risk-h" className="text-lg font-semibold">Risks and what to watch</h2>
+          <h2 id="risk-h" className="text-h2 font-semibold">Risks and what to watch</h2>
           <ul className="grid list-disc gap-1 pl-5 text-sm">{c.risks.map((r, i) => <li key={i}><Markdown text={r} /></li>)}</ul>
         </section>
       )}
 
       <section aria-labelledby="src-h" className="grid gap-2 break-inside-avoid">
-        <h2 id="src-h" className="text-lg font-semibold">Sources</h2>
+        <h2 id="src-h" className="text-h2 font-semibold">Sources</h2>
         <ol className="grid list-decimal gap-0.5 pl-5 text-xs">
           {c.sources.map((s, i) => (
             <li key={i}>{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-sky underline-offset-2 hover:underline">{s.name}</a> : s.name}</li>

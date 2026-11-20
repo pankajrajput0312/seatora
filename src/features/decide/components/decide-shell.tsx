@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, CalendarDays, GitCompareArrows, House, IndianRupee, LayoutGrid, ListOrdered, ScanSearch, SlidersHorizontal, Table2, TrendingUp, Users } from "lucide-react";
 import { Calculator } from "lucide-react";
-import { Award, CircleArrowUp, Gift, Globe, LogOut, Menu, MessageCircle, Pencil, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Award, ChevronDown, CircleArrowUp, Gift, Globe, LogOut, Menu, MessageCircle, Pencil, ShieldCheck, Sparkles, X } from "lucide-react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { SideNav, SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
@@ -328,9 +328,16 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
               // sooner), then shrink (globals.css): never over the logo.
               <span data-topbar-end className="flex min-w-0 items-center gap-2.5">
                 {choices && (
-                  <select aria-label="Exam" value={ex} onChange={(e) => pickExam(e.target.value as ExamKey)} className="hit h-8 rounded-md border border-edge bg-card px-2 text-xs font-semibold shadow-xs hover:border-input">
-                    {choices.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-                  </select>
+                  // A chip the size of the plan chip beside it. Phones keep every select's font at 16px (iOS zooms into a
+                  // smaller one: globals.css), which drew this one oversized, so the native select sits invisible over the
+                  // 12px words (its 44px hit area too): it still opens the system's picker and keeps its name.
+                  <span className="relative inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-edge bg-card pr-1.5 pl-2 text-xs font-semibold whitespace-nowrap shadow-xs hover:border-input has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-ring">
+                    <span aria-hidden>{choices.find((c) => c.key === ex)?.label ?? E.label}</span>
+                    <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
+                    <select aria-label="Exam" value={ex} onChange={(e) => pickExam(e.target.value as ExamKey)} className="absolute inset-x-0 top-1/2 h-11 w-full -translate-y-1/2 cursor-pointer opacity-0">
+                      {choices.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                    </select>
+                  </span>
                 )}
                 {account && (
                   <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className={cn("hit inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-edge bg-card px-2.5 text-xs whitespace-nowrap hover:border-input", !account.upgrade && "@max-[25rem]/topbar:hidden")}>
@@ -435,9 +442,10 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
       </p>
 
       <BackToTop />
-      {/* Phones: the Compare tray, a one-line pill above the bottom bar's left end (Top sits at its right end). */}
+      {/* Phones: the Compare tray, a one-line pill above the bottom bar's left end (Top sits at its right end). Hidden
+          while a View menu is open, so it never covers the menu's last choices. */}
       {compare.length > 0 && !isCurrent("/decide/compare") && (
-        <Link href={L.compare(compare)} data-compare-pill className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.75rem)] left-3 z-30 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-sm font-semibold whitespace-nowrap shadow-overlay md:hidden print:hidden">
+        <Link href={L.compare(compare)} data-compare-pill className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.75rem)] left-3 z-30 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-sm font-semibold whitespace-nowrap shadow-overlay md:hidden print:hidden [.app:has(details[data-view-menu][open])_&]:hidden">
           <GitCompareArrows className="size-4" aria-hidden />Compare <span className="numeric">{compare.length}/{MAX_COMPARE}</span><span className="sr-only"> selected</span>
         </Link>
       )}
