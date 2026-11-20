@@ -328,15 +328,15 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
               // sooner), then shrink (globals.css): never over the logo.
               <span data-topbar-end className="flex min-w-0 items-center gap-2.5">
                 {choices && (
-                  <select aria-label="Exam" value={ex} onChange={(e) => pickExam(e.target.value as ExamKey)} className="hit h-8 rounded-full border border-input bg-card px-2.5 text-xs font-semibold">
+                  <select aria-label="Exam" value={ex} onChange={(e) => pickExam(e.target.value as ExamKey)} className="hit h-8 rounded-md border border-edge bg-card px-2 text-xs font-semibold shadow-xs hover:border-input">
                     {choices.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
                   </select>
                 )}
                 {account && (
-                  <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className={cn("hit inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-input px-2.5 text-xs whitespace-nowrap", !account.upgrade && "@max-[25rem]/topbar:hidden")}>
+                  <Link href={L.to("/decide/plan")} title={account.plan} data-upgrade={account.upgrade ? "header_chip" : undefined} className={cn("hit inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-edge bg-card px-2.5 text-xs whitespace-nowrap hover:border-input", !account.upgrade && "@max-[25rem]/topbar:hidden")}>
                     <span className="sr-only">Your plan: </span>
                     <span className={cn("truncate font-semibold", account.upgrade && "@max-[25rem]/topbar:hidden")}>{account.upgrade ? "Free" : account.plan.split(" · ")[0]}</span>
-                    {account.upgrade && <span className="-mr-1.5 rounded-full bg-[#5ccfe6] px-2 py-0.5 font-semibold text-[#0b0e12]">Upgrade</span>}
+                    {account.upgrade && <span className="-mr-1.5 rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-foreground">Upgrade</span>}
                   </Link>
                 )}
                 {/* Compare tray: in the sticky header (phones: a pill above the bottom bar; scroll-padding keeps focus clear of it). */}
@@ -352,9 +352,9 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
                 )}
                 {/* Phones: the rank and its edit button as one chip here (the sidebar, with its rank card, is in the drawer). */}
                 <button type="button" data-profile-edit aria-label={shown ? `${E.rankWord} ${formatRank(shown.rank)} ${profileSub(E, shown)}: edit your rank and preferences` : "Set your rank"} onClick={() => setEditing(trying ? "try" : "edit")}
-                  className="hit inline-flex h-8 min-w-0 items-center gap-1 rounded-full border border-input px-2.5 text-xs whitespace-nowrap md:hidden">
+                  className="hit inline-flex h-8 min-w-0 items-center gap-1 rounded-full border border-wash-line bg-wash px-2.5 text-xs whitespace-nowrap md:hidden">
                   {shown ? <><span className="numeric shrink-0 font-semibold"><span className="@max-[23.75rem]/topbar:hidden">{`${E.rankWord} `}</span><span className="@max-[21.25rem]/topbar:hidden">{formatRank(shown.rank)}</span><span className="hidden @max-[21.25rem]/topbar:inline">{compactRank(shown.rank)}</span></span><span className="truncate text-muted-foreground @max-[25rem]/topbar:hidden">{E.perGroup ? `· ${profileSub(E, shown)}` : <>· {categoryName(shown.category)}{shown.pwd ? " PwD" : ""}</>}</span></> : <span className="truncate">{hydrated ? <>Set <span className="@max-[23.75rem]/topbar:hidden">your </span>rank</> : "Loading…"}</span>}
-                  <Pencil className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+                  <Pencil className="size-3 shrink-0 text-sky" aria-hidden />
                 </button>
                 <Link href="/" className="hidden min-h-11 items-center px-2 text-sm text-muted-foreground hover:text-foreground md:inline-flex">Back to site</Link>
               </span>
@@ -366,11 +366,11 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
             aria-label="Decide"
             footer={<AccountFooter account={account} href={L.to("/decide/plan")} current={pathname === "/decide/plan"} />}
             header={
-              <div className="rounded-lg border border-border bg-card p-3">
-                <p className="text-xs text-muted-foreground">{ex === DEFAULT_EXAM ? "Your rank" : `Your ${E.label} rank`}</p>
+              <div className="rounded-xl border border-border bg-card p-3">
+                <p className="text-xs font-medium text-muted-foreground">{ex === DEFAULT_EXAM ? "Your rank" : `Your ${E.label} rank`}</p>
                 {shown ? (
                   <>
-                    <p className="mt-0.5 text-2xl font-bold tracking-tight">{formatRank(shown.rank)}</p>
+                    <p className="mt-0.5 text-figure font-semibold">{formatRank(shown.rank)}</p>
                     <p className="text-xs text-muted-foreground">
                       {E.perGroup ? profileSub(E, shown) : <>{shown.category}{shown.pwd ? " PwD" : ""}</>}, {shown.pairs?.length ? `${shown.pairs.length} ${shown.pairs.length === 1 ? "course" : "courses"}` : shown.specialties.length ? `${shown.specialties.length} ${shown.specialties.length === 1 ? "specialty" : "specialties"}` : "all specialties"}
                     </p>
@@ -378,7 +378,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
                 ) : (
                   <p className="mt-0.5 text-sm">{hydrated ? "Not set yet" : "Loading…"}</p>
                 )}
-                <Button data-profile-edit variant="secondary" className="mt-2 w-full" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(trying ? "try" : "edit")}>{shown ? "Edit" : "Set your rank"}</Button>
+                <Button data-profile-edit variant="secondary" className="mt-2.5 w-full" aria-label={shown ? "Edit your rank and preferences" : "Set your rank"} onClick={() => setEditing(trying ? "try" : "edit")}>{shown ? "Edit" : "Set your rank"}</Button>
                 <Link href="/" className="mt-1 inline-flex min-h-10 items-center text-sm text-muted-foreground hover:text-foreground md:hidden">Back to site</Link>
               </div>
             }
@@ -386,7 +386,7 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
             {nav.map((sec) => (
               <SideNavSection key={sec.title} title={sec.title}>
                 {sec.items.map(({ href, label, icon }) => (
-                  <SideNavItem key={href} label={label} icon={icon} href={href === RESULT_ITEM ? resultHref! : href.startsWith("/decide") ? navHref(href) : href} isSelected={href === RESULT_ITEM ? onResult : isCurrent(href) && !(onResult && href === "/decide/allotments")} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className={newBadge}>New</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-full bg-sky px-1.5 text-xs font-bold text-white">BETA</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-full bg-foreground px-1.5 text-xs font-bold text-background">20%</span> })} {...(href === "/" && { className: "md:hidden" })} />
+                  <SideNavItem key={href} label={label} icon={icon} href={href === RESULT_ITEM ? resultHref! : href.startsWith("/decide") ? navHref(href) : href} isSelected={href === RESULT_ITEM ? onResult : isCurrent(href) && !(onResult && href === "/decide/allotments")} {...(href === "/decide/residents" && { "data-accent": "residents", endContent: <span className={newBadge}>New</span> })} {...(href === "/decide/ask" && { endContent: <span className="rounded-sm bg-wash px-1.5 text-xs leading-5 font-semibold text-sky">Beta</span> })} {...(href === "/decide/refer" && { endContent: <span className="rounded-sm bg-muted px-1.5 text-xs leading-5 font-semibold text-foreground">20%</span> })} {...(href === "/" && { className: "md:hidden" })} />
                 ))}
               </SideNavSection>
             ))}
@@ -441,18 +441,18 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
           <GitCompareArrows className="size-4" aria-hidden />Compare <span className="numeric">{compare.length}/{MAX_COMPARE}</span><span className="sr-only"> selected</span>
         </Link>
       )}
-      <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
+      <nav data-bottom-bar aria-label="Decide shortcuts" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {bottom.filter(shows).map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={navHref(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", href === "/decide/residents" ? cn("font-semibold text-residents", isCurrent(href) ? "border-residents" : "border-transparent") : isCurrent(href) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
+          <Link key={href} href={navHref(href)} aria-current={isCurrent(href) ? "page" : undefined} className={cn("-mt-px flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", href === "/decide/residents" ? cn("font-semibold text-residents", isCurrent(href) ? "border-sky bg-wash" : "border-transparent") : isCurrent(href) ? "border-sky bg-wash font-semibold text-foreground" : "border-transparent text-muted-foreground")}>
             <span className="relative">
               <Icon className="size-[1.25rem]" strokeWidth={1.75} aria-hidden />
-              {href === "/decide/residents" && <span className={cn(newBadge, "absolute -top-2 left-1/2 ml-2.5 bg-background")}>New</span>}
+              {href === "/decide/residents" && <span className={cn(newBadge, "absolute -top-2 left-1/2 ml-2.5 bg-card")}>New</span>}
             </span>
             <span className="numeric">{label}</span>
           </Link>
         ))}
         {/* More: the menu, marked current on any page that isn't one of the tabs. */}
-        <button type="button" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen} className={cn("flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", bottom.some(({ href }) => isCurrent(href)) ? "border-transparent text-muted-foreground" : "border-foreground font-semibold text-foreground")}>
+        <button type="button" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen} className={cn("-mt-px flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 border-t-2 text-xs", bottom.some(({ href }) => isCurrent(href)) ? "border-transparent text-muted-foreground" : "border-sky bg-wash font-semibold text-foreground")}>
           <Menu className="size-[1.25rem]" strokeWidth={1.75} aria-hidden />
           <span>More</span>
         </button>
@@ -485,7 +485,8 @@ const newBadge = "rounded-full border border-current px-1.5 text-xs leading-4 fo
 
 export type ShellAccount = { name: string; plan: string; upgrade: boolean; freeTill: string | null };
 
-const cyan = "flex min-h-11 flex-col items-center justify-center rounded-md bg-[#5ccfe6] px-3 py-1 text-[#0b0e12] hover:bg-[#7fdcef]";
+/** The footer's one call to action: a primary button (the accent). */
+const cta = "flex min-h-11 flex-col items-center justify-center rounded-md bg-primary px-3 py-1 text-primary-foreground shadow-xs hover:bg-primary/90";
 
 /**
  * The sidebar's (and the phone menu's) bottom: her initial, name and plan line, both to /decide/plan, Log out beside them, and above it a cyan
@@ -496,21 +497,21 @@ function AccountFooter({ account, href, current }: { account: ShellAccount | nul
   if (!account)
     return (
       <div data-nav-footer className="grid gap-2 border-t border-border pt-2">
-        <Link href="/signup?next=%2Fdecide" className={cn(cyan, "text-sm font-bold")}>Create free account</Link>
-        <Link href="/login?next=%2Fdecide" className="inline-flex min-h-11 items-center justify-center rounded-md border border-input text-sm font-semibold">Sign in</Link>
+        <Link href="/signup?next=%2Fdecide" className={cn(cta, "text-sm font-semibold")}>Create free account</Link>
+        <Link href="/login?next=%2Fdecide" className="inline-flex min-h-11 items-center justify-center rounded-md border border-edge bg-card text-sm font-semibold shadow-xs hover:border-input hover:bg-muted">Sign in</Link>
       </div>
     );
   return (
     <div data-nav-footer className="grid gap-1.5 border-t border-border pt-2">
       {account.upgrade && (
-        <Link href={href} data-upgrade="sidebar_footer" className={cyan}>
-          <span className="flex items-center gap-1.5 text-sm font-bold"><CircleArrowUp className="size-4" aria-hidden />Upgrade</span>
-          {account.freeTill && <span className="text-xs font-semibold">Free till {account.freeTill}</span>}
+        <Link href={href} data-upgrade="sidebar_footer" className={cta}>
+          <span className="flex items-center gap-1.5 text-sm font-semibold"><CircleArrowUp className="size-4" aria-hidden />Upgrade</span>
+          {account.freeTill && <span className="text-xs font-medium">Free till {account.freeTill}</span>}
         </Link>
       )}
       <div className="flex min-w-0 items-center gap-1">
         <Link href={href} aria-current={current ? "page" : undefined} className={cn("flex min-h-12 max-md:min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 hover:bg-muted", current && "bg-muted")}>
-          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-[#0b0e12] text-sm font-bold text-[#5ccfe6]">{account.name[0]?.toUpperCase()}</span>
+          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full border border-wash-line bg-wash text-sm font-semibold text-sky">{account.name[0]?.toUpperCase()}</span>
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold">{account.name}</span>
             <span className="block truncate text-xs text-muted-foreground">{account.plan}</span>
