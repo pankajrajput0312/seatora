@@ -13,7 +13,8 @@ export type SortChoice = { value: string; label: string; short?: string; href: s
 
 /**
  * The toolbar's "Sort: <current> ▾", beside View: a native <select> (labelled "Sort", the keyboard's and the screen
- * reader's own control) over the words she sees, so the current sort is always on the page. Picking one loads its
+ * reader's own control) over the words she sees, so the current sort is always on the page (phones: the icon and its
+ * short word; md: "Sort:" and the short word; lg up the whole choice, its full words in the tooltip when cut). Picking one loads its
  * `href` (the sort lives in the address: Back, a shared link, the CSV); the new order is announced ("Sorted by …").
  * With the keyboard (arrows change a closed select at once on some systems) it waits until she stops. Inside a filter
  * form, the address's `sort` and `dir` ride along as hidden fields, so Apply keeps the order. `value`: the current
@@ -55,15 +56,16 @@ export function SortMenu({ choices, value, className }: { choices: SortChoice[];
       {(["sort", "dir"] as const).map((k) => sp.get(k) && <input key={k} type="hidden" name={k} value={sp.get(k)!} />)}
       <ArrowUpDown className="size-4 shrink-0" aria-hidden />
       <span aria-hidden className="max-md:hidden">Sort:</span>
-      <span aria-hidden className="min-w-0 truncate font-normal text-muted-foreground md:max-w-64">
-        <span className="md:hidden">{shown.short ?? shown.label}</span>
-        <span className="max-md:hidden">{shown.label}</span>
+      <span aria-hidden className="min-w-0 truncate font-normal text-muted-foreground lg:max-w-56">
+        <span className="lg:hidden">{shown.short ?? shown.label}</span>
+        <span className="max-lg:hidden">{shown.label}</span>
       </span>
       <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       <label htmlFor={id} className="sr-only">Sort</label>
       <select
         id={id}
         value={shown.value}
+        title={shown.label}
         onKeyDown={() => (keyed.current = true)}
         onPointerDown={() => (keyed.current = false)}
         onChange={(e) => {

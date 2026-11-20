@@ -42,7 +42,7 @@ type Sort = (typeof sorts)[number];
 /** The toolbar's Sort (`last`: the allotments' year; `round`: the competitive sort's, e.g. "2026 R2"); `short`: a phone's. */
 const sortWords = (last: string, round: string): Record<Sort, { label: string; short: string }> => ({
   name: { label: "Name", short: "Name" },
-  competitive: { label: `Most competitive first (${round} Open last rank)`, short: "Competitive" },
+  competitive: { label: `Most competitive (${round} Open)`, short: "Competitive" },
   courses: { label: "Most courses first", short: "Courses" },
   allotments: { label: `Most allotments (${last})`, short: "Allotments" },
   fee: { label: "Fee a year: lowest first (its cheapest course)", short: "Fee" },
