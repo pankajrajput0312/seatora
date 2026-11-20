@@ -36,7 +36,7 @@ export function PageHead({ title, children, about, more, note }: { title: string
   const tip = children && about ? <>{children} {about}</> : (children ?? about);
   return (
     <div className="flex flex-wrap items-center gap-x-2">
-      <h1 id="main-h1" tabIndex={-1} className="text-2xl font-bold tracking-tight md:text-3xl">{title}</h1>
+      <h1 id="main-h1" tabIndex={-1} className="text-h1 font-semibold">{title}</h1>
       {tip && <InfoTip label={title} more={more}>{tip}</InfoTip>}
       {note && <p className="text-sm text-muted-foreground">{note}</p>}
     </div>
@@ -48,7 +48,7 @@ export function PageHead({ title, children, about, more, note }: { title: string
  * required: a missing closing passes undefined, which must mean "no badge", never a default of true.
  */
 export function Provisional({ when }: { when: boolean | null | undefined }) {
-  return when ? <Badge tone="warning">Provisional</Badge> : null;
+  return when ? <Badge tone="provisional">Provisional</Badge> : null;
 }
 
 /**
@@ -59,11 +59,11 @@ export function Provisional({ when }: { when: boolean | null | undefined }) {
 /** `seats`: the option's reach per category and the newest lists' seats (OptionRow), so a reach on categories those lists have no seats of says so (lib/reach.ts reachedElsewhere). */
 export function ReachBadge({ reach, provisional, latest, includeLatest = true, on, otherGroup, from, seats }: { reach: Reach; provisional?: boolean; latest: Latest; includeLatest?: boolean; on?: string; otherGroup?: boolean; from?: OptionRow["reachFrom"]; seats?: Parameters<typeof reachedElsewhere>[1] }) {
   // NEET SS: her rank isn't compared with another question group's seats (OptionRow.otherGroup).
-  if (otherGroup) return <Badge tone="neutral" className="text-muted-foreground">Another question group</Badge>;
+  if (otherGroup) return <Badge tone="closed">Another question group</Badge>;
   const elsewhere = seats && reachedElsewhere(reach, seats, latest.exam);
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <Badge tone={elsewhere ? "warning" : reachTone[reach]} className={reach === "closed-before" ? "text-muted-foreground" : undefined}>
+      <Badge tone={elsewhere ? "within" : reachTone[reach]}>
         {reach === "reached-both" && <History className="mr-1 size-3" aria-hidden />}
         {reachLabel(reach, latest, pastOf(latest), includeLatest, on)}{elsewhere && ` ${elsewhere.on}`}
       </Badge>
@@ -81,7 +81,7 @@ export function ReachBadge({ reach, provisional, latest, includeLatest = true, o
 function ReachedFrom({ from, reach }: { from: NonNullable<OptionRow["reachFrom"]>; reach: Reach }) {
   const year = reach !== "reached-latest" && <span className="numeric"><YearName year={from.year} />: </span>;
   if (from.round === "R1") return <span className="block w-full text-xs text-muted-foreground">{reach === "reached-one" && year}In Round 1</span>;
-  return <span className="block w-full text-xs text-sun">{year}Only in a later round (<RoundName year={from.year} round={from.round} />)</span>;
+  return <span className="block w-full text-xs text-reach-later">{year}Only in a later round (<RoundName year={from.year} round={from.round} />)</span>;
 }
 
 /** A deepest closing rank with its round (named as that `year`'s PDFs call it, when given) and seat category; "—" (with sr-only text) when missing. */
@@ -89,7 +89,7 @@ export function Closing({ d, year }: { d: Deepest | null | undefined; year?: num
   if (!d) return <Dash />;
   return (
     <span className="numeric">
-      <span className="text-[15px] font-semibold">{formatRank(d.closing)}</span>
+      <span className="text-[0.9375rem] font-semibold">{formatRank(d.closing)}</span>
       <span className="block text-xs font-normal text-muted-foreground">{year == null ? <RoundShort round={d.round} /> : <RoundName year={year} round={d.round} />}, {d.category} seat</span>
     </span>
   );

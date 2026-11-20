@@ -357,7 +357,7 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
   return (
     // No Portal: rendered inside .app (DecideShell), so the dialog uses the case-sheet tokens, not the dark site's.
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
+      <Dialog.Overlay className="fixed inset-0 z-50 bg-foreground/40" />
       <Dialog.Content
         // First run: focus lands on the rank field. Editing: on the sheet itself, so a phone's keyboard doesn't cover
         // it before she picks what to change. On close the shell puts focus on the visible Edit / Set your rank button.
@@ -368,10 +368,10 @@ export function ProfileDialog({ open, onOpenChange, profile, meta, onSave, onTry
         }}
         // First run: a stray tap outside would throw the steps away; Escape and Close still leave.
         onInteractOutside={(e) => setup && e.preventDefault()}
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-xl border border-border bg-popover p-6 pb-0 shadow-overlay outline-none md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-2xl border border-border bg-popover p-6 pb-0 shadow-overlay outline-none md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Dialog.Title className="text-xl font-semibold">{trial ? `Try ${exam === DEFAULT_EXAM ? "a" : `${/^[AEIOU]/.test(E.label) ? "an" : "a"} ${E.label}`} rank` : `Your ${exam === DEFAULT_EXAM ? "" : `${E.label} `}${setup ? "rank and courses" : "rank and preferences"}`}</Dialog.Title>
+            <Dialog.Title className="text-h2 font-semibold">{trial ? `Try ${exam === DEFAULT_EXAM ? "a" : `${/^[AEIOU]/.test(E.label) ? "an" : "a"} ${E.label}`} rank` : `Your ${exam === DEFAULT_EXAM ? "" : `${E.label} `}${setup ? "rank and courses" : "rank and preferences"}`}</Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-muted-foreground">{trial ? "Try a rank: nothing is saved unless you choose Save as mine." : "Saved to your account, on every device you sign in on."}{onTry && !trial && " Or try one without saving."}</Dialog.Description>
           </div>
           <Dialog.Close asChild>

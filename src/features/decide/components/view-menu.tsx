@@ -49,7 +49,7 @@ export function SortMenu({ choices, value, className }: { choices: SortChoice[];
     <div
       data-sort-menu
       className={cn(
-        "relative inline-flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-md border border-input bg-secondary px-3 text-sm font-medium whitespace-nowrap hover:bg-raised has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring md:px-4",
+        "relative inline-flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-md border border-edge bg-secondary px-3 text-sm font-medium whitespace-nowrap shadow-xs hover:border-input hover:bg-muted has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-ring md:px-4",
         className,
       )}
     >
@@ -119,14 +119,14 @@ export function ViewMenu({ current, children, className }: { current?: string; c
       }}
     >
       {/* Phones: the icon alone (the toolbar's row is the search box's); its name stays "View". */}
-      <summary className="inline-flex h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-2 rounded-md border border-input bg-secondary text-sm font-medium whitespace-nowrap hover:bg-raised md:px-4 [&::-webkit-details-marker]:hidden">
+      <summary className="inline-flex h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-2 rounded-md border border-edge bg-secondary text-sm font-medium whitespace-nowrap shadow-xs hover:border-input hover:bg-muted group-open/vm:border-input group-open/vm:bg-muted md:px-4 [&::-webkit-details-marker]:hidden">
         <SlidersHorizontal className="size-4" aria-hidden />
         <span className="max-md:sr-only">View</span>
         {current && <span className="max-w-56 truncate font-normal text-muted-foreground max-md:sr-only">{current}</span>}
         <ChevronDown className="size-4 text-muted-foreground transition-transform group-open/vm:rotate-180 max-md:hidden" aria-hidden />
       </summary>
       {/* Phones: across the pinned toolbar (its box is the panel's), under it. */}
-      <div className="absolute right-0 z-30 mt-1 grid max-h-[70dvh] w-[34rem] gap-3 overflow-auto rounded-xl border border-border bg-card p-3 shadow-overlay max-md:inset-x-4 max-md:top-full max-md:w-auto">
+      <div className="absolute right-0 z-30 mt-1.5 grid max-h-[70dvh] w-[34rem] gap-4 overflow-auto rounded-lg border border-border bg-popover p-4 shadow-overlay max-md:inset-x-4 max-md:top-full max-md:w-auto">
         {children}
       </div>
     </details>

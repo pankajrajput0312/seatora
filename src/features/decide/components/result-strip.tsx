@@ -32,7 +32,7 @@ export function ResultStrip({ news }: { news: ResultNews }) {
   const link = "font-semibold whitespace-nowrap text-sky underline underline-offset-2";
   return (
     <div className="px-4 pt-4 md:px-6 xl:px-10" data-print-hide>
-      <div role="status" className="flex items-center gap-2 rounded-lg border border-sky/40 bg-sky/10 py-1 pr-1 pl-3 text-sm">
+      <div role="status" className="flex items-center gap-2 rounded-lg border border-wash-line bg-wash py-1 pr-1 pl-3 text-sm">
         <Megaphone className="size-4 shrink-0 text-sky" aria-hidden />
         <p className="min-w-0 flex-1 py-1">
           <span className="font-semibold">NEET PG {news.name} result is out{news.provisional && " (provisional)"}</span>
@@ -40,7 +40,7 @@ export function ResultStrip({ news }: { news: ResultNews }) {
           {" · "}<Link href="/neet-pg#lr-h" className={link}>Last ranks by branch</Link>
           {" · "}<Link href={L.allotments({ year: news.year, round: news.round })} className={link}>All allotments</Link>
         </p>
-        <button type="button" onClick={close} aria-label={`Close the ${news.name} result note`} className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sky/10 hover:text-foreground">
+        <button type="button" onClick={close} aria-label={`Close the ${news.name} result note`} className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground">
           <X className="size-4" aria-hidden />
         </button>
       </div>

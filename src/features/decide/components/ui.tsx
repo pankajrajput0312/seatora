@@ -19,13 +19,15 @@ export const tbl = {
   // (scroll-table.tsx): its header row stays pinned under the top bar while the page scrolls past it.
   wrap: "relative scroll-px-12 overflow-x-auto overflow-y-hidden rounded-xl border border-border bg-card",
   table: "w-full text-sm",
-  headRow: "border-b border-border text-left",
-  th: "px-3 py-2 text-xs font-semibold text-muted-foreground",
-  row: "border-b border-border last:border-0 hover:bg-muted/50",
-  td: "px-3 py-2 align-top",
-  num: "px-3 py-2 text-right align-top text-[0.875rem] font-semibold tabular-nums md:text-[15px]",
+  /** No zebra: hairline rows under a header ruled in the stronger edge. */
+  headRow: "border-b border-edge text-left",
+  th: "px-3 py-2.5 align-bottom text-xs font-semibold text-muted-foreground",
+  row: "border-b border-border last:border-0 hover:bg-muted/60",
+  td: "px-3 py-2.5 align-top",
+  /** Numbers: right-aligned, tabular (IBM Plex Sans's own figures are; tabular-nums keeps a fallback face in line). */
+  num: "px-3 py-2.5 text-right align-top text-[0.875rem] font-medium tabular-nums md:text-[0.9375rem]",
   /** A ScrollTable's thead: the sheet behind it and its ruled line (a shadow: no row borders in a pinned header). */
-  head: "bg-card shadow-[0_1px_0_var(--color-border)]",
+  head: "bg-card shadow-[0_1px_0_var(--color-edge)]",
   /** Phones: a pinned row-header column is narrow (about a third of the screen), so the rest of the row shows beside it. */
   pin: "max-md:w-[8.5rem] max-md:min-w-[8.5rem] max-md:max-w-[8.5rem]",
   /** Phones: a name in a pinned column on two lines at most (the full name in its title and for screen readers). */
@@ -102,7 +104,14 @@ export function Field({ label, children, className }: { label: string; children:
 export { ActiveFilters } from "./active-filters";
 
 /** Text inputs and selects in filter bars and forms (same focus and invalid states as the Input primitive). */
-export const control = "h-11 max-md:h-[2.375rem] w-full rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-sky aria-invalid:border-ember";
+export const control = "h-11 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground hover:border-foreground/60 focus:border-sky aria-invalid:border-ember";
+
+/**
+ * A filter chip (a link or label that picks one view: Options' reach, Seats' lists): a pill with a quiet edge; the one
+ * picked in the accent's tint, its edge and words in the accent.
+ */
+export const chip = (active: boolean) =>
+  cn("inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm", active ? "border-sky bg-wash font-semibold text-sky" : "border-edge bg-card hover:border-input hover:bg-muted");
 
 export function Select({ name, value, options, all }: { name: string; value: string | undefined; options: { value: string; label: string }[]; all?: string }) {
   return (
@@ -130,7 +139,7 @@ export function EmptyState({ title, description, icon: Icon, href, action, child
 }) {
   const actions = children ?? (href ? <Link href={href} className="inline-flex min-h-11 items-center text-sm text-sky underline">{action ?? "Clear filters"}</Link> : undefined);
   return (
-    <div className={cn("rounded-xl border border-dashed border-border bg-card px-6 py-12", className)}>
+    <div className={cn("rounded-xl border border-dashed border-edge bg-card px-6 py-12", className)}>
       <AstryxEmptyState title={title} description={description} headingLevel={headingLevel} icon={Icon && <Icon className="size-6 text-muted-foreground" strokeWidth={1.75} />} actions={actions} />
     </div>
   );
@@ -144,7 +153,7 @@ export function StatCell({ label, value, note, info }: { label: string; value: R
   return (
     <div className="bg-card p-4 sm:p-5">
       <dt className="flex items-center gap-1 text-xs text-muted-foreground sm:text-sm">{label}{info && <InfoTip label={label}>{info}</InfoTip>}</dt>
-      <dd className="mt-1 text-3xl leading-tight font-bold tracking-tight sm:text-[2.5rem]">{value}</dd>
+      <dd className="mt-1 text-figure font-semibold">{value}</dd>
       {note && <dd className="text-xs text-muted-foreground">{note}</dd>}
     </div>
   );

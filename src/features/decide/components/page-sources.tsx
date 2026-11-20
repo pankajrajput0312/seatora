@@ -261,7 +261,7 @@ export function PageSourcesFooter({ className }: { className?: string }) {
                     ) : (
                       <span title={l.title}>{l.label}</span>
                     )}
-                    {l.provisional && <Badge tone="warning">Provisional</Badge>}
+                    {l.provisional && <Badge tone="provisional">Provisional</Badge>}
                   </span>
                 ))}
                 {d.note && <span className="basis-full">{d.note}</span>}

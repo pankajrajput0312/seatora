@@ -46,7 +46,7 @@ export async function YourResult({ res, exam, L, round, askHeld }: { res: NonNul
       round={{ year: latest.year, round: latest.round }}
       news={news && { id: news.id, closed }}
       title={`${w.roundName(latest.round)} result`}
-      badge={latest.provisional ? <Provisional when /> : <Badge>Final</Badge>}
+      badge={latest.provisional ? <Provisional when /> : <Badge tone="final">Final</Badge>}
       found={x.kind === "found" && !x.flag}
       footer={askHeld && <div><HeldPicker current={null} link="Already hold a seat? Set it to see upgrades" /></div>}
     >

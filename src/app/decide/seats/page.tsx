@@ -23,7 +23,7 @@ import { SortMenu, ViewMenu, ViewMenuGroup } from "@/features/decide/components/
 import { chosenView } from "@/features/decide/server/view";
 import { SubTabs } from "@/features/decide/components/sub-tabs";
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
-import { ActiveFilters, control, EmptyState, Field, Pager, rangeLabel, smallLink, tbl, toolbar } from "@/features/decide/components/ui";
+import { ActiveFilters, chip, control, EmptyState, Field, Pager, rangeLabel, smallLink, tbl, toolbar } from "@/features/decide/components/ui";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pastOf, reachWindow } from "@/features/decide/lib/reach";
 import { termChips, termValueLabel } from "@/features/decide/lib/term-filters";
@@ -110,8 +110,6 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
   const matching = r.seats[list.key] ?? 0;
   const title = listTitle(list, exam);
   const round = `${yearName(exam, list.year)} ${roundNameFrom(list.name, list.round)}`;
-  const chip = (active: boolean) =>
-    `inline-flex min-h-11 items-center rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const caption = matrix
     ? `Seat matrix, ${round}${allRounds ? " and every other round" : ""}: seats per list, terms${profile ? ", your reach" : ""} and closing ranks by year and round, ${sortLabels[sort].toLowerCase()}, page ${r.page}`
     : `${compare ? `Seats in every ${round} list side by side` : `Seats in the ${title} list`} (${authorityOf(exam)} PDF${compare ? "s" : ""}), ${sortLabels[sort].toLowerCase()}, page ${r.page}`;

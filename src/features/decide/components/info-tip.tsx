@@ -37,10 +37,10 @@ function placeTip(btn: HTMLElement, p: HTMLElement) {
  */
 const CSS = `@layer components{
 .tip-i{position:relative;display:inline-flex;flex-shrink:0;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;border-radius:9999px;vertical-align:middle;color:var(--color-muted-foreground)}
-.tip-i:hover{color:var(--color-sky)}
+.tip-i:hover,.tip-i[aria-expanded=true]{color:var(--color-sky)}
 .tip-i::before{content:"";position:absolute;inset:-.75rem}
 .tip-i>svg{width:1rem;height:1rem}
-.tip-p{position:fixed;width:min(20rem,calc(100vw - 1rem));max-height:min(24rem,calc(100dvh - 1rem));overflow:auto;padding:.75rem;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-popover);color:var(--color-foreground);box-shadow:var(--shadow-overlay);font-size:var(--text-xs);line-height:var(--leading-relaxed);font-weight:400;text-align:left;white-space:normal;text-transform:none;outline:none}
+.tip-p{position:fixed;width:min(20rem,calc(100vw - 1rem));max-height:min(24rem,calc(100dvh - 1rem));overflow:auto;padding:.75rem .875rem;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-popover);color:var(--color-foreground);box-shadow:var(--shadow-overlay);font-size:.8125rem;line-height:1.25rem;font-weight:400;text-align:left;white-space:normal;text-transform:none;outline:none}
 @supports (top:anchor(bottom)){.tip-p{position-anchor:auto;margin:0;right:auto;bottom:auto;top:calc(anchor(bottom,calc(50% - 6px)) + 6px);left:clamp(.5rem,calc(anchor(center,50%) - min(10rem,50vw - .5rem)),calc(100vw - min(20rem,100vw - 1rem) - .5rem))}}
 .tip-t{position:relative;display:inline;padding:0;font:inherit;color:inherit;text-align:inherit;text-decoration:underline dotted;text-decoration-color:var(--color-muted-foreground);text-underline-offset:.2em;cursor:help}
 .tip-t::before{content:"";position:absolute;inset:-.6rem -.2rem}

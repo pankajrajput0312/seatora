@@ -148,7 +148,7 @@ export function BeCareful({ cells, className }: { cells: StatCell[]; className?:
   if (!why.length) return null;
   return (
     <p data-terms className={cn("text-xs", className)}>
-      <span className="font-semibold text-ember">Be careful</span>: {why.join(" · ")}
+      <span className="font-semibold text-risk">Be careful</span>: {why.join(" · ")}
     </p>
   );
 }

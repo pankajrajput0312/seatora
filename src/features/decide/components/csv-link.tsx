@@ -12,7 +12,7 @@ export function CsvLink({ href, what, total }: { href: string; what: string; tot
   if (total != null && total > CSV_MAX_ROWS)
     return (
       <span className="inline-flex items-center gap-0.5">
-        <span aria-disabled="true" className="inline-flex h-11 max-md:h-[2.375rem] items-center gap-2 rounded-md border border-input px-3 text-sm text-muted-foreground">
+        <span aria-disabled="true" className="inline-flex h-11 items-center gap-2 rounded-md border border-edge px-3 text-sm text-muted-foreground">
           <Download className="size-4" aria-hidden />CSV
         </span>
         <InfoTip label="the CSV download">

@@ -174,12 +174,12 @@ export function FiltersPanel({ count, clear, total, counts, recount, saveDefault
           e.preventDefault();
           if (!sheet.current?.open) sheet.current?.showModal();
         }}
-        className="inline-flex h-11 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-input bg-secondary px-3 text-sm font-medium hover:bg-raised md:px-4"
+        className="inline-flex h-11 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-edge bg-secondary px-3 text-sm font-medium shadow-xs hover:border-input hover:bg-muted md:px-4"
       >
         <ListFilter className="size-4" aria-hidden />
         Filters
         {count > 0 && (
-          <span className="numeric inline-flex min-w-5 items-center justify-center rounded-full bg-sky px-1.5 text-xs font-semibold text-background">
+          <span className="numeric inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-sky px-1.5 text-xs font-semibold text-primary-foreground">
             {count}<span className="sr-only"> applied</span>
           </span>
         )}
@@ -209,7 +209,7 @@ export function FiltersPanel({ count, clear, total, counts, recount, saveDefault
         }}
         onChange={(e) => (e.target as Partial<HTMLInputElement>).type !== "search" && recountNow(e.currentTarget.closest("form"))}
         onClose={() => move(0)}
-        className="filter-sheet fixed m-0 flex max-h-none max-w-none flex-col border-0 border-border bg-card p-0 text-foreground shadow-overlay outline-none backdrop:bg-foreground/45 not-open:hidden max-md:inset-x-0 max-md:top-auto max-md:bottom-0 max-md:h-[calc(100dvh-0.75rem)] max-md:w-full max-md:rounded-t-2xl max-md:border-t md:inset-y-0 md:right-0 md:left-auto md:h-dvh md:w-[28rem] md:rounded-l-2xl md:border-l"
+        className="filter-sheet fixed m-0 flex max-h-none max-w-none flex-col border-0 border-border bg-card p-0 text-foreground shadow-overlay outline-none backdrop:bg-foreground/40 not-open:hidden max-md:inset-x-0 max-md:top-auto max-md:bottom-0 max-md:h-[calc(100dvh-0.75rem)] max-md:w-full max-md:rounded-t-2xl max-md:border-t md:inset-y-0 md:right-0 md:left-auto md:h-dvh md:w-[28rem] md:rounded-l-2xl md:border-l"
       >
         {/* The handle and title: drag down (phones) to close. */}
         <div
@@ -235,9 +235,9 @@ export function FiltersPanel({ count, clear, total, counts, recount, saveDefault
             move(0);
           }}
         >
-          <div aria-hidden className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-border md:hidden" />
+          <div aria-hidden className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-edge md:hidden" />
           <div className="flex items-center justify-between py-1 pr-2 pl-4">
-            <h2 className="text-base font-semibold">Filters</h2>
+            <h2 className="text-title font-semibold">Filters</h2>
             <Button type="button" variant="ghost" size="icon" aria-label="Close filters" onClick={close}><X className="size-5" aria-hidden /></Button>
           </div>
         </div>

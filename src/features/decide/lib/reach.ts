@@ -315,15 +315,16 @@ export function seatsBelowNotes(ns: SeatsBelow[], latest: Latest, pastYears: [nu
   });
 }
 
-export const reachTone: Record<Reach, "info" | "neutral" | "warning"> = {
-  "reached-latest": "info",
-  "reached-both": "info",
-  "reached-one": "neutral",
-  "within-10": "warning",
-  "stray-only": "warning",
-  "closed-before": "neutral",
-  "no-data": "neutral",
-  new: "neutral",
+/** A label's badge colour (components/ui/badge.tsx reach tones): the colour repeats the words, never replaces them. */
+export const reachTone: Record<Reach, "reached" | "later" | "within" | "closed" | "none"> = {
+  "reached-latest": "reached",
+  "reached-both": "reached",
+  "reached-one": "reached",
+  "within-10": "within",
+  "stray-only": "later",
+  "closed-before": "closed",
+  "no-data": "none",
+  new: "none",
 };
 
 /**
