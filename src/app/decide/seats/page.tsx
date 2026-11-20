@@ -261,6 +261,11 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
               <InfoTip label={matrix ? "the seat matrix" : compare ? `the ${round} lists side by side` : `the ${title} list`}>{about}</InfoTip>
             </nav>
           </ViewMenuGroup>
+          {r.total > 0 && (
+            <ViewMenuGroup label="Layout">
+              <ViewToggle page="seats" view={view} className="justify-self-start" />
+            </ViewMenuGroup>
+          )}
           {matrix && (
             <ViewMenuGroup label="Rounds">
               <nav aria-label="Seat matrix rounds" className="flex flex-wrap gap-2">
@@ -317,7 +322,6 @@ async function SeatLists({ f, profile, params, L, exam }: { f: SeatsParams; prof
         </AboutData>
         {r.total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <ViewToggle page="seats" view={view} />
             {exam === DEFAULT_EXAM && <CsvLink href={L.with("/api/v1/seats/export", { tab: null, page: null })} what={`${matrix ? "the seat matrix" : compare ? `every ${round} list` : `the ${title} list`}, these filters, every row`} total={r.total} />}
             {matrix && view === "table" && <SeatMatrixDisplay groups={seatGroups(r.lists, exam)} ranked={!!profile} years={years} />}
           </div>

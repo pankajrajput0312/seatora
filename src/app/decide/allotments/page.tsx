@@ -18,7 +18,8 @@ import { StatHead, TermStatCells } from "@/features/decide/components/stat-cells
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
-import { VIEW_PARAM, ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { VIEW_PARAM, ViewPanes } from "@/features/decide/components/view-toggle";
+import { LayoutMenu } from "@/features/decide/components/view-menu";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { statKeys, statLabel } from "@/features/decide/lib/stat-format";
@@ -294,7 +295,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
 
       {/* Filters, the count and the results tools on one row (globals.css .filter-row); chips and notes under it. */}
       <div className="filter-row">
-      <FilterBar action="/decide/allotments" params={params} active={active.length} clear={showAll} total={total} noun="allotments">
+      <FilterBar action="/decide/allotments" params={params} active={active.length} clear={showAll} total={total} noun="allotments" view={total > 0 && <LayoutMenu page="allotments" view={view} />}>
         {inst && <input type="hidden" name="inst" value={inst.slug} />}
         {f.mine && <input type="hidden" name="mine" value={f.mine} />}
         <Field label="Year"><Select name="year" value={filters.year ? String(filters.year) : "all"} options={[{ value: "all", label: "All years" }, ...meta.years.map((y) => ({ value: String(y.year), label: y.label }))]} /></Field>
@@ -308,9 +309,10 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
       </FilterBar>
       <ActiveFilters items={active} clear={showAll} />
       {fromProfile && (
-        <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-          <span>{fromProfile.courses.length ? fromProfile.courses.map(courseLabel).join(", ") : "Every course"}, every year and round, your rank ±25%.</span>
-          <Link href={showAll} className={`${smallLink} text-sky`}>Show all</Link>
+        // One line (the whole list in its title and the Filters sheet), so the results come first.
+        <p className="flex min-w-0 items-center gap-x-2 text-sm text-muted-foreground">
+          <span title={fromProfile.courses.map(courseLabel).join(", ")} className="min-w-0 truncate">{fromProfile.courses.length ? fromProfile.courses.map(courseLabel).join(", ") : "Every course"}, every year and round, your rank ±25%.</span>
+          <Link href={showAll} className={`${smallLink} shrink-0 text-sky`}>Show all</Link>
         </p>
       )}
       {rankError && <p id="rank-error" role="alert" className="text-sm text-ember">{rankError}</p>}
@@ -325,7 +327,6 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
         </AboutData>
         {total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <ViewToggle page="allotments" view={view} />
             {exam === DEFAULT_EXAM && <CsvLink href={L.with("/api/v1/allotments/export", { page: null, [VIEW_PARAM]: null })} what={`these ${formatRank(total)} allotments`} total={total} />}
             {view === "table" && <AllotmentsDisplay cols={colsOf(E)} />}
           </div>

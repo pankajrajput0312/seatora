@@ -45,10 +45,10 @@ export const toolbar = "filter-toolbar flex min-w-0 items-start gap-2";
  * Submitting drops `page`, so results start at page 1, and keeps the address's Cards | Table choice (ViewField).
  * `active` (a list page: the number of its active-filter chips): the toolbar (pinned on phones): `search` (its label and
  * input, if any), a Filters button with that count opening the fields (`children`: FilterSections and Fields) in a sheet
- * (FiltersPanel; `clear` its Reset), and on phones `total` results (`noun`). Without `active`: the fields in a card
+ * (FiltersPanel; `clear` its Reset), the `view` menu, and on phones `total` results (`noun`). Without `active`: the fields in a card
  * laid out by `cols`, with Apply.
  */
-export function FilterBar({ action, params, children, cols = "md:grid-cols-4", search, active, clear, total, noun = "results", recount }: {
+export function FilterBar({ action, params, children, cols = "md:grid-cols-4", search, active, clear, total, noun = "results", recount, view }: {
   action: string;
   params: URLSearchParams;
   children: React.ReactNode;
@@ -60,6 +60,8 @@ export function FilterBar({ action, params, children, cols = "md:grid-cols-4", s
   noun?: string;
   /** The Filters sheet's count after a change (FiltersPanel `recount`); without it, the page fetched with the fields. */
   recount?: (query: string) => Promise<number | null>;
+  /** The toolbar's View menu (view-menu.tsx: Cards | Table, Expand all), after Filters. */
+  view?: React.ReactNode;
 }) {
   if (active != null)
     return (
@@ -70,6 +72,7 @@ export function FilterBar({ action, params, children, cols = "md:grid-cols-4", s
         <FiltersPanel count={active} clear={clear} total={total} recount={recount}>
           <Fragment key={params.toString()}>{children}</Fragment>
         </FiltersPanel>
+        {view}
         {total != null && <ToolbarCount total={total} noun={noun} />}
       </FilterForm>
     );

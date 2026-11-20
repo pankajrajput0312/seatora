@@ -103,6 +103,7 @@ test("options, the round view by default: her options with 2026 R2 seats, new on
   // Short; the full sentence (103 with newly added seats…) is behind its (i) "About 2026 R2 seats".
   await expect(summary).toContainText(/^1,065 with 2026 R2 seats:\s*708 clear,\s*357 virtual only,\s*\d+ new: no past allotment/);
   await expect(summary).toContainText("103 with newly added seats");
+  await openView(page); // the reach chips sit in the toolbar's View menu
   await expect(page.getByRole("link", { name: "All 1,065 options" })).toBeVisible();
   const count = page.locator("#options-count");
   await expect(count).toContainText("Showing 1–25 of 1,065 options");
@@ -110,6 +111,7 @@ test("options, the round view by default: her options with 2026 R2 seats, new on
 
   // New options: their own chip; a real row whose star saves it under its option id.
   const fresh = Number((await summary.getByRole("link", { name: /new\s*: no past allotment/ }).textContent())!.match(/[\d,]+/)![0].replace(",", ""));
+  await openView(page);
   await page.getByRole("link", { name: new RegExp(`^New: no past allotment ${fresh} options$`) }).click();
   await expect(count).toContainText(`of ${fresh} options`);
   const row = page.locator("[data-item]").filter({ visible: true }).first();
@@ -136,12 +138,15 @@ test("options, the round view by default: her options with 2026 R2 seats, new on
   await page.goto(`/decide/options?${PROFILE}&seats=virtual`);
   await page.getByRole("region", { name: "2026 R2 seats in your courses" }).getByRole("link", { name: /new\s*: no past allotment/ }).click();
   await expect(count).toContainText(`of ${fresh} options`);
-  // Hide them by keyboard: the same link, now "Show them", keeps focus.
+  // Hide them by keyboard (in the View menu): the menu closes, focus back on its View button.
   await page.goto(`/decide/options?${PROFILE}`);
+  await openView(page);
   await page.getByRole("link", { name: "Hide them" }).focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/closed=0/);
-  await expect(page.getByRole("link", { name: "Show them" })).toBeFocused();
+  await expect(page.locator("[data-view-menu] > summary")).toBeFocused();
+  await openView(page);
+  await expect(page.getByRole("link", { name: /hidden · Show$/ })).toBeVisible();
 });
 const formatN = (n: number) => n.toLocaleString("en-IN");
 
@@ -151,7 +156,9 @@ test("Cards | Table writes `layout`, keeps the page's own `view`, renders only t
     await page.goto(path);
     const toggle = page.getByRole("group", { name: "View as" });
     for (const v of ["Cards", "Table"]) {
+      await openView(page); // Cards | Table sit in the toolbar's View menu
       await toggle.getByRole("link", { name: v, exact: true }).click(); // a navigation: the page comes back in that view
+      await openView(page);
       await expect.poll(() => new URL(page.url()).searchParams.get("layout"), path).toBe(v.toLowerCase());
       await expect(toggle.getByRole("link", { name: v, exact: true }), path).toHaveAttribute("aria-current", "true");
       expect(new URL(page.url()).searchParams.get("view"), path).toBe(view);
@@ -165,12 +172,17 @@ test("Cards | Table writes `layout`, keeps the page's own `view`, renders only t
     await expect(page.locator('[data-view-pane="cards"]'), path).toHaveCount(0);
   }
   // Seats' list, view and round pickers sit behind its toolbar's View button.
-  await page.locator("[data-view-menu] > summary").click();
+  await openView(page);
   await expect(page.getByRole("link", { name: "One list" })).toHaveAttribute("aria-current", "true");
   await page.goto(`/decide/options?${PROFILE}&view=all&layout=cards`);
   await expect(page.locator("#options-count")).toContainText("of 641 options");
 });
 
+/** Opens the toolbar's View menu (view-menu.tsx: Cards | Table, Expand all, Seats' lists, Options' reach), if closed. */
+const openView = async (page: import("@playwright/test").Page) => {
+  const menu = page.locator("[data-view-menu]");
+  if ((await menu.getAttribute("open")) == null) await menu.locator("> summary").click();
+};
 /** Opens the page's Filters sheet (list pages keep their filters behind it). */
 const openFilters = async (page: import("@playwright/test").Page) => {
   if (!(await page.getByRole("dialog", { name: "Filters" }).isVisible())) await page.getByRole("button", { name: /^Filters/ }).click();
@@ -209,6 +221,7 @@ test("filters sit behind a Filters button: its count, a sheet with sections, Esc
 test("options, the view of every option with past allotments: her 641 options in the open quotas (25 at a time), Show more focuses the first new row, two ticked states both apply", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto(`/decide/options?${PROFILE}&view=all`);
+  await openView(page);
   await expect(page.getByRole("link", { name: "All 641 options" })).toBeVisible();
   const count = page.locator("#options-count");
   await expect(count).toContainText("Showing 1–25 of 641 options");
@@ -364,6 +377,7 @@ test("last ranks show the official closings: closing on one seat category, allot
   await row.getByText("Rounds by year").click();
   await expect(grid).toBeVisible();
   await expect(grid).toContainText("21,699");
+  await openView(page);
   await page.getByRole("link", { name: "Expand all rounds by year" }).click();
   await expect(page).toHaveURL(/expand=1/);
   await expect(page.locator("tr.expand-row").first()).toBeVisible();

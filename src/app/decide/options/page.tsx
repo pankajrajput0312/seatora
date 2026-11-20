@@ -12,7 +12,8 @@ import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm, FiltersPanel, ToolbarCount, ToolbarSearch } from "@/features/decide/components/filter-form";
 import { InfoTip } from "@/features/decide/components/info-tip";
 import { OptionsResults } from "@/features/decide/components/option-actions";
-import { ViewField } from "@/features/decide/components/view-toggle";
+import { ViewField, ViewToggle } from "@/features/decide/components/view-toggle";
+import { ViewMenu, ViewMenuGroup } from "@/features/decide/components/view-menu";
 import { chosenView } from "@/features/decide/server/view";
 import { listRow } from "@/features/decide/components/options-view";
 import { fmtDay, kindNote, seatKindNote, UnlistedSeats } from "@/features/decide/components/seats/seat-lists";
@@ -23,7 +24,7 @@ import { GroupPrompt } from "@/features/decide/components/dashboard-parts";
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { ActiveFilters, control, EmptyState, Field, smallLink, toolbar } from "@/features/decide/components/ui";
 import { Button } from "@/components/ui/button";
-import { ListOrdered } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, ListOrdered } from "lucide-react";
 import { iniElsewhere } from "@/features/decide/lib/college-aliases";
 import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
@@ -247,6 +248,7 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:border-input"}`;
   const n = (x: number) => <span className="numeric font-semibold">{formatRank(x)}</span>;
+  const detailsHref = here({ details: f.details ? null : "1", page: f.page > 1 ? String(f.page) : null });
   // What the round's seat lists are, behind the (i) of the summary (round view) or of the link to that view.
   const listsTip = lists.length > 0 && (
     <>
@@ -430,6 +432,46 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
             )}
           </Fragment>
         </FiltersPanel>
+        {/* Reach and Cards | Table behind View (results first); the closed-before toggle the reach list's last chip. */}
+        <ViewMenu current={f.reach ? reachLabel(f.reach, latest, PAST_YEARS, !f.prov) : view === "cards" ? "Cards" : "Table"}>
+          <ViewMenuGroup label="Reach">
+            <nav aria-label="Filter by reach" className="flex flex-wrap items-center gap-2">
+              <Link href={here({ reach: null })} aria-current={!f.reach ? "true" : undefined} className={chip(!f.reach)}>
+                All <span className="numeric font-semibold">{formatRank(all)}</span><span className="sr-only"> options</span>
+              </Link>
+              {reachOrder.filter((x) => r.counts[x] > 0).map((x) => (
+                <Link key={x} href={here({ reach: x, closed: x === "closed-before" ? "1" : null })} aria-current={f.reach === x ? "true" : undefined} className={chip(f.reach === x)}>
+                  {reachLabel(x, latest, PAST_YEARS, !f.prov)} <span className="numeric font-semibold">{formatRank(r.counts[x])}</span><span className="sr-only"> options</span>
+                  {x === "reached-latest" && <Provisional when={latest.provisional && !f.prov} />}
+                </Link>
+              ))}
+              {(r.hiddenClosed > 0 || (r.showClosed && !f.reach && r.counts["closed-before"] > 0)) && (
+                <span className="inline-flex items-center gap-1 border-l border-border pl-2">
+                  {/* One link in both states, so React keeps the element and focus stays on it after the toggle. */}
+                  <Link href={here({ closed: r.hiddenClosed > 0 ? "1" : "0" })} className={`${chip(false)} border-dashed`}>
+                    {r.hiddenClosed > 0 ? <>Closed before your rank: {n(r.hiddenClosed)} hidden · Show</> : "Closed ones shown · Hide them"}
+                  </Link>
+                  <InfoTip label="closed before your rank">
+                    Options whose closing rank came before yours in every round of {counted}
+                    {r.hiddenProvisional > 0 && ` (${formatRank(r.hiddenProvisional)} of the hidden ones only in the provisional ${latestName})`}.
+                  </InfoTip>
+                </span>
+              )}
+            </nav>
+          </ViewMenuGroup>
+          {r.total > 0 && (
+            <ViewMenuGroup label="Layout">
+              <ViewToggle page="options" view={view} className="justify-self-start" />
+              {/* A link: the address keeps the choice (Back, a shared link) and it works without JS. */}
+              {view === "cards" && (
+                <Link href={detailsHref} scroll={false} className="inline-flex min-h-11 items-center gap-1.5 justify-self-start rounded-md border border-border bg-card px-3 text-sm hover:bg-muted">
+                  {f.details ? <ChevronsDownUp className="size-4" strokeWidth={1.75} aria-hidden /> : <ChevronsUpDown className="size-4" strokeWidth={1.75} aria-hidden />}
+                  {f.details ? "Hide details on every card" : "Show details on every card"}
+                </Link>
+              )}
+            </ViewMenuGroup>
+          )}
+        </ViewMenu>
         <ToolbarCount total={r.total} noun="options" />
       </FilterForm>
       <ActiveFilters items={active} clear={clearAll} />
@@ -437,30 +479,6 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
       {capNote}
       <UntypedNote n={untyped} noun={untyped === 1 ? "option" : "options"} href={here({ ctype: null })} />
 
-      {/* One row that scrolls sideways (never wraps), the closed-before toggle its last chip. */}
-      <nav aria-label="Filter by reach" className="chip-row flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] *:shrink-0 *:whitespace-nowrap">
-        <Link href={here({ reach: null })} aria-current={!f.reach ? "true" : undefined} className={chip(!f.reach)}>
-          All <span className="numeric font-semibold">{formatRank(all)}</span><span className="sr-only"> options</span>
-        </Link>
-        {reachOrder.filter((x) => r.counts[x] > 0).map((x) => (
-          <Link key={x} href={here({ reach: x, closed: x === "closed-before" ? "1" : null })} aria-current={f.reach === x ? "true" : undefined} className={chip(f.reach === x)}>
-            {reachLabel(x, latest, PAST_YEARS, !f.prov)} <span className="numeric font-semibold">{formatRank(r.counts[x])}</span><span className="sr-only"> options</span>
-            {x === "reached-latest" && <Provisional when={latest.provisional && !f.prov} />}
-          </Link>
-        ))}
-        {(r.hiddenClosed > 0 || (r.showClosed && !f.reach && r.counts["closed-before"] > 0)) && (
-          <span className="inline-flex items-center gap-1 border-l border-border pl-2">
-            {/* One link in both states, so React keeps the element and focus stays on it after the toggle. */}
-            <Link href={here({ closed: r.hiddenClosed > 0 ? "1" : "0" })} className={`${chip(false)} border-dashed`}>
-              {r.hiddenClosed > 0 ? <>Closed before your rank: {n(r.hiddenClosed)} hidden · Show</> : "Closed ones shown · Hide them"}
-            </Link>
-            <InfoTip label="closed before your rank">
-              Options whose closing rank came before yours in every round of {counted}
-              {r.hiddenProvisional > 0 && ` (${formatRank(r.hiddenProvisional)} of the hidden ones only in the provisional ${latestName})`}.
-            </InfoTip>
-          </span>
-        )}
-      </nav>
       {/* Her seat, pinned above the results (never in them), with the Upgrades only switch and what she risks, folded. */}
       {held && (
         <HeldSeat
@@ -514,7 +532,6 @@ export default async function OptionsPage({ searchParams }: { searchParams: Prom
           seatLists={lists}
           view={view}
           details={!!f.details}
-          detailsHref={here({ details: f.details ? null : "1", page: f.page > 1 ? String(f.page) : null })}
           // Label order: the options with no allotment on her seat categories (and those closed before her rank) under their own heading.
           grouping={!f.sort || f.sort === "label" ? { counts: r.counts } : null}
           historyMore={

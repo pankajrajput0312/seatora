@@ -11,7 +11,8 @@ import { residentsFilters, ResidentsAbout, ResidentsCards, ResidentsTable, type 
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { ResidentsCollegeFilter, ResidentsPicks, ResidentsSearch } from "@/features/decide/components/residents-search";
 import { ActiveFilters, EmptyState, Field, FilterBar, Pager, Select, smallLink } from "@/features/decide/components/ui";
-import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { ViewPanes } from "@/features/decide/components/view-toggle";
+import { LayoutMenu } from "@/features/decide/components/view-menu";
 import { decideLinks } from "@/features/decide/lib/links";
 import { specialtyName } from "@/features/decide/lib/specialty-search";
 import { profileFromParams, toURLSearchParams } from "@/features/decide/profile";
@@ -147,6 +148,7 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         total={total}
         noun="residents"
         recount={countResidents}
+        view={total > 0 && <LayoutMenu page="residents" view={view} />}
         search={<ResidentsSearch q={query.q} colleges={collegeOpts} names={query.name ?? []} findColleges={findResidentColleges} findNames={findResidentNames} />}
       >
         <ResidentsCollegeFilter />
@@ -163,7 +165,6 @@ export default async function ResidentsPage({ searchParams }: { searchParams: Pr
         <p id="results" tabIndex={-1} aria-live="polite" className="text-sm text-muted-foreground max-md:sr-only">
           <span className="numeric font-semibold text-foreground">{formatRank(total)}</span> {total === 1 ? "resident" : "residents"}
         </p>
-        {total > 0 && <ViewToggle page="residents" view={view} />}
       </div>
       </div>
 

@@ -17,7 +17,8 @@ import { TermFilterControls, UntypedNote } from "@/features/decide/components/te
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { Badge } from "@/components/ui/badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
-import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { ViewPanes } from "@/features/decide/components/view-toggle";
+import { LayoutMenu } from "@/features/decide/components/view-menu";
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -218,6 +219,7 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
         clear={clear}
         total={res.total}
         noun="institutes"
+        view={res.total > 0 && <LayoutMenu page="institutes" view={view} />}
         search={
           <label className="min-w-0">
             <span className="sr-only">Search institutes by name or state</span>
@@ -246,7 +248,6 @@ export default async function InstitutesPage({ searchParams }: { searchParams: P
           )}
          <ColourLegend className="ml-1 align-middle" /></p>
         </AboutData>
-        {res.total > 0 && <ViewToggle page="institutes" view={view} />}
       </div>
       </div>
 

@@ -18,7 +18,8 @@ import { StatHead, TermStatCells } from "@/features/decide/components/stat-cells
 import { TermFilterControls, UntypedNote } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
-import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { ViewPanes } from "@/features/decide/components/view-toggle";
+import { LayoutMenu, ViewMenuGroup } from "@/features/decide/components/view-menu";
 import { chosenView } from "@/features/decide/server/view";
 import { decideLinks, type DecideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankRange } from "@/features/decide/lib/params";
@@ -411,6 +412,17 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
         clear={clear}
         total={lr.total}
         noun="options"
+        view={
+          lr.total > 0 && (
+            <LayoutMenu page={VIEW} view={view}>
+              <ViewMenuGroup label="Rounds by year">
+                <Link href={L.with(LR, { expand: open ? null : "1" })} scroll={false} className={`${smallLink} justify-self-start text-sm text-sky`}>
+                  {open ? "Collapse all" : "Expand all"}<span className="sr-only"> rounds by year</span>
+                </Link>
+              </ViewMenuGroup>
+            </LayoutMenu>
+          )
+        }
         search={
           <label className="grid min-w-0 text-sm">
             <span className="sr-only">Institute or state</span>
@@ -481,14 +493,6 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
            <ColourLegend className="ml-1 align-middle" /></p>
           <DataSource used={years.map((year) => ({ year }))} />
         </AboutData>
-        {lr.total > 0 && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <Link href={L.with(LR, { expand: open ? null : "1" })} scroll={false} className={`${smallLink} text-sm text-sky`}>
-              {open ? "Collapse all" : "Expand all"}<span className="sr-only"> rounds by year</span>
-            </Link>
-            <ViewToggle page={VIEW} view={view} />
-          </div>
-        )}
       </div>
       </div>
 

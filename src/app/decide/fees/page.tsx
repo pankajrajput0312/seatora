@@ -18,7 +18,8 @@ import { courseFilter } from "@/features/decide/lib/course-filter";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { AboutData } from "@/features/decide/components/filter-form";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, tbl } from "@/features/decide/components/ui";
-import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { ViewPanes } from "@/features/decide/components/view-toggle";
+import { LayoutMenu } from "@/features/decide/components/view-menu";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams } from "@/features/decide/lib/params";
@@ -195,6 +196,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         clear={L.to("/decide/fees")}
         total={res.total}
         noun={noun}
+        view={res.total > 0 && <LayoutMenu page="fees" view={view} />}
         search={
           <label className="grid min-w-0 text-sm">
             <span className="sr-only">Institute or state</span>
@@ -237,7 +239,6 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         </AboutData>
         {res.total > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <ViewToggle page="fees" view={view} />
             {/* /api/v1 is NEET PG's: another exam has no CSV yet. */}
             {exam === DEFAULT_EXAM && <CsvLink href={`/api/v1/fees/export?${params}`} what={`these ${formatRank(res.total)} ${noun}`} />}
           </div>

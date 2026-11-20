@@ -19,7 +19,8 @@ import { StatHead, TermStatCells } from "@/features/decide/components/stat-cells
 import { TermFilterControls } from "@/features/decide/components/term-filter-controls";
 import { TypeBadge } from "@/features/decide/components/type-badge";
 import { ActiveFilters, control, EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, tbl } from "@/features/decide/components/ui";
-import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
+import { ViewPanes } from "@/features/decide/components/view-toggle";
+import { LayoutMenu } from "@/features/decide/components/view-menu";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
 import { decideLinks } from "@/features/decide/lib/links";
 import { pageValue, parseSearchParams, rankShorthand } from "@/features/decide/lib/params";
@@ -173,6 +174,7 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
         clear={clear}
         total={rank && year && !invalid ? kept.length : undefined}
         noun="allotments"
+        view={!invalid && groups.length > 0 && <LayoutMenu page={VIEW} view={view} />}
         search={
           <label className="flex min-w-0 items-center gap-2 text-sm">
             <span className="shrink-0 text-xs font-semibold text-muted-foreground">Rank</span>
@@ -226,7 +228,6 @@ export default async function RankScanPage({ searchParams }: { searchParams: Pro
                <ColourLegend className="ml-1 align-middle" /></p>
               <DataSource used={[{ year: year.year }]} />
             </AboutData>
-            {groups.length > 0 && <ViewToggle page={VIEW} view={view} />}
           </div>
           {roundsLine}
           {groups.length === 0 && (

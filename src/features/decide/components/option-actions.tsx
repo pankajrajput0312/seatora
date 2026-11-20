@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ColourLegend } from "./colour-legend";
 import Link from "next/link";
-import { ChevronDown, ChevronsDownUp, ChevronsUpDown, GitCompareArrows, Star } from "lucide-react";
+import { ChevronDown, GitCompareArrows, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
@@ -26,7 +26,7 @@ import { BeCareful, summaryKeys, summaryText, TermStatCells, TermSummary, type S
 import { typeCategoryLabel } from "./institute/college-type";
 import { TypeBadge } from "./type-badge";
 import { smallLink, tbl } from "./ui";
-import { ViewPanes, ViewToggle, type View } from "./view-toggle";
+import { ViewPanes, type View } from "./view-toggle";
 import { ScrollTable } from "./scroll-table";
 import { QuotaName } from "./round-name";
 import { CourseKindTag, QuotaTerm, RoundTerm, Term } from "./term";
@@ -459,10 +459,10 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
 /**
  * One server-rendered page of options; "Show more" appends the next page from /api/v1/options (`query` = the same
  * profile and filters) and moves focus to the first new row. The page never holds more rows than she asked to see.
- * `tools`: after the Cards | Table toggle beside the count (the CSV download). `historyMore`: what the closing
+ * `tools`: beside the count (the CSV download; Cards | Table is in the page's View menu). `historyMore`: what the closing
  * ranks count, behind the history note's (i).
  */
-export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, moreHref, tools, notes, historyMore, view, latest, pastYears, includeLatest, seatLists, grouping = null, details = false, detailsHref }: {
+export function OptionsResults({ initial, page, pageSize, total, query, caption, firstPageHref, moreHref, tools, notes, historyMore, view, latest, pastYears, includeLatest, seatLists, grouping = null, details = false }: {
   initial: ListRow[];
   page: number;
   pageSize: number;
@@ -480,9 +480,8 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
   view: View;
   /** The label order (Options' default sort): the no-allotment and closed-before groups headed (Grouping). */
   grouping?: Grouping;
-  /** Every card's Details open (the address's `details=1`), and the link that flips it (cards only). */
+  /** Every card's Details open (the address's `details=1`; the link that flips it is in the page's View menu). */
   details?: boolean;
-  detailsHref?: string;
 } & Years) {
   const L = useDecideLinks();
   const [rows, setRows] = useState(initial);
@@ -521,14 +520,6 @@ export function OptionsResults({ initial, page, pageSize, total, query, caption,
           {notes}
         </AboutData>
         <div className="flex min-w-0 flex-wrap items-center gap-2 max-md:basis-full">
-          {/* A link: the address keeps the choice (Back, a shared link) and it works without JS. */}
-          {view === "cards" && detailsHref && (
-            <Link href={detailsHref} scroll={false} className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm hover:bg-muted">
-              {details ? <ChevronsDownUp className="size-4" strokeWidth={1.75} aria-hidden /> : <ChevronsUpDown className="size-4" strokeWidth={1.75} aria-hidden />}
-              {details ? "Hide details on every card" : "Show details on every card"}
-            </Link>
-          )}
-          <ViewToggle page="options" view={view} />
           {tools}
         </div>
       </div>
