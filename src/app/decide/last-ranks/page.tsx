@@ -109,7 +109,7 @@ function RoundsToggle({ of, open, className, children }: { of: string; open: boo
   );
 }
 
-/** A row's year × round grid, newest year first, rounds R1 → special stray. `stack`: each count under its closing (cards). */
+/** A row's year × round grid, newest year first, latest round first (special stray → R1). `stack`: each count under its closing (cards). */
 function YearGrid({ r, cols, rds, caption, rank, stack = true }: { r: OptionRow; cols: Col[]; rds: Round[]; caption: string; rank?: number; stack?: boolean }) {
   return (
     <div className="overflow-x-auto overflow-y-hidden px-2 pb-1">
@@ -249,10 +249,13 @@ export default async function LastRanksPage({ searchParams }: { searchParams: Pr
   const untyped = all && typeless ? all.rows.filter((r) => termsPass(r.fees, r.hospital?.type?.value, typeless)).length : 0;
   const page = Math.min(Math.max(1, Math.ceil(lr.total / PAGE_SIZE)), f.page ?? (at >= 0 ? Math.floor(at / PAGE_SIZE) + 1 : 1));
   const rows = lr.rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  // Newest year first; rounds R1 → special stray within a year (the service's order).
-  const cols: Col[] = lr.columns.filter((c) => !f.since || c.year >= f.since).sort((a, b) => b.year - a.year);
+  // Newest first throughout (owner, 20 Nov): newest year first, and within a year the latest round first (R2, then R1).
+  const cols: Col[] = lr.columns
+    .filter((c) => !f.since || c.year >= f.since)
+    .sort((a, b) => b.year - a.year)
+    .map((c) => ({ ...c, rounds: [...c.rounds].reverse() }));
   const years = cols.map((c) => c.year);
-  const rds = rounds.filter((rd) => cols.some((c) => c.rounds.includes(rd)));
+  const rds = rounds.filter((rd) => cols.some((c) => c.rounds.includes(rd))).reverse();
   // Each row's Best: its deepest closing in the years shown (in the closing-rank range when one is set).
   const bestOf = (r: OptionRow) => bestCell(r.grid, years, closing);
   // The sorted year and round column, if one is (in the table beside the newest year's rounds; on each card a chip).

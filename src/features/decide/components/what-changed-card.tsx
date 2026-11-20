@@ -70,12 +70,25 @@ export function WhatChangedCard({ items, courses }: { items: VisitItem[]; course
     href ? <a href={href} target="_blank" rel="noopener noreferrer" className={`${smallLink} text-sky`}>{text}<span className="sr-only">: {title} (opens in a new tab)</span></a> : text;
   const ours = courses && lists.some((l) => l.year === courses.year && l.round === courses.round);
 
+  // A new result is the news (owner, 20 Nov): say it in one line; the notices and the rest fold under it.
+  const top = results[0];
+  const headline = top && `${yearName(exam, top.year)} ${round(top.round)} result is out${top.provisional ? " (provisional)" : ""}`;
+  const rest = notices.length + steps.length + lists.length + Math.max(0, results.length - 1);
+
   return (
     <section aria-labelledby="changed-h" className="rounded-xl border border-sky/40 bg-sky/10 p-4" data-print-hide>
       <div className="flex items-start justify-between gap-3">
-        <h2 id="changed-h" className="text-title font-semibold">What changed since your last visit</h2>
+        <h2 id="changed-h" className="text-title font-semibold">{headline ?? "What changed since your last visit"}</h2>
         <Button variant="ghost" size="icon" className="-mt-2 -mr-2 shrink-0" aria-label="Dismiss what changed" onClick={dismiss}><X className="size-4" aria-hidden /></Button>
       </div>
+      {top && (
+        <p className="mt-1 text-body">
+          MCC&apos;s {round(top.round)} result is in Seatora now: your options, closing ranks and your own result include it.{" "}
+          <Link href={L.options()} className={`${smallLink} text-sky`}>See your options</Link>
+          {top.url && <> · {link(top.url, "MCC's result PDF", "MCC's result PDF")}</>}
+        </p>
+      )}
+      <Fold on={!!top && rest > 0} label={`Also new since your last visit (${formatRank(rest)})`}>
       <div className="mt-1 grid gap-3 text-body">
         {notices.length > 0 && (
           <div>
@@ -122,11 +135,11 @@ export function WhatChangedCard({ items, courses }: { items: VisitItem[]; course
             )}
           </div>
         )}
-        {results.length > 0 && (
+        {results.length > (top ? 1 : 0) && (
           <div>
             <h3 className="text-sm font-semibold">{results.length === 1 ? "A new result in the data" : "New results in the data"}</h3>
             <ul className="grid gap-0.5">
-              {results.map((r) => {
+              {results.slice(top ? 1 : 0).map((r) => {
                 const title = `${yearName(exam, r.year)} ${round(r.round)} ${r.provisional ? "provisional" : "final"} result`;
                 return <li key={r.k}>{link(r.url, title, title)}</li>;
               })}
@@ -135,7 +148,19 @@ export function WhatChangedCard({ items, courses }: { items: VisitItem[]; course
           </div>
         )}
       </div>
+      </Fold>
     </section>
+  );
+}
+
+/** The card's other news under a disclosure when a result leads it; as before otherwise. */
+function Fold({ on, label, children }: { on: boolean; label: string; children: React.ReactNode }) {
+  if (!on) return <>{children}</>;
+  return (
+    <details className="mt-2">
+      <summary className={`${smallLink} cursor-pointer text-sm text-sky`}>{label}</summary>
+      {children}
+    </details>
   );
 }
 
