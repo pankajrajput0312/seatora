@@ -73,11 +73,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <AppPage className="grid grid-cols-1 gap-4">
         {title}
         <HeldStrip />
+        {/* Residents first (owner, 20 Nov 2026: "on top keep this"). */}
+        <ResidentsPromo L={decideLinks(params)} />
         {noGroup ? <GroupPrompt /> : <SetupCard />}
         <RoundStatusBanner params={params} />
         {exams[exam].crossover && <CrossoverLink L={decideLinks(params)} />}
         <RankByBranch profile={null} exam={exam} L={decideLinks(params)} />
-        <ResidentsPromo L={decideLinks(params)} />
         <ToolGroups L={decideLinks(params)} E={await examInfo(exam)} />
       </AppPage>
     );
@@ -148,6 +149,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     <AppPage className="grid grid-cols-1 gap-4">
       {title}
       <HeldStrip />
+      {/* Residents first (owner, 20 Nov 2026: "on top keep this"). */}
+      <ResidentsPromo L={L} />
       {/* What the latest round's result (R2 on) lists for her rank, with what else is new since her last visit; before
           such a result, What changed (never on a first visit). Then the seat she holds and what she risks by upgrading
           from it ("Already hold a seat?" is a link in the result card). */}
@@ -194,7 +197,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         )}
       </section>
       <RankByBranch profile={profile} exam={exam} L={L} />
-      <ResidentsPromo L={L} />
       <ToolGroups L={L} E={E} />
       <RoundStatusBanner params={params} />
       {exams[exam].crossover && <CrossoverLink L={decideLinks(params)} />}
