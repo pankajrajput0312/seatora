@@ -24,6 +24,7 @@ import { YourPicture } from "@/features/decide/components/your-picture";
 import { HeldSeat } from "@/features/decide/components/held-seat";
 import { WhatChanged } from "@/features/decide/components/what-changed";
 import { YourResult } from "@/features/decide/components/your-result";
+import { rankResult } from "@/features/decide/server/your-result";
 import { RankByBranch } from "@/features/decide/components/rank-by-branch";
 import { kindName, roundShort } from "@/features/decide/types";
 import { QuotaName, RoundShort } from "@/features/decide/components/round-name";
@@ -54,10 +55,12 @@ const CrossoverLink = ({ L }: { L: ReturnType<typeof decideLinks> }) => (
 const title = <h1 id="main-h1" tabIndex={-1} className="sr-only">Home</h1>;
 
 /**
- * Residents first for everyone (the owner's call). No rank yet: then the three-step setup, today's MCC step and the
- * tools. With a rank: then the next step to take, today's MCC step, the tools, then her options as Options opens them (service.ts optionsView:
- * the round view while a round's seat lists are out and its result isn't, else every option with past allotments), so
- * every number here is the count of the Options page its link opens. History charts follow.
+ * No rank yet: the three-step setup, today's MCC step, last rank by branch, Residents and the tools. With a rank: the
+ * latest round's result for it (one card, the round's news folded in; What changed in its place before such a result),
+ * her seat, Your picture, the next step, her rank by branch, Residents, the tools, today's MCC step, then her options as
+ * Options opens them (service.ts optionsView: the round view while a round's seat lists are out and its result isn't,
+ * else every option with past allotments), so every number here is the count of the Options page its link opens.
+ * History charts follow.
  */
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = toURLSearchParams(await searchParams);
@@ -70,11 +73,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <AppPage className="grid grid-cols-1 gap-4">
         {title}
         <HeldStrip />
-        <ResidentsPromo L={decideLinks(params)} />
         {noGroup ? <GroupPrompt /> : <SetupCard />}
         <RoundStatusBanner params={params} />
         {exams[exam].crossover && <CrossoverLink L={decideLinks(params)} />}
         <RankByBranch profile={null} exam={exam} L={decideLinks(params)} />
+        <ResidentsPromo L={decideLinks(params)} />
         <ToolGroups L={decideLinks(params)} E={await examInfo(exam)} />
       </AppPage>
     );
@@ -84,7 +87,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // Her caps as Options reads them (an absent maxfee / bondyrs is hers; nd=keep keeps the ones not published).
   const { params: tp, filters: terms } = readTermFilters(params, profile);
   // The charts count what the numbers count: the same term filters (her caps, or the page's).
-  const [d, meta, r, rs, pic, E] = await Promise.all([dashboard(profile, exam, terms), getMeta(exam), listOptions(profile, { terms }, { page: 1, pageSize: 1 }, exam), roundStatus(LATEST_YEAR, exam), optionsPicture(profile, { terms }, exam), examInfo(exam)]);
+  const [d, meta, r, rs, pic, E, res] = await Promise.all([dashboard(profile, exam, terms), getMeta(exam), listOptions(profile, { terms }, { page: 1, pageSize: 1 }, exam), roundStatus(LATEST_YEAR, exam), optionsPicture(profile, { terms }, exam), examInfo(exam), rankResult(profile, exam)]);
   const L = decideLinks(params);
   const list = r.view === "round" ? r.seatLists[0] : undefined;
   const roundWords = list && roundName[list.round];
@@ -144,21 +147,19 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <AppPage className="grid grid-cols-1 gap-4">
       {title}
-      {/* What the latest round's result (R2 on) lists for her rank: first, above everything else. */}
-      <YourResult profile={profile} exam={exam} L={L} />
-      {/* Since her last visit (never on a first one), then the seat she holds and what she risks by upgrading from it. */}
-      <WhatChanged exam={exam} round={list && sum ? { list, sum } : null} />
-      <HeldSeat profile={profile} exam={exam} L={L} where="home" />
       <HeldStrip />
-      <ResidentsPromo L={L} />
+      {/* What the latest round's result (R2 on) lists for her rank, with what else is new since her last visit; before
+          such a result, What changed (never on a first visit). Then the seat she holds and what she risks by upgrading
+          from it ("Already hold a seat?" is a link in the result card). */}
+      {res ? <YourResult res={res} exam={exam} L={L} round={list && sum ? { list, sum } : null} askHeld={!profile.held} /> : <WhatChanged exam={exam} round={list && sum ? { list, sum } : null} />}
+      {(!res || profile.held) && <HeldSeat profile={profile} exam={exam} L={L} where="home" />}
       {reached > 0 && <YourPicture pic={pic} profile={profile} E={E} latest={latest} L={L} scope={list ? ` with seats in ${lists}` : ""} href={(x) => L.options({ reach: x, closed: x === "closed-before" || undefined })} />}
-      {/* Desktop: the box above holds the only two buttons (the Season Pass, Search residents) and the tools follow; Options
-          is a tool there and its numbers are below, so this card is for phones (and always when nothing is left to show). */}
+      {/* Desktop: Options is a tool there and its numbers are below, so this card is for phones (and always when nothing is left to show). */}
       <section aria-labelledby="next-step-h" className={`rounded-xl border border-border bg-card p-4 sm:p-5 ${total ? "md:hidden" : ""}`}>
         <p className="section-label text-muted-foreground">Next recommended step</p>
         {total ? (
           <>
-            <h2 id="next-step-h" className="mt-1 text-h2 font-bold">Review your options</h2>
+            <h2 id="next-step-h" className="mt-1 text-title font-semibold">Review your options</h2>
             {filling && (
               <p className="mt-1 text-body">
                 <span className="font-semibold">{roundName[filling.round]} {stepName[filling.step].toLowerCase()}</span>{" "}
@@ -179,23 +180,24 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </>
         ) : capCause ? (
           <>
-            <h2 id="next-step-h" className="mt-1 text-h2 font-bold">Your limits hide your options</h2>
+            <h2 id="next-step-h" className="mt-1 text-title font-semibold">Your limits hide your options</h2>
             <p className="mt-1 text-body text-muted-foreground">Your courses have options, but {capWords} {capped + r.unknownTerms === 1 ? "hides it" : "hides them"}. Show them, or lift the limit in your profile.</p>
             <div className="mt-2">{capNote}</div>
             <Button asChild size="lg" className="mt-3 min-h-11 max-sm:w-full"><Link href={L.to("/decide", { editProfile: 1 })}>Edit your profile</Link></Button>
           </>
         ) : (
           <>
-            <h2 id="next-step-h" className="mt-1 text-h2 font-bold">Widen your profile</h2>
+            <h2 id="next-step-h" className="mt-1 text-title font-semibold">Widen your profile</h2>
             <p className="mt-1 text-body text-muted-foreground">Your courses, quotas, states, fee or bond limits leave no options. Add courses or lift a limit.</p>
             <Button asChild size="lg" className="mt-3 min-h-11 max-sm:w-full"><Link href={L.to("/decide", { editProfile: 1 })}>Edit your profile</Link></Button>
           </>
         )}
       </section>
       <RankByBranch profile={profile} exam={exam} L={L} />
+      <ResidentsPromo L={L} />
       <ToolGroups L={L} E={E} />
       <RoundStatusBanner params={params} />
-        {exams[exam].crossover && <CrossoverLink L={decideLinks(params)} />}
+      {exams[exam].crossover && <CrossoverLink L={decideLinks(params)} />}
 
       <section aria-labelledby="numbers-h" className="grid gap-2">
         <div className="flex items-center gap-1">

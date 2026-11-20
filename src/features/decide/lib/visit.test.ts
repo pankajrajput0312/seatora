@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MccNotice, RoundStepInfo, SeatList, Source } from "../types";
-import { noticeKey, visitDiff, visitItems, VISIT_NOTICES } from "./visit";
+import { besides, noticeKey, visitDiff, visitItems, VISIT_NOTICES } from "./visit";
 
 const notice = (date: string, title: string): MccNotice => ({ title, date, url: `https://mcc.example/${title}.pdf`, authority: "MCC", kind: "notice", year: 2026, round: null });
 const step = (s: Partial<RoundStepInfo>): RoundStepInfo => ({ step: "choice_filling", status: "upcoming", date: null, url: null, title: null, note: null, scheduled: null, scheduledBy: null, events: [], ...s });
@@ -41,5 +41,11 @@ describe("What changed since your last visit (lib/visit.ts)", () => {
     const items = visitItems({ ...before, notices: many }, at).filter((i) => i.kind === "notice");
     expect(items.length).toBe(VISIT_NOTICES);
     expect(items[0].k).toBe(noticeKey(many[0]));
+  });
+  it("Home's result card folds what else is new: not its own round's result, any other", () => {
+    const seen = visitItems(before, at).map((i) => i.k);
+    const fresh = visitDiff(seen, visitItems({ ...before, notices: [notice("2026-11-20", "r2-result"), ...before.notices], sources: [...before.sources, src("R2", true)] }, at))!;
+    expect(besides(fresh, { year: 2026, round: "R2" }).map((i) => i.kind)).toEqual(["notice"]);
+    expect(besides(fresh, { year: 2026, round: "R3" }).map((i) => i.kind)).toEqual(["notice", "result"]);
   });
 });

@@ -28,10 +28,9 @@ import { ApplyCoupon, CouponForm } from "./coupon-form";
  *   signed out, to /signup?coupon=, which lands on the plan page with it).
  * `className`: the primary button; `noteClassName`: text (and the secondary button's colour). Each Upgrade carries
  * data-upgrade: a click is an upgrade_click at the nearest data-placement (docs/FUNNEL.md). `coupon`: the page's
- * ?coupon=, applied to the price (or filled into "Have a coupon?") and kept through sign-up. `freeLabel`: the free
- * claim's words in place of "Upgrade for ₹0" (Decide's home: "Get free Season Pass", its price shown beside it).
+ * ?coupon=, applied to the price (or filled into "Have a coupon?") and kept through sign-up.
  */
-export async function SeasonPassButton({ className, noteClassName, coupon, freeLabel }: { className?: string; noteClassName?: string; coupon?: string | null; freeLabel?: string }) {
+export async function SeasonPassButton({ className, noteClassName, coupon }: { className?: string; noteClassName?: string; coupon?: string | null }) {
   const user = await getCurrentUser();
   const s = user && passState(user);
   const text = cn("text-sm", noteClassName);
@@ -41,7 +40,7 @@ export async function SeasonPassButton({ className, noteClassName, coupon, freeL
   const free = freeNow();
   const code = (await cookies()).get(REF_COOKIE)?.value ?? null;
   const q = paymentsOn() ? await quote(user?.id ?? null, code) : null;
-  const claimLabel = free && (freeLabel ?? <span>Upgrade free till {shortDate(free)}</span>);
+  const claimLabel = free && <span>Upgrade free till {shortDate(free)}</span>;
 
   const c = coupon ? await priceFor(user?.id ?? null, coupon) : null; // ?coupon=: priced as if she had typed it
   const ok = c && !c.error ? c : null;

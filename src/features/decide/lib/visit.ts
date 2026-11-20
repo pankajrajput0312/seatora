@@ -41,3 +41,6 @@ export const visitDiff = (seen: readonly string[] | null | undefined, items: Vis
   const was = new Set(seen);
   return items.filter((i) => !was.has(i.k));
 };
+
+/** What's new besides a round's result (Home's result card says that one). */
+export const besides = (fresh: VisitItem[], r: { year: number; round: Round }) => fresh.filter((i) => !(i.kind === "result" && i.year === r.year && i.round === r.round));

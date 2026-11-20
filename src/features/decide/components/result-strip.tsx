@@ -7,17 +7,26 @@ import { useDecideLinks } from "../lib/use-decide-store";
 import { RESULT_CLOSED_COOKIE } from "../lib/round-status";
 import type { ResultNews } from "../server/your-result";
 
+// The result closed in this tab: the layout's `resultStrip` is read once per full load, and the strip unmounts on Home.
+let closedHere: string | null = null;
+
+/** Closes the strip for this result (a cookie the layout reads, so it never flashes back): the strip's ✕ and Home's result card's. */
+export const closeResultNews = (id: string) => {
+  closedHere = id;
+  document.cookie = `${RESULT_CLOSED_COOKIE}=${encodeURIComponent(id)}; path=/; max-age=${60 * 60 * 24 * 90}; samesite=lax`;
+};
+
 /**
- * The latest round's result, while it is the newest news (server/your-result.ts resultNews), on every Decide page: where
- * to see it (her result on Home, the last rank by branch, every allotment of the round). ✕ closes it for this result
- * (a cookie the layout reads, so it never flashes back); the final result's strip shows again.
+ * The latest round's result, while it is the newest news (server/your-result.ts resultNews), on every Decide page but
+ * Home (its result card says it): where to see it (her result on Home, the last rank by branch, every allotment of the
+ * round). ✕ closes it for this result (closeResultNews); the final result's strip shows again.
  */
 export function ResultStrip({ news }: { news: ResultNews }) {
   const L = useDecideLinks();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(() => closedHere !== news.id);
   if (!open) return null;
   const close = () => {
-    document.cookie = `${RESULT_CLOSED_COOKIE}=${encodeURIComponent(news.id)}; path=/; max-age=${60 * 60 * 24 * 90}; samesite=lax`;
+    closeResultNews(news.id);
     setOpen(false);
   };
   const link = "font-semibold whitespace-nowrap text-sky underline underline-offset-2";

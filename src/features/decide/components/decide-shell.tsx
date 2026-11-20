@@ -396,7 +396,8 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
         {/* isolate: page overlays (filter panels) stay below the sticky header. */}
         <div aria-busy={loading || undefined} data-no-terms={!E.has.fees || undefined} className={cn("isolate transition-opacity md:pb-0", compare.length ? "pb-[calc(9rem+env(safe-area-inset-bottom))]" : "pb-[calc(6rem+env(safe-area-inset-bottom))]", loading && "opacity-60")}>
           <RenamedSaved listName={listName} />
-          {result && resultStrip && <ResultStrip news={result} />}
+          {/* Home's result card says it (your-result.tsx). */}
+          {result && resultStrip && pathname !== "/decide" && <ResultStrip news={result} />}
           {(trying || badCat) && inUrl && (
             <div className="grid gap-2 px-4 pt-4 md:px-6 xl:px-10" data-print-hide>
               {badCat && (
@@ -409,13 +410,14 @@ function Shell({ meta, phone, ask, admin, exam, choices, account, listName, resu
                 </p>
               )}
               {trying && (
-                <p role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-sky/40 bg-sky/10 px-3 py-1.5 text-sm">
-                  <span className="min-w-[13rem] flex-1">
+                // One line on a wide screen; on a phone, the rank, then its two buttons (flush with the text).
+                <p role="status" className="flex flex-wrap items-center gap-x-3 rounded-md border border-sky/40 bg-sky/10 px-3 py-0.5 text-sm">
+                  <span className="min-w-[13rem] flex-1 py-1">
                     <span className="font-semibold">Trying <span className="numeric">{E.rankWord} {formatRank(inUrl.rank)}</span> · {profileSub(E, inUrl)}</span> — not saved.
                   </span>
-                  <span className="flex flex-wrap gap-x-2">
-                    <Button variant="ghost" size="sm" className="text-sky max-md:h-11" onClick={() => save(inUrl)}>Save as mine</Button>
-                    {profile && <Button variant="ghost" size="sm" className="text-sky max-md:h-11" onClick={() => backToMine(profile)}>Back to my rank</Button>}
+                  <span className="flex flex-wrap gap-x-1 max-md:-ml-2">
+                    <Button variant="ghost" size="sm" className="text-sky max-md:h-10" onClick={() => save(inUrl)}>Save as mine</Button>
+                    {profile && <Button variant="ghost" size="sm" className="text-sky max-md:h-10" onClick={() => backToMine(profile)}>Back to my rank</Button>}
                   </span>
                 </p>
               )}

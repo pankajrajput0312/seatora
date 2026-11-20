@@ -89,6 +89,26 @@ test("overview leads with what's open now and the round's numbers, each opening 
   await expect(page.locator("#options-count")).toContainText("of 1,065 options");
 });
 
+test("Home: one result card first, the result strip on the other pages only; its ✕ marks the news read and keeps her result", async ({ page }) => {
+  await page.goto(`/decide?${PROFILE}`);
+  const card = page.getByRole("region", { name: /^Round \d result$/ });
+  test.skip(!(await card.count()), "no later round's result in the data");
+  const strip = page.getByRole("button", { name: /^Close the .* result note$/ });
+  await expect(strip).toHaveCount(0);
+  await expect(page.locator("h2").first()).toHaveAttribute("id", "your-result-h");
+  // "Already hold a seat?" is the card's link, not a box of its own.
+  await expect(card.getByRole("button", { name: "Already hold a seat? Set it to see upgrades" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your current seat" })).toHaveCount(0);
+  await page.goto(`/decide/options?${PROFILE}`);
+  if (!(await strip.count())) return; // the result is no longer the newest news
+  await page.goto(`/decide?${PROFILE}`);
+  await card.getByRole("button", { name: /news as seen$/ }).click();
+  await expect(card).toContainText(/AIR 42,284/);
+  await expect(page.locator("#your-result-h")).toBeFocused();
+  await page.goto(`/decide/options?${PROFILE}`);
+  await expect(strip).toHaveCount(0);
+});
+
 // ---- Options, choices and compare on the real MCC data (her profile: AIR 42,284, OBC, Anaesthesiology + Family Medicine) ----
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const OPT_KOKILA_ANAES = "KOKILABENDHIRUBHAIAMBANIHOSPITALPLOTNOX8#400710~DNB~ANAESTHESIOLOGY~DNB Quota";

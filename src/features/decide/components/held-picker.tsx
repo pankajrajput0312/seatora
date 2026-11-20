@@ -12,14 +12,14 @@ import { roundName } from "../lib/round-status";
 import { useExamInfo, useSavedProfile, useTrying } from "../lib/use-decide-store";
 import type { Round } from "../types";
 import { navigating, toast } from "./nav-pending";
-import { control } from "./ui";
+import { control, smallLink } from "./ui";
 
 /**
  * "I already hold a seat": search the exam's seats (any course; held-actions.ts findSeats), pick hers and the round she
  * joined it in. Saved to her profile (her account keeps it), and into the address so every page reads it; trying a
  * rank, the address only (nothing saved). `current`: her seat as the page shows it, null with none.
  */
-export function HeldPicker({ current }: { current: { name: string; round: Round } | null }) {
+export function HeldPicker({ current, link }: { current: { name: string; round: Round } | null; /** A text link in place of the button (Home's result card). */ link?: string }) {
   const E = useExamInfo();
   const trying = useTrying();
   const [saved, setSaved] = useSavedProfile();
@@ -75,7 +75,11 @@ export function HeldPicker({ current }: { current: { name: string; round: Round 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { setOpen(o); if (o) { setPick(null); setRound(current?.round ?? "R1"); } }}>
       <Dialog.Trigger asChild>
-        <Button variant="secondary" className="shrink-0 max-sm:w-full">{current ? "Change seat" : "I already hold a seat"}</Button>
+        {link ? (
+          <button type="button" className={`${smallLink} text-left text-sm text-sky`}>{link}</button>
+        ) : (
+          <Button variant="secondary" className="shrink-0 max-sm:w-full">{current ? "Change seat" : "I already hold a seat"}</Button>
+        )}
       </Dialog.Trigger>
       <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
       {/* Focus on the search: finding her seat is the first thing to do. */}

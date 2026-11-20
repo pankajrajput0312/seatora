@@ -4,18 +4,16 @@ import { activeExam } from "@/features/exams/active";
 import { examShows, neetPg, type Exam } from "@/features/exams/exam";
 import { authorityOf, exams, inExamWords } from "@/features/exams/registry";
 import { kindName } from "../types";
-import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
 import { PLANS } from "@/features/payments/plans";
-import { limitLine, passView } from "@/features/plans/components/plan-cards";
-import { freeNow, inviteLine, planLimits, shortDate } from "@/features/plans/plans";
-import { formatPaise, REFERRAL_PERCENT } from "@/features/referrals/lib";
+import { passView } from "@/features/plans/components/plan-cards";
+import { freeNow } from "@/features/plans/plans";
+import { formatPaise } from "@/features/referrals/lib";
 import { cn } from "@/lib/cn";
 import type { DecideLinks } from "../lib/links";
 
 // The planner's home, in Seatora's own look (the logo's ink, cyan and green): the tools as cards under the sidebar's own
-// names, and the Residents card (above the tools until her rank is set, then below them). The Season Pass box in it:
-// ~~₹499~~ ₹0 and "Get free Season Pass" while FREE_FOR_ALL_UNTIL is ahead, then ~~₹499~~ ₹199. The schedule is the
-// status strip above (round-status.tsx), not a card.
+// names, and the Residents card just above them. The Season Pass line in it: ₹0 now and "Get free Season Pass" while
+// FREE_FOR_ALL_UNTIL is ahead, then ~~₹499~~ ₹199 and "Upgrade". The schedule is the status strip (round-status.tsx), not a card.
 
 const groups = [
   {
@@ -80,75 +78,47 @@ export function ToolGroups({ L, E = neetPg }: { L: DecideLinks; E?: Exam }) {
   );
 }
 
-/** The Residents card, compact, with the Season Pass box beside it (under it on phones). */
+/**
+ * The Residents card, one row: what it is, "Search residents", and her Season Pass in a small line (the plan page has
+ * the plans; the sidebar's footer and the header chip say "Upgrade" too).
+ */
 export async function ResidentsPromo({ L }: { L: DecideLinks }) {
   if (!exams[await activeExam()].has.residents) return null;
   const free = freeNow();
-  const { state, got, invite } = await passView(); // what the plan cards say: her pass, or her invite's price
+  const { got, invite } = await passView(); // what the plan cards say: her pass, or her invite's price
   const list = PLANS.season_pass.amount;
-  // What the Free plan keeps once the free period ends: not said to a paid pass or staff, whom it doesn't concern.
-  const keeps = planLimits("FREE");
-  const after = free && state !== "pass" && state !== "staff" && `After ${shortDate(free)}, Free plan limits: ${limitLine("institutes", keeps.institutes).replace(/ a day$/, "")} and ${limitLine("residents", keeps.residents)}.`;
-  // Light-on-dark theme tokens inside this black card, so shared parts (the coupon field and its Apply) stay readable.
+  const green = "font-mono font-semibold text-[#5fd36f]";
   return (
-    <section aria-labelledby="residents-h" className="rounded-xl border border-[#1f2a33] bg-[#0b0e12] text-[#f1f4f7] [--color-foreground:#f1f4f7] [--color-input:#5b6b78] [--color-muted-foreground:#a3abb3]">
-      <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-start">
-        <div>
-          <p className="flex items-center gap-2 text-[#5ccfe6]">
-            <span className="section-label">Residents</span>
-            <span className="rounded-full border border-current px-1.5 text-caption font-semibold">New</span>
-          </p>
-          <h2 id="residents-h" className="mt-1 text-h2 font-semibold" style={{ color: "#f1f4f7" }}>Know who&apos;s already there.</h2>
-          <p className="mt-1 max-w-xl text-body text-[#a3abb3]">The residents at every PG hospital, by course and year.</p>
-          <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1">
-            {[["77K+", "residents"], ["1,800+", "hospitals"], ["2023–25", "batches"]].map(([n, l]) => (
-              // The number reads first on screen; the term (dt) comes first in the markup, as a <dl> needs.
-              <div key={l} className="flex flex-row-reverse items-baseline justify-end gap-1.5">
-                <dt className="text-caption text-[#a3abb3]">{l}</dt>
-                <dd className="font-mono text-lg font-semibold text-[#5fd36f]">{n}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-1 text-caption text-[#a3abb3]">From MCC&apos;s official admitted lists, 2023–25.</p>
-          <Link href={L.to("/decide/residents")} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-md border border-[#5ccfe6] px-4 text-body font-semibold text-[#5ccfe6] hover:bg-[#5ccfe6]/10">
-            Search residents <ArrowRight className="size-4" aria-hidden />
-          </Link>
+    <section aria-labelledby="residents-h" className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-[#1f2a33] bg-[#0b0e12] p-4 text-[#f1f4f7]">
+      <div className="min-w-0 flex-1 basis-72">
+        <div className="flex flex-wrap items-center gap-x-2">
+          <h2 id="residents-h" className="text-title font-semibold" style={{ color: "#f1f4f7" }}>Know who&apos;s already there</h2>
+          <span className="rounded-full border border-[#5ccfe6] px-1.5 text-caption font-semibold text-[#5ccfe6]">New</span>
         </div>
-        <div data-placement="home_card" className="rounded-lg border border-dashed border-[#2b3a45] px-4 py-3 md:max-w-72">
-          <p className="section-label text-[#a3abb3]">Season Pass</p>
+        <p className="text-body text-[#a3abb3]">
+          <span className={green}>77K+</span> residents at <span className={green}>1,800+</span> PG hospitals, by course and year: MCC&apos;s official admitted lists, 2023–25.
+        </p>
+        <p className="mt-1 text-caption text-[#a3abb3]">
+          Season Pass:{" "}
           {got ? (
-            <p className="mt-1 text-body font-bold text-[#5fd36f]">{got}</p>
-          ) : free ? (
-            // As the plan card: ₹0 now, never a struck "was" price beside it.
-            <p className="mt-1 flex items-baseline gap-2">
-              <span className="font-mono text-h2 font-bold text-[#5fd36f]">₹0</span>
-              <span className="text-caption text-[#a3abb3]">now</span>
-            </p>
+            <span className="font-semibold text-[#5fd36f]">{got}</span>
           ) : (
-            <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
-              <s className="font-mono text-body text-[#6b7480]" aria-label={`Was ${formatPaise(PLANS.season_pass.wasAmount)}`}>{formatPaise(PLANS.season_pass.wasAmount)}</s>
-              <span className="font-mono text-h2 font-bold text-[#5fd36f]">{formatPaise(invite?.amount ?? list)}</span>
-              {invite && <span className="text-caption text-[#f1f4f7]">with {invite.name}&apos;s invite</span>}
-            </p>
+            <>
+              {free ? (
+                // As the plan card: ₹0 now, never a struck "was" price beside it.
+                <><span className={green}>₹0</span> now, then {formatPaise(invite?.amount ?? list)}{invite && ` with ${invite.name}'s invite`}</>
+              ) : (
+                <><s className="font-mono text-[#6b7480]"><span className="sr-only">was </span>{formatPaise(PLANS.season_pass.wasAmount)}</s> <span className={green}>{formatPaise(invite?.amount ?? list)}</span>{invite && ` with ${invite.name}'s invite`}</>
+              )}
+              {" · "}
+              <Link href={L.to("/decide/plan")} data-upgrade="home_card" className="hit font-semibold text-[#5ccfe6] underline underline-offset-2">{free ? "Get free Season Pass" : "Upgrade"}</Link>
+            </>
           )}
-          {free && invite && state !== "pass" && state !== "staff" && <p className="text-caption text-[#f1f4f7]">{inviteLine(invite.name, invite.amount, list, free)}</p>}
-          {free && !invite && state !== "pass" && state !== "staff" && state !== "claimed" && <p className="text-caption text-[#f1f4f7]">Then {formatPaise(list)} once.</p>}
-          {after && <p className="text-caption text-[#f1f4f7]">{after}</p>}
-          <div className="mt-3">
-            <SeasonPassButton
-              freeLabel="Get free Season Pass"
-              className="min-h-11 rounded-md bg-[#5fd36f] px-4 text-body font-semibold text-[#0b0e12] hover:bg-[#7fe08b]"
-              noteClassName="text-[#a3abb3]"
-            />
-          </div>
-          {/* The referral line only once there is a price to take 20% off. */}
-          {!free && (
-            <Link href={L.to("/decide/refer")} className="mt-1 inline-flex min-h-11 items-center text-caption text-[#5ccfe6] underline">
-              Refer a friend: {REFERRAL_PERCENT}% off for them, {REFERRAL_PERCENT}% for you
-            </Link>
-          )}
-        </div>
+        </p>
       </div>
+      <Link href={L.to("/decide/residents")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#5ccfe6] px-4 text-body font-semibold text-[#5ccfe6] hover:bg-[#5ccfe6]/10 max-sm:w-full">
+        Search residents <ArrowRight className="size-4" aria-hidden />
+      </Link>
     </section>
   );
 }
