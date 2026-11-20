@@ -44,6 +44,8 @@ const noindex = ["/decide/:path*", "/api/:path*", "/login", "/signup", "/account
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Local review through a proxy (bb connect): its origin may post server actions (sign-in). Unset everywhere else.
+  ...(process.env.REVIEW_ORIGIN && { experimental: { serverActions: { allowedOrigins: [process.env.REVIEW_ORIGIN] } } }),
   // The build-time catalog snapshot (prisma/snapshot.ts) ships with every server route; Ask Seatora's skills (read
   // from disk, features/ask/skills.ts) with its chat route.
   outputFileTracingIncludes: { "/**": ["./.snapshot/catalog.json.gz"], "/api/ask/chat": ["./src/features/ask/skills/*.md"] },
