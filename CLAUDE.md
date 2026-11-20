@@ -23,7 +23,7 @@ Modular monolith. `src/app` routes are thin and compose features. Domain logic l
 
 ## Design systems (enforced): two, never mixed on one page
 - **Public site** (`src/app/(site)`: landing, privacy, auth): [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md), a dark, cool interface modelled on roook.space, using Geist Sans with Geist Pixel for display and scanlines.
-- **Inside app** (`src/app/decide`): [docs/APP_DESIGN_SYSTEM.md](docs/APP_DESIGN_SYSTEM.md), the light "case sheet" system on Astryx (Meta's design system), set in Atkinson Hyperlegible Next.
+- **Inside app** (`src/app/decide`): [docs/APP_DESIGN_SYSTEM.md](docs/APP_DESIGN_SYSTEM.md), the light "Clean & clinical" system on Astryx (Meta's design system), set in IBM Plex Sans, one teal accent; its styleguide is `/decide/design` (staff only).
 - Tokens live in `src/app/globals.css`: `@theme` for the site, with the `.app` scope overriding them for the inside app. Use only token classes (`bg-card`, `text-muted-foreground`, `border-border`, `text-leaf`…), never hex or raw OKLCH values in components.
 - Signal colours (`sky`, `leaf`, `sun`, `ember`) carry meaning only. No gradients, blobs or decorative glow (the hero vignette is the documented exception).
 - Ranks, fees and statistics use `numeric` in columns. `font-pixel` is used on the public site only.

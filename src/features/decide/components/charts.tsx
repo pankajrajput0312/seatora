@@ -143,7 +143,9 @@ function Strip({ rank, rows, year: y = 2025, g }: StripProps & { g: Geo }) {
             <g key={r.course}>
               {!g.above && <text x={0} y={cy + 5} className="fill-foreground font-medium" style={{ fontSize: g.font }}>{r.course}</text>}
               <line x1={L} x2={W - R} y1={cy} y2={cy} className="stroke-border" strokeWidth={1} />
-              {r.points.map((p, j) => <circle key={j} cx={x(p.closing)} cy={cy} r={g.W < 500 ? 4 : 5} strokeWidth={g.W < 500 ? 1.5 : 2} className={cn("stroke-card", p.closing >= rank ? "fill-mark" : "fill-muted-foreground/60")} />)}
+              {/* No ring: on the grid paper a sheet-coloured ring smeared white where dots crowd; translucent fills darken
+                  with the crowd instead, so density reads as depth of colour. */}
+              {r.points.map((p, j) => <circle key={j} cx={x(p.closing)} cy={cy} r={g.W < 500 ? 4 : 5} fillOpacity={p.closing >= rank ? 0.75 : 0.45} className={p.closing >= rank ? "fill-mark" : "fill-muted-foreground"} />)}
             </g>
           );
         })}

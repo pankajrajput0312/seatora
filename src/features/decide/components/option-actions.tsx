@@ -407,7 +407,7 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
               <td className={sessionCols ? "px-3 py-3 text-right" : notPhone}><ClosingCell d={r.latest} year={latest.year} r1={r1Of(r, latest.year)} /></td>
               {sessionCols && <td className={phoneOnly}><ClosingCell d={r.byYear[last]} year={last} /></td>}
               {/* Wide enough for a reach label on one or two lines, so a row is as tall as its name, not its notes. */}
-              <td className="px-2 py-3 md:min-w-[10.5rem]">
+              <td className="px-2 py-3 md:min-w-[11.5rem]">
                 <ReachBadge reach={r.reach} provisional={r.reachProvisional} latest={latest} includeLatest={includeLatest} from={r.reachFrom} seats={r} />
                 <SeatsBelowNote r={r} latest={latest} includeLatest={includeLatest} />
                 {E.has.fees && <BeCareful cells={statCells(r.fees)} className="mt-1 max-w-xs" />}
