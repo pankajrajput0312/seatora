@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Check, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { getCurrentUser } from "@/features/auth/lib/session";
 import { passLine } from "@/components/marketing/price-line";
 import { SeasonPassButton } from "@/features/payments/components/season-pass-button";
@@ -13,8 +14,9 @@ import { cn } from "@/lib/cn";
 import { FEATURE_LABEL, freeNow, gotLine, inviteLine, longDate, passState, planLimits, shortDate, type Feature, type Plan } from "../plans";
 
 // Free and Season Pass as two cards (the sign-in pop-up, /decide/plan, /pricing, the paywall, the account page), every
-// line read from the plans config (env overrides included). Token colours, so it reads on the app's light sheet and the
-// site's dark page alike; the Season Pass card is the hero in Seatora's ink and cyan.
+// line read from the plans config (env overrides included). Token colours only, so it reads on the app's light sheet and
+// the site's dark page alike: flat sheets with a hairline; the Season Pass, the one to act on, edged and headed in the
+// accent (docs/APP_DESIGN_SYSTEM.md).
 
 /** What each card lists, in this order. Ask Seatora is the owner's beta, not a plan feature yet. */
 const SHOWN: Feature[] = ["institutes", "residents", "compare", "choiceLists", "csv", "reports"];
@@ -28,6 +30,8 @@ export function limitLine(f: Feature, n: number) {
 }
 
 const button = "inline-flex min-h-11 w-full items-center justify-center rounded-md px-4 text-sm font-semibold";
+const head = "flex min-h-14 flex-wrap items-center gap-2 border-b px-4 py-2";
+const price = "numeric text-figure font-semibold";
 
 /**
  * Her Season Pass for the plan cards and the Home box (so they say the same): `got`, what she has (gotLine: her paid
@@ -54,8 +58,8 @@ export async function PlanCards({ className, coupon }: { className?: string; cou
       free={state === "pass" || state === "staff" ? null : freeNow()} // a paid pass: its price, not the free-period offer
       got={got}
       invite={invite}
-      cta={<SeasonPassButton coupon={coupon} className={cn(button, "bg-[#5fd36f] text-[#0b0e12] hover:bg-[#7fe08b]")} noteClassName="text-muted-foreground" />}
-      freeCta={!user && <Link href={coupon ? `/signup?${new URLSearchParams({ coupon })}` : "/signup"} className={cn(button, "border border-border text-foreground hover:bg-muted")}>Create free account</Link>}
+      cta={<SeasonPassButton coupon={coupon} className={cn(button, "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90")} noteClassName="text-muted-foreground" />}
+      freeCta={!user && <Link href={coupon ? `/signup?${new URLSearchParams({ coupon })}` : "/signup"} className={cn(button, "border border-edge bg-card text-foreground shadow-xs hover:border-input hover:bg-muted")}>Create free account</Link>}
     />
   );
 }
@@ -77,48 +81,48 @@ export function PlanCardsView({ current, free, got, invite, cta, freeCta, classN
     : free
       ? invite ? "No card now, no auto-renew." : passLine(free)
       : invite ? `Once, no auto-renew, valid till ${season}.` : `${formatPaise(discountedPrice(list))} with an invite, valid till ${season}.`;
-  const yours = <span className="rounded-full bg-[#5ccfe6] px-2 py-0.5 text-xs font-bold text-[#0b0e12]">Your plan</span>;
+  const yours = <Badge tone="info" className="font-semibold">Your plan</Badge>;
   return (
     <div className={cn("grid gap-3 sm:grid-cols-2", className)}>
-      <div data-plan="PREMIUM" className={cn("flex flex-col overflow-hidden rounded-xl border-2 border-[#5ccfe6] bg-card", current === "PREMIUM" && "ring-4 ring-[#5ccfe6]/35")}>
-        <div className="flex min-h-14 flex-wrap items-center gap-2 bg-[#0b0e12] px-4 py-2">
-          <h3 className="text-lg font-bold text-[#f1f4f7]">Season Pass</h3>
+      <div data-plan="PREMIUM" className="flex flex-col overflow-hidden rounded-xl border border-sky bg-card ring-1 ring-sky">
+        <div className={cn(head, "border-wash-line bg-wash")}>
+          <h3 className="text-title font-semibold">Season Pass</h3>
           {current === "PREMIUM" && yours}
-          {free && <span className="ml-auto rounded-full bg-[#5fd36f] px-2.5 py-0.5 text-xs font-bold text-[#0b0e12]">Free till {shortDate(free)}</span>}
+          {free && <Badge tone="success" className="ml-auto font-semibold">Free till {shortDate(free)}</Badge>}
         </div>
         <div className="flex flex-1 flex-col p-4">
           {/* The price it costs (her invite's), in and after the free period: the free period is the ribbon and the line. */}
           {got ? (
-            <p className="numeric text-xl font-extrabold">{got}</p>
+            <p className="numeric text-title font-semibold">{got}</p>
           ) : (
             <p className="flex flex-wrap items-baseline gap-x-2">
-              <span className="numeric text-4xl font-extrabold">{formatPaise(invite?.amount ?? list)}</span>
+              <span className={price}>{formatPaise(invite?.amount ?? list)}</span>
               <span className="text-sm text-muted-foreground">{invite ? `with ${invite.name}'s invite` : "once, no auto-renew"}</span>
             </p>
           )}
           {/* The free period (claimed or not): her invite's price after it. */}
-          {free && invite && <p className="mt-2 rounded-md border border-sky/40 bg-sky/10 px-3 py-2 text-sm font-semibold">{inviteLine(invite.name, invite.amount, list, free)}</p>}
+          {free && invite && <p className="mt-2 rounded-md border border-wash-line bg-wash px-3 py-2 text-sm font-semibold">{inviteLine(invite.name, invite.amount, list, free)}</p>}
           {line && <p className="mt-1 text-sm text-muted-foreground">{line}</p>}
           <Lines plan="PREMIUM" />
           <div className="mt-auto pt-5">{cta}</div>
         </div>
       </div>
 
-      <div data-plan="FREE" className={cn("flex flex-col overflow-hidden rounded-xl bg-card sm:order-first", current === "FREE" ? "border-2 border-foreground" : "border-2 border-border")}>
-        <div className="flex min-h-14 flex-wrap items-center gap-2 border-b border-border px-4 py-2">
-          <h3 className="text-lg font-bold">Free</h3>
+      <div data-plan="FREE" className="flex flex-col overflow-hidden rounded-xl border border-border bg-card sm:order-first">
+        <div className={cn(head, "border-border")}>
+          <h3 className="text-title font-semibold">Free</h3>
           {current === "FREE" && yours}
         </div>
         <div className="flex flex-1 flex-col p-4">
           <p className="flex items-baseline gap-2">
-            <span className="numeric text-4xl font-extrabold">₹0</span>
+            <span className={price}>₹0</span>
             <span className="text-sm text-muted-foreground">always</span>
           </p>
           <p className="mt-1 text-sm text-muted-foreground">A free account, no card needed.</p>
           <Lines plan="FREE" />
           <div className="mt-auto pt-5">
             {current === "FREE" ? (
-              <button type="button" disabled className={cn(button, "border border-border text-muted-foreground")}>Current plan</button>
+              <button type="button" disabled className={cn(button, "border border-border bg-muted text-muted-foreground")}>Current plan</button>
             ) : freeCta}
           </div>
         </div>
