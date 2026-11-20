@@ -65,7 +65,7 @@ it("last rank by branch: per quota tab and seat category the highest rank, allot
     row("MD", "General Medicine", "All India", "Open", 6334, 500),
     row("Diploma", "Radiodiagnosis", "All India", "SC", 23520, 2), // no Open seat: last, after every Open one
     row("MD", "Anaesthesiology", "Deemed/Paid Seats", "Open", 158950, 236),
-    row("MD", "Anaesthesiology", "Non-Resident Indian", "Open", 150000), // restricted: never in a tab
+    row("MD", "Anaesthesiology", "Non-Resident Indian", "Open", 120000), // restricted: never in a tab
     row("MD", "Anaesthesiology", "Armed Forces Medical", "Open", 40000),
     row("MD", "Anaesthesiology", "Armed Forces Medical", "SC", 133207),
   ]);
@@ -75,7 +75,8 @@ it("last rank by branch: per quota tab and seat category the highest rank, allot
   expect([aiq.cats, aiq.pwd, deemed.cats, deemed.pwd]).toEqual([["Open", "OBC", "SC"], true, ["Open"], false]);
   expect(deemed.rows.map((r) => [r.course, r.last.Open])).toEqual([["MD Anaesthesiology", 158950]]);
   expect(dnb.rows).toEqual([]);
-  expect(restricted.map((r) => [r.quota, r.course, r.max])).toEqual([["Armed Forces Medical", "MD Anaesthesiology", 133207], ["Non-Resident Indian", "MD Anaesthesiology", 150000]]);
+  // Restricted: the last rank on any of its seats, lowest first (as the tabs), not grouped by quota.
+  expect(restricted.map((r) => [r.quota, r.course, r.max])).toEqual([["Non-Resident Indian", "MD Anaesthesiology", 120000], ["Armed Forces Medical", "MD Anaesthesiology", 133207]]);
 });
 
 it("her rank against the branches: reached first, closest to her rank first, then closed before it, closest first, then none on her seats", () => {

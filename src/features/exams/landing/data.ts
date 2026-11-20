@@ -179,8 +179,8 @@ type BranchAgg = { degree: string; name: string; slug: string; quota: string; ca
 /**
  * A round's cutoffs, summed per course, quota and seat category (SQL), as the branch tables: each open quota's courses,
  * most competitive first (Open last rank, lowest first; no Open seat last, A–Z), and its seat categories with any rank;
- * `restricted`, every restricted quota's courses (quota, then course, A–Z) with the last rank on any of its seats. A
- * restricted quota never mixes into an open quota's numbers.
+ * `restricted`, every restricted quota's courses with the last rank on any of its seats, most competitive first too
+ * (that last rank, lowest first; then quota and course, A–Z). A restricted quota never mixes into an open quota's numbers.
  */
 export function branchTabs(rows: BranchAgg[]) {
   const by = new Map<string, BranchRow>();
@@ -201,7 +201,7 @@ export function branchTabs(rows: BranchAgg[]) {
   const restricted = all
     .filter((r) => restrictedQuota(DEFAULT_EXAM, r.quota) && Object.keys(r.last).length)
     .map((r) => ({ ...r, max: Math.max(...Object.values(r.last)) }))
-    .sort((a, b) => a.quota.localeCompare(b.quota) || name(a, b));
+    .sort((a, b) => a.max - b.max || a.quota.localeCompare(b.quota) || name(a, b));
   return { tabs, restricted };
 }
 

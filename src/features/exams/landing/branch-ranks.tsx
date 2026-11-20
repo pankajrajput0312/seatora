@@ -1,7 +1,8 @@
 // NEET PG's latest round with a result, last rank by branch (the home page, right after the hero, and /neet-pg): one
 // table per open quota and one of the restricted quotas, all server-rendered. Tabs, the phone's second column and the
-// PwD switch are form controls read by CSS (:has), the row fold a checkbox; only the search box is client JS. Decide Home
-// shows the same tables (BranchTables) in the app's look, and with her rank, her rank against each branch.
+// PwD switch are form controls read by CSS (:has), the row fold a checkbox; only the search and the sort are client JS
+// (branch-search.tsx: the sort reorders the rows from their data-*, sortData). Decide Home shows the same tables
+// (BranchTables) in the app's look, and with her rank, her rank against each branch.
 import "server-only";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
@@ -12,7 +13,7 @@ import { decideLinks } from "@/features/decide/lib/links";
 import { roundName } from "@/features/decide/lib/round-status";
 import type { BaseCategory, Category } from "@/features/decide/types";
 import { cn } from "@/lib/cn";
-import { BranchSearch } from "./branch-search";
+import { BranchSearch, BranchSort } from "./branch-search";
 import { branchRanks, vsRank, type BranchRow } from "./data";
 
 /** Rows shown before "Show all N" (Decide Home: 10): the page stays short; a search shows every match. */
@@ -56,6 +57,9 @@ const rank = (k: number | undefined) => (k == null ? <span data-na="">—</span>
 const viaSignup = (next: string) => `/signup?${new URLSearchParams({ next })}`;
 const lastRanks = (slug: string, quota: string) => viaSignup(decideLinks("").lastRanks(slug, { quota }));
 const L = "underline decoration-foreground/25 underline-offset-4 hover:text-sky";
+/** A row's values for the sort (branch-search.tsx ordered): `data-i`, its place in the server's order. */
+const sortData = (r: BranchRow, i: number, keys: Partial<Record<string, number>>) =>
+  Object.fromEntries(Object.entries({ i, n: r.n, ...keys }).map(([k, v]) => [`data-${k}`, v]));
 
 export async function BranchRanks() {
   const d = await branchRanks();
@@ -126,8 +130,25 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
 
   return (
     <div data-lr className={cn("group/lr", SWITCHES, className)}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <BranchSearch />
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <BranchSearch />
+          {/* The first option is the server's order (most competitive first; with her rank, closest to it first). */}
+          <BranchSort fold={fold} store={app ? "seatora.lr-sort.app" : "seatora.lr-sort"}>
+            {me && <option value="">Closest to my rank</option>}
+            <option value={me ? "open" : ""}>Most competitive first</option>
+            <option value="open-desc">Least competitive first</option>
+            {!me ? (
+              <optgroup label="By category">
+                {phoneCats.map((c) => <option key={c} value={c.toLowerCase()}>{c} last rank</option>)}
+              </optgroup>
+            ) : (
+              mine !== "Open" && <option value="mine">{mine} last rank</option>
+            )}
+            <option value="n-desc">Most seats</option>
+            <option value="name">Branch A–Z</option>
+          </BranchSort>
+        </div>
         {!me && (
           <div className="flex flex-wrap items-center gap-x-5 text-sm">
             <fieldset className={cn("flex items-center gap-1 md:hidden", noCats.map((k) => hiddenOn[k]).join(" "))}>
@@ -190,7 +211,7 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
                     <span className="text-muted-foreground">Closed {formatRank(me.rank - r.best.last)} before you{via}</span>
                   );
                   return (
-                    <tr key={`${r.quota}|${r.slug}`} data-name={(restricted ? `${r.course} ${r.quota}` : r.course).toLowerCase()} data-more={i >= fold || undefined} className="border-t border-border hover:bg-muted">
+                    <tr key={`${r.quota}|${r.slug}`} data-name={(restricted ? `${r.course} ${r.quota}` : r.course).toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { open: r.last.Open, mine: mine === "Open" ? undefined : r.last[mine] })} className="border-t border-border hover:bg-muted">
                       <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
                         <Link href={href(r.slug, r.quota)} className={L}>{r.course}</Link>
                         {restricted && <span className="block text-xs text-muted-foreground">{r.quota}</span>}
@@ -226,7 +247,7 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
             </thead>
             <tbody>
               {t.rows.map((r, i) => (
-                <tr key={r.slug} data-name={r.course.toLowerCase()} data-more={i >= fold || undefined} className="border-t border-border hover:bg-muted">
+                <tr key={r.slug} data-name={r.course.toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { open: r.last.Open, ...Object.fromEntries(phoneCats.map((c) => [c.toLowerCase(), r.last[c]])) })} className="border-t border-border hover:bg-muted">
                   <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
                     <Link href={href(r.slug, r.quota)} className={L}>{r.course}</Link>
                     <span className="numeric block text-xs text-muted-foreground md:hidden">{seats(r.n)}</span>
@@ -261,7 +282,7 @@ export function BranchTables({ d, href, me, app = false, className }: { d: Data;
             </thead>
             <tbody>
               {d.restricted.map((r, i) => (
-                <tr key={`${r.quota}|${r.slug}`} data-name={`${r.course} ${r.quota}`.toLowerCase()} data-more={i >= fold || undefined} className="border-t border-border hover:bg-muted">
+                <tr key={`${r.quota}|${r.slug}`} data-name={`${r.course} ${r.quota}`.toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { last: r.max })} className="border-t border-border hover:bg-muted">
                   <td className="hidden px-4 py-2.5 text-muted-foreground md:table-cell">{r.quota}</td>
                   <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
                     <Link href={href(r.slug, r.quota)} className={L}>{r.course}</Link>
