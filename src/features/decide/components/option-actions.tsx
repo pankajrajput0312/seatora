@@ -344,8 +344,9 @@ function OptionsList({ rows, caption, start, L, view, latest, pastYears, include
   // Rounds by year (it opens the grid in the full-width row below, so the row stays narrow) and the cross-links.
   const rowTools = (r: ListRow) => (
     <>
-      <details open={open.has(r.id)} onToggle={(e) => toggle(r.id, e.currentTarget.open)}>
-        <summary className={summary}>Rounds by year</summary>
+      <details open={open.has(r.id)} onToggle={(e) => toggle(r.id, e.currentTarget.open)} className="group/d">
+        {/* 24px tall with a 44px hit area (as Last ranks): the table row stays as tall as its words. */}
+        <summary className="hit inline-flex min-h-6 cursor-pointer list-none items-center gap-1 text-sky [&::-webkit-details-marker]:hidden">Rounds by year{chevron}</summary>
       </details>
       <Related r={r} L={L} />
     </>
