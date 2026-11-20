@@ -81,12 +81,12 @@ export function HeldPicker({ current, link }: { current: { name: string; round: 
           <Button variant="secondary" className="shrink-0 max-sm:w-full">{current ? "Change seat" : "I already hold a seat"}</Button>
         )}
       </Dialog.Trigger>
-      <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
+      <Dialog.Overlay className="fixed inset-0 z-50 bg-foreground/40" />
       {/* Focus on the search: finding her seat is the first thing to do. */}
-      <Dialog.Content onOpenAutoFocus={(e) => { e.preventDefault(); find.current?.focus(); }} className="fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col rounded-t-xl border border-border bg-popover p-4 shadow-overlay outline-none sm:p-6 md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl">
+      <Dialog.Content onOpenAutoFocus={(e) => { e.preventDefault(); find.current?.focus(); }} className="fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col rounded-t-2xl border border-border bg-popover p-4 shadow-overlay outline-none sm:p-6 md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:w-full md:max-w-xl md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Dialog.Title className="text-xl font-semibold">Your current seat</Dialog.Title>
+            <Dialog.Title className="text-h2 font-semibold">Your current seat</Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-muted-foreground">
               {trying ? "For this trial only: nothing is saved." : "Saved to your profile, on every device you sign in on."} Options then pins it as Your seat and can show only the options that beat it.
             </Dialog.Description>
