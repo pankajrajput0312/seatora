@@ -9,9 +9,9 @@ import { seatLists } from "@/features/decide/server/seats";
 import { courseTerms } from "@/features/decide/server/terms";
 import { examGroupCourses } from "@/features/decide/service";
 import { statCells } from "@/features/decide/lib/stat-format";
-import { eligibleCategories, isStrayRound } from "@/features/decide/lib/reach";
+import { eligibleCategories, isStrayRound, latestRound } from "@/features/decide/lib/reach";
 import { stepsNow } from "@/features/decide/lib/round-status";
-import { optionId, type BaseCategory, type Round } from "@/features/decide/types";
+import { baseCategories, optionId, type BaseCategory, type Category, type Round } from "@/features/decide/types";
 import type { Opt } from "@/features/decide/server/catalog";
 import { db } from "@/lib/db";
 import { quotaIn, roundIn, roundNamesOf, tidyLabel, type Exam } from "../exam";
@@ -165,6 +165,65 @@ export const rankCheck = (rank: number, category: BaseCategory, take = 5) =>
     };
   });
 export type RankCheck = Awaited<ReturnType<typeof rankCheck>>;
+
+/** The branch table's quota tabs (the quotas anyone can take), All India first; every other quota is a restricted one. */
+export const branchQuotas = [
+  { key: "aiq", quota: "All India", label: "All India" },
+  { key: "deemed", quota: "Deemed/Paid Seats", label: "Deemed (Self-Financed Merit Seat)" },
+  { key: "dnb", quota: "DNB Quota", label: "DNB" },
+] as const;
+/** One course in one quota of a round: its last (highest) rank on each seat category, and the allotments it made. */
+export type BranchRow = { course: string; slug: string; quota: string; last: Partial<Record<Category, number>>; n: number };
+type BranchAgg = { degree: string; name: string; slug: string; quota: string; category: string; closing: number | null; n: number };
+
+/**
+ * A round's cutoffs, summed per course, quota and seat category (SQL), as the branch tables: each open quota's courses,
+ * most competitive first (Open last rank, lowest first; no Open seat last, A–Z), and its seat categories with any rank;
+ * `restricted`, every restricted quota's courses (quota, then course, A–Z) with the last rank on any of its seats. A
+ * restricted quota never mixes into an open quota's numbers.
+ */
+export function branchTabs(rows: BranchAgg[]) {
+  const by = new Map<string, BranchRow>();
+  for (const r of rows) {
+    const k = `${r.quota}|${r.slug}`;
+    const b = by.get(k) ?? by.set(k, { course: `${r.degree} ${r.name}`, slug: r.slug, quota: r.quota, last: {}, n: 0 }).get(k)!;
+    const c = r.category as Category;
+    b.n += r.n;
+    if (r.closing != null) b.last[c] = Math.max(b.last[c] ?? 0, r.closing);
+  }
+  const all = [...by.values()];
+  const name = (a: BranchRow, b: BranchRow) => a.course.localeCompare(b.course);
+  const tabs = branchQuotas.map((t) => {
+    const rows = all.filter((r) => r.quota === t.quota).sort((a, b) => (a.last.Open ?? Infinity) - (b.last.Open ?? Infinity) || name(a, b));
+    const cats = baseCategories.filter((c) => rows.some((r) => r.last[c] != null || r.last[`${c} PwD`] != null));
+    return { ...t, rows, cats, pwd: rows.some((r) => baseCategories.some((c) => r.last[`${c} PwD`] != null)) };
+  });
+  const restricted = all
+    .filter((r) => restrictedQuota(DEFAULT_EXAM, r.quota) && Object.keys(r.last).length)
+    .map((r) => ({ ...r, max: Math.max(...Object.values(r.last)) }))
+    .sort((a, b) => a.quota.localeCompare(b.quota) || name(a, b));
+  return { tabs, restricted };
+}
+
+/** NEET PG's latest round with a result (lib/reach.ts latestRound: R1, then R2 once imported…), as branchTabs. */
+const branchTable = perImport(async () => {
+  const cat = await getCatalog(DEFAULT_EXAM);
+  const { year, round, provisional } = latestRound(cat.sources);
+  const src = cat.sources.find((s) => s.year === year && s.round === round);
+  if (!src) return null;
+  const rows = await db.$queryRaw<BranchAgg[]>`
+    SELECT s.degree, s.name, s.slug, c.quota, c.category, MAX(c."closingRank") AS closing, SUM(c.n)::int AS n
+    FROM "Cutoff" c JOIN "CollegeSpecialty" cs ON cs.id = c."collegeSpecialtyId" JOIN "Specialty" s ON s.id = cs."specialtyId"
+    WHERE c.exam = ${DEFAULT_EXAM} AND c."counsellingYear" = ${year} AND c.round = ${round}
+    GROUP BY s.id, c.quota, c.category`;
+  return rows.length ? { year: yearName(DEFAULT_EXAM, year), round, provisional, source: { name: src.name, url: src.url }, ...branchTabs(rows) } : null;
+});
+/** The home page's and /neet-pg's last rank by branch; null (the section hidden) without data or when the read fails. */
+export const branchRanks = () =>
+  asTrustedServer(() => branchTable()).catch((e) => {
+    console.error("branch last ranks", e);
+    return null;
+  });
 
 /**
  * Residents for the public pages, counts only (never a name, which only signed-in members see): every resident Seatora

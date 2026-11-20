@@ -18,6 +18,7 @@ import { alertOf, badgeOf, fmtIST, fmtNote, roundName, stepName } from "@/featur
 import { kindName, type Round } from "@/features/decide/types";
 import { crossover } from "../crossover";
 import { authorityOf, DEFAULT_EXAM, sessionExams, type ExamKey } from "../keys";
+import { BranchRanks } from "./branch-ranks";
 import { landingData, type LandingData } from "./data";
 import { landingGate } from "./gate";
 import { commonFaqs, landingWords } from "./words";
@@ -157,6 +158,8 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
           )}
         </Container>
       </section>
+
+      {exam === DEFAULT_EXAM && <BranchRanks />}
 
       <Inside d={d} title={`What's inside for ${E.label}`} />
 

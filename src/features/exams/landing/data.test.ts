@@ -6,8 +6,9 @@ import type { Category, Cutoff, DecideData, Round } from "@/features/decide/type
 // quotas anyone can take and the seats her category can take; stray rounds, restricted quotas and other years never count.
 vi.stubEnv("DATABASE_URL", "");
 let rankCheck: typeof import("./data").rankCheck;
+let branchTabs: typeof import("./data").branchTabs;
 beforeAll(async () => {
-  ({ rankCheck } = await import("./data"));
+  ({ rankCheck, branchTabs } = await import("./data"));
   setTestCatalog(data);
 });
 afterAll(() => setTestCatalog(null));
@@ -52,4 +53,26 @@ it("counts the options that took the rank last year and shows the tightest at di
   // Institute A's All India seat took 1,400 only in Round 2; nothing took 5,000 outside the stray round.
   expect((await rankCheck(1400, "Open")).rows).toMatchObject([{ college: { name: "Institute A" }, quota: "All India", round: "R2", closing: 1500 }]);
   expect(await rankCheck(5000, "Open")).toMatchObject({ n: 0, rows: [] });
+});
+
+it("last rank by branch: per quota tab and seat category the highest rank, allotments summed, Open's lowest first; restricted quotas apart", () => {
+  const row = (degree: string, name: string, quota: string, category: string, closing: number | null, n = 1) => ({ degree, name, slug: `${degree}-${name}`.toLowerCase(), quota, category, closing, n });
+  const { tabs, restricted } = branchTabs([
+    row("MD", "Anaesthesiology", "All India", "Open", 28979, 600),
+    row("MD", "Anaesthesiology", "All India", "OBC", 34013, 300),
+    row("MD", "Anaesthesiology", "All India", "OBC PwD", 90000),
+    row("MD", "General Medicine", "All India", "Open", 6334, 500),
+    row("Diploma", "Radiodiagnosis", "All India", "SC", 23520, 2), // no Open seat: last, after every Open one
+    row("MD", "Anaesthesiology", "Deemed/Paid Seats", "Open", 158950, 236),
+    row("MD", "Anaesthesiology", "Non-Resident Indian", "Open", 150000), // restricted: never in a tab
+    row("MD", "Anaesthesiology", "Armed Forces Medical", "Open", 40000),
+    row("MD", "Anaesthesiology", "Armed Forces Medical", "SC", 133207),
+  ]);
+  const [aiq, deemed, dnb] = tabs;
+  expect(aiq.rows.map((r) => [r.course, r.last.Open, r.n])).toEqual([["MD General Medicine", 6334, 500], ["MD Anaesthesiology", 28979, 901], ["Diploma Radiodiagnosis", undefined, 2]]);
+  expect(aiq.rows[1].last).toEqual({ Open: 28979, OBC: 34013, "OBC PwD": 90000 });
+  expect([aiq.cats, aiq.pwd, deemed.cats, deemed.pwd]).toEqual([["Open", "OBC", "SC"], true, ["Open"], false]);
+  expect(deemed.rows.map((r) => [r.course, r.last.Open])).toEqual([["MD Anaesthesiology", 158950]]);
+  expect(dnb.rows).toEqual([]);
+  expect(restricted.map((r) => [r.quota, r.course, r.max])).toEqual([["Armed Forces Medical", "MD Anaesthesiology", 133207], ["Non-Resident Indian", "MD Anaesthesiology", 150000]]);
 });
