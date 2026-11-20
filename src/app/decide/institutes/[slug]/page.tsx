@@ -26,8 +26,8 @@ import { TypeBadge } from "@/features/decide/components/type-badge";
 import { FilterDropdown } from "@/features/decide/components/filter-dropdown";
 import { FilterForm, FiltersPanel } from "@/features/decide/components/filter-form";
 import { EmptyState, Field, FilterBar, Pager, rangeLabel, Select, smallLink, StatStrip, tbl, toolbar } from "@/features/decide/components/ui";
-import { ViewPanes, ViewToggle } from "@/features/decide/components/view-toggle";
-import { SortMenu } from "@/features/decide/components/view-menu";
+import { ViewPanes } from "@/features/decide/components/view-toggle";
+import { LayoutMenu, SortMenu } from "@/features/decide/components/view-menu";
 import { byNumber, byText, chain, type Cmp } from "@/features/decide/lib/sorts";
 import { feeValue } from "@/features/decide/lib/term-filters";
 import { chosenView, pageSizeFor } from "@/features/decide/server/view";
@@ -453,14 +453,15 @@ export default async function InstitutePage({ params, searchParams }: Props) {
         <section aria-labelledby="courses-h" className="grid grid-cols-1 gap-3">
           <h2 id="courses-h" className="sr-only">Courses</h2>
           {unlistedNote}
-          <div className={toolbarRow}>
+          {/* relative: on phones the View menu's panel opens across this row, under it. */}
+          <div className={`${toolbarRow} relative`}>
             {mine && round.length > 0 && options.length > 0 ? (
               <CategoryToggle mine={mine} all={!seatCats} href={(all) => L.with(`/decide/institutes/${slug}`, { scat: all ? "all" : null })} />
             ) : <span className="max-md:hidden" />}
             {options.length > 0 && (
               <span className="flex flex-wrap items-center gap-2">
                 <SortMenu value={courseSort} choices={courseSorts.filter((s) => (s !== "reach" || profile) && (s !== "fee" || E.has.fees)).map((s) => ({ value: s, ...courseSortWords[s], href: L.with(`/decide/institutes/${slug}`, { sort: s || null, page: null }) }))} />
-                <ViewToggle page="institute-courses" />
+                <LayoutMenu page="institute-courses" view={await chosenView(sp, "institute-courses")} />
               </span>
             )}
           </div>
@@ -630,6 +631,7 @@ export default async function InstitutePage({ params, searchParams }: Props) {
                 />
               )
             }
+            view={allot.total > 0 && <LayoutMenu page="institute-allotments" view={await chosenView(sp, "institute-allotments")} />}
           >
             <input type="hidden" name="tab" value="allotments" />
             <Field label="Year"><Select name="year" value={allotYear ? String(allotYear) : undefined} all="All years" options={meta.years.map((y) => ({ value: String(y.year), label: y.label }))} /></Field>
@@ -641,7 +643,6 @@ export default async function InstitutePage({ params, searchParams }: Props) {
               <InfoTip label="allotments here">Newest first. Ranks only, never names. Select a rank to scan the allotments around it that year.</InfoTip>
               <Link href={L.allotments({ inst: slug, course: allotCourse, year: allotYear })} className={`${smallLink} text-sky`}>Open in Allotments</Link>
             </p>
-            {allot.total > 0 && <ViewToggle page="institute-allotments" />}
           </div>
           {allot.total === 0 ? (
             <EmptyState title="No allotments match these filters." href={L.institute(slug, "allotments")} />
