@@ -506,7 +506,7 @@ export function FeesSection({ t: all, id, className, groups = [], courses }: { t
   const title = programmeTitle(t);
   return (
     <section aria-labelledby={id} className={cn("grid content-start gap-5", className)}>
-      <h3 id={id} className="text-lg font-semibold">{title}</h3>
+      <h3 id={id} className="text-title font-semibold">{title}</h3>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="grid min-w-0 content-start gap-6">
           {groups.length > 0 ? groups.map((g, i) => <FeeGroup key={g.quotaGroup} g={g} id={`${id}-g${i}`} of={id} title={title} off={offs[i]} courses={courses} exam={t.exam} />) : <TermsYears t={t} />}

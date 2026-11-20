@@ -236,7 +236,7 @@ export default async function AllotmentsPage({ searchParams }: { searchParams: P
           {rows.map((a, i) => (
             <tr key={i} className={tbl.row}>
               <td className={`${td} ${stick} text-right max-md:text-left md:whitespace-nowrap ${tbl.pin}`}>
-                {rankLink(a, "numeric inline-flex min-h-6 min-w-6 items-center justify-end text-[15px] font-semibold hover:text-sky hover:underline max-md:justify-start")}
+                {rankLink(a, "numeric inline-flex min-h-6 min-w-6 items-center justify-end text-[0.9375rem] font-semibold hover:text-sky hover:underline max-md:justify-start")}
                 <span className="block text-xs md:hidden"><span className="numeric">{yn(a.year)}</span> {roundOf(a)} <Provisional when={a.provisional} /></span>
                 <span title={inst ? a.courseName : a.college.name} className={`block text-xs text-muted-foreground md:hidden ${tbl.clamp}`}>{inst ? a.courseName : a.college.name}</span>
                 {/* Two stacked targets, each at least 24 × 24 px (WCAG 2.5.8). */}
