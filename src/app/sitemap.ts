@@ -7,6 +7,9 @@ import { residentsData, residentsPath } from "@/features/exams/landing/residents
 import { examKeys, exams } from "@/features/exams/registry";
 import { db } from "@/lib/db";
 
+/** NEET PG's guides built here (the colleges' and residents' pages list themselves). */
+const hubs = ["/neet-pg/cutoff", "/neet-pg/college-predictor", "/neet-pg/counselling-2026", "/neet-pg/stipend-bond"];
+
 // Re-read hourly, like the pages it lists: a new MCC result adds its round's cutoff page and moves the dates.
 export const revalidate = 3600;
 
@@ -21,6 +24,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     page("", 1, lastModified),
     // Each open exam's landing page (registry `public`); a staff-only exam's is noindex and never listed.
     ...examKeys.filter((k) => exams[k].public).map((k) => page(`/${k}`, 0.8, lastModified)),
+    // NEET PG's guides (cutoff hub, college predictor, counselling, stipend and bond): each read from the data, so the import marker.
+    ...hubs.map((p) => page(p, 0.7, lastModified)),
     // Every result round's cutoff page; only the newest changes with an import (provisional to final), older ones keep no date.
     ...rounds.map((r, i) => page(cutoffPath(r), i === 0 ? 0.8 : 0.5, i === 0 ? lastModified : undefined)),
     // The residents pages (counts only), dated when the newest admitted list arrived (the residents import's DataSource).

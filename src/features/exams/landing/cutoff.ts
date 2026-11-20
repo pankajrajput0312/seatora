@@ -36,3 +36,13 @@ export function cutoffWords({ year, round, provisional }: CutoffRound) {
     description: `${provisional ? "Provisional " : ""}NEET PG ${year} ${roundName[round]} cutoff from MCC's result: last All India Rank by branch for AIQ, deemed and DNB seats, per category.`,
   };
 }
+
+/**
+ * A course's public slug ("md-general-medicine"): its own `slug` (Specialty.slug) when it has one, else degree and name
+ * lowercased, every run of other characters one "-". The one rule for /neet-pg/cutoff/[course] and every link to it.
+ */
+export const courseSlug = (c: { slug?: string | null; degree: string; name: string }) =>
+  c.slug || `${c.degree}-${c.name}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** A course's last rank in every round: "/neet-pg/cutoff/md-general-medicine". */
+export const coursePath = (c: Parameters<typeof courseSlug>[0]) => `/neet-pg/cutoff/${courseSlug(c)}`;

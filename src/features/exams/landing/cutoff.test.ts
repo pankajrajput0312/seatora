@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { rounds } from "@/features/decide/types";
-import { cutoffPath, cutoffWords, roundsOf } from "./cutoff";
+import { courseSlug, coursePath, cutoffPath, cutoffWords, roundsOf } from "./cutoff";
 
 it("one page per result round, newest first, provisional while any of its sources is", () => {
   const src = [
@@ -30,4 +30,10 @@ it("every round's words fit Google's title (with \" · Seatora\") and descriptio
     title: "NEET PG 2026 Round 2 Cutoff: Last Rank by Branch",
     h1: "NEET PG 2026 Round 2 Cutoff (Provisional): Last Rank by Branch",
   });
+});
+
+it("a course's page is its own slug, else degree and name in kebab case (as the data's slugs are made)", () => {
+  expect(coursePath({ slug: "md-general-medicine", degree: "MD", name: "x" })).toBe("/neet-pg/cutoff/md-general-medicine");
+  expect(courseSlug({ degree: "Diploma", name: "GYNAE. and OBST." })).toBe("diploma-gynae-and-obst");
+  expect(courseSlug({ slug: "", degree: "DNB", name: "Cardio Vascular and Thoracic Surgery (Direct 6 Years Course)" })).toBe("dnb-cardio-vascular-and-thoracic-surgery-direct-6-years-course");
 });

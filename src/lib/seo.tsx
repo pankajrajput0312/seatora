@@ -23,6 +23,22 @@ export const pageWords = {
     title: `Pricing: NEET PG 2026 Season Pass, ${price} once`,
     description: `Seatora pricing: a free account, or full access for ${price} once for the NEET PG 2026 season (until ${longDate(SEASON_PASS_UNTIL)}). No subscription, nothing renews.`,
   },
+  "/neet-pg/cutoff": {
+    title: "NEET PG Cutoff 2026 & Previous Year Closing Ranks",
+    description: "NEET PG cutoff 2026 and previous years (2023–2025): last rank by round and branch from MCC's results, AIQ, deemed and DNB. State quota not covered.",
+  },
+  "/neet-pg/college-predictor": {
+    title: "NEET PG College Predictor 2026 by Rank",
+    description: "NEET PG college predictor 2026 from MCC's closing ranks: enter your AIR and category to see where ranks like yours were allotted. History, not a promise.",
+  },
+  "/neet-pg/counselling-2026": {
+    title: "NEET PG Counselling 2026: Dates, Rounds, Results",
+    description: "NEET PG counselling 2026 dates from MCC's notices: Round 1, Round 2 result, Round 3 and stray round schedule, deposits and upgrades. AIQ only.",
+  },
+  "/neet-pg/stipend-bond": {
+    title: "NEET PG Stipend & Bond: State and College-wise",
+    description: "NEET PG stipend and service bond by state and college: monthly stipends, bond years and penalties for MCC seats, from official documents.",
+  },
 } as const;
 
 /**

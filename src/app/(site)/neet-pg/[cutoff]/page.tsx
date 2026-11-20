@@ -8,8 +8,8 @@ import { Faq } from "@/components/marketing/faq";
 import { SourceLabel } from "@/components/ui/source-label";
 import { siteConfig } from "@/config/site";
 import { roundName } from "@/features/decide/lib/round-status";
-import { BranchNotes, BranchTables, branchHref } from "@/features/exams/landing/branch-ranks";
-import { cutoffPath, cutoffWords } from "@/features/exams/landing/cutoff";
+import { BranchNotes, BranchTables } from "@/features/exams/landing/branch-ranks";
+import { coursePath, cutoffPath, cutoffWords } from "@/features/exams/landing/cutoff";
 import { cutoffPage, cutoffRounds } from "@/features/exams/landing/data";
 import { cutoffText } from "@/features/exams/landing/words";
 import { breadcrumbLd, JsonLd, pageMeta } from "@/lib/seo";
@@ -22,6 +22,8 @@ export const generateStaticParams = async () => (await cutoffRounds()).slice(0, 
 type Props = { params: Promise<{ cutoff: string }> };
 const load = async ({ params }: Props) => cutoffPage(`/neet-pg/${(await params).cutoff}`);
 const link = "underline decoration-foreground/25 underline-offset-4 hover:text-sky";
+/** A branch's own page, every round (/neet-pg/cutoff/md-general-medicine), whatever the quota. */
+const branchPage = (slug: string) => coursePath({ slug, degree: "", name: "" });
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const p = await load(props);
@@ -57,12 +59,14 @@ export default async function CutoffPage(props: Props) {
 
   return (
     <>
-      <JsonLd data={{ "@graph": [breadcrumbLd([[siteConfig.name, "/"], ["NEET PG counselling", "/neet-pg"], [w.name, d.path]]), dataset] }} />
+      <JsonLd data={{ "@graph": [breadcrumbLd([[siteConfig.name, "/"], ["NEET PG counselling", "/neet-pg"], ["NEET PG cutoff", "/neet-pg/cutoff"], [w.name, d.path]]), dataset] }} />
       <section aria-labelledby="cut-h" className="border-b border-border">
         <Container className="pt-8 pb-16 sm:pt-16 md:pb-24">
           <nav aria-label="Breadcrumb">
             <ol className="flex flex-wrap gap-x-2 text-sm text-muted-foreground">
               <li><Link href="/neet-pg" className={link}>NEET PG counselling</Link></li>
+              <li aria-hidden>/</li>
+              <li><Link href="/neet-pg/cutoff" className={link}>NEET PG cutoff</Link></li>
               <li aria-hidden>/</li>
               <li aria-current="page">{at.year} {round} cutoff</li>
             </ol>
@@ -86,7 +90,7 @@ export default async function CutoffPage(props: Props) {
             <SourceLabel provenance={{ sourceName: d.source.name, sourceUrl: d.source.url, sourceType: "OFFICIAL", academicYear: d.year }} />
           </p>
 
-          <BranchTables d={d} href={branchHref} className="mt-8" />
+          <BranchTables d={d} href={branchPage} className="mt-8" />
           <BranchNotes d={d} />
         </Container>
       </section>
@@ -96,6 +100,9 @@ export default async function CutoffPage(props: Props) {
       <section aria-labelledby="rounds-h" className="border-b border-border">
         <Container className="py-16 md:py-20">
           <h2 id="rounds-h" className="text-2xl font-semibold tracking-tight md:text-3xl">Other rounds</h2>
+          <p className="mt-3 text-sm">
+            <Link href="/neet-pg/cutoff" className={`inline-flex min-h-11 items-center ${link}`}>NEET PG cutoff: every round and every branch</Link>
+          </p>
           <ul className="mt-6 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
             {p.rounds.filter((r) => cutoffPath(r) !== d.path).map((r) => (
               <li key={cutoffPath(r)}>

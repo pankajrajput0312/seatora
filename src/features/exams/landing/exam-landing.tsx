@@ -172,6 +172,22 @@ export async function ExamLanding({ exam }: { exam: ExamKey }) {
         )}
       </Inside>
 
+      {exam === DEFAULT_EXAM && (
+        <section aria-labelledby="guides-h" className="border-b border-border">
+          <Container className="py-16 md:py-20">
+            <h2 id="guides-h" className="text-2xl font-semibold tracking-tight md:text-3xl">NEET PG guides</h2>
+            <ul className="mt-8 grid gap-x-12 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+              {siteConfig.neetPg.map((g) => (
+                <li key={g.href} className="border-t border-border pt-4">
+                  <Link href={g.href} className="text-base font-medium underline decoration-foreground/25 underline-offset-4 hover:text-sky">{g.title}</Link>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{g.about}</p>
+                </li>
+              ))}
+            </ul>
+          </Container>
+        </section>
+      )}
+
       <section aria-labelledby="how-h" className="border-b border-border">
         <Container className="py-16 md:py-24">
           <h2 id="how-h" className="text-2xl font-semibold tracking-tight md:text-3xl">How it works</h2>

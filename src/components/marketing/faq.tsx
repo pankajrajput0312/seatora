@@ -31,7 +31,14 @@ export const faqs = (): FaqItem[] => [
   },
   {
     q: "Will it tell me which college I'll get?",
-    a: "No one can promise that honestly. Seatora shows where your rank sat against previous-year closing ranks by round, quota and category, so you can build a realistic, well-researched choice list.",
+    a: (
+      <>
+        No one can promise that honestly. Seatora shows where your rank sat against{" "}
+        <Link href="/neet-pg/cutoff" className="text-sky underline underline-offset-4">previous-year closing ranks</Link> by round, quota and category, so you
+        can build a realistic, well-researched choice list.
+      </>
+    ),
+    text: "No one can promise that honestly. Seatora shows where your rank sat against previous-year closing ranks by round, quota and category, so you can build a realistic, well-researched choice list.",
   },
   {
     q: "Where does the data come from?",

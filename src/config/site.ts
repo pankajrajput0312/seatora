@@ -15,4 +15,13 @@ export const siteConfig = {
     { label: "Pricing", href: "/pricing" },
     { label: "FAQ", href: "/#faq" },
   ],
+  /** NEET PG's public guides: the footer's "NEET PG" group (`label`) and /neet-pg's links (`title`, `about`). */
+  neetPg: [
+    { label: "Cutoff", href: "/neet-pg/cutoff", title: "NEET PG cutoff", about: "Last rank by round and branch, every year in MCC's results." },
+    { label: "Colleges", href: "/neet-pg/colleges", title: "NEET PG colleges", about: "Every institute in MCC's NEET PG counselling, one page each." },
+    { label: "College predictor", href: "/neet-pg/college-predictor", title: "College predictor", about: "Where ranks like yours were allotted: history, not a prediction." },
+    { label: "Counselling 2026", href: "/neet-pg/counselling-2026", title: "Counselling 2026", about: "Rounds, dates and results from MCC's notices." },
+    { label: "Stipend & bond", href: "/neet-pg/stipend-bond", title: "Stipend and bond", about: "Monthly stipends, service bonds and penalties by state and college." },
+    { label: "Residents", href: "/neet-pg/residents", title: "Residents", about: "Residents at each college by course and year, from MCC's admitted lists." },
+  ],
 } as const;

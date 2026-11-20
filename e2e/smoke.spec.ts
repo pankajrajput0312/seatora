@@ -64,6 +64,19 @@ test("the rank check answers a rank with no sign-in, and sign-up says what it op
   await expect(page.getByRole("link", { name: "Sign in" }).and(page.locator("main a"))).toHaveCount(1); // once, under the form
 });
 
+test("NEET PG's guides render with JSON-LD that parses, each in the footer's NEET PG links, and the college table searches", async ({ page }) => {
+  needsDb();
+  for (const path of ["/neet-pg/cutoff", "/neet-pg/college-predictor", "/neet-pg/counselling-2026", "/neet-pg/stipend-bond"]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1 }), path).toBeVisible();
+    for (const ld of await page.locator('script[type="application/ld+json"]').allTextContents()) expect(() => JSON.parse(ld), path).not.toThrow();
+    await expect(page.locator(`footer a[href="${path}"]`), path).toHaveCount(1);
+  }
+  const table = page.getByRole("table", { name: "NEET PG stipend and bond by college" });
+  await page.getByLabel("Search a college or state").fill("kerala");
+  await expect(table.locator("tbody tr").first()).toContainText("Kerala");
+});
+
 test("a visitor's planner link in the footer goes to sign-up, never to the sign-in page", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator('footer a[href="/neet-pg"]')).toHaveCount(1);

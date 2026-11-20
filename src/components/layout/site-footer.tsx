@@ -33,6 +33,12 @@ export function SiteFooter() {
           <span className="font-mono text-xs">© {new Date().getFullYear()}{business.sellerName && ` ${business.sellerName}`}</span>
         </nav>
       </Container>
+      <Container>
+        <nav aria-label="NEET PG" className="flex flex-wrap items-center gap-x-6 border-t border-border pt-2 pb-6 text-sm text-muted-foreground">
+          <span className="mr-1 font-mono text-xs uppercase tracking-widest">NEET PG</span>
+          {siteConfig.neetPg.map((item) => <Link key={item.href} href={item.href} className={link}>{item.label}</Link>)}
+        </nav>
+      </Container>
       <Container aria-hidden className="select-none">
         <p className="-mb-[0.18em] font-pixel text-[22vw] leading-none text-foreground/[0.06] [mask-image:linear-gradient(to_bottom,black_40%,transparent)] lg:text-[16rem]">
           seatora

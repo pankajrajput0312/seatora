@@ -22,7 +22,7 @@ import { cutoffPath, roundsOf, type CutoffRound } from "./cutoff";
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const byAllotments = (year: number) => (a: Opt, b: Opt) => (b.byYear[year] ?? 0) - (a.byYear[year] ?? 0) || (a.id < b.id ? -1 : 1);
 /** An option's institute, course name and slug, and quota as the exam names it. */
-const nameIn = (cat: Catalog, E: Pick<Exam, "quotaNames" | "typos">, o: Opt) => {
+export const nameIn = (cat: Catalog, E: Pick<Exam, "quotaNames" | "typos">, o: Opt) => {
   const course = cat.courseOf.get(`${o.degree}|${o.specialty}`);
   return { college: cat.collegeByKey.get(o.college)!, course: course ? `${course.degree} ${course.name}` : o.degree, courseSlug: course?.slug ?? "", quota: quotaIn(E, o.quota) };
 };
