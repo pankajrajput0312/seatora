@@ -111,11 +111,14 @@ export async function handleMessage(m: Incoming) {
     }
     if (r === "expired" || login.full) return sendText(m.phone, "That code has expired. Tap Continue with WhatsApp again.");
   }
+  // Only a number with a Seatora account gets the assistant (owner, 20 Nov 2026): anyone else gets the sign-up link,
+  // and no account is made from a chat message (an account is made only by signing up, e.g. the login code above).
+  const user = await db.user.findUnique({ where: { phone: m.phone } });
+  if (!user) return signupPrompt(m.phone);
   const cfg = askConfig();
   // Speed over depth on a chat (the voice agent's bot runs a fast model with no thinking): low effort always, and
   // WHATSAPP_MODEL can name a faster model than the Ask page's.
   const model = process.env.WHATSAPP_MODEL?.trim() || cfg.model;
-  const user = await accountOf(m.phone, m.name);
   // Meta redelivers until it gets a 200: the message id is the turn's request id, so a repeat never runs twice.
   const requestId = createHash("sha256").update(m.id).digest("hex").slice(0, 40);
   const turn = await startTurn(user.id, { conversationId: await chatOf(user.id), requestId, question: m.text.slice(0, 2000) });
@@ -200,4 +203,18 @@ export async function handleMessage(m: Incoming) {
   }
   if (text.trim()) await sendText(m.phone, toWhatsApp(text));
   if (offered) await sendChoices(m.phone, toWhatsApp(offered.question), offered.options as Choice[]);
+}
+
+/** The reply to a number with no Seatora account: the sign-up link, at most once in SIGNUP_PROMPT_HOURS per number (so
+ * another bot can't loop with ours); nothing else, and no assistant. The number is kept only as a short hash. */
+const SIGNUP_PROMPT_HOURS = 6;
+export async function signupPrompt(phone: string) {
+  const p = createHash("sha256").update(phone).digest("hex").slice(0, 16);
+  const since = new Date(Date.now() - SIGNUP_PROMPT_HOURS * 3_600_000);
+  const recent = await db.funnelEvent.findFirst({ where: { name: "wa_signup_prompt", at: { gte: since }, meta: { path: ["p"], equals: p } }, select: { id: true } });
+  if (recent) return;
+  await db.funnelEvent.create({ data: { name: "wa_signup_prompt", meta: { p } } });
+  const url = `${siteConfig.url}/signup`;
+  const text = "Hi! Seatora's assistant is for Seatora members. Sign up free (tap Continue with WhatsApp, it takes a minute), then message me here again.";
+  return (await sendLink(phone, text, "Sign up free", url)) || sendText(phone, `${text}\n${url}`);
 }
