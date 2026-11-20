@@ -59,7 +59,7 @@ const viaSignup = (next: string) => `/signup?${new URLSearchParams({ next })}`;
 export const branchHref = (slug: string, quota: string) => viaSignup(decideLinks("").lastRanks(slug, { quota }));
 const L = "underline decoration-foreground/25 underline-offset-4 hover:text-sky";
 /** A row's values for the sort (branch-search.tsx ordered): `data-i`, its place in the server's order. */
-const sortData = (r: BranchRow, i: number, keys: Partial<Record<string, number>>) =>
+const sortData = (r: BranchRow, i: number, keys: Partial<Record<string, number | string>>) =>
   Object.fromEntries(Object.entries({ i, n: r.n, ...keys }).map(([k, v]) => [`data-${k}`, v]));
 
 /**
@@ -113,8 +113,11 @@ export function BranchNotes({ d }: { d: Pick<Data, "restricted"> }) {
   );
 }
 
-/** What a table's rows are: branches (default), a college's courses, a branch's colleges; `eg`, the search's example. */
-export type Noun = { one: string; many: string; eg: string };
+/**
+ * What a table's rows are: branches (default), a college's courses, a branch's colleges; `eg`, the search's example;
+ * `sub`, what each row's `sub` line is ("State": a branch's colleges), a sort A–Z by it.
+ */
+export type Noun = { one: string; many: string; eg: string; sub?: string };
 const BRANCH: Noun = { one: "branch", many: "branches", eg: "radio" };
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
@@ -172,6 +175,7 @@ export function BranchTables({ d, href, me, app = false, className, noun = BRANC
             )}
             <option value="n-desc">Most seats</option>
             <option value="name">{cap(noun.one)} A–Z</option>
+            {!me && noun.sub && <option value="sub">{noun.sub} A–Z</option>}
           </BranchSort>
         </div>
         {!me && (
@@ -274,7 +278,7 @@ export function BranchTables({ d, href, me, app = false, className, noun = BRANC
             </thead>
             <tbody>
               {t.rows.map((r, i) => (
-                <tr key={r.slug} data-name={`${r.course} ${r.sub ?? ""}`.trim().toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { open: r.last.Open, ...Object.fromEntries(phoneCats.map((c) => [c.toLowerCase(), r.last[c]])) })} className="border-t border-border hover:bg-muted">
+                <tr key={r.slug} data-name={`${r.course} ${r.sub ?? ""}`.trim().toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { open: r.last.Open, ...Object.fromEntries(phoneCats.map((c) => [c.toLowerCase(), r.last[c]])), sub: r.sub })} className="border-t border-border hover:bg-muted">
                   <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
                     <Link href={href(r.slug, r.quota)} className={L}>{r.course}</Link>
                     {r.sub && <span className="block text-xs text-muted-foreground">{r.sub}</span>}
@@ -317,7 +321,7 @@ export function BranchTables({ d, href, me, app = false, className, noun = BRANC
             </thead>
             <tbody>
               {d.restricted.map((r, i) => (
-                <tr key={`${r.quota}|${r.slug}`} data-name={`${r.course} ${r.sub ?? ""} ${r.quota}`.toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { last: r.max })} className="border-t border-border hover:bg-muted">
+                <tr key={`${r.quota}|${r.slug}`} data-name={`${r.course} ${r.sub ?? ""} ${r.quota}`.toLowerCase()} data-more={i >= fold || undefined} {...sortData(r, i, { last: r.max, sub: noun.sub && (r.sub ?? "") })} className="border-t border-border hover:bg-muted">
                   <td className="hidden px-4 py-2.5 text-muted-foreground md:table-cell">{r.quota}</td>
                   <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
                     <Link href={href(r.slug, r.quota)} className={L}>{r.course}</Link>

@@ -142,6 +142,8 @@ const stipendTable = perImport(async () => {
     const t = ts[0];
     const [, stipend, bond, inr] = statCells(t);
     const fromRule = t.bond.basis === "state_rule" || !!t.bond.yearsFrom;
+    const b = bondOf(bond);
+    const a = t.bond.amount;
     return [{
       name: c.name,
       slug: c.slug,
@@ -149,6 +151,9 @@ const stipendTable = perImport(async () => {
       programme: t.programme,
       stipend: stipend.marker ? `${stipend.full} (${stipend.marker})` : stipend.full,
       bond: bond.tone === "bond" ? `${bond.full}${inr.tone !== "muted" && inr.full.includes("₹") ? `, ${inr.short} penalty` : ""}${fromRule ? " (state rule)" : ""}` : bond.full,
+      // The sort's figures (the table's cells, as numbers): year 1's stipend a month; the bond's years and ₹ penalty, 0
+      // for no bond; null where the cell has none.
+      sort: [t.years[0]?.stipend?.inr ?? null, b === "none" ? 0 : b === "bond" ? t.bond.years : null, b === "none" ? 0 : b === "bond" && a.state === "figure" ? a.max : null] as const,
     }];
   });
   rows.sort((a, b) => a.state.localeCompare(b.state) || a.name.localeCompare(b.name));

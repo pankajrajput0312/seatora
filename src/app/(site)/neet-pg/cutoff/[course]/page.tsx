@@ -80,7 +80,7 @@ export default async function BranchPage(props: Props) {
             ))}
           </ul>
 
-          <BranchTables d={d} href={(slug) => collegePath(slug)} noun={{ one: "college", many: "colleges", eg: "Delhi" }} cols={{ prev: `${at.prevYear} deepest, Open` }} className="mt-8" />
+          <BranchTables d={d} href={(slug) => collegePath(slug)} noun={{ one: "college", many: "colleges", eg: "Delhi", sub: "State" }} cols={{ prev: `${at.prevYear} deepest, Open` }} className="mt-8" />
           <BranchNotes d={d} />
           <p className="mt-6 text-sm">
             <Link href={p.gated} className="inline-flex min-h-11 items-center gap-1.5 text-sky underline underline-offset-4 hover:no-underline">

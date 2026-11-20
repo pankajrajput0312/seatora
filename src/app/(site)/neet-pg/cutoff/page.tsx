@@ -8,7 +8,7 @@ import { formatRank } from "@/features/cutoffs/lib/format";
 import { dataVersion } from "@/features/decide/server/catalog";
 import { roundName } from "@/features/decide/lib/round-status";
 import { DEFAULT_EXAM } from "@/features/exams/keys";
-import { BranchSearch } from "@/features/exams/landing/branch-search";
+import { BranchSearch, BranchSort } from "@/features/exams/landing/branch-search";
 import { cutoffPath, cutoffWords } from "@/features/exams/landing/cutoff";
 import { cutoffRounds } from "@/features/exams/landing/data";
 import { HubHead, HubSection, Lead, hubCrumbs, hubLink } from "@/features/exams/landing/hub-bits";
@@ -123,7 +123,14 @@ export default async function CutoffHub() {
         intro={`Each branch's latest last rank on Open seats in a main round (Round 1 to 3; stray rounds close far later and aren't counted here): All India Quota, or the DNB quota for DNB courses. ${n(withRank)} of ${n(courses.length)} branches have one; open a branch for every round.`}
       >
         <div data-lr className="mt-6">
-          <BranchSearch />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <BranchSearch />
+            <BranchSort store="seatora.cutoff-hub-sort">
+              <option value="">Branch A–Z</option>
+              <option value="open">Most competitive first</option>
+              <option value="open-desc">Least competitive first</option>
+            </BranchSort>
+          </div>
           <div data-panel="branches" className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
             <table className={`w-full text-sm ${ROWS}`}>
               <caption className="sr-only">NEET PG last rank by branch, latest main round, Open seats</caption>
@@ -134,8 +141,8 @@ export default async function CutoffHub() {
                 </tr>
               </thead>
               <tbody>
-                {courses.map((c) => (
-                  <tr key={c.path} data-name={c.course.toLowerCase()}>
+                {courses.map((c, i) => (
+                  <tr key={c.path} data-name={c.course.toLowerCase()} data-i={i} data-open={c.last?.closing}>
                     <th scope="row"><Link href={c.path}>{c.course}</Link></th>
                     <td>
                       {c.last ? (

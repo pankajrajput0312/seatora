@@ -1,12 +1,12 @@
 // The residents pages' hospital table (/neet-pg/residents: the hospitals with the most residents; a state's page: all of
-// them, each with its courses): counts only, server-rendered. The search is the branch tables' (BranchSearch, the only
-// JS); the fold a checkbox read by CSS. Each hospital links to its residents in Decide, sign-up first.
+// them, each with its courses): counts only, server-rendered. The search and sort are the branch tables' (BranchSearch,
+// BranchSort: the only JS); the fold a checkbox read by CSS. Each hospital links to its residents in Decide, sign-up first.
 import "server-only";
 import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { decideLinks } from "@/features/decide/lib/links";
 import { cn } from "@/lib/cn";
-import { BranchSearch } from "./branch-search";
+import { BranchSearch, BranchSort } from "./branch-search";
 import type { Residents } from "./residents";
 
 const FOLD = 25;
@@ -20,11 +20,21 @@ export const th = "px-3 py-3 font-mono text-xs font-normal uppercase tracking-wi
 /** Number cells, styled from the table (one class list, not one per cell). */
 export const CELLS = "[&_td]:numeric [&_td]:px-3 [&_td]:py-2.5 [&_td]:text-right [&_td]:whitespace-nowrap md:[&_td]:px-4";
 
-/** `courses`: each hospital's courses with their counts under its name (a state's page); else its state and course count. */
+/**
+ * `courses`: each hospital's courses with their counts under its name (a state's page); else its state and course count,
+ * and a sort by state.
+ */
 export function HospitalTable({ r, hospitals, caption, none, courses = false }: { r: Residents; hospitals: Residents["hospitals"]; caption: string; none: string; courses?: boolean }) {
   return (
     <div data-lr className="group/lr [&_[data-more]]:hidden has-[.lr-more:checked]:[&_[data-more]]:table-row data-searching:[&_[data-more]]:table-row">
-      <BranchSearch label="Search a hospital" placeholder="Search a hospital by name" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <BranchSearch label="Search a hospital" placeholder="Search a hospital by name" />
+        <BranchSort fold={FOLD} store="seatora.residents-sort">
+          <option value="">Most residents first</option>
+          <option value="name">Hospital A–Z</option>
+          {!courses && <option value="state">State A–Z</option>}
+        </BranchSort>
+      </div>
       <div data-panel className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
         <table className={cn("w-full text-sm", CELLS)}>
           <caption className="sr-only">{caption}</caption>
@@ -39,7 +49,7 @@ export function HospitalTable({ r, hospitals, caption, none, courses = false }: 
           </thead>
           <tbody>
             {hospitals.map((h, i) => (
-              <tr key={h.slug} data-name={`${h.hospital} ${h.state ?? ""}`.toLowerCase()} data-more={i >= FOLD || undefined} className="border-t border-border hover:bg-muted">
+              <tr key={h.slug} data-name={`${h.hospital} ${h.state ?? ""}`.toLowerCase()} data-more={i >= FOLD || undefined} data-i={i} data-state={(!courses && h.state) || undefined} className="border-t border-border hover:bg-muted">
                 <th scope="row" className="px-3 py-2.5 text-left font-normal break-words md:px-4">
                   <Link href={hospitalHref(h.slug)} className={textLink}>{h.hospital}</Link>
                   <span className="block text-xs leading-relaxed text-muted-foreground">

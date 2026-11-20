@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { ordered } from "./branch-search";
 
 // Rows as the server writes them (data-i: its order, Open's lowest first; no Open seat last).
-const row = (i: number, name: string, d: Record<string, number> = {}) => ({ dataset: { i: String(i), name, ...Object.fromEntries(Object.entries(d).map(([k, v]) => [k, String(v)])) } });
+const row = (i: number, name: string, d: Record<string, number | string> = {}) => ({ dataset: { i: String(i), name, ...Object.fromEntries(Object.entries(d).map(([k, v]) => [k, String(v)])) } });
 const rows = [
   row(0, "md general medicine", { open: 6334, obc: 9000, n: 500 }),
   row(1, "md radiodiagnosis", { open: 6334, sc: 40000, n: 200 }), // ties Open with General Medicine
@@ -30,4 +30,17 @@ it("a restricted row sorts by its one last rank on any rank sort", () => {
   expect(names("open-desc", restricted)).toEqual(["md anaesthesiology armed forces medical", "md anaesthesiology non-resident indian"]);
   expect(names("obc-desc", restricted)).toEqual(names("open-desc", restricted));
   expect(names("sc", restricted)).toEqual(names("", restricted));
+});
+
+it("sorts a text key A–Z (a state), rows without it or with it empty last, ties in the server's order", () => {
+  const colleges = [
+    row(0, "aiims delhi", { state: "Delhi", n: 3 }),
+    row(1, "kem mumbai", { state: "Maharashtra", n: 9 }),
+    row(2, "no state college", { n: 1 }),
+    row(3, "mamc delhi", { state: "Delhi", n: 5 }),
+    row(4, "restricted row", { state: "", last: 120000, n: 1 }), // a restricted row with no state: never its last rank
+  ];
+  expect(names("state", colleges)).toEqual(["aiims delhi", "mamc delhi", "kem mumbai", "no state college", "restricted row"]);
+  expect(names("state-desc", colleges)).toEqual(["kem mumbai", "aiims delhi", "mamc delhi", "no state college", "restricted row"]);
+  expect(names("n-desc", colleges)).toEqual(["kem mumbai", "mamc delhi", "aiims delhi", "no state college", "restricted row"]);
 });

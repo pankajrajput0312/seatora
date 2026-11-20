@@ -1,10 +1,11 @@
 // The public colleges lists (/neet-pg/colleges, /neet-pg/colleges/state/<state>) and the breadcrumb the college and
 // branch pages share. Server-rendered: the type filter is radio chips read by CSS (:has), like the branch tables' tabs;
-// no client JS.
+// the only client JS is the branch tables' sort (BranchSort, from each row's data-*).
 import "server-only";
 import Link from "next/link";
 import { formatRank } from "@/features/cutoffs/lib/format";
 import { cn } from "@/lib/cn";
+import { BranchSort } from "./branch-search";
 import { collegePath, typeKeys, type IndexRow, type TypeKey } from "./colleges";
 
 export const L = "underline decoration-foreground/25 underline-offset-4 hover:text-sky";
@@ -31,27 +32,36 @@ const quotaShort: Record<string, string> = { "Deemed/Paid Seats": "deemed", "DNB
 
 /**
  * Colleges with their type, courses and their most competitive course's Open last rank in the round (IndexRow order),
- * filtered by type. `place`: the line under a name, its state (the index) or PIN code (a state's page).
+ * filtered by type, sorted as she picks (the type: typeKeys' order). `place`: the line under a name, its state (the
+ * index) or PIN code (a state's page).
  */
 export function CollegeList({ rows, caption, place, className }: { rows: IndexRow[]; caption: string; place: "state" | "pincode"; className?: string }) {
   const types = typeKeys.map((t) => ({ ...t, n: rows.filter((r) => r.type.key === t.key).length })).filter((t) => t.n);
   return (
-    <div className={cn(Object.values(FILTER).join(" "), className)}>
-      {types.length > 1 && (
-        <fieldset className="flex flex-wrap items-center gap-1">
-          <legend className="sr-only">College type</legend>
-          <label className={chip}>
-            <input type="radio" name="ct" id="ct-all" defaultChecked className="sr-only" />
-            All <span className="numeric text-xs">{rows.length}</span>
-          </label>
-          {types.map((t) => (
-            <label key={t.key} className={chip}>
-              <input type="radio" name="ct" id={`ct-${t.key}`} className="sr-only" />
-              {t.label} <span className="numeric text-xs">{t.n}</span>
+    <div data-lr className={cn(Object.values(FILTER).join(" "), className)}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        {types.length > 1 && (
+          <fieldset className="flex flex-wrap items-center gap-1">
+            <legend className="sr-only">College type</legend>
+            <label className={chip}>
+              <input type="radio" name="ct" id="ct-all" defaultChecked className="sr-only" />
+              All <span className="numeric text-xs">{rows.length}</span>
             </label>
-          ))}
-        </fieldset>
-      )}
+            {types.map((t) => (
+              <label key={t.key} className={chip}>
+                <input type="radio" name="ct" id={`ct-${t.key}`} className="sr-only" />
+                {t.label} <span className="numeric text-xs">{t.n}</span>
+              </label>
+            ))}
+          </fieldset>
+        )}
+        <BranchSort store="seatora.colleges-sort">
+          <option value="">Most competitive first</option>
+          <option value="courses-desc">Most courses</option>
+          <option value="t">Type</option>
+          <option value="name">College A–Z</option>
+        </BranchSort>
+      </div>
       <div className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
         <table className={cn("w-full text-sm", ROWS)}>
           <caption className="sr-only">{caption}</caption>
@@ -64,8 +74,8 @@ export function CollegeList({ rows, caption, place, className }: { rows: IndexRo
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.slug} data-type={r.type.key}>
+            {rows.map((r, i) => (
+              <tr key={r.slug} data-type={r.type.key} data-i={i} data-name={r.label.toLowerCase()} data-courses={r.courses || undefined} data-t={typeKeys.findIndex((t) => t.key === r.type.key)}>
                 <th scope="row">
                   <Link href={collegePath(r.slug)}>{r.label}</Link>
                   <small>{r[place] ?? ""}<span className="md:hidden">{` · ${r.type.label}${r.courses ? ` · ${r.courses} courses` : ""}`}</span></small>

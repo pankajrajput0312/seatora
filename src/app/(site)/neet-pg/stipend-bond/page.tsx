@@ -177,7 +177,7 @@ export default async function StipendBondPage() {
       )}
 
       <HubSection id="colleges-h" title="College-wise stipend and bond" intro="Each institute's first course type (MD/MS before DNB), year 1's stipend and its bond. Open an institute for every course type, year and penalty, each with its document.">
-        <CollegeTable rows={d.rows.map((r) => [r.name, r.slug, r.state, r.programme, r.stipend, r.bond])} fold={FOLD} />
+        <CollegeTable rows={d.rows.map((r) => [r.name, r.slug, r.state, r.programme, r.stipend, r.bond, ...r.sort])} fold={FOLD} />
       </HubSection>
 
       <Faq items={faqs} title="Questions about stipends and bonds." />
