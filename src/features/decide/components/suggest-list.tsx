@@ -125,10 +125,12 @@ export function SuggestList({ items, groups, safeNote }: { items: SuggestItem[];
         <p role="status" aria-live="polite" className="sr-only">{said}</p>
       </div>
 
+      {/* One sheet: a preference group's heading is a sunken group row, its choices ruled below it. */}
+      <div className="divide-y divide-border rounded-xl border border-border bg-card">
       {runs.map((run) => (
         <section key={run.at} aria-labelledby={groups ? `pref-${run.at}` : undefined}>
           {groups && (
-            <h3 id={`pref-${run.at}`} className="border-b border-border pb-1 text-sm font-semibold">
+            <h3 id={`pref-${run.at}`} className="border-b border-border bg-muted px-4 py-2 text-sm font-semibold">
               {groups[run.pref] ?? "Courses not in your order"}
             </h3>
           )}
@@ -138,9 +140,9 @@ export function SuggestList({ items, groups, safeNote }: { items: SuggestItem[];
               const i = x.item;
               const mine = at.get(i.id);
               return (
-                <li key={i.id} className="flex gap-2 py-2">
+                <li key={i.id} className="flex gap-2 py-2.5 pr-4 pl-1.5">
                   <span className="flex w-11 shrink-0 flex-col items-center">
-                    <span className="numeric text-sm font-bold">{n}</span>
+                    <span className="numeric text-sm font-semibold">{n}</span>
                     {!trying && (
                       <label className="grid size-11 cursor-pointer place-items-center">
                         <input type="checkbox" className="size-5 accent-sky" checked={picked.has(i.id)} onChange={(e) => toggle(i.id, e.target.checked)} aria-label={`Select ${n}: ${name(i)}`} />
@@ -167,6 +169,7 @@ export function SuggestList({ items, groups, safeNote }: { items: SuggestItem[];
           </ol>
         </section>
       ))}
+      </div>
       {!all && (
         <Button variant="secondary" className="justify-self-center" onClick={() => setAll(true)}>
           Show all {formatRank(items.length)}
