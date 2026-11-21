@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { AuthForm } from "@/features/auth/components/auth-form";
 import { AuthShell } from "@/features/auth/components/auth-shell";
 import { cameFor } from "@/features/auth/lib/came-for";
+import { PhoneLogin } from "@/features/auth/components/phone-login";
 import { WhatsAppLogin } from "@/features/auth/components/whatsapp-login";
 import { hasSiteAccess } from "@/features/auth/lib/session";
+import { phoneLoginOn } from "@/features/auth/lib/phone-login";
 import { whatsappLoginOn } from "@/features/auth/lib/whatsapp-login";
 import { openAccess, safeNext } from "@/lib/site-access";
 
@@ -28,7 +30,8 @@ export default async function LoginPage({ searchParams }: Props) {
         </p>
       )}
       <AuthForm mode="signin" next={to} open={openAccess()} />
-      {whatsappLoginOn() && <WhatsAppLogin next={safeNext(to)} />}
+      {phoneLoginOn() && <PhoneLogin next={safeNext(to)} />}
+        {whatsappLoginOn() && <WhatsAppLogin next={safeNext(to)} />}
     </AuthShell>
   );
 }

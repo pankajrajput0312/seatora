@@ -12,15 +12,16 @@ if (!isDev) {
 }
 
 // Static pages can't carry per-request nonces, so inline scripts/styles Next emits are allowed.
-// Razorpay Checkout (features/payments): its script, its modal (an iframe on api.razorpay.com) and its calls.
+// Razorpay Checkout (features/payments): its script, its modal (an iframe on api.razorpay.com) and its calls. Phone
+// sign-in (features/auth/components/phone-login.tsx): Firebase Auth's calls, its reCAPTCHA and its auth iframe.
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' https://checkout.razorpay.com${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://www.google.com https://www.gstatic.com https://apis.google.com${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.razorpay.com",
+  "img-src 'self' data: blob: https://*.razorpay.com https://www.gstatic.com",
   "font-src 'self'",
-  "frame-src https://api.razorpay.com https://checkout.razorpay.com",
-  `connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com${isDev ? " ws:" : ""}`,
+  "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.google.com https://*.firebaseapp.com",
+  `connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google.com${isDev ? " ws:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

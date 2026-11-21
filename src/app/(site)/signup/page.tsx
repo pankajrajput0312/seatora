@@ -5,8 +5,10 @@ import { priceLine } from "@/components/marketing/price-line";
 import { AuthForm } from "@/features/auth/components/auth-form";
 import { AuthShell } from "@/features/auth/components/auth-shell";
 import { cameFor } from "@/features/auth/lib/came-for";
+import { PhoneLogin } from "@/features/auth/components/phone-login";
 import { WhatsAppLogin } from "@/features/auth/components/whatsapp-login";
 import { hasSiteAccess } from "@/features/auth/lib/session";
+import { phoneLoginOn } from "@/features/auth/lib/phone-login";
 import { whatsappLoginOn } from "@/features/auth/lib/whatsapp-login";
 import { TrackView } from "@/features/funnel/components/beacon";
 import { couponCodeSchema } from "@/features/payments/coupons";
@@ -46,6 +48,7 @@ export default async function SignupPage({ searchParams }: Props) {
         {forWhat}
         <p className="mb-6 text-sm text-muted-foreground max-sm:order-last max-sm:mt-6 max-sm:mb-0">{priceLine()}</p>
         <AuthForm mode="signup" next={to} open refCode={refCode} />
+        {phoneLoginOn() && <PhoneLogin next={safeNext(to)} />}
         {whatsappLoginOn() && <WhatsAppLogin next={safeNext(to)} />}
       </AuthShell>
     );

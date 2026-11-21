@@ -24,6 +24,7 @@ beforeEach(() => {
 describe("owner alerts", () => {
   it("says who and what, the number for a WhatsApp account", async () => {
     expect(ownerLine("signup_done", "Asha (asha@x.in)", { referred: true })).toBe("New sign-up on Seatora: Asha (asha@x.in), invited by a friend.");
+    expect(ownerLine("signup_done", "Doctor (+919876543210)", { via: "phone" })).toBe("New sign-up on Seatora: Doctor (+919876543210), by mobile number.");
     expect(ownerLine("free_claimed", "Asha (asha@x.in)", {})).toBe("Upgrade on Seatora: Asha (asha@x.in) took the free Season Pass.");
     expect(ownerLine("payment_paid", "Asha (asha@x.in)", { amount: 19900 })).toBe("Payment on Seatora: Asha (asha@x.in) paid ₹199 for the Season Pass.");
     await alertOwner("signup_done", "u2", { via: "whatsapp" });
